@@ -54,6 +54,8 @@ hs_set_argv(int argc, char *argv[])
 
 static int hs_init_count;
 
+static void jhc_hs_init(void);
+
 void
 hs_init(int *argc, char **argv[])
 {
@@ -68,6 +70,7 @@ hs_init(int *argc, char **argv[])
                 assert(EOF == -1);
 
                 jhc_alloc_init();
+                jhc_hs_init();
                 hs_set_argv(*argc,*argv);
 #if JHC_isPosix
                 if(!uname(&jhc_utsname)) {

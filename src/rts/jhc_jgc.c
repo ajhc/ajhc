@@ -11,6 +11,8 @@ struct frame {
           = { gc, n, { __VA_ARGS__ } }; gc_t gc = (gc_t)(void *)&l;
 #else
 #define gc_frame0(gc,n,...) void *ptrs[n] = { __VA_ARGS__ }; for(int i = 0; i < n; i++) gc[i] = (sptr_t)ptrs[i]; gc_t sgc = gc;  gc_t gc = sgc + n;
+#define gc_frame1(gc,p1) gc[0] = (sptr_t)p1; gc_t sgc = gc;  gc_t gc = sgc + 1;
+#define gc_frame2(gc,p1,p2) gc[0] = (sptr_t)p1; gc[1] = (sptr_t)p2; gc_t sgc = gc;  gc_t gc = sgc + 2;
 #endif
 
 static unsigned number_gcs;             // number of garbage collections
@@ -95,7 +97,7 @@ gc_perform_gc(gc_t gc)
 
         debugf("Setting Roots:");
         stack_check(&stack, root_stack.ptr);
-        for(int i = 0; i < root_stack.ptr; i++) {
+        for(unsigned i = 0; i < root_stack.ptr; i++) {
                 gc_add_grey(&stack, root_stack.stack[i]);
                 debugf(" %p", root_stack.stack[i]);
         }

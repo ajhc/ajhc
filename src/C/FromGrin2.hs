@@ -52,7 +52,7 @@ data Written = Written {
     wRequires :: Requires,
     wStructures :: Map.Map Name Structure,
     wTags :: Set.Set Atom,
-    wAllocs :: Set.Set Atom,
+    wAllocs :: Set.Set (Atom,Int),
     wEnums :: Map.Map Name Int,
     wFunctions :: Map.Map Name Function
     }
@@ -147,11 +147,15 @@ compileGrin grin = (LBS.fromChunks code, snub (reqLibraries req))  where
         text "",
         body
         ]
-    jgcs = [ text "static struct s_cache *" <> tshow (nodeCacheName m) <> char ';' | m <- Set.toList wAllocs]
+    jgcs | fopts FO.Jgc = [ text "static struct s_cache *" <> tshow (nodeCacheName m) <> char ';' | (m,_) <- Set.toList wAllocs]
+         | otherwise = empty
     nh_stuff = text "static const void * const nh_stuff[] = {" $$ fsep (punctuate (char ',') (cafnames ++ constnames ++ [text "NULL"]))  $$ text "};"
     includes =  map include (snub $ reqIncludes req)
     include fn = text "#include <" <> text fn <> text ">"
-    (header,body) = generateC (Map.elems fm) (Map.elems sm)
+    (header,body) = generateC (function (name "jhc_hs_init") voidType [] [] icaches:Map.elems fm) (Map.elems sm)
+    icaches :: Statement
+    icaches | fopts FO.Jgc = mconcat [  toStatement $ functionCall (name "find_cache") [reference (toExpression $ nodeCacheName t),toExpression $ name "arena", tbsize (sizeof (structType $ nodeStructName t)), toExpression nptrs] | (t,nptrs) <- Set.toList wAllocs ]
+            | otherwise = mempty
     cafnames = [ text "&_" <> tshow (varName v) | (v,_) <- grinCafs grin ]
     constnames =  map (\n -> text "&_c" <> tshow n) [ 1 .. length $ Grin.HashConst.toList finalHcHash]
     ((cafs',finalHcHash,Written { wRequires = req, wFunctions = fm, wEnums = wenum, wStructures = sm, wTags = ts, .. }),cpr) = runC grin $ go >> mapM convertCAF (grinCafs grin)
@@ -790,7 +794,8 @@ newNode region ty ~(NodeC t as) = do
       Nothing -> do
         st <- nodeType t
         as' <- mapM convertVal as
-        let wmalloc = jhc_malloc (reference (toExpression $ nodeCacheName t)) nptrs'
+        let wmalloc | fopts FO.Jgc = \_ -> functionCall (name "s_alloc") [toExpression $ name "gc", (toExpression $ nodeCacheName t)]
+                    | otherwise = jhc_malloc (reference (toExpression $ nodeCacheName t)) nptrs'
             nptrs = length (filter (not . nonPtr . getType) as) + if sf then 1 else 0
             nptrs' = if nptrs > 0 && not sf && t `Map.notMember` cpr then nptrs + 1 else nptrs
             malloc =  wmalloc (sizeof st)
@@ -803,7 +808,7 @@ newNode region ty ~(NodeC t as) = do
                 v <- newVar st
                 return (mempty,reference v)
             False -> do
-                tell mempty { wAllocs = Set.singleton t }
+                tell mempty { wAllocs = Set.singleton (t,nptrs') }
                 ty `newTmpVar` malloc
         let tmp' = concrete t tmp
             ass = [ if isValUnknown aa then mempty else project' i tmp' =* a | a <- as' | aa <- as | i <- map arg [(1 :: Int) ..] ]
@@ -906,7 +911,11 @@ castFunc _ _ tb e = cast (opTyToC tb) e
 ----------------------------
 
 --gc_roots vs = functionCall (name "gc_begin_frame0") (constant (number (fromIntegral $ length vs)):vs)
-gc_roots vs   = functionCall (name "gc_frame0") (v_gc:constant (number (fromIntegral $ length vs)):vs)
+--gc_roots vs   = functionCall (name "gc_frame0") (v_gc:constant (number (fromIntegral $ length vs)):vs)
+gc_roots vs   = case length vs of
+--    1 ->  functionCall (name "gc_frame1") (v_gc:vs)
+--    2 ->  functionCall (name "gc_frame2") (v_gc:vs)
+    lvs -> functionCall (name "gc_frame0") (v_gc:constant (number (fromIntegral lvs)):vs)
 gc_end        = functionCall (name "gc_end") []
 tbsize sz = functionCall (name "TO_BLOCKS") [sz]
 jhc_malloc ntn nptrs sz | fopts FO.Jgc = functionCall (name "gc_alloc") [v_gc,ntn, tbsize sz, toExpression nptrs]

@@ -211,10 +211,10 @@ clear_block_used_bits(unsigned num_entries, struct s_block *pg)
         memset(pg->used,0,BITARRAY_SIZE_IN_BYTES(num_entries) - sizeof(pg->used[0]));
         int excess = num_entries % BITS_PER_UNIT;
         pg->used[BITARRAY_SIZE(num_entries) - 1] = ~((1UL << excess) - 1);
-        if(JHC_VALGRIND) {
+#if JHC_VALGRIND
                 unsigned header =  sizeof(struct s_block) + BITARRAY_SIZE_IN_BYTES(num_entries);
                 VALGRIND_MAKE_MEM_NOACCESS((char *)pg + header, BLOCK_SIZE - header);
-        }
+#endif
 }
 
 static void *
