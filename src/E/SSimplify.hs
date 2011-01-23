@@ -231,7 +231,8 @@ collectDs ds (OMap fve) = do
         -- ignore rules when calculating loopbreakers
         -- we must not simplify the expanded body of a rule without recalculating occurance info.
         graph' = newGraph rds (\ ((comb,_),_) -> combIdent comb) (\ (_,fv) -> keys fv)
-        (lb,lbds) =  findLoopBreakers (\ ((comb,_),_) -> loopFunc (combHead comb) (combBody comb)) (const True) graph'
+        (lb,lbds) =  findLoopBreakers (\ ((comb,_),_) -> loopFunc (combHead comb) (combBody comb)) canBeLoopBreaker graph'
+        canBeLoopBreaker n = not $ getProperty prop_WRAPPER (fst $ fst $ n)
         ds'' = map ( \ ((t,rv),rv') -> (t,rv `mappend` rv') ) lbds
         fids = foldl andOM mempty (fve:map unOMap (snds ds''))
         ffids = fromList [ (tvrIdent t,lup t) | (Comb { combHead = t },_) <- ds'' ]
@@ -336,7 +337,9 @@ isBoundTo o e = IsBoundTo {
     bindingOccurance = useOccurance o,
     bindingE = e,
     bindingCheap = isCheap e,
-    inlineForced = if useOccurance o == LoopBreaker then ForceNoinline else NotForced,
+    inlineForced = case () of
+      _ | useOccurance o == LoopBreaker -> ForceNoinline
+        | otherwise -> NotForced,
     bindingAtomic = atomic
     } where
     atomic = isAtomic e

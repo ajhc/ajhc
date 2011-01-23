@@ -39,8 +39,9 @@ baseInlinability t e
 forceInline :: HasProperties a => a -> Bool
 forceInline x
     | forceNoinline props = False
+    | getProperty prop_WRAPPER props = True
     | not (fopts FO.InlinePragmas) = False
-    | otherwise  = fromList [prop_INLINE,prop_WRAPPER,prop_SUPERINLINE] `intersects` props
+    | otherwise  = fromList [prop_INLINE,prop_SUPERINLINE] `intersects` props
     where props = getProperties x
 
 forceSuperInline :: HasProperties a => a -> Bool
