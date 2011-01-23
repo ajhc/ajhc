@@ -7,14 +7,14 @@ instance Bits $1 where
     x .|. y = or$1 x y
     x `xor` y = xor$1 x y
     complement x = complement$1 x
-    shiftL i x = shiftL$1 x i
-    shiftR i x = shiftR$1 x i
+    shiftL x i = shiftL$1 x i
+    shiftR x i = shiftR$1 x i
 
 foreign import primitive "And" and$1 :: $1 -> $1 -> $1
 foreign import primitive "Or" or$1 :: $1 -> $1 -> $1
 foreign import primitive "Xor" xor$1 :: $1 -> $1 -> $1
-foreign import primitive "Shr$2" shiftR$1 :: Int -> $1 -> $1
-foreign import primitive "Shl" shiftL$1 :: Int -> $1 -> $1
+foreign import primitive "Shr$2" shiftR$1 :: $1 -> Int -> $1
+foreign import primitive "Shl" shiftL$1 :: $1 -> Int -> $1
 foreign import primitive "Com" complement$1 :: $1 -> $1
 
 }})
