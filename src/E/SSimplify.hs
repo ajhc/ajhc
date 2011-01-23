@@ -10,17 +10,16 @@ module E.SSimplify(
     emptySimplifyOpts
     ) where
 
-import Util.RWS
 import Control.Monad.Identity
+import Data.Maybe
 import Data.Typeable
 import Debug.Trace
 import List hiding(delete,union,insert)
-import Data.Maybe
 import qualified Data.Set as Set
 import qualified Data.Traversable as T
 
-import StringTable.Atom
 import C.Prims
+import Cmm.Number
 import DataConstructors
 import Doc.PPrint
 import E.E
@@ -39,14 +38,15 @@ import Name.Id
 import Name.Name
 import Name.Names
 import Name.VConsts
-import Cmm.Number
 import Options
 import Stats hiding(null,new,print,Stats,singleton)
+import StringTable.Atom
 import Support.CanType
 import Support.FreeVars
 import Util.Graph
 import Util.HasSize
 import Util.NameMonad
+import Util.RWS
 import Util.ReaderWriter
 import Util.SetLike as S
 import qualified E.Demand as Demand
