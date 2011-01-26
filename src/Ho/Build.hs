@@ -833,6 +833,11 @@ dumpHoFile fn = ans where
         showList "ModuleMap" (map pprint . sortUnder fst $ Map.toList $ hoModuleMap $ libHoLib l)
         showList "ModuleDeps" (map pprint . sortUnder fst $ Map.toList $ hoModuleDeps $ libHoLib l)
         showList "ModuleReexports" (map pprint . sortUnder fst $ Map.toList $ hoReexports $ libHoLib l)
+        forM_ (Map.toList $ libBuildMap l) $ \ (g,hoB) -> do
+            print g
+            wdump FD.Core $ do
+                putStrLn " ---- lambdacube  ---- "
+                mapM_ (\ (v,lc) -> putChar '\n' >> printCheckName'' (hoDataTable hoB) v lc) (hoEs hoB)
 
     doHo fn = do
         (hoh,idep,ho) <- readHoFile fn
@@ -882,10 +887,9 @@ dumpHoFile fn = ans where
         wdump FD.Core $ do
             putStrLn " ---- lambdacube  ---- "
             mapM_ (\ (v,lc) -> putChar '\n' >> printCheckName'' (hoDataTable hoB) v lc) (hoEs hoB)
-        where
-        printCheckName'' :: DataTable -> TVr -> E -> IO ()
-        printCheckName'' _dataTable tvr e = do
-            when (dump FD.EInfo || verbose2) $ putStrLn (show $ tvrInfo tvr)
-            putStrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pprint (tvrType tvr)))
-            putStrLn (render $ hang 4 (pprint tvr <+> equals <+> pprint e))
+    printCheckName'' :: DataTable -> TVr -> E -> IO ()
+    printCheckName'' _dataTable tvr e = do
+        when (dump FD.EInfo || verbose2) $ putStrLn (show $ tvrInfo tvr)
+        putStrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pprint (tvrType tvr)))
+        putStrLn (render $ hang 4 (pprint tvr <+> equals <+> pprint e))
 
