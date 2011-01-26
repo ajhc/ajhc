@@ -309,7 +309,7 @@ cacheSimpOpts opts = opts {
    } where
     bb Comb { combBody = e } | isFullyConst e = Just (Done e)
     bb _ = Nothing
-    initScope = fmap (\ c -> fixInline (so_finalPhase opts) (combHead c) $ isBoundTo noUseInfo (combBody c)) (so_boundVars opts)
+    initScope = fmap (\ c -> isBoundTo opts (combHead c) noUseInfo (combBody c)) (so_boundVars opts)
     rules = mapMaybeIdMap f (so_boundVars opts)
     f Comb { combRules = rs } = if null rs then Nothing else Just $ arules rs
 
@@ -319,10 +319,10 @@ data Range = Done OutE | Susp InE Subst
 type Subst = IdMap Range
 
 data Forced = ForceInline | ForceNoinline | NotForced
-    deriving(Eq,Ord)
+    deriving(Eq,Ord,Show)
 
-data Binding =
-    NotAmong [Name]
+data Binding
+    = NotAmong [Name]
     | IsBoundTo {
         bindingOccurance :: {-# UNPACK #-} !Occurance,
         bindingE :: OutE,
@@ -331,9 +331,9 @@ data Binding =
         bindingAtomic :: {-# UNPACK #-} !Bool
         }
     | NotKnown
-    deriving(Ord,Eq)
+    deriving(Ord,Eq,Show)
 
-isBoundTo o e = IsBoundTo {
+isBoundTo opt v o e = fixInline (so_finalPhase opt) v $ IsBoundTo {
     bindingOccurance = useOccurance o,
     bindingE = e,
     bindingCheap = isCheap e,
@@ -359,8 +359,8 @@ calcForced finalPhase v =
     let props = getProperties v in
         case (forceNoinline props,finalPhase,forceInline props) of
             (True,_,_) -> ForceNoinline
+            (False,_,True) -> ForceInline
             (False,True,_) -> NotForced
-            (False,False,True) -> ForceInline
             (False,False,False) -> NotForced
 
 
@@ -574,7 +574,7 @@ simplifyDs prog sopts dsIn = ans where
              | otherwise = "(epheremal)"
 
     -- Rename a if necessary. We always have to substitute all occurrences because we update the type.
-    nname tvr@(TVr { tvrIdent = n, tvrType =  t})  = do
+    nname tvr@(TVr { tvrIdent = n, tvrType = t}) = do
         t' <- dosub t
         inb <- ask
         let t'' = substMap' (envInScopeCache inb) t'
@@ -676,12 +676,12 @@ simplifyDs prog sopts dsIn = ans where
             doCase e _ b [] (Just d) | not (isLifted e || isUnboxed (getType e)) = do
                 mtick "E.Simplify.case-unlifted"
                 b' <- nname b
-                d' <- localEnv (insertDoneSubst b (EVar b') . (insertInScope (tvrIdent b') (fixInline finalPhase b' $ isBoundTo noUseInfo e))) $ f cont d
+                d' <- localEnv (insertDoneSubst b (EVar b') . (insertInScope (tvrIdent b') (isBoundTo sopts b' noUseInfo e))) $ f cont d
                 done StartContext $ eLet b' e d'
             doCase e@ELam {} _ b [] (Just d)  = do
                 mtick "E.Simplify.case-lambda"
                 b' <- nname b
-                d' <- localEnv (insertDoneSubst b (EVar b') . (insertInScope (tvrIdent b') (fixInline finalPhase b' $ isBoundTo noUseInfo e))) $ f cont d
+                d' <- localEnv (insertDoneSubst b (EVar b') . (insertInScope (tvrIdent b') (isBoundTo sopts b' noUseInfo e))) $ f cont d
                 done StartContext $ eLet b' e d'
             -- atomic unboxed values may be substituted or discarded without replicating work or affecting program semantics.
             doCase e _ b [] (Just d) | isUnboxed (getType e), isAtomic e = do
@@ -706,8 +706,8 @@ simplifyDs prog sopts dsIn = ans where
                     (EVar v,z) | isEmptyId z -> do
                         nn <- newName
                         b' <- return b' { tvrIdent = nn }
-                        return $ (insertInScope (tvrIdent v) (isBoundTo noUseInfo (EVar b')),b')
-                    (EVar v,_) -> return $ (insertDoneSubst b (EVar b') . insertInScope (tvrIdent v) (isBoundTo noUseInfo (EVar b')),b')
+                        return $ (insertInScope (tvrIdent v) (isBoundTo sopts v noUseInfo (EVar b')),b')
+                    (EVar v,_) -> return $ (insertDoneSubst b (EVar b') . insertInScope (tvrIdent v) (isBoundTo sopts v noUseInfo (EVar b')),b')
                     _ -> return $ (insertDoneSubst b (EVar b'),b')
                 inb <- ask
                 let dd e' = localEnv (const $ ids $ extendScope newinb inb) $ f cont e' where
@@ -726,7 +726,7 @@ simplifyDs prog sopts dsIn = ans where
                             ninb = fromList [ (n,NotKnown)  | TVr { tvrIdent = n } <- ns' ]
                         e' <- localEnv (const $ ids $ substAddList nsub (extendScope ninb $ mins e (patToLitEE p') inb)) $ f cont ae
                         return $ Alt p' e'
-                    mins _ e | emptyId `notMember` (freeVars e :: IdSet) = insertInScope (tvrIdent b') (isBoundTo noUseInfo e)
+                    mins _ e | emptyId `notMember` (freeVars e :: IdSet) = insertInScope (tvrIdent b') (isBoundTo sopts b' noUseInfo e)
                     mins _ _ = id
 
                 d' <- T.mapM dd d
@@ -761,7 +761,7 @@ simplifyDs prog sopts dsIn = ans where
             Just (bs,e) -> do
                 let bs' = [ x | x@(TVr { tvrIdent = n },_) <- bs, n /= emptyId]
                 binds <- mapM (\ (v,e) -> nname v >>= return . (,,) e v) bs'
-                e' <- localEnv (substAddList [ (n,Done $ EVar nt) | (_,TVr { tvrIdent = n },nt) <- binds] . extendScope (fromList [ (n,isBoundTo noUseInfo e) | (e,_,TVr { tvrIdent = n }) <- binds])) $ f StartContext e
+                e' <- localEnv (substAddList [ (n,Done $ EVar nt) | (_,TVr { tvrIdent = n },nt) <- binds] . extendScope (fromList [ (n,isBoundTo sopts t noUseInfo e) | (e,_,t@TVr { tvrIdent = n }) <- binds])) $ f StartContext e
                 done cont $ eLetRec [ (v,e) | (e,_,v) <- binds ] e'
             Nothing -> do
                 done cont $ EError ("match falls off bottom: " ++ pprint l) t'
@@ -819,7 +819,7 @@ simplifyDs prog sopts dsIn = ans where
                 knowLit LitCons { litName = c } = KnowIsCon c
                 knowLit (LitInt n _) = KnowIsNum n
         case z of
-            (Just (x,xs)) -> didInline x xs  -- h x xs inb
+            (Just (x,xs)) -> didInline x xs
             _ -> case mlookup (tvrIdent v) (envInScope inb) of
                 Just IsBoundTo { inlineForced = ForceNoinline } -> appVar v xs'
                 Just IsBoundTo { bindingOccurance = Once } -> error "IsBoundTo: Once"
@@ -829,6 +829,9 @@ simplifyDs prog sopts dsIn = ans where
                 Just IsBoundTo { bindingE = e, inlineForced = ForceInline } | someBenefit v e txs -> do
                     mtick  (toAtom $ "E.Simplify.inline.Forced/{" ++ tvrShowName v  ++ "}")
                     didInline e xs'
+--                Just ibt@IsBoundTo { bindingE = e } | False && someBenefit v e txs && getProperty prop_WRAPPER v -> do
+--                    mtick  (toAtom $ "E.Simplify.inline.Wrapper/{" ++ tvrShowName v  ++ "}")
+--                    trace (show (v,e,ibt,tvrInfo v)) didInline e xs'
                 Just IsBoundTo { bindingOccurance = OnceInLam, bindingE = e, bindingCheap = True } | someBenefit v e txs -> do
                     mtick  (toAtom $ "E.Simplify.inline.OnceInLam/{" ++ showName (tvrIdent v)  ++ "}")
                     didInline e xs'
@@ -900,7 +903,7 @@ simplifyDs prog sopts dsIn = ans where
                     nogrowth IsBoundTo { bindingAtomic = False } = NotKnown
                     nogrowth x = x
                 e' <- localEnv inb $ f (LazyContext t') e
-                let ibt = fixInline finalPhase t' $ isBoundTo n e'
+                let ibt = isBoundTo sopts t' n e'
                 case (bindingAtomic ibt,inlineForced ibt) of
                     (True,f) | f /= ForceNoinline -> do
                         --when (n /= Unused) $ mtick $ "E.Simplify.inline.Atomic.{" ++ showName t ++ "}"

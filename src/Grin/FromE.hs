@@ -359,6 +359,8 @@ evalVar fty tvr  = do
 compile' ::  CEnv -> (TVr,[TVr],E) -> C (Atom,Lam)
 compile' cenv (tvr,as,e) = ans where
     ans = do
+        when (getProperty prop_WRAPPER tvr) $
+            liftIO $ putErrLn $ "WARNING: Wrapper still exists at grin transformation time: " ++ show tvr
         --putStrLn $ "Compiling: " ++ show nn
         x <- cr e
         let (nn,_,_) = fromJust $ mlookup (tvrIdent tvr) (scMap cenv)
