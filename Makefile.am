@@ -24,7 +24,7 @@ HSFILES=src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/
 	src/FrontEnd/Tc/Module.hs src/FrontEnd/Tc/Type.hs src/FrontEnd/Tc/Unify.hs src/FrontEnd/TypeSigs.hs src/FrontEnd/TypeSynonyms.hs\
        	src/FrontEnd/TypeSyns.hs src/FrontEnd/Unlit.hs src/FrontEnd/Utils.hs src/FrontEnd/Warning.hs src/GenUtil.hs src/Grin/DeadCode.hs\
        	src/Grin/Devolve.hs src/Grin/EvalInline.hs src/Grin/FromE.hs src/Grin/Grin.hs src/Grin/HashConst.hs src/Grin/Lint.hs\
-       	src/Grin/NodeAnalyze.hs src/Grin/Noodle.hs src/Grin/Optimize.hs src/Grin/Show.hs src/Grin/Simplify.hs src/Grin/Val.hs \
+       	src/Grin/NodeAnalyze.hs src/Grin/Noodle.hs src/Grin/Optimize.hs src/Grin/Show.hs src/Grin/Val.hs \
 	src/Grin/Whiz.hs src/Ho/Binary.hs src/Ho/Collected.hs src/Ho/Library.hs src/Info/Binary.hs src/Info/Info.hs src/Info/Properties.hs \
 	src/Info/Types.hs src/Interactive.hs src/Main.hs src/Name/Binary.hs src/Name/Id.hs src/Name/Name.hs src/Name/Names.hs \
 	src/Name/Prim.hs src/PackedString.hs src/PrimitiveOperators.hs \
