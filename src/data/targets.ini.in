@@ -16,7 +16,7 @@
 [default]
 cc=gcc
 gc=static
-cflags=-std=gnu99 -D_GNU_SOURCE -falign-functions=4 -ffast-math -Wextra -Wall -Wno-unused-parameter
+cflags=-std=gnu99 -D_GNU_SOURCE -falign-functions=4 -ffast-math -Wextra -Wall -Wno-unused-parameter -fno-strict-aliasing
 cflags_debug=-g
 cflags_nodebug=-DNDEBUG -O3
 profile=false
@@ -29,7 +29,6 @@ autoload=base,haskell98
 cc=@MINGW@
 executable_extension=.exe
 merge=i686
-cflags+=-fno-strict-aliasing
 
 [wii]
 cc=powerpc-eabi-gcc
