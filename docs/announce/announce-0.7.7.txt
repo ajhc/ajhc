@@ -1,0 +1,36 @@
+Announcing jhc 0.7.7! This release fixes a large number of bugs that cropped up
+when compiling hoskell out in the wild as well as adds some more features. 
+
+  http://repetae.net/computer/jhc/
+
+Changes: (including some changes from the unannounced 0.7.6 release)
+
+ * The Garbage Collector is now enabled by default.
+ * new standard libraries
+     * transformers
+     * parsec
+     * QuickCheck
+ * report proper errors with line numbers for various issues with compiled code.
+ * New option '-C' that compiles to C code and stops, useful for targeting other
+   platforms or building shared libraries.
+ * Nintendo Wii added as target (thanks to Korcan Hussein)
+ * Fix major performance bug that kept WRAPPERs from being inlined in certain places.
+ * Typechecking speed greatly increased.
+ * monomorphism-restriction flag is now respected
+ * empty class contexts now work
+ * unicode in haskell source supported now
+ * Type Defaulting now works properly
+ * RULES parse like ghc now for compatibility
+ * 'do' 'where' on same indent now parses
+ * Build system fixes and cleanups
+ * irrefutable pattern bindings desugar properly now.
+ * GHC parsing regression tests have been ported to jhc, helped find and fix many bugs.
+ * Certain optimizations would discard RULES, these have been fixed.
+ * Removed quadratic behavior in optimizer, speeds things up noticibly.
+ * Garbage collector improvements, caches are pre-initialized.
+ * Fix shiftL/R implementations for built in types.
+ * All Num, Real, and Integral magic removed from compiler. This is a very
+   good thing.
+ * improved help messages
+
+        John
