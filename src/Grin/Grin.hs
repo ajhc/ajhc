@@ -69,11 +69,11 @@ import Options
 import StringTable.Atom
 import Support.CanType
 import Support.FreeVars
+import Util.GMap
+import Util.Gen
+import Util.HasSize
 import Util.Perhaps
 import Util.SetLike
-import Util.GMap
-import Util.HasSize
-import Util.Gen
 import qualified Cmm.Op as Op
 import qualified Info.Info as Info
 import qualified Stats
@@ -81,66 +81,7 @@ import qualified Stats
 -- Extremely simple first order monadic code with basic type system.  similar
 -- to GRIN except for the explicit typing on variables. Note, that certain
 -- haskell types become Grin values, however, nothing may be done with types other
--- than examining them. (types may not be constructed at run-time) ( do we need
--- this for polymorphic recursion? )
-
-data TyThunk =
-    TyNotThunk                 -- ^ not the thunk
-    | TyPApp (Maybe Ty) Atom   -- ^ can be applied to (possibly) an argument, and what results
-    | TySusp Atom              -- ^ can be evaluated and calls what function
-    deriving(Eq,Show)
-
-data TyTy = TyTy {
-    tySlots :: [Ty],
-    tyReturn :: [Ty],
-    tyThunk :: TyThunk,
-    tySiblings :: Maybe [Atom]
-}
-
-tyTy = TyTy { tySlots = [], tyReturn = [], tySiblings = Nothing, tyThunk = TyNotThunk }
-
-newtype TyEnv = TyEnv (GMap Atom TyTy)
-    deriving(Monoid)
-
-
-tagHole = toAtom "@hole"
-
-gEval :: Val -> Exp
-gEval x = BaseOp Eval [x]
-
--- lazy node sptr_t
-tyINode = TyINode
--- strict node wptr_t
-tyDNode = TyNode
-
-
-instance TypeNames Ty where
-    tIntzh = TyPrim (Op.bits32)
-    tEnumzh = TyPrim (Op.bits16)
-    tCharzh = TyPrim (Op.bits32)
-
-data Callable = Continuation | Function | Closure | LocalFunction | Primitive'
-    deriving(Eq,Ord,Show)
-
-
-type Tag = Atom
-
-newtype Var = V Int
-    deriving(Eq,Ord,Enum)
-
-instance Show Var where
-    showsPrec _ (V n) xs = 'v':shows n xs
-
-
-
-{-
-
-data VCont = VCont Val VContext
-
-data VContext = PrimApp PrimApp VCont | Decons Tag Int VCont | ContUnknown
-
-
--}
+-- than examining them. (types may not be constructed at run-time)
 
 infixr 1  :->, :>>=
 
@@ -156,7 +97,7 @@ data BaseOp
     | Promote               -- turn an inode into a node, the inode _must_ already be a valid node
     | Eval                  -- evaluate an inode, returns a node representing the evaluated value. Bool is whether to update the inode
     | Apply [Ty]            -- apply a partial application to a value, returning the given type
-    | StoreNode !Bool       -- create a new node, Bool is true if it should be an direct node, the second val is the region
+    | StoreNode !Bool       -- create a new node, Bool is true if it should be a direct node, the second val is the region
     | Redirect              -- write an indirection over its first argument to point to its second one
     | Overwrite             -- overwrite an existing node with new data (the tag must match what was used for the initial Store)
     | PeekVal               -- read a value from a pointed to location
@@ -243,7 +184,13 @@ data Ty =
     | TyUnknown                  -- ^ an unknown possibly undefined type, All of these must be eliminated by code generation
     deriving(Eq,Ord)
 
+data Callable = Continuation | Function | Closure | LocalFunction | Primitive'
+    deriving(Eq,Ord,Show)
 
+type Tag = Atom
+
+newtype Var = V Int
+    deriving(Eq,Ord,Enum)
 
 data FuncDef = FuncDef {
     funcDefName  :: Atom,
@@ -252,9 +199,44 @@ data FuncDef = FuncDef {
     funcDefProps :: FuncProps
     } deriving(Eq,Ord,Show)
 
+-- Type information table (TyEnv)
+
+data TyThunk
+    = TyNotThunk               -- ^ not the thunk
+    | TyPApp (Maybe Ty) Atom   -- ^ can be applied to (possibly) an argument, and what results
+    | TySusp Atom              -- ^ can be evaluated and calls what function
+    deriving(Eq,Show)
+
+data TyTy = TyTy {
+    tySlots :: [Ty],
+    tyReturn :: [Ty],
+    tyThunk :: TyThunk,
+    tySiblings :: Maybe [Atom]
+}
+
+tyTy = TyTy { tySlots = [], tyReturn = [], tySiblings = Nothing, tyThunk = TyNotThunk }
+
+newtype TyEnv = TyEnv (GMap Atom TyTy)
+    deriving(Monoid)
+
+-- random utility values
+
+lamExp (_ :-> e) = e
+lamBind (b :-> _) = b
+
+isVar Var {} = True
+isVar _ = False
+
+tagHole = toAtom "@hole"
+
+gEval :: Val -> Exp
+gEval x = BaseOp Eval [x]
+
+tyINode = TyINode -- ^ lazy node sptr_t
+tyDNode = TyNode  -- ^ strict node wptr_t
+
 createFuncDef local name body@(args :-> rest)  = updateFuncDefProps FuncDef { funcDefName = name, funcDefBody = body, funcDefCall = call, funcDefProps = funcProps } where
     call = Item name (TyCall (if local then LocalFunction else Function) (map getType args) (getType rest))
-
 
 updateFuncDefProps fd@FuncDef { funcDefBody = body@(args :-> rest) } =  fd { funcDefProps = props } where
     props = (funcDefProps fd) { funcFreeVars = freeVars body, funcTags = freeVars body, funcType = (map getType args,getType rest) }
@@ -262,7 +244,6 @@ updateFuncDefProps fd@FuncDef { funcDefBody = body@(args :-> rest) } =  fd { fun
 grinFuncs grin = map (\x -> (funcDefName x, funcDefBody x)) (grinFunctions grin)
 setGrinFunctions xs _grin | flint && hasRepeatUnder fst xs = error $ "setGrinFunctions: grin has redundent definitions" ++ show (fsts xs)
 setGrinFunctions xs grin = grin { grinFunctions = map (uncurry (createFuncDef False)) xs }
-
 
 extendTyEnv ds (TyEnv env) = TyEnv (fromList xs `mappend` env) where
     xs = [ (funcDefName d,tyTy { tySlots = ss, tyReturn = r }) |  d <- ds, let (ss,r) = funcType $ funcDefProps d]
@@ -294,50 +275,6 @@ funcProps = FuncProps {
     funcLoops = Maybe
     }
 
-
-instance Show Ty where
-    show TyNode = "N"
-    show TyINode = "I"
-    show (TyPtr t) = '&':show t
-    show (TyUnit) = "()"
-    show (TyPrim t) = show t
-    show TyRegion = "M"
-    show TyGcContext = "GC"
-    show (TyRegister t) = 'r':show t
-    show (TyCall c as rt) = show c <> tupled (map show as) <+> "->" <+> show rt
-    show TyUnknown = "?"
-
-
-instance Show Val where
-    -- showsPrec _ s | Just st <- fromVal s = text $ show (st::String)
-    showsPrec _ (NodeC t []) = parens $ (fromAtom t)
-    showsPrec _ (NodeC t vs) = parens $ (fromAtom t) <+> hsep (map shows vs)
-    showsPrec _ (Index v o) = shows v <> char '[' <> shows o <> char ']'
-    showsPrec _ (Var (V i) t)
-        | TyINode <- t = text "ni" <> tshow i
-        | TyNode <- t = text "nd" <> tshow i
-        | TyRegion <- t = text "m" <> tshow i
-        | TyRegister ty <- t = text "r" <> tshow (Var (V i) ty)
-        | TyGcContext <- t = text "gc" <> tshow i
-        | TyPtr t' <- t = text "p" <> shows (Var (V i) t')
-        | TyPrim Op.TyBool <- t  = char 'b' <> tshow i
-        | TyPrim (Op.TyBits _ Op.HintFloat) <- t  = char 'f' <> tshow i
-        | TyPrim (Op.TyBits _ Op.HintCharacter) <- t  = char 'c' <> tshow i
-        | TyPrim (Op.TyBits (Op.Bits 8)  _) <- t  = char 'o' <> tshow i      -- octet
-        | TyPrim (Op.TyBits (Op.Bits 16)  _) <- t  = char 'h' <> tshow i     -- half
-        | TyPrim (Op.TyBits (Op.Bits 32)  _) <- t  = char 'w' <> tshow i     -- word
-        | TyPrim (Op.TyBits (Op.Bits 64)  _) <- t  = char 'd' <> tshow i     -- doubleword
-        | TyPrim (Op.TyBits (Op.Bits 128)  _) <- t  = char 'q' <> tshow i    -- quadword
-        | TyPrim (Op.TyBits (Op.BitsArch Op.BitsPtr)  _) <- t  = text "bp" <> tshow i
-        | TyPrim (Op.TyBits (Op.BitsArch Op.BitsMax)  _) <- t  = text "bm" <> tshow i
-        | TyPrim (Op.TyBits _ _) <- t  = char 'l' <> tshow i
-        | otherwise = char 'v' <> tshow i
-    showsPrec _ (Lit i _)  = tshow i
-    showsPrec _ Unit  = showString "()"
-    showsPrec _ (Const v) = char '&' <> shows v
-    showsPrec _ (Item a  ty) = tshow a <> text "::" <> tshow ty
-    showsPrec _ (ValUnknown ty) = text "?::" <> tshow ty
-    showsPrec _ (ValPrim aprim xs _) = tshow aprim <> tupled (map tshow xs)
 
 data Phase = PhaseInit | PostInlineEval | PostAeOptimize | PostDevolve
     deriving(Show,Eq,Ord,Enum)
@@ -379,16 +316,15 @@ data TagInfo
     | TagFunc
 
 tagInfo t = case fromAtom t of
-    'F':xs ->  TagSusp True (toAtom $ 'f':xs)
-    'B':xs ->  TagSusp True (toAtom $ 'b':xs)
+    'F':xs -> TagSusp True (toAtom $ 'f':xs)
+    'B':xs -> TagSusp True (toAtom $ 'b':xs)
     'f':_  -> TagFunc
     'b':_  -> TagFunc
+    'C':_  -> TagDataCons
+    'T':_  -> TagTypeCons
     'P':is | (n@(_:_),('_':xs)) <- span isDigit is -> TagPApp (read n) (toAtom $ 'f':xs)
     'Y':is | (n@(_:_),('_':xs)) <- span isDigit is -> TagTypePApp (read n) (toAtom $ 'T':xs)
-    'C':_ -> TagDataCons
-    'T':_ -> TagTypeCons
     t -> error $ "tagInfo: bad tag " ++  t
-
 
 partialTag :: Tag -> Int -> Tag
 partialTag v c = case fromAtom v of
@@ -399,8 +335,6 @@ partialTag v c = case fromAtom v of
     ('b':xs) | 0 <- c ->  toAtom $ 'B':xs
     _ -> error $  "partialTag: " ++ show (v,c)
 
-
-
 tagUnfunction :: Monad m => Tag -> m (Int, Tag)
 tagUnfunction t
     | tagIsSuspFunction t = return (0,tagFlipFunction t)
@@ -408,8 +342,6 @@ tagUnfunction t
     | ('P':zs) <- t', (n@(_:_),'_':rs) <- span isDigit zs = return (read n, toAtom ('f':rs))
     where t' = fromAtom t
 tagUnfunction _ = fail "Tag does not represent function"
-
-
 
 tagFlipFunction t
     | 'F':xs <- t' = toAtom $ 'f':xs
@@ -478,7 +410,6 @@ isHole x = x `elem` map properHole [TyINode, TyNode]
 isValUnknown ValUnknown {} = True
 isValUnknown _ = False
 
-
 ---------
 -- Look up stuff in the typing environment.
 ---------
@@ -511,6 +442,7 @@ p1 = Var v1 TyINode
 p2 = Var v2 TyINode
 p3 = Var v3 TyINode
 
+-- CanType instances
 
 instance CanType Exp [Ty] where
     getType (_ :>>= (_ :-> e2)) = getType e2
@@ -555,6 +487,8 @@ instance CanType Val Ty where
     getType (ValPrim _ _ ty) = ty
     getType (ValUnknown ty) = ty
     getType (Item _ ty) = ty
+
+-- FreeVars instances
 
 instance FreeVars Lam (Set.Set Var) where
     freeVars (x :-> y) = freeVars y Set.\\ freeVars x
@@ -728,11 +662,61 @@ instance FreeVars Exp (GSet Tag) where
     freeVars MkCont { expCont = v, expLam = as} = freeVars (v,as)
     freeVars GcRoots { expValues = v, expBody = b } = freeVars (v,b)
 
-lamExp (_ :-> e) = e
-lamBind (b :-> _) = b
+-- Show instances
 
-isVar Var {} = True
-isVar _ = False
+instance Show Var where
+    showsPrec _ (V n) xs = 'v':shows n xs
+
+instance Show Ty where
+    show TyNode = "N"
+    show TyINode = "I"
+    show (TyPtr t) = '&':show t
+    show (TyUnit) = "()"
+    show (TyPrim t) = show t
+    show TyRegion = "M"
+    show TyGcContext = "GC"
+    show (TyRegister t) = 'r':show t
+    show (TyCall c as rt) = show c <> tupled (map show as) <+> "->" <+> show rt
+    show TyUnknown = "?"
+
+
+instance Show Val where
+    -- showsPrec _ s | Just st <- fromVal s = text $ show (st::String)
+    showsPrec _ (NodeC t []) = parens $ (fromAtom t)
+    showsPrec _ (NodeC t vs) = parens $ (fromAtom t) <+> hsep (map shows vs)
+    showsPrec _ (Index v o) = shows v <> char '[' <> shows o <> char ']'
+    showsPrec _ (Var (V i) t)
+        | TyINode <- t = text "ni" <> tshow i
+        | TyNode <- t = text "nd" <> tshow i
+        | TyRegion <- t = text "m" <> tshow i
+        | TyRegister ty <- t = text "r" <> tshow (Var (V i) ty)
+        | TyGcContext <- t = text "gc" <> tshow i
+        | TyPtr t' <- t = text "p" <> shows (Var (V i) t')
+        | TyPrim Op.TyBool <- t  = char 'b' <> tshow i
+        | TyPrim (Op.TyBits _ Op.HintFloat) <- t  = char 'f' <> tshow i
+        | TyPrim (Op.TyBits _ Op.HintCharacter) <- t  = char 'c' <> tshow i
+        | TyPrim (Op.TyBits (Op.Bits 8)  _) <- t  = char 'o' <> tshow i      -- octet
+        | TyPrim (Op.TyBits (Op.Bits 16)  _) <- t  = char 'h' <> tshow i     -- half
+        | TyPrim (Op.TyBits (Op.Bits 32)  _) <- t  = char 'w' <> tshow i     -- word
+        | TyPrim (Op.TyBits (Op.Bits 64)  _) <- t  = char 'd' <> tshow i     -- doubleword
+        | TyPrim (Op.TyBits (Op.Bits 128)  _) <- t  = char 'q' <> tshow i    -- quadword
+        | TyPrim (Op.TyBits (Op.BitsArch Op.BitsPtr)  _) <- t  = text "bp" <> tshow i
+        | TyPrim (Op.TyBits (Op.BitsArch Op.BitsMax)  _) <- t  = text "bm" <> tshow i
+        | TyPrim (Op.TyBits _ _) <- t  = char 'l' <> tshow i
+        | otherwise = char 'v' <> tshow i
+    showsPrec _ (Lit i _)  = tshow i
+    showsPrec _ Unit  = showString "()"
+    showsPrec _ (Const v) = char '&' <> shows v
+    showsPrec _ (Item a  ty) = tshow a <> text "::" <> tshow ty
+    showsPrec _ (ValUnknown ty) = text "?::" <> tshow ty
+    showsPrec _ (ValPrim aprim xs _) = tshow aprim <> tupled (map tshow xs)
+
+-- misc instances
+
+instance TypeNames Ty where
+    tIntzh = TyPrim (Op.bits32)
+    tEnumzh = TyPrim (Op.bits16)
+    tCharzh = TyPrim (Op.bits32)
 
 
 instance Intjection Var where

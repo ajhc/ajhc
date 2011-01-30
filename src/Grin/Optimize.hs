@@ -1,22 +1,21 @@
-
 module Grin.Optimize(grinPush,grinSpeculate) where
 
 import Control.Monad.State
 import List
 import qualified Data.Set as Set
 
-import StringTable.Atom
 import C.Prims
 import Grin.Grin
 import Grin.Noodle
+import Options (verbose)
 import Stats hiding(null,isEmpty)
+import StringTable.Atom
 import Support.CanType
 import Support.FreeVars
-import Util.HasSize
 import Util.GMap
 import Util.Graph
+import Util.HasSize
 import Util.SetLike
-import Options (verbose)
 
 data PExp = PExp {
     pexpUniq :: Int,
@@ -166,8 +165,6 @@ grinPush stats (l :-> e) = ans where
 --        v <- prefer exp
 --        return [ p | p <- pexps, v == pexpBind p]
 
-
-
 grinSpeculate :: Grin -> IO Grin
 grinSpeculate grin = do
     let ss = findSpeculatable grin
@@ -176,7 +173,6 @@ grinSpeculate grin = do
     let (grin',stats) = runStatM (performSpeculate ss grin)
     when verbose $ Stats.printStat "Speculate" stats
     return grin'
-
 
 performSpeculate specs grin = do
     let sset = fromList (map tagFlipFunction specs) :: GSet Tag
@@ -206,6 +202,3 @@ findSpeculatable grin = ans where
     isSpeculatable _ = False
 
 demote x = BaseOp Demote [x]
-
-
-

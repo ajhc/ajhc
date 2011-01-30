@@ -35,10 +35,6 @@ import Util.UniqueMonad()
 import qualified Info.Info as Info
 import qualified Util.Graph as G
 
-
-
-
-
 atomizeApps ::
     Bool          -- ^ whether to atomize type arguments
     -> Program
@@ -83,12 +79,8 @@ atomizeAp inscope atomizeTypes dataTable e = runReader (f e) inscope where
     isAtomic e | not atomizeTypes && sortTypeLike e = True
     isAtomic e = isFullyConst e
 
-
-
-
 fvBind (Left (_,fv)) = fv
 fvBind (Right xs) = unions (snds xs)
-
 
 canFloatPast t | sortKindLike . getType $ t = True
 canFloatPast t | getType t == tWorldzh = True
@@ -115,16 +107,15 @@ programFloatInward prog = do
     --nprog <- programMapBodies (return . floatInward) nprog
     return nprog { progStats = nstats }
 
-
 --cupbinds bs = f bs where
 --    f (Left ((t,_),fv):rs) = (tvrShowName t,fv):f rs
 --    f (Right ds:rs) = f $ map Left ds ++ rs
 --    f [] = []
 
-floatInward ::
-    E  -- ^ input term
+floatInward
+    :: E  -- ^ input term
     -> E  -- ^ output term
-floatInward e = floatInwardE e [] where
+floatInward e = floatInwardE e []
 
 floatInwardE :: E -> Binds -> E
 floatInwardE e fvs = f e fvs where
@@ -172,9 +163,7 @@ sepDupableBinds fvs xs = partition ind xs where
     unsafe_ones = concat [ map (combIdent . fst) vs | vs <- map G.fromScc xs,any (not . isCheap) (map (combBody . fst) vs)]
     ind x = any ( (`elem` uso) . combIdent . fst ) (G.fromScc x)
 
-
 -- | seperate bindings based on whether they can be floated inward
-
 sepByDropPoint ::
     [FVarSet]           -- ^ list of possible drop points
     -> Binds            -- ^ list of bindings and their free variables
@@ -198,7 +187,6 @@ sepByDropPoint ds fs' = (r,xs) where
         nu = length (filter snd ds')
     fvDecls (Left (c,_)) = [combIdent c]
     fvDecls (Right ts) = [combIdent c | (c,_) <- ts ]
-
 
 newtype Level = Level Int
     deriving(Eq,Ord,Enum,Show,Typeable)
@@ -238,12 +226,11 @@ floatOutward prog = do
             dds [] nrs e imap = ELetRec (concat nrs) (g n e imap)
         g n e imap = runIdentity $ (emapE' (\e -> g' n e imap) e)
         g' n e imap = return $ g n e imap
-    let imap = Map.fromList $ map (\x -> (x,top_level)) ([ tvrIdent t| (t,_) <-  programDs prog ] ++ idSetToList (progExternalNames prog `mappend` progSeasoning prog))
+    let imap = Map.fromList $ map (\x -> (x,top_level)) ([ tvrIdent t| (t,_) <-  programDs prog ] ++
+            idSetToList (progExternalNames prog `mappend` progSeasoning prog))
     prog <- flip programMapDs prog (\ (t,e) -> do
         e' <- letBindAll (progDataTable prog) (progModule prog) e
         return $ tl (t,e') imap)
-
-
     let dofloat ELetRec { eDefs = ds, eBody = e } = do
             e' <- dofloat e
             ds' <- mapM df ds
@@ -291,7 +278,6 @@ floatOutward prog = do
     let nprog = progCombinators_s (concat cds) prog
     return nprog { progStats = progStats nprog `mappend` stats }
 
-
 maybeShowName t = if '@' `elem` n then "(epheremal)" else n where
     n = tvrShowName t
 
@@ -299,12 +285,10 @@ lfName u modName ns x = case fromId x of
     Just y  -> toName ns (show modName, "fl@"++show y ++ "$" ++ show u)
     Nothing -> toName ns (show modName, "fl@"++show x ++ "$" ++ show u)
 
-
 mapMSnd f xs = sequence [ (,) x `liftM` f y | (x,y) <- xs]
 
-
-letBindAll ::
-    DataTable  -- ^ the data table for expanding newtypes
+letBindAll
+    :: DataTable  -- ^ the data table for expanding newtypes
     -> Module     -- ^ current module name
     -> E          -- ^ input term
     -> IO E
@@ -335,12 +319,7 @@ letBindAll  dataTable modName e = f e  where
         e' <- f e
         return (ELetRec [(tv,e')] (EVar tv))
 
-
-
 letRec [] e = e
 letRec ds _ | flint && hasRepeatUnder fst ds = error "letRec: repeated variables!"
 letRec ds e | flint && any (isUnboxed .tvrType . fst) ds = error "letRec: binding unboxed!"
 letRec ds e = ELetRec ds e
-
-
-
