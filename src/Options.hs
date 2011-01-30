@@ -190,7 +190,7 @@ data Opt = Opt {
   } {-!derive: update !-}
 
 
-opt = Opt {
+emptyOpt = Opt {
     optMode        = CompileExe,
     optColumns     = getColumns,
     optCross       = False,
@@ -327,12 +327,12 @@ helpUsage = usageInfo header theoptions ++ trailer where
 -- | Parse commandline options.
 processOptions :: IO Opt
 processOptions = do
+    -- initial argument processing
     argv <- getArguments
     let (o,ns,rc) = getOpt Permute theoptions argv
+    o <- return (foldl (flip ($)) emptyOpt o)
     when (rc /= []) $ putErrLn (concat rc ++ helpUsage) >> exitWith exitCodeUsage
-    o1 <- either putErrDie return $ postProcessFD (foldl (flip ($)) opt o)
-    o2 <- either putErrDie return $ postProcessFO o1
-    case optMode o2 of
+    case optMode o of
         ShowHelp    -> doShowHelp
         ShowConfig  -> doShowConfig
         StopError s -> putErrLn "bad option passed to --stop should be one of parse, deps, typecheck, or c" >> exitWith exitCodeUsage
@@ -342,9 +342,22 @@ processOptions = do
             putStrLn $ "-I" ++ VC.datadir ++ "/" ++ VC.package ++ "-" ++ VC.shortVersion ++ "/include"
             exitSuccess
         _ -> return ()
+    -- read targets.ini file
     Just home <- fmap (`mplus` Just "/") $ lookupEnv "HOME"
-    inis <- parseIniFiles (optVerbose o2 > 0) (BS.toString targets_ini) [confDir ++ "/targets.ini", confDir ++ "/targets-local.ini", home ++ "/etc/jhc/targets.ini", home ++ "/.jhc/targets.ini"] (optArch o2)
-    when (FlagDump.Ini `S.member` optDumpSet o2) $ flip mapM_ (M.toList inis) $ \(a,b) -> putStrLn (a ++ "=" ++ b)
+    inis <- parseIniFiles (optVerbose o > 0) (BS.toString targets_ini) [confDir ++ "/targets.ini", confDir ++ "/targets-local.ini", home ++ "/etc/jhc/targets.ini", home ++ "/.jhc/targets.ini"] (optArch o)
+    -- process dump flags
+    o <- either putErrDie return $ postProcessFD o
+    when (FlagDump.Ini `S.member` optDumpSet o) $ flip mapM_ (M.toList inis) $ \(a,b) -> putStrLn (a ++ "=" ++ b)
+    -- set flags based on ini options
+    let o1 = case M.lookup "gc" inis of
+            Just "jgc" -> optFOptsSet_u (S.insert FlagOpts.Jgc) o
+            Just "boehm" -> optFOptsSet_u (S.insert FlagOpts.Boehm) o
+            _ -> o
+    o2 <- either putErrDie return $ postProcessFO o1
+    when (FlagDump.Ini `S.member` optDumpSet o) $ do
+        putStrLn (show $ optDumpSet o)
+        putStrLn (show $ optFOptsSet o)
+    -- add autoloads based on ini options
     let autoloads = maybe [] (tokens (',' ==)) (M.lookup "autoload" inis)
         o3 = o2 { optArgs = ns, optInis = inis }
     case optNoAuto o2 of
