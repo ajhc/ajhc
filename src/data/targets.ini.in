@@ -15,7 +15,7 @@
 
 [default]
 cc=gcc
-gc=static
+gc=jgc
 cflags=-std=gnu99 -D_GNU_SOURCE -falign-functions=4 -ffast-math -Wextra -Wall -Wno-unused-parameter -fno-strict-aliasing
 cflags_debug=-g
 cflags_nodebug=-DNDEBUG -O3
@@ -33,7 +33,6 @@ merge=i686
 [wii]
 cc=powerpc-eabi-gcc
 byteorder=be
-gc=static
 cflags+=-g -DGEKKO -D__WORDSIZE=32 -mrvl -mcpu=750 -meabi -mhard-float
 executable_extension=.elf
 bits=32
