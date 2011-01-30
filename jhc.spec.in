@@ -51,6 +51,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_datadir}/@PACKAGE@-@SHORTVERSION@/xhtml-3000.2.0.1.hl
 %{_datadir}/@PACKAGE@-@SHORTVERSION@/QuickCheck-1.2.0.0.hl
 %{_datadir}/@PACKAGE@-@SHORTVERSION@/parsec-2.1.0.1.hl
+%{_datadir}/@PACKAGE@-@SHORTVERSION@/transformers-0.2.1.0.hl
 %{_datadir}/@PACKAGE@-@SHORTVERSION@/include/HsFFI.h
 %{_sysconfdir}/@PACKAGE@-@SHORTVERSION@/targets.ini
 
