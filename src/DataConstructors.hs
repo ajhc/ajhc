@@ -732,7 +732,8 @@ slotTypes wdt n (ELit LitCons { litName = pn, litArgs = xs, litType = _ })
     Identity pc = getConstructor (conInhabits mc) wdt
     sub = substMap $ fromDistinctAscList [ (i,sl) | sl <- xs | i <- anonymousIds ]
 slotTypes wdt n kind
-    | sortKindLike kind, (e,ts) <- fromPi kind = drop (length ts) (conSlots mc)
+    | sortKindLike kind, (e,ts) <- fromPi kind = take (length (conSlots mc) - length ts) (conSlots mc)
+    -- | sortKindLike kind, (e,ts) <- fromPi kind = (conSlots mc)
     where Identity mc = getConstructor n wdt
 slotTypes wdt n e | Just fa <- followAlias wdt e  = slotTypes wdt n fa
 slotTypes _ n e = error $ "slotTypes: error in " ++ show n ++ ": " ++ show e
@@ -749,7 +750,7 @@ slotTypesHs wdt n (ELit LitCons { litName = pn, litArgs = xs, litType = _ })
     Identity pc = getConstructor (conInhabits mc) wdt
     sub = substMap $ fromDistinctAscList [ (i,sl) | sl <- xs | i <- anonymousIds ]
 slotTypesHs wdt n kind
-    | sortKindLike kind, (e,ts) <- fromPi kind = drop (length ts) (conSlots mc)
+    | sortKindLike kind, (e,ts) <- fromPi kind = take (length (conSlots mc) - length ts) (conSlots mc)
     where Identity mc = getConstructor n wdt
 slotTypesHs wdt n e | Just fa <- followAlias wdt e  = slotTypes wdt n fa
 slotTypesHs _ n e = error $ "slotTypes: error in " ++ show n ++ ": " ++ show e
