@@ -261,14 +261,15 @@ inferType dataTable ds e = rfc e where
         valid t
         es' <- mapM rfc es
         strong' t
-    fc (ELit LitCons { litName = n, litArgs = es, litType =  t}) = do
-        withContext ("Checking Constructor: " ++ show n) $ do
+    fc e@(ELit LitCons { litName = n, litArgs = es, litType =  t}) = do
+        withContext ("Checking Constructor: " ++ show e) $ do
         valid t
         es' <- mapM rfc es
         t' <- strong' t
         let sts = slotTypes dataTable n t
             les = length es
             lsts = length sts
+        withContext ("Checking Args: " ++ show (sts,es')) $ do
         unless (les == lsts || (les < lsts && isEPi t')) $ do
             fail "constructor with wrong number of arguments"
         zipWithM_ eq sts es'
