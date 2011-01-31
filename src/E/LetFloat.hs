@@ -201,36 +201,38 @@ notFloatOut e = False
 
 floatOutward :: Program -> IO Program
 floatOutward prog = do
-    -- set natural levels on all types
-    let tl (t,e) imap = (tvrInfo_u (Info.insert top_level) t,g top_level e imap)
-        g n e@ELam {} imap = foldr ELam (g n' b imap') ts' where
-            (b,ts) = fromLam e
-            n' = succ n
-            ts' = map (tvrInfo_u (Info.insert n')) ts
-            imap' = Map.fromList [ (tvrIdent t,n') | t <- ts] `Map.union` imap
-        g n ec@ECase {} imap = runIdentity $ caseBodiesMapM (\e -> g' n e imap') ec { eCaseBind = m (eCaseBind ec), eCaseAlts = map ma (eCaseAlts ec) } where
-            m t = tvrInfo_u (Info.insert n) t
-            ma (Alt lc@LitCons { litName = n, litArgs = xs, litType = t }  b) = Alt lc { litArgs = map m xs } b
-            ma a = a
-            imap' = Map.fromList [ (tvrIdent t,n) | t <- caseBinds ec] `Map.union` imap
-        g n ELetRec { eDefs = ds, eBody = e } imap = dds (map G.fromScc $ decomposeDs ds) [] e imap where
-            dds (ts:rs) nrs e imap = dds rs (ts':nrs) e imap' where
-                n' = maximum (Level 1:[ lup t | t <- fvs ])
-                lup n = case Map.lookup n imap of
-                    Just x -> x
-                    Nothing -> error $ "LetFloat: could not find " ++ show tvr { tvrIdent = n }
-                cl = CLevel n
-                fvs = [ t | t <- freeVars (snds ts), t `notElem` (map (tvrIdent . fst) ts)]
-                ts' = [(tvrInfo_u (Info.insert cl . Info.insert n') t,g n e imap') |  (t,e) <- ts]
-                imap' = Map.fromList [ (tvrIdent t,n') | t <- fsts ts] `Map.union` imap
-            dds [] nrs e imap = ELetRec (concat nrs) (g n e imap)
-        g n e imap = runIdentity $ (emapE' (\e -> g' n e imap) e)
-        g' n e imap = return $ g n e imap
+    -- annotate bindings with their levels
+    let tl (t,e) imap = (tvrInfo_u (Info.insert top_level) t,g imap top_level e)
+        g imap n e = gg e where
+            gg e@ELam {} = foldr ELam (g imap' n' b) ts' where
+                (b,ts) = fromLam e
+                n' = succ n
+                ts' = map (tvrInfo_u (Info.insert n')) ts
+                imap' = Map.fromList [ (tvrIdent t,n') | t <- ts] `Map.union` imap
+            gg ec@ECase {} = caseBodiesMap (\e -> g imap' n e) ec { eCaseScrutinee = gg (eCaseScrutinee ec), eCaseBind = m (eCaseBind ec), eCaseAlts = map ma (eCaseAlts ec) } where
+                m t = tvrInfo_u (Info.insert n) t
+                ma (Alt lc@LitCons { litName = n, litArgs = xs, litType = t }  b) = Alt lc { litArgs = map m xs } b
+                ma a = a
+                imap' = Map.fromList [ (tvrIdent t,n) | t <- caseBinds ec] `Map.union` imap
+            gg ELetRec { eDefs = ds, eBody = e } = dds (map G.fromScc $ decomposeDs ds) [] e imap where
+                dds (ts:rs) nrs e imap = dds rs (ts':nrs) e imap' where
+                    n' = maximum (Level 1:[ lup t | t <- fvs ])
+                    lup n = case Map.lookup n imap of
+                        Just x -> x
+                        Nothing -> error $ "LetFloat: could not find " ++ show tvr { tvrIdent = n }
+                    cl = CLevel n
+                    fvs = [ t | t <- freeVars ts, t `notElem` (map (tvrIdent . fst) ts)]
+                    ts' = [(tvrInfo_u (Info.insert cl . Info.insert n') t,g imap' n e) |  (t,e) <- ts]
+                    imap' = Map.fromList [ (tvrIdent t,n') | t <- fsts ts] `Map.union` imap
+                dds [] nrs e imap = ELetRec (concat nrs) (g imap n e)
+            gg e = runIdentity $ (emapE' (\e -> return $ gg e) e)
     let imap = Map.fromList $ map (\x -> (x,top_level)) ([ tvrIdent t| (t,_) <-  programDs prog ] ++
             idSetToList (progExternalNames prog `mappend` progSeasoning prog))
     prog <- flip programMapDs prog (\ (t,e) -> do
         e' <- letBindAll (progDataTable prog) (progModule prog) e
         return $ tl (t,e') imap)
+
+    -- perform floating based on previous annotations
     let dofloat ELetRec { eDefs = ds, eBody = e } = do
             e' <- dofloat e
             ds' <- mapM df ds

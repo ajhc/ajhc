@@ -120,6 +120,9 @@ caseBodiesMapM f ec@ECase { eCaseAlts = as, eCaseDefault = d } = do
     return $ caseUpdate ec { eCaseAlts = as', eCaseDefault = d' }
 caseBodiesMapM _ _ = error "caseBodiesMapM"
 
+caseBodiesMap :: (E -> E) -> E -> E
+caseBodiesMap f ec = runIdentity $ caseBodiesMapM (\x -> return $ f x) ec
+
 eToList :: Monad m => E -> m  [E]
 eToList (ELit LitCons { litName = n, litArgs = [e,b] }) | dc_Cons == n = eToList b >>= \x -> return (e:x)
 eToList (ELit LitCons { litName = n, litArgs = [] }) | dc_EmptyList == n = return []
