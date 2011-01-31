@@ -824,7 +824,6 @@ dumpHoFile fn = ans where
         putStrLn $ "Name:" <+> pprint (hohName hoh)
         showList "LibDeps" (map pprint . sortUnder fst $ hohLibDeps hoh)
         showList "ArchDeps" (map pprint . sortUnder fst $ hohArchDeps hoh)
-
     doHl fn = do
         l <- readHlFile fn
         doHoh $ libHoHeader l
@@ -835,10 +834,7 @@ dumpHoFile fn = ans where
         showList "ModuleReexports" (map pprint . sortUnder fst $ Map.toList $ hoReexports $ libHoLib l)
         forM_ (Map.toList $ libBuildMap l) $ \ (g,hoB) -> do
             print g
-            wdump FD.Core $ do
-                putStrLn " ---- lambdacube  ---- "
-                mapM_ (\ (v,lc) -> putChar '\n' >> printCheckName'' (hoDataTable hoB) v lc) (hoEs hoB)
-
+            doHoB hoB
     doHo fn = do
         (hoh,idep,ho) <- readHoFile fn
         doHoh hoh
@@ -847,7 +843,6 @@ dumpHoFile fn = ans where
         showList "Dependencies" (map pprint . sortUnder fst $ hoDepends idep)
         showList "ModDependencies" (map pprint $ hoModDepends idep)
         showList "IDepCache" (map pprint . sortUnder fst $ Map.toList $ hoIDeps idep)
-    --    when (not $ Prelude.null (hohMetaInfo hoh)) $ putStrLn $ "MetaInfo:\n" <> vindent (sort [text (' ':' ':k) <> char ':' <+> show v | (k,v) <- hohMetaInfo hoh])
         putStrLn $ "Modules contained:" <+> tshow (keys $ hoExports hoE)
         putStrLn $ "number of definitions:" <+> tshow (size $ hoDefs hoE)
         putStrLn $ "hoAssumps:" <+> tshow (size $ hoAssumps hoE)
@@ -855,9 +850,6 @@ dumpHoFile fn = ans where
         putStrLn $ "hoKinds:" <+> tshow (size $  hoKinds hoE)
         putStrLn $ "hoClassHierarchy:" <+> tshow (size $  hoClassHierarchy hoE)
         putStrLn $ "hoTypeSynonyms:" <+> tshow (size $  hoTypeSynonyms hoE)
-        putStrLn $ "hoDataTable:" <+> tshow (size $  hoDataTable hoB)
-        putStrLn $ "hoEs:" <+> tshow (size $  hoEs hoB)
-        putStrLn $ "hoRules:" <+> tshow (size $  hoRules hoB)
         wdump FD.Exports $ do
             putStrLn "---- exports information ----";
             putStrLn $  (pprint $ hoExports hoE :: String)
@@ -873,6 +865,14 @@ dumpHoFile fn = ans where
         when (dump FD.Class) $
              do {putStrLn "---- class hierarchy ---- ";
                  printClassHierarchy (hoClassHierarchy hoE)}
+        wdump FD.Types $ do
+            putStrLn " ---- the types of identifiers ---- "
+            putStrLn $ PPrint.render $ pprint (hoAssumps hoE)
+        doHoB hoB
+    doHoB hoB = do
+        putStrLn $ "hoDataTable:" <+> tshow (size $  hoDataTable hoB)
+        putStrLn $ "hoEs:" <+> tshow (size $  hoEs hoB)
+        putStrLn $ "hoRules:" <+> tshow (size $  hoRules hoB)
         let rules = hoRules hoB
         wdump FD.Rules $ putStrLn "  ---- user rules ---- " >> printRules RuleUser rules
         wdump FD.Rules $ putStrLn "  ---- user catalysts ---- " >> printRules RuleCatalyst rules
@@ -881,9 +881,6 @@ dumpHoFile fn = ans where
              putStrLn "  ---- data table ---- "
              putDocM putStr (showDataTable (hoDataTable hoB))
              putChar '\n'
-        wdump FD.Types $ do
-            putStrLn " ---- the types of identifiers ---- "
-            putStrLn $ PPrint.render $ pprint (hoAssumps hoE)
         wdump FD.Core $ do
             putStrLn " ---- lambdacube  ---- "
             mapM_ (\ (v,lc) -> putChar '\n' >> printCheckName'' (hoDataTable hoB) v lc) (hoEs hoB)
