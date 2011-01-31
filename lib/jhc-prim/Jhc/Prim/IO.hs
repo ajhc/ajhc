@@ -5,7 +5,7 @@ data RealWorld
 
 type STRep s a = State_ s -> (# State_ s, a #)
 type World__ = State_ RealWorld
-type UIO = STRep RealWorld
+type UIO a = STRep RealWorld a
 type UIO_ = World__ -> World__
 
 
