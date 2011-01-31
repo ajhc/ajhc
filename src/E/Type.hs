@@ -155,7 +155,7 @@ data E = EAp E E
        eCaseDefault :: (Maybe E),
        eCaseAllFV  :: IdSet
        }
-	deriving(Eq, Ord, Show)
+	deriving(Eq, Ord)
     {-! derive: is, from !-}
 
 
@@ -195,15 +195,6 @@ data TVr' e = TVr { tvrIdent :: !Id, tvrType :: e, tvrInfo :: Info.Info }
 
 data Alt e = Alt (Lit TVr e) e
     deriving(Eq,Ord)
-
---instance FunctorM TVr' where
---    fmapM f t = do e <- f (tvrType t); return t { tvrType = e }
---instance Functor TVr' where
---    fmap f t = runIdentity (fmapM (return . f) t)
-
-instance Show e => Show (Alt e) where
-    showsPrec n (Alt l e) = showParen (n > 10) $ shows l . showString " -> " . shows e
-
 
 instance Eq TVr where
     (==) (TVr { tvrIdent = i }) (TVr { tvrIdent = i' }) = i == i'
