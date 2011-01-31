@@ -63,7 +63,6 @@ mapExpVal g x = f x where
     f (BaseOp a vs) = return (BaseOp a) `ap` mapM g vs
     f (Return vs) = return Return `ap` mapM g vs
     f (Prim x vs t) = return (Prim x) `ap` mapM g vs `ap` return t
---    f (Store v) = return Store `ap` g v
     f e@Alloc { expValue = v, expCount = c } = do
         v <- g v
         c <- g c
@@ -161,8 +160,10 @@ valIsConstant (Index v t) = valIsConstant v && valIsConstant t
 valIsConstant ValPrim {} = True
 valIsConstant _ = False
 
-
-
+-- NOPs will not produce any code at run-time so we can tail-call through them.
+isNop (BaseOp Promote _) = True
+isNop (BaseOp Demote _) = True
+isNop _ = False
 
 isOmittable (BaseOp Promote _) = True
 isOmittable (BaseOp Demote _) = True
@@ -191,6 +192,7 @@ collectFuncs :: Exp -> (Set.Set Atom,Set.Set Atom)
 collectFuncs exp = runWriter (cfunc exp) where
         clfunc (l :-> r) = cfunc r
         cfunc e | False && trace ("isManifestNode: " ++ show e) False = undefined
+        cfunc (e :>>= v :-> op@(BaseOp _ v')) | isNop op && v == v' = do cfunc e
         cfunc (e :>>= y) = do
             xs <- cfunc e
             tell xs
