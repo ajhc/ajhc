@@ -1,4 +1,3 @@
-
 module E.Traverse(
     emapE_,
     emapE,
@@ -31,10 +30,8 @@ instance Monoid MInt where
     mempty = MInt 0
     mappend (MInt a) (MInt b) = a `seq` b `seq` MInt (a + b)
 
-
 runRename :: IdSet -> E -> (E,IdSet)
 runRename set e = renameE set mempty e
-
 
 emapE_ :: Monad m => (E -> m a) -> E -> m ()
 emapE_ f e = emapEG f' f' e >> return () where
@@ -44,6 +41,11 @@ emapE' f = emapEG f return
 
 emapEG f g e = emapEGH f g g e
 
+-- map subexpressions
+-- emapEGH f g h
+-- f - applied to direct subexpressions
+-- g - applied to the type-level subexpressions
+-- h - applied to the types of variables that occur in value position
 emapEGH f g h e = z e where
     z (EAp aa ab) = do aa <- f aa;ab <- f ab; return $ EAp aa ab
     z (ELam aa ab) = do aa <- mapmTvr g aa; ab <- f ab; return $ ELam aa ab
@@ -75,8 +77,6 @@ emapEGH f g h e = z e where
         l' <- T.mapM g l
         return (Alt l' e')
 
-
-
 instance HasSize E where
     size = eSize
 
@@ -87,7 +87,6 @@ eSize e = n where
     f e@EPrim {} = tell (MInt 1) >> return e
     f e@EError {} = tell (MInt 1) >> return e
     f e = tell (MInt 1) >> emapE' f e
-
 
 renameE :: IdSet -> IdMap E -> E -> (E,IdSet)
 renameE initSet initMap e = runReader (runIdNameT $ addBoundNamesIdMap initMap >> addBoundNamesIdSet initSet >> f e) initMap  where
@@ -160,7 +159,6 @@ renameE initSet initMap e = runReader (runIdNameT $ addBoundNamesIdMap initMap >
         e' <- localSubst n (f e)
         return $ elam tv' e'
 
-
 scopeCheck :: Monad m => Bool -> IdMap TVr -> E -> m ()
 scopeCheck checkFvs initMap e = runReaderT (f e) initMap  where
     f (ELam tvr e) = f (tvrType tvr) >> local (minsert (tvrIdent tvr) tvr) (f e)
@@ -183,6 +181,3 @@ scopeCheck checkFvs initMap e = runReaderT (f e) initMap  where
     doAlt (Alt LitCons { litArgs = xs, litType = t } e) = do
         f t >> local (fromList [ (tvrIdent t,t) | t <- xs] `mappend`) (f e)
     doAlt (Alt (LitInt _ t) e) = f t >> f e
-
-
-
