@@ -196,9 +196,16 @@ emptyConstructor = Constructor {
 instance HasSize DataTable where
     size (DataTable d) = Map.size d
 
+{-# NOINLINE getConstructor #-}
 getConstructor :: Monad m => Name -> DataTable -> m Constructor
-getConstructor n _ | Just e <- fromConjured modAbsurd  n = return emptyConstructor { conName = n, conType = e, conExpr = tAbsurd e, conInhabits = tStar }
-getConstructor n _ | Just e <- fromConjured modBox  n = return emptyConstructor { conName = n, conType = e, conExpr = mktBox e, conInhabits = tStar }
+getConstructor n _ | isJust me = return (emptyConstructor {
+    conName = n, conType = e,
+    conExpr = foldr ELam (foldl eAp (mktBox e) (map EVar tvrs)) tvrs,
+    conInhabits = tStar, conOrigSlots = map SlotNormal sts }) where
+        sts = map tvrType ss
+        tvrs = [ tvr { tvrIdent = i , tvrType = t } | i <- anonymousIds | t <- sts ]
+        (_,ss) = fromPi e
+        me@(~(Just e)) = fromConjured modBox n `mplus` fromConjured modAbsurd n
 getConstructor n _ | RawType <- nameType n = return $ primitiveConstructor n
 getConstructor n _ | Just v <- fromUnboxedNameTuple n, DataConstructor <- nameType n = return $ snd $ tunboxedtuple v
 getConstructor n _ | Just v <- fromUnboxedNameTuple n, TypeConstructor <- nameType n = return $ fst $ tunboxedtuple v
@@ -207,13 +214,11 @@ getConstructor n (DataTable map) = case Map.lookup n map of
     Nothing -> fail $ "getConstructor: " ++ show (nameType n,n)
 
 -- | return the single constructor of product types
-
 getProduct :: Monad m => DataTable -> E -> m Constructor
 getProduct dataTable e | (ELit LitCons { litName = cn }) <- followAliases dataTable e, Just c <- getConstructor cn dataTable = f c where
     f c | DataNormal [x] <- conChildren c = getConstructor x dataTable
         | otherwise = fail "Not Product type"
 getProduct _ _ = fail "Not Product type"
-
 
 tunboxedtuple :: Int -> (Constructor,Constructor)
 tunboxedtuple n = (typeCons,dataCons) where
@@ -749,6 +754,7 @@ slotTypesHs wdt n kind
 slotTypesHs wdt n e | Just fa <- followAlias wdt e  = slotTypes wdt n fa
 slotTypesHs _ n e = error $ "slotTypes: error in " ++ show n ++ ": " ++ show e
 
+{-# NOINLINE showDataTable #-}
 showDataTable (DataTable mp) = vcat xs where
     c  const = vcat [t,e,cs,al,vt,ih,ch] where
         t  = text "::" <+> ePretty conType
@@ -770,11 +776,13 @@ showDataTable (DataTable mp) = vcat xs where
     ds = sortBy (\(x,_) (y,_) -> compare x y) [(show x,y)  | (x,y) <-  Map.toList mp]
 
 
+{-# NOINLINE samplePrimitiveDataTable #-}
 samplePrimitiveDataTable :: DataTable
 samplePrimitiveDataTable = DataTable $ Map.fromList [ (x,c) | x <- xs, c <- getConstructor x mempty] where
     nt v = map (flip unboxedNameTuple (v::Int)) [DataConstructor, TypeConstructor]
-    xs = nt 0 ++ nt 3 ++ [nameConjured modAbsurd eStar,nameConjured modBox hs,rt_bits16,rt_bits_ptr_]
+    xs = nt 0 ++ nt 3 ++ [nameConjured modAbsurd eStar,nameConjured modBox hs, nameConjured modAbsurd hs', nameConjured modBox hs',rt_bits16,rt_bits_ptr_]
     hs = EPi (tVr emptyId eHash) eStar
+    hs' = tFunc eStar (tFunc (tFunc eStar eHash) eStar)
 
 getSiblings :: DataTable -> Name -> Maybe [Name]
 getSiblings dt n
@@ -947,4 +955,3 @@ typeTable = Map.fromList [
     (tc_Unit,  "void"),
     (tc_World__,  "void")
     ]
-
