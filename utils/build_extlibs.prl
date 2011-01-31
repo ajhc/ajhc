@@ -10,7 +10,11 @@ use Getopt::Std;
 our ($opt_l,$opt_d);
 getopts('ld') or die "unknown opt";
 
-
+# clean out environment
+delete $ENV{JHC_PATH};
+delete $ENV{JHC_OPTS};
+delete $ENV{JHC_CACHE};
+delete $ENV{JHC_LIBRARY_PATH};
 
 my $tmpdir = "tmp/build";
 
@@ -19,7 +23,7 @@ mkdir "tmp/build";
 
 sub mysystem {
     print( (join " ", @_), '\n');
-    system @_;
+    system @_ and die "Running Command Failed!";
 }
 
 foreach my $fn (@ARGV) {
@@ -51,7 +55,7 @@ foreach my $fn (@ARGV) {
     mysystem "tar -zxv --directory $tmpdir -f $tmpdir/$name-$version.tar.gz" and die "$!: tar";
     my $src = -d "$tmpdir/$name-$version/src" ? "/src" : "";
     mysystem "patch -d $tmpdir/$name-$version -p1 < $patch" if -e $patch;
-    mysystem "./jhc $options --build-hl $fn -L- -L. -i$tmpdir/$name-$version$src" and die "$!: jhc";
+    mysystem "./jhc $options $ENV{JHC_TEST} --build-hl $fn -L- -L. -i$tmpdir/$name-$version$src" and die "$!: jhc";
 }
 
 
