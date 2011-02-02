@@ -138,6 +138,8 @@ hPrintCheckName fh dataTable tvr e = do
         tmatch = isJust $ match (const Nothing) [] ty (tvrType tvr)
     when (dump FD.EInfo || verbose2) $ hPutStrLn fh (show $ tvrInfo tvr)
     hPutStrLn fh (render $ hang 4 (pprint tvr <+> text "::" <+> (pprint $ tvrType tvr)))
-    when (not tmatch || dump FD.EVerbose) $
+    when (ty /= Unknown && (not tmatch || dump FD.EVerbose)) $
         hPutStrLn fh (render $ hang 4 (pprint tvr <+> text "::" <+> pty))
     hPutStrLn fh (render $ hang 4 (pprint tvr <+> equals <+> pprint e))
+    when (ty == Unknown) $
+        hPutStrLn fh (render $ hang 4 (pprint tvr <+> text "TypeError:" </> pty))
