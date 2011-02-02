@@ -5,7 +5,6 @@ module Jhc.Prim.Bits where
 -- brings the names into scope, so it is okay to
 -- have platform specific definitions here.
 
-
 data Bits1_ :: #
 
 data Bits8_   :: #
@@ -40,3 +39,8 @@ newtype Addr_ = Addr_ BitsPtr_
 newtype FunAddr_ = FunAddr_ BitsPtr_
 newtype Char_ = Char_ Bits32_
 
+-- type aliases to help document whether signed or unsigned
+-- uses are intended, they have no effect other than helping
+-- convey intent to someone reading the code.
+type Word_ = Bits32_
+type Int_  = Bits32_
