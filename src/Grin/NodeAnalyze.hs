@@ -18,18 +18,19 @@ import Text.Printf
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Util.UniqueMonad
-import Util.SetLike
 import Grin.Grin hiding(V)
 import Grin.Lint
 import Grin.Noodle
 import Grin.Whiz
+import Options
 import StringTable.Atom
 import Support.CanType
-import Support.Tickle
 import Support.FreeVars
+import Support.Tickle
 import Util.Gen
+import Util.SetLike
 import Util.UnionSolve
+import Util.UniqueMonad
 import qualified Stats
 
 
@@ -382,7 +383,7 @@ fixupfs cmap tyEnv l = tickleM f (l::Lam) where
         Just ResultBounded { resultLB = Just lb } -> return lb
         Just ResultBounded { resultLB = Nothing } -> return bottom
         _ -> fail "lupVar"
-    pstuff x arg n@(N w t) = liftIO $ printf "-- %s %s %s\n" x (show arg) (show n)
+    pstuff x arg n@(N w t) = liftIO $ when verbose (printf "-- %s %s %s\n" x (show arg) (show n))
     f a@(BaseOp Eval [arg]) | Just n <- lupVar arg = case n of
         N WHNF _ -> do
             pstuff "eval" arg n

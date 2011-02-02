@@ -165,7 +165,11 @@ compile prog@Program { progDataTable = dataTable } = do
     let (cc,reqcc,rcafs) = constantCaf prog
         funcMain = toAtom "b_main"
     wdump FD.Progress $ do
-        putErrLn $ "Found" <+> tshow (length cc) <+> "CAFs to convert to constants," <+> tshow (length reqcc) <+> "of which are recursive."
+        putErrLn $ "Updatable CAFS:" <+> tshow (length rcafs)
+        putErrLn $ "Constant CAFS: " <+> tshow (length cc)
+        putErrLn $ "Recursive CAFS:" <+> tshow (length reqcc)
+--        putErrLn $ "Found" <+> tshow (length cc) <+> "CAFs to convert to constants," <+> tshow (length reqcc) <+> "of which are recursive."
+    when verbose $ do
         putErrLn "Recursive"
         putDocMLn putStr $ vcat [ pprint v  | v <- reqcc ]
         putErrLn "Constant"

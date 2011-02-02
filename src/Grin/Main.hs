@@ -40,11 +40,13 @@ compileToGrin prog = do
     let pushGrin grin = do
             nf   <- mapMsnd (grinPush undefined) (grinFuncs grin)
             return $ setGrinFunctions nf grin
+    putProgressLn "-- Dead Code Analysis"
     x <- deadCode stats (grinEntryPointNames x) x  -- XXX
     x <- transformGrin simplifyParms x
     x <- pushGrin x
     lintCheckGrin x
     x <- transformGrin simplifyParms x
+    putProgressLn "-- Speculative Execution Optimization"
     x <- grinSpeculate x
     lintCheckGrin x
     x <- deadCode stats (grinEntryPointNames x) x  -- XXX
@@ -54,6 +56,7 @@ compileToGrin prog = do
     lintCheckGrin x
     x <- transformGrin simplifyParms x
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
+    putProgressLn "-- Node Usage Analysis"
     wdump FD.GrinPreeval $ dumpGrin "preeval" x
     x <- transformGrin nodeAnalyzeParms x
     x <- transformGrin simplifyParms x
@@ -63,6 +66,7 @@ compileToGrin prog = do
     x <- createEvalApply x
     x <- transformGrin simplifyParms x
     lintCheckGrin x
+    putProgressLn "-- Grin Devolution"
     wdump FD.GrinFinal $ dumpGrin "predevolve" x
     x <- transformGrin devolveTransform x
     --x <- opt "After Devolve Optimization" x

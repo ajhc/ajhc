@@ -415,7 +415,7 @@ compileWholeProgram prog = do
 
 
     prog <- if (fopts FO.TypeAnalysis) then do
-      transformProgram transformParms { transformCategory = "typeAnalyzeMethods",
+      transformProgram transformParms { transformCategory = "TypeAnalyzeMethods",
                                         transformOperation = typeAnalyze False,
                                         transformDumpProgress = dump FD.Progress }
                        prog
@@ -498,7 +498,7 @@ compileWholeProgram prog = do
 
     lintCheckProgram (putErrLn "LintPostLifting") prog
 
-    wdump FD.Progress $ printEStats (programE prog)
+--    wdump FD.Progress $ printEStats (programE prog)
 
     prog <- Demand.analyzeProgram prog
     prog <- return $ E.CPR.cprAnalyzeProgram prog
