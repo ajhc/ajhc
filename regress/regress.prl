@@ -178,6 +178,88 @@ sub combine_yaml {
     return $ny;
 }
 
+sub run_test {
+    my ($cwd, $y, $name, $ln, $fn) = @_;
+    $fn = $y->{progname} unless defined $fn;
+    return if defined $y->{skip};
+    my $must_fail = (0 + $y->{jhc_exit_code}) != 0;
+    my $no_run = $y->{run} eq 'no';
+    my @flags = @{$y->{jhc_flags}};
+    return if $ln =~ /_code$/;
+    $fn =~ /^([^_].*)\.l?hs$/ or return;
+    my $fbase = "$cwd/$1";
+    $name = "$name.$ln";
+    if(@cond) {
+        my $keep = 0;
+        foreach (@cond) {
+            $keep = 1 if $name  =~ /$_/;
+        }
+        unless($keep) {
+            return;
+        }
+    }
+    foreach (@ncond) {
+        if($name =~ /$_/) {
+            return;
+        }
+    }
+    rlog "---- $name";
+    my @jhc  = $opt_p ? ("$jhc_dir/jhcp",'+RTS', "-S$rd/$name.jhcp_prof",@opt_rts,'-RTS')  :  ("$jhc_dir/jhc");
+    my @cmd = (@jhc, ($verbose ? ('-v') : ()), ($opt_win ? ('-mwin32') : ()), @libs , @fast, '-o', "$rd/$name", @flags, @opts, "$cwd/$fn");
+    my $res = join(" ",@cmd) . " > '$rd/$name.jhc_out' 2>&1";
+    my ($r,$time) = my_system $res;
+    my $result = { name => $name, compile_command => $res, compile_status => $r, compile_results => "$rd/$name.jhc_out", compile_time => $time };
+    push @res, $result;
+    if($must_fail) {
+        if($r == 0) {
+            rlog "Compilation Succeeded When It shouldn't!";
+            $error++;
+            $result->{compile_status} = 'BAD';
+            return;
+        } else {
+            $result->{compile_status} = 'pass';
+            return;
+        }
+    } else {
+        if($r == 0) {
+            $result->{compile_status} = 'pass';
+        } else {
+            $error++;
+        }
+    }
+    unless($r == 0) {
+        rlog "Compilation Failed: $r";
+        my $msg = `tail $result->{compile_results}`;
+        rlog $msg;
+        $error++;
+        if(statf($r) eq 'INT') {done()};
+        return;
+    }
+    return if $no_run || $opt_tc;
+    my @args = @{$y->{args}};
+    $result->{run_stdout} = "$rd/$name.stdout";
+    my $discard_stderr = $y->{discard_stderr} ? " 2> /dev/null" : "";
+    my $stdin = " < $fbase.stdin" if -f "$fbase.stdin";
+    my $run_cmd = (($opt_win || $y->{opt_win}) ? "$rd/$name.exe " : "$rd/$name ") . join(" ",@args) . " > '$result->{run_stdout}'$discard_stderr" . ($stdin || "");
+    $result->{run_cmd} = $run_cmd;
+    ($r,$time) = my_system $run_cmd;
+    $result->{run_status} = $r;
+    $result->{run_time} = $time;
+    unless($r == 0) {
+        rlog "-- Run Failed: $r";
+        $error++;
+        if(statf($r) eq 'INT') {done()};
+        return;
+    }
+
+    if(-f "$fbase.expected.stdout" ) {
+        $result->{expected_stdout} = "$fbase.expected.stdout";
+        my $r = system "diff --strip-trailing-cr $result->{run_stdout} $result->{expected_stdout}";
+        $result->{stdout_diff} = $r;
+        $error++ if $r ne 0;
+    }
+}
+
 sub do_it {
     my ($cwd,$name, $oy) = @_;
     my ($y,$yc) = ($oy,{});
@@ -187,7 +269,8 @@ sub do_it {
     }
     #print "Entering $cwd\n";
     opendir my $dh,$cwd or die "$!: could not read $cwd";
-    test: foreach my $fn (sort readdir $dh) {
+    my %done;
+    foreach my $fn (sort readdir $dh) {
         next unless $fn =~ /^\w/;
         my $n = "$cwd/$fn";
         if (-d $n && $n ne "results") {
@@ -195,84 +278,15 @@ sub do_it {
             $fnn =~ s/^\d+_//;
             do_it($n,$name ? "$name.$fnn" : $fnn, $y);
         } elsif ($fn =~ /^([^_].*)\.l?hs$/) {
-            my $ln = $1;
-            my $y = combine_yaml($y, $yc->{tests}{$ln});
-            next if defined $y->{skip};
-            my $must_fail = (0 + $y->{jhc_exit_code}) != 0;
-            my $no_run = $y->{run} eq 'no';
-            my @flags = @{$y->{jhc_flags}};
-            next if $ln =~ /_code$/;
-            my $fbase = "$cwd/$ln";
-            my $name = "$name.$ln";
-            if(@cond) {
-                my $keep = 0;
-                foreach (@cond) {
-                $keep = 1 if $name  =~ /$_/;
-                }
-                unless($keep) {
-                    next;
-                }
-            }
-            foreach (@ncond) {
-                if($name =~ /$_/) {
-                    next test;
-                }
-            }
-            rlog "---- $name";
-            my @jhc  = $opt_p ? ("$jhc_dir/jhcp",'+RTS', "-S$rd/$name.jhcp_prof",@opt_rts,'-RTS')  :  ("$jhc_dir/jhc");
-            my @cmd = (@jhc, ($verbose ? ('-v') : ()), ($opt_win ? ('-mwin32') : ()), @libs , @fast, '-o', "$rd/$name", @flags, @opts, "$cwd/$fn");
-            my $res = join(" ",@cmd) . " > '$rd/$name.jhc_out' 2>&1";
-            my ($r,$time) = my_system $res;
-            my $result = { name => $name, compile_command => $res, compile_status => $r, compile_results => "$rd/$name.jhc_out", compile_time => $time };
-            push @res, $result;
-            if($must_fail) {
-                if($r == 0) {
-                    rlog "Compilation Succeeded When It shouldn't!";
-                    $error++;
-                    $result->{compile_status} = 'BAD';
-                    next;
-                } else {
-                    $result->{compile_status} = 'pass';
-                    next;
-                }
-            } else {
-                if($r == 0) {
-                    $result->{compile_status} = 'pass';
-                } else {
-                    $error++;
-                }
-            }
-            unless($r == 0) {
-                rlog "Compilation Failed: $r";
-                my $msg = `tail $result->{compile_results}`;
-                rlog $msg;
-                $error++;
-                if(statf($r) eq 'INT') {done()};
-                next;
-            }
-            next if $no_run || $opt_tc;
-            my @args = @{$y->{args}};
-            $result->{run_stdout} = "$rd/$name.stdout";
-            my $stdin = " < $fbase.stdin" if -f "$fbase.stdin";
-            my $run_cmd = ($opt_win ? "$rd/$name.exe " : "$rd/$name ") . join(" ",@args) . " > $result->{run_stdout}" . ($stdin || "");
-            $result->{run_cmd} = $run_cmd;
-            ($r,$time) = my_system $run_cmd;
-            $result->{run_status} = $r;
-            $result->{run_time} = $time;
-            unless($r == 0) {
-                rlog "-- Run Failed: $r";
-                $error++;
-                if(statf($r) eq 'INT') {done()};
-                next;
-            }
-
-            if(-f "$fbase.expected.stdout" ) {
-                $result->{expected_stdout} = "$fbase.expected.stdout";
-                my $r = system "diff --strip-trailing-cr $result->{run_stdout} $result->{expected_stdout}";
-                $result->{stdout_diff} = $r;
-                $error++ if $r ne 0;
-            }
+            $done{$1} = 1;
+            my $y = combine_yaml($y, $yc->{tests}{$1});
+            run_test($cwd,$y,$name,$1,$fn);
         }
+    }
+    foreach my $t (sort keys %{$y->{tests}}) {
+        next if $done{$t}++;
+        my $y = combine_yaml($y, $yc->{tests}{$t});
+        run_test($cwd,$y,$name,$t,undef);
     }
     closedir $dh;
 }
@@ -284,7 +298,10 @@ do_it($test_dir,"", {
         jhc_exit_code => 0,
         args => [],
         libs => [],
+        progname => undef,
         run => 'yes',
+        opt_win => undef,
+        discard_stderr => undef,
         skip => undef
     });
 done();

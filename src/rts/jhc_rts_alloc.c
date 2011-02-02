@@ -26,7 +26,6 @@ alloc_count(int n,int atomic)
         (atomic ? alloced_atomic : alloced)[n]++;
 }
 
-
 static void
 print_alloc_size_stats(void) {
         char fmt[] = "%10s %10s %10s %10s %10s\n";
@@ -39,7 +38,6 @@ print_alloc_size_stats(void) {
                 fprintf(stderr,fmt2,i,alloced[i],alloced_atomic[i],alloced_atomic[i] + alloced[i], accum);
         }
 }
-
 
 #else
 
@@ -57,10 +55,9 @@ print_alloc_size_stats(void) {
 #define jhc_malloc_atomic GC_malloc_atomic
 #define jhc_free GC_free
 
-static void jhc_malloc_init(void) { GC_INIT(); }
-static void jhc_malloc_fini(void) {  }
-static void jhc_alloc_print_stats(void) { GC_dump(); }
-
+static void jhc_alloc_init(void) { GC_INIT(); }
+static void jhc_alloc_fini(void) { }
+static void jhc_alloc_print_stats(void) { }
 
 #elif _JHC_GC == _JHC_GC_NONE
 

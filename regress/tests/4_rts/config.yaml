@@ -1,0 +1,26 @@
+progname: HelloWorld.hs
+tests:
+  HelloWorld:
+  HelloWorld_jgc:
+    jhc_flags: -fjgc
+  HelloWorld_no_jgc:
+    jhc_flags: -fno-jgc
+  HelloWorld_64:
+    jhc_flags: -m64
+  HelloWorld_32:
+    jhc_flags: -m32
+  HelloWorld_profile:
+    jhc_flags: -fprofile
+    discard_stderr: 1
+  HelloWorld_debug:
+    jhc_flags: -fdebug
+  HelloWorld_boehm:
+    jhc_flags: -mgc=boehm
+  HelloWorld_fullint:
+    jhc_flags: -m32 -ffull-int
+  HelloWorld_nofullint:
+    jhc_flags: -m32 -fno-full-int
+  HelloWorld_win:
+    jhc_flags: -mwin32
+    opt_win: 1
+

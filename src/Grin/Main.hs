@@ -89,8 +89,8 @@ compileGrinToC grin = do
         lup k = maybe "" id $ Map.lookup k (optInis options)
     (argstring,sversion) <- getArgString
     let
-        boehmOpts | fopts FO.Boehm || lup "gc" == "boehm"  = ["-D_JHC_GC=_JHC_GC_BOEHM", "-lgc"]
-                  | fopts FO.Jgc || lup "gc" == "jgc"  = ["-D_JHC_GC=_JHC_GC_JGC"]
+        boehmOpts | fopts FO.Boehm = ["-D_JHC_GC=_JHC_GC_BOEHM", "-lgc"]
+                  | fopts FO.Jgc   = ["-D_JHC_GC=_JHC_GC_JGC"]
                   | otherwise = []
         profileOpts | fopts FO.Profile || lup "profile" == "true" = ["-D_JHC_PROFILE=1"]
                     | otherwise = []
