@@ -34,7 +34,7 @@ if test -z "$DRIFTGHC"; then
     echo [DrIFT not found: using preprocessed files]
 fi
 
-AC_CHECK_PROGS([MINGW],[mingw-gcc i386-mingw32-gcc i586-mingw32msvc-gcc],
+AC_CHECK_PROGS([MINGW],[mingw-gcc mingw32-gcc i386-mingw32-gcc i586-mingw32msvc-gcc],
                [i386-mingw32-gcc])
 
 GHC=$HC
