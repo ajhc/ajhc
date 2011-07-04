@@ -84,6 +84,10 @@ whiz sub te tf inState start = res where
         v <- applySubst env v
         as <- mapM (dc env) as
         return $ Case v as
+    g env (GcRoots vs body) = do
+        vs <- mapM (applySubst env) vs
+        body <- f body [] env
+        return $ GcRoots vs body
 --    g env lt@Let { expDefs = defs, expBody = Let { expDefs = defs', expBody = body } } = g env lt { expDefs = defs `mappend` defs', expBody = body }
     g env lt@Let { expDefs = defs, expBody = body } = do
         body <- f body [] env
@@ -153,6 +157,10 @@ fizz sub te tf inState start = res where
         v <- applySubst env v
         as <- mapM (dc env) as
         return $ Case v as
+    g env (GcRoots vs body) = do
+        vs <- mapM (applySubst env) vs
+        body <- f body [] env
+        return $ GcRoots vs body
     g env lt@Let { expDefs = defs, expBody = body } = do
         body <- f body [] env
         let f def@FuncDef { funcDefName = n, funcDefBody = b } = do
