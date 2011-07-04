@@ -155,7 +155,7 @@ struct fptr {};
 // we use dummy structs here so the compiler will catch any attempt
 // to use one type in anothers place
 typedef struct sptr * sptr_t;
-typedef struct wptr * wptr_t;
+typedef struct sptr * wptr_t;
 typedef struct fptr * fptr_t;
 typedef uintptr_t     what_t;
 
