@@ -3,6 +3,9 @@ static jmp_buf jhc_uncaught;
 #ifdef __WIN32__
 A_UNUSED static char *jhc_options_os =  "mingw32";
 A_UNUSED static char *jhc_options_arch = "i386";
+#elif defined(__ARM_EABI__)
+A_UNUSED static char *jhc_options_os =  "nds";
+A_UNUSED static char *jhc_options_arch = "ARM";
 #else
 A_UNUSED struct utsname jhc_utsname;
 A_UNUSED static char *jhc_options_os = "(unknown os)";

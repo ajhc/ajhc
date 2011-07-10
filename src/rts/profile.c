@@ -45,12 +45,14 @@ profile_pop(struct profile_stack *ps)
 #endif
 
 #ifndef __WIN32__
+#ifndef __ARM_EABI__
 void print_times(struct tms *tm) {
     float cpt = (float)sysconf(_SC_CLK_TCK);
     fprintf(stderr, "User Time:   %.2fs\n", (float)tm->tms_utime/cpt);
     fprintf(stderr, "System Time: %.2fs\n", (float)tm->tms_stime/cpt);
     fprintf(stderr, "Total Time:  %.2fs\n", (float)(tm->tms_stime + tm->tms_utime)/cpt);
 }
+#endif
 #endif
 
 static void A_COLD
@@ -68,10 +70,12 @@ jhc_print_profile(void) {
         fprintf(stderr, "Version: %s\n\n", jhc_version);
         jhc_alloc_print_stats();
 #ifndef __WIN32__
+#ifndef __ARM_EABI__
         print_times(&tm);
 #if _JHC_PROFILE
         print_times(&gc_gc_time.tm_total);
         print_times(&gc_alloc_time.tm_total);
+#endif
 #endif
 #endif
         fprintf(stderr, "-----------------\n");

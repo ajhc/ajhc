@@ -12,11 +12,15 @@
 #include <wchar.h>
 #include <setjmp.h>
 #ifndef __WIN32__
+#ifdef __ARM_EABI__
+#include <malloc.h>
+#else
 #include <sys/select.h>
+#include <sys/utsname.h>
+#endif
 #include <sys/times.h>
 #include <sys/types.h>
 #include <sys/param.h>
-#include <sys/utsname.h>
 #else
 #include <malloc.h>
 #endif
@@ -110,7 +114,7 @@
 #define JHC_isBigEndian (__BYTE_ORDER == __BIG_ENDIAN)
 #endif
 
-#define JHC_isPosix (!JHC_isWindows)
+#define JHC_isPosix (!JHC_isWindows && !defined(__ARM_EABI__))
 
 static void _amain(void);
 

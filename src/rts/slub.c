@@ -98,6 +98,9 @@ s_new_megablock(struct s_arena *arena)
 #if defined(__WIN32__)
         mb->base = _aligned_malloc(MEGABLOCK_SIZE, BLOCK_SIZE);
         int ret = !mb->base;
+#elif defined(__ARM_EABI__)
+        mb->base = memalign(BLOCK_SIZE,MEGABLOCK_SIZE);
+        int ret = !mb->base;
 #elif (defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ <  1060)
         assert(sysconf(_SC_PAGESIZE) == BLOCK_SIZE);
         mb->base = valloc(MEGABLOCK_SIZE);
