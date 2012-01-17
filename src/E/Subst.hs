@@ -15,7 +15,6 @@ module E.Subst(
 -- This is a little tricky.
 
 {-
-
 Consider the following example.
 fn = \x0 -> let x1 = 10+x0      -- x1 is only used once, let's inline it.
             in (\x0 -> x1+x0)   -- x0 from the outer lambda isn't used.
@@ -25,7 +24,6 @@ fn = \x0 -> (\x0 -> (10+x0)+x0)
 
 We solve this by renaming variable whenever they clash with the current scope:
 fn = \x0 -> (\x1 -> (10+x0)+x1)
-
 
 Another solution would be to assign a globally unique id to each variable. However,
 in a pure and lazy language like Haskell, renaming variables on the fly is easier
@@ -55,7 +53,6 @@ import Util.SetLike as S
 --    f [] = e
 --    f ds = ELetRec ds e
 
-
 -- | Basic substitution routine
 subst ::
     TVr   -- ^ Variable to substitute
@@ -75,9 +72,6 @@ subst' :: TVr -> E -> E -> E
 subst' (TVr { tvrIdent = eid }) _ e | eid == emptyId = e
 subst' (TVr { tvrIdent = (i) }) w e = doSubst' True False (msingleton i w) (\n -> n `member` (freeVars w `union` freeVars e :: IdSet)) e
 
-
-
-
 litSMapM f LitCons { litName = s, litArgs = es, litType = t, litAliasFor = af } = do
     t' <- f t
     es' <- mapM f es
@@ -85,8 +79,6 @@ litSMapM f LitCons { litName = s, litArgs = es, litType = t, litAliasFor = af } 
 litSMapM f (LitInt n t) = do
     t' <- f t
     return $ LitInt n t'
-
-
 
 substMap :: IdMap E -> E -> E
 substMap im e = doSubst' False False im (\n -> n `member` (unions $ (freeVars e :: IdSet):map freeVars (values im))) e
@@ -170,18 +162,14 @@ doSubst' substInVars allShadow bm check e  = f e (Set.empty, bm) where
         let nvr = (tvr { tvrIdent =  i', tvrType =  t'})
         return (nvr,\(s,m) -> (Set.insert i' . Set.insert i $ s, minsert i (EVar nvr) . delete i' $ m))
 
-
-
 mnv :: Bool -> Set.Set Id -> Id -> (Id -> Bool) -> Set.Set Id -> IdMap a -> Id
 mnv allShadow xs i checkTaken s ss
-    | allShadow = newId (Set.size xs + Set.size s + size ss) (not . scheck)
-    | isInvalidId i || scheck i = newId (Set.size xs + Set.size s + size ss) (not . check)
+    | allShadow = newId (Set.size xs `mixInt` Set.size s `mixInt` size ss) (not . scheck)
+    | isInvalidId i || scheck i = newId (Set.size xs `mixInt` Set.size s `mixInt` size ss) (not . check)
             -- It is very important that we don't check for 'xs' membership in the guard above.
     | otherwise = i
     where scheck n = n `member` ss || n `member` s || checkTaken n
           check n = scheck n || n `member` xs
-
-
 
 eAp (EPi t b) e = if tvrIdent t == emptyId then b else subst t e b
 eAp (ELam t b) e = if tvrIdent t == emptyId then b else subst t e b
@@ -289,5 +277,3 @@ typeSubst termSubst typeSubst e  = f e (False,termSubst',typeSubst) where
         case i == i' of
             True -> return (nvr,addMap i  (Just $ EVar nvr))
             False -> return (nvr,addMap i (Just $ EVar nvr) . addMap i' Nothing)
-
-

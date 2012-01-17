@@ -27,6 +27,8 @@ module Name.Id(
     emptyId,
     newIds,
     newId,
+    mixInt,
+    mixInt3,
     toId,
     fromId,
     candidateIds,
@@ -37,7 +39,6 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Data.Bits
 import Data.Int
-import Data.Word
 import Data.Monoid
 import qualified Data.Binary as B
 import qualified Data.IntMap  as IM
@@ -72,12 +73,8 @@ import Util.SetLike as S
  -
  -}
 
-
-
 newtype Id = Id Int
     deriving(Eq,Ord)
-
-
 
 anonymous :: Int -> Id
 anonymous x | x <= 0 = error "invalid anonymous id"
@@ -130,7 +127,6 @@ idToInt (Id x) = x
 mapMaybeIdMap :: (a -> Maybe b) -> IdMap a -> IdMap b
 mapMaybeIdMap fn (IntjectionMap m) = IntjectionMap (IM.mapMaybe fn m)
 
-
 type IdMap = IntjectionMap Id
 --type instance GMap Id = IdMap
 
@@ -163,9 +159,7 @@ instance MapLike Id a (IdMap a) where
 --    toSet (IntjectionMap im)  = IntjectionSet $ IM.keysSet im
 --    toMap f (IntjectionSet is) = IntjectionMap $ IM.fromDistinctAscList [ (x,f (Id x)) |  x <- IS.toAscList is]
 
-
 --deriving instance MapLike Int a (IM.IntMap a) => MapLike Id a (IdMap a)
-
 
 idSetToIdMap :: (Id -> a) -> IdSet -> IdMap a
 --idSetToIdMap f (IdSet is) = IdMap $ IM.fromDistinctAscList [ (x,f (Id x)) |  x <- IS.toAscList is]
@@ -211,7 +205,7 @@ instance Monad m => NameMonad Id (IdNameT m) where
         return nn
     newName  = IdNameT $ do
         (used,bound) <- get
-        fromIdNameT $ newNameFrom (candidateIds (size used `xor` 128 * size bound))
+        fromIdNameT $ newNameFrom (candidateIds (size used `mixInt` size bound))
 
 addNamesIdSet nset = IdNameT $ do
     modify (\ (used,bound) -> (nset `union` used, bound) )
@@ -247,8 +241,6 @@ instance Show v => Show (IdMap v) where
 anonymousIds :: [Id]
 anonymousIds = map anonymous [1 .. ]
 
-
-
 etherealIds :: [Id]
 etherealIds = map Id [-4, -6 ..  ]
 
@@ -265,14 +257,14 @@ sillyId = Id $ -2
 emptyId :: Id
 emptyId = Id 0
 
-
 -- | find some temporary ids that are not members of the set,
 -- useful for generating a small number of local unique names.
 
 newIds :: IdSet -> [Id]
-newIds (IntjectionSet ids) = [ Id i | Id i <- candidateIds (size ids' `xor` IS.findMin ids' `xor` IS.findMax ids') , i `notMember` ids ] where
-    ids' = if size ids == 0 then IS.insert 0 ids else ids
-
+newIds (IntjectionSet ids) = ans where
+    ans = if sids == 0 then candidateIds 42 else [ Id i | Id i <- candidates, i `notMember` ids ]
+    sids = size ids
+    candidates = candidateIds (mixInt3 sids (IS.findMin ids) (IS.findMax ids))
 
 newId :: Int           -- ^ a seed value, useful for speeding up finding a unique id
       -> (Id -> Bool)  -- ^ whether an Id is acceptable
@@ -286,16 +278,6 @@ candidateIds !seed = f (2 + (mask $ hashInt seed)) where
     f !x = Id x:f (x + 2)
     --mask x = trace ("candidate " ++ show seed) $ Id $ x .&. 0x0FFFFFFE
 
-hashInt :: Int -> Int
-hashInt x = fromIntegral $ f (fromIntegral x) where
-    f :: Word -> Word
-    f a = a''''' where
-        !a' = (a `xor` 61) `xor` (a `shiftR` 16)
-        !a'' = a' + (a' `shiftL` 3)
-        !a''' = a'' `xor` (a'' `shiftR` 4)
-        !a'''' = a''' * 0x27d4eb2d
-        !a''''' = a'''' `xor` (a'''' `shiftR` 15)
-
 toId :: Name -> Id
 toId x = Id $ fromAtom (toAtom x)
 
@@ -306,7 +288,6 @@ fromId :: Monad m => Id -> m Name
 fromId (Id i) = case intToAtom i of
     Just a -> return $ fromAtom a
     Nothing -> fail $ "Name.fromId: not a name " ++ show (Id i)
-
 
 instance DocLike d => PPrint d Id where
     pprint x = tshow x

@@ -1,10 +1,9 @@
-module Util.NameMonad(NameMonad(..), GenName(..), NameMT, runNameMT, runNameMT', freeNames) where
+module Util.NameMonad(NameMonad(..),GenName(..),NameMT,runNameMT,runNameMT',freeNames,mixInt,mixInt3,hashInt) where
 
--- This may be horrid overdesign. I broke several principles I usually use to
--- prevent ones natural tendancy to overdesign.
-
-import qualified Data.Set as Set
 import Control.Monad.State
+import Data.Bits
+import Data.Word
+import qualified Data.Set as Set
 
 -- | There are bound names and used names, the used names are always a superset of the bound names.
 -- used names will not be chosen for any new bindings, bound names should be renamed if encountered.
@@ -83,6 +82,21 @@ instance (GenName n,Ord n,Monad m) => NameMonad n (NameMT n m) where
         return nn
     newName  = NameMT $ do
         (used,bound) <- get
-        fromNameMT $ newNameFrom  (genNames (Set.size used + Set.size bound))
+        fromNameMT $ newNameFrom  (genNames (Set.size used `mixInt` Set.size bound))
 
+hashInt :: Int -> Int
+hashInt x = fromIntegral $ f (fromIntegral x) where
+    f :: Word -> Word
+    f a = a''''' where
+        !a' = (a `xor` 61) `xor` (a `shiftR` 16)
+        !a'' = a' + (a' `shiftL` 3)
+        !a''' = a'' `xor` (a'' `shiftR` 4)
+        !a'''' = a''' * 0x27d4eb2d
+        !a''''' = a'''' `xor` (a'''' `shiftR` 15)
+
+mixInt :: Int -> Int -> Int
+mixInt x y = hashInt x - hashInt y
+
+mixInt3 :: Int -> Int -> Int -> Int
+mixInt3 x y z = (hashInt x - hashInt y) `xor` hashInt z
 
