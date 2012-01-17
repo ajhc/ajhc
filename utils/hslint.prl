@@ -1,0 +1,26 @@
+#!/usr/bin/perl
+
+my $err = 0;
+
+foreach my $fn (@ARGV) {
+    open my $fh, "<", $fn or die "$!: $fn";
+    my $noblank = 1;
+    my $imports = undef;
+    while(defined ($_ = <$fh>)) {
+        /\s+\n$/ and $err++, print "$fn:$.: Trailing whitespace\n";
+        $err++, print "$fn:$.: Extra blank line\n" if !/\S/ && $noblank;
+        $noblank = scalar !/\S/;
+        if (defined $imports) {
+            if (!/^import /) {
+                 $err++, print "$fn:$.: nonsorted imports\n" if  join('', sort @$imports) ne join('', @$imports);
+                 $imports = undef;
+            }
+        }
+        push @$imports, $_ if /^import /;
+    }
+    $err++, print "$fn:$. Extra blank line\n" if $noblank;
+    close $fh;
+}
+
+
+exit 1 if $err;
