@@ -172,6 +172,7 @@ isOmittable (BaseOp ReadRegister _) = True
 isOmittable (BaseOp NewRegister _) = True
 isOmittable (BaseOp GcPush _) = True  -- omittable because if we don't use the returned gc context, then we don't need to push to begin with
 isOmittable (BaseOp (StoreNode _) _) = True
+isOmittable Alloc {} = True
 isOmittable (Return {}) = True
 isOmittable Prim { expPrimitive = aprim } = aprimIsCheap aprim
 isOmittable (Case x ds) = all isOmittable [ e | _ :-> e <- ds ]
