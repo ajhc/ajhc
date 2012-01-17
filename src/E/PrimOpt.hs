@@ -23,7 +23,6 @@ import Support.CanType
 import Support.FreeVars
 import qualified Cmm.Op as Op
 
-
 {-@Extensions
 
 # Foreign Primitives
@@ -85,15 +84,11 @@ C-- Primitive
 
 -}
 
-
-
 unbox :: DataTable -> E -> Id -> (TVr -> E) -> E
 unbox dataTable e vn wtd = eCase e  [Alt (litCons { litName = cna, litArgs = [tvra], litType = te }) (wtd tvra)] Unknown where
     te = getType e
     tvra = tVr vn sta
     (ExtTypeBoxed cna sta _) = fromMaybe (error $ "lookupExtTypeInfo(unbox): " ++ show te) $ lookupExtTypeInfo dataTable te
-
-
 
 -- | this creates a string representing the type of primitive optimization was
 -- performed for bookkeeping purposes
@@ -107,7 +102,6 @@ cextra _ _ = ""
 
 primConv cop t1 t2 e rt = EPrim (APrim (Op (Op.ConvOp cop t1) t2) mempty) [e] rt
 
-
 performPrimOpt (ELit lc@LitCons { litArgs = xs }) = do
     xs' <- mapM performPrimOpt xs
     primOpt' (ELit lc { litArgs = xs' })
@@ -115,7 +109,6 @@ performPrimOpt (EPrim ap xs t) = do
     xs' <- mapM performPrimOpt xs
     primOpt' (EPrim ap xs' t)
 performPrimOpt e = return e
-
 
 primOpt' e@(EPrim (APrim s _) xs t) = do
     let primopt (Op (Op.BinOp bop t1 t2) tr) [e1,e2] rt = binOp bop t1 t2 tr e1 e2 rt
@@ -150,7 +143,6 @@ instance Expression E E where
     fromUnOp (EPrim (APrim Op { primCOp = Op.UnOp bop t1, primRetTy = tr } mempty) [e1] str) = Just (bop,t1,tr,e1,str)
     fromUnOp _ = Nothing
 
-
 -- | this is called once after conversion to E on all primitives, it performs various
 -- one time only transformations.
 
@@ -160,18 +152,18 @@ processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o i
     primopt "seq" [x,y] _  = return $ prim_seq x y
     primopt "exitFailure__" [w] rt  = return $ EError "" rt
     primopt op [a,b] t | Just cop <- readM op = mdo
-        (pa,(ta,sta)) <- extractPrimitive dataTable a
-        (pb,(tb,stb)) <- extractPrimitive dataTable b
+        (pa,(ta,_sta)) <- extractPrimitive dataTable a
+        (pb,(tb,_stb)) <- extractPrimitive dataTable b
         (bp,(tr,str)) <- boxPrimitive dataTable
                 (EPrim (APrim Op { primCOp = Op.BinOp cop (stringToOpTy ta) (stringToOpTy tb), primRetTy = (stringToOpTy tr) } mempty) [pa, pb] str) t
         return bp
     primopt op [a] t | Just cop <- readM op = mdo
-        (pa,(ta,sta)) <- extractPrimitive dataTable a
+        (pa,(ta,_sta)) <- extractPrimitive dataTable a
         (bp,(tr,str)) <- boxPrimitive dataTable
                 (EPrim (APrim Op { primCOp = Op.UnOp cop (stringToOpTy ta), primRetTy = (stringToOpTy tr) } mempty) [pa] str) t
         return bp
     primopt op [a] t | Just cop <- readM op = mdo
-        (pa,(ta,sta)) <- extractPrimitive dataTable a
+        (pa,(ta,_sta)) <- extractPrimitive dataTable a
         (bp,(tr,str)) <- boxPrimitive dataTable
                 (EPrim (APrim Op { primCOp = Op.ConvOp cop (stringToOpTy ta), primRetTy = (stringToOpTy tr) } mempty) [pa] str) t
         return bp
@@ -208,12 +200,9 @@ processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o i
     primopt pn [v] t | Just c <- getPrefix "minBound." pn    >>= Op.readTy = return (EPrim (APrim (PrimTypeInfo c c PrimMinBound) mempty) [] t)
     primopt pn [v] t | Just c <- getPrefix "umaxBound." pn   >>= Op.readTy = return (EPrim (APrim (PrimTypeInfo c c PrimUMaxBound) mempty) [] t)
     primopt pn [] t | Just c <-  getPrefix "const.M_PI" pn = mdo
-        (res,(ta,sta)) <- boxPrimitive dataTable (ELit (LitInt (realToFrac (pi :: Double)) sta)) t; return res
+        (res,(_ta,sta)) <- boxPrimitive dataTable (ELit (LitInt (realToFrac (pi :: Double)) sta)) t; return res
     primopt pn [] t | Just c <-  getPrefix "const." pn = mdo
         (res,(ta,sta)) <- boxPrimitive dataTable (EPrim (APrim (CConst c ta) mempty) [] sta) t; return res
     primopt pn [] _ | Just c <-  getPrefix "error." pn = return (EError c orig_t)
     primopt _ _ _ = fail "not a primopt we care about"
 processPrimPrim _ e = e
-
-
-

@@ -43,8 +43,8 @@ import System.IO.Unsafe
 import qualified Data.Map as Map
 import qualified Prelude(null)
 
-import StringTable.Atom
 import GenUtil
+import StringTable.Atom
 import qualified Doc.Chars as C
 import qualified Util.IntBag as IB
 
@@ -60,7 +60,6 @@ splitUp n str = filter (not . Prelude.null) (f n str)  where
             (a,"") -> [x,a]
             _ -> error "this can't happen"
         _ -> error "this can't happen"
-
 
 print greets stats = do
     l <- toList stats
@@ -113,7 +112,6 @@ printLStat n greets (Stat s) = do
 --------------
 -- monad stats
 --------------
-
 
 class Monad m => MonadStats m where
     mticks' ::  Int -> Atom -> m ()
@@ -220,7 +218,6 @@ isEmpty (Stats r) = null `liftM` readIORef r
 
 tick stats k = ticks stats 1 k
 
-
 ticks (Stats r) c k = modifyIORef r (mappend $ singleStat c k)
 
 -----------------
@@ -229,7 +226,6 @@ ticks (Stats r) c k = modifyIORef r (mappend $ singleStat c k)
 
 tickStat ::  Stats -> Stat -> IO ()
 tickStat (Stats r) s = modifyIORef r (mappend s)
-
 
 runStatIO :: MonadIO m =>  Stats -> StatT m a -> m a
 runStatIO stats action = do

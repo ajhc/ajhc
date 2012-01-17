@@ -141,7 +141,7 @@ data Constructor = Constructor {
     conExpr      :: E,            -- expression which constructs this value
     conOrigSlots :: [Slot],       -- original slots
     conDeriving  :: [Name],       -- classes this type derives
-    conAlias     :: {-# UNPACK #-} !AliasType, -- whether this is a simple alias and has no tag of its own.
+    conAlias     :: !AliasType,   -- whether this is a simple alias and has no tag of its own.
     conInhabits  :: Name,         -- what constructor it inhabits, similar to conType, but not quite.
     conVirtual   :: Maybe [Name], -- whether this is a virtual constructor that translates into an enum and its siblings
     conChildren  :: DataFamily
@@ -302,9 +302,6 @@ primitiveTable = concatMap f allCTypes  where
             conChildren = DataNormal [dc]
            }
         tipe = ELit (litCons { litName = tc, litArgs = [], litType = eStar })
-    f _ = []
-
-
 
 typesCompatable :: forall m . Monad m => DataTable -> E -> E -> m ()
 typesCompatable dataTable a b = f etherealIds a b where
@@ -341,7 +338,6 @@ typesCompatable dataTable a b = f etherealIds a b where
         boxCompat (ELit (LitCons { litName = n }))  t | Just e <- fromConjured modBox n =  e == getType t
         boxCompat _ _ = False
 
-
 extractPrimitive :: Monad m => DataTable -> E -> m (E,(ExtType,E))
 extractPrimitive dataTable e = case followAliases dataTable (getType e) of
     st@(ELit LitCons { litName = c, litArgs = [], litType = t })
@@ -373,9 +369,6 @@ boxPrimitive dataTable e et = case followAliases dataTable et of
              else
                 return $ (eStrictLet tvra e $ ELit litCons { litName = cn, litArgs = [EVar tvra], litType = et },(show n,st))
     e' -> fail $ "boxPrimitive: " ++ show (e,e')
-
-
-
 
 extractIO :: Monad m => E -> m E
 extractIO e = f e where
@@ -511,15 +504,17 @@ create_integralCast conv c1 t1 c2 t2 e t = eCase e [Alt (litCons { litName = c1,
 
 nameToOpTy n = do RawType <- return $ nameType n; Op.readTy (show n)
 
+{-
 create_integralCast_toInt c1 t1 e = create_integralCast Op.I2I c1 t1 dc_Int tIntzh e tInt
 create_integralCast_toInteger c1 t1 e = create_integralCast Op.Sx c1 t1 dc_Integer tIntegerzh e tInteger
 create_integralCast_fromInt c2 t2 e t = create_integralCast Op.I2I dc_Int tIntzh c2 t2 e t
 create_integralCast_fromInteger c2 t2 e t = create_integralCast Op.Lobits dc_Integer tIntegerzh c2 t2 e t
 
-create_uintegralCast_toInt c1 t1 e = create_integralCast Op.U2U c1 t1 dc_Int tIntzh e tInt
 create_uintegralCast_toInteger c1 t1 e = create_integralCast Op.Zx c1 t1 dc_Integer tIntegerzh e tInteger
 create_uintegralCast_fromInt c2 t2 e t = create_integralCast Op.U2U dc_Int tIntzh c2 t2 e t
 create_uintegralCast_fromInteger c2 t2 e t = create_integralCast Op.Lobits dc_Integer tIntegerzh c2 t2 e t
+-}
+create_uintegralCast_toInt c1 t1 e = create_integralCast Op.U2U c1 t1 dc_Int tIntzh e tInt
 
 updateLit :: DataTable -> Lit e t -> Lit e t
 updateLit _ l@LitInt {} = l

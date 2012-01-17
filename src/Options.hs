@@ -37,21 +37,20 @@ import System
 import System.Console.GetOpt
 import System.Directory
 import System.IO.Unsafe
+import qualified Data.ByteString.UTF8 as BS
 import qualified Data.Map as M
 import qualified Data.Set as S
-import qualified Data.ByteString.UTF8 as BS
 
 import RawFiles(targets_ini)
 import Support.IniParse
+import Util.ExitCodes
 import Util.Gen
 import Util.YAML
-import Util.ExitCodes
 import Version.Config
 import Version.Version(versionString,versionContext)
-import qualified Version.Config as VC
 import qualified FlagDump
 import qualified FlagOpts
-
+import qualified Version.Config as VC
 
 {-@CrossCompilation
 
@@ -154,7 +153,6 @@ data Mode = BuildHl FilePath         -- ^ Build the specified hl-file given a de
           | Preprocess               -- ^ Filter through preprocessor
             deriving(Eq)
 
-
 data Opt = Opt {
     optMode        ::  Mode,      -- ^ Mode of interaction
     optColumns     :: !Int,       -- ^ Width of terminal.
@@ -188,7 +186,6 @@ data Opt = Opt {
     optDumpSet     ::  S.Set FlagDump.Flag,    -- ^ Dump flags.
     optFOptsSet    ::  S.Set FlagOpts.Flag     -- ^ Flag options (-f\<opt\>).
   } {-!derive: update !-}
-
 
 emptyOpt = Opt {
     optMode        = CompileExe,
@@ -277,11 +274,9 @@ stop "typecheck" = StopTypeCheck
 stop "c" = StopC
 stop s = StopError s
 
-
 -- | Width of terminal.
 getColumns :: Int
 getColumns = read $ unsafePerformIO (getEnv "COLUMNS" `mplus` return "80")
-
 
 postProcessFD :: Monad m => Opt -> m Opt
 postProcessFD o = case FlagDump.process (optDumpSet o) (optDump o ++ vv) of

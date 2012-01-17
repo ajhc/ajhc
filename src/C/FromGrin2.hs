@@ -3,13 +3,11 @@ module C.FromGrin2(compileGrin) where
 
 import Control.Monad.Identity
 import Control.Monad.RWS
-import System.IO.Unsafe
 import Data.List
 import Data.Char
 import Data.Maybe
 import Data.Monoid
 import Text.PrettyPrint.HughesPJ(nest,($$),fsep)
-import Text.Printf
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as P
@@ -27,7 +25,6 @@ import Grin.Show()
 import Grin.Val
 import Options
 import PackedString
-import RawFiles
 import RtsFiles
 import StringTable.Atom
 import Support.CanType
@@ -35,12 +32,10 @@ import Support.FreeVars
 import Util.Gen
 import Util.UniqueMonad
 import Util.SetLike
-import Util.GMap
 import qualified Cmm.Op as Op
 import qualified FlagOpts as FO
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.UTF8 as BS
-import qualified Data.ByteString as BS
 
 ---------------
 -- C Monad

@@ -51,30 +51,26 @@ module FrontEnd.Tc.Monad(
 import Control.Monad.Error
 import Control.Monad.Reader
 import Control.Monad.Writer.Strict
-import qualified Control.Applicative as T
-import qualified Data.Traversable as T
-import qualified Data.Foldable as T
-import qualified Data.Sequence as Seq
-
-
 import Data.IORef
 import Data.Monoid
 import List
-import Maybe
-import qualified Data.Map as Map
-import qualified Data.Set as Set
 import System
 import Text.PrettyPrint.HughesPJ(Doc)
+import qualified Data.Foldable as T
+import qualified Data.Map as Map
+import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
+import qualified Data.Traversable as T
 
-
-import FrontEnd.Diagnostic
 import Doc.DocLike
 import Doc.PPrint
 import FrontEnd.Class
+import FrontEnd.Diagnostic
 import FrontEnd.KindInfer
 import FrontEnd.SrcLoc(bogusASrcLoc,MonadSrcLoc(..))
-import FrontEnd.Tc.Type
 import FrontEnd.Tc.Kind
+import FrontEnd.Tc.Type
+import FrontEnd.Warning
 import GenUtil
 import Name.Name
 import Name.Names
@@ -82,12 +78,8 @@ import Options
 import Support.CanType
 import Support.FreeVars
 import Support.Tickle
-import Util.Inst
-import Util.SetLike
-import FrontEnd.Warning
 import qualified FlagDump as FD
-import {-# SOURCE #-} FrontEnd.Tc.Class(ClassHierarchy,simplify)
-
+import {-# SOURCE #-} FrontEnd.Tc.Class(simplify)
 
 data BindingType = RecursiveInfered | Supplied
 type TypeEnv = Map.Map Name Sigma
@@ -131,8 +123,6 @@ data TcInfo = TcInfo {
     tcInfoClassHierarchy :: ClassHierarchy
     }
 
-
-
 -- | run a computation with a local environment
 localEnv :: TypeEnv -> Tc a -> Tc a
 localEnv te act = do
@@ -168,7 +158,6 @@ getCollectedCoerce = do
     r <- liftIO $ readIORef v
     r <- T.mapM flattenType r
     return r
-
 
 runTc :: (MonadIO m,OptionMonad m) => TcInfo -> Tc a -> m a
 runTc tcInfo  (Tc tim) = do
@@ -238,14 +227,10 @@ dConScheme conName = do
         Nothing -> error $ "dConScheme: constructor not found: " ++ show conName ++
                               "\nin this environment:\n" ++ show env
 
-
-
 -- | returns a new box and a function to read said box.
 
 newBox :: Kind -> Tc Type
 newBox k = newMetaVar Sigma k
-
-
 
 unificationError t1 t2 = do
     t1 <- evalFullType t1
@@ -255,7 +240,6 @@ unificationError t1 t2 = do
     liftIO $ processIOErrors
     liftIO $ putErrLn msg
     liftIO $ exitFailure
-
 
 lookupName :: Name -> Tc Sigma
 lookupName n = do
@@ -270,14 +254,12 @@ lookupName n = do
             return (TForAll nvs $ [] :=> foldr TArrow  (tTTuple' nvs') nvs')
         Nothing -> fail $ "Could not find var in tcEnv:" ++ show (nameType n,n)
 
-
 newMetaVar :: MetaVarType -> Kind -> Tc Type
 newMetaVar t k = do
     te <- ask
     n <- newUniq
     r <- liftIO $ newIORef Nothing
     return $ TMetaVar MetaVar { metaUniq = n, metaKind = k, metaRef = r, metaType = t }
-
 
 class Instantiate a where
     inst:: Map.Map Int Type -> Map.Map Name Type -> a -> a
@@ -296,7 +278,6 @@ instance Instantiate Type where
     inst mm ts (TAssoc tc as bs) = TAssoc tc (map (inst mm ts) as) (map (inst mm ts) bs)
     inst mm _ t = error $ "inst: " ++ show t
 
-
 instance Instantiate a => Instantiate [a] where
   inst mm ts = map (inst mm ts)
 
@@ -305,7 +286,6 @@ instance Instantiate t => Instantiate (Qual t) where
 
 instance Instantiate Pred where
   inst mm ts is = tickle (inst mm ts :: Type -> Type) is -- (IsIn c t) = IsIn c (inst mm ts t)
-
 
 freshInstance :: MetaVarType -> Sigma -> Tc ([Type],Rho)
 freshInstance typ (TForAll as qt) = do
@@ -391,9 +371,6 @@ boxySpec (TForAll as qt@(ps :=> t)) = do
     (t',vs) <- runWriterT (f t as)
     addPreds $ inst mempty (Map.fromList [ (tyvarName bt,s) | (bt,s) <- vs ]) ps
     return (sortGroupUnderFG fst snd vs,t')
-
-
-
 
 freeMetaVarsEnv :: Tc (Set.Set MetaVar)
 freeMetaVarsEnv = do
@@ -516,8 +493,6 @@ elimBox mv | isBoxyMetaVar mv = do
 
 elimBox mv = error $ "elimBox: nonboxy" ++ show mv
 
-
-
 ----------------------------------------
 -- Declaration of instances, boilerplate
 ----------------------------------------
@@ -564,7 +539,6 @@ tcInfoEmpty = TcInfo {
     tcInfoSigEnv = mempty
 }
 
-
 withMetaVars :: MetaVar -> [Kind] -> ([Sigma] -> Sigma) -> ([Sigma'] -> Tc a) -> Tc a
 withMetaVars mv ks sfunc bsfunc | isBoxyMetaVar mv = do
     boxes <- mapM newBox ks
@@ -576,4 +550,3 @@ withMetaVars mv ks sfunc bsfunc  = do
     taus <- mapM (newMetaVar Tau) ks
     varBind mv (sfunc taus)
     bsfunc taus
-
