@@ -5,13 +5,12 @@ import Monad
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import StringTable.Atom
 import GenUtil
 import Grin.Grin
+import StringTable.Atom
 import Support.CanType
 import Support.Tuple
 import Util.Graph
-
 
 tailcalls :: Lam -> Set.Set Atom
 tailcalls (_ :-> e) = f e where
@@ -23,10 +22,8 @@ tailcalls (_ :-> e) = f e where
 unboxingCandidate :: Item -> Bool
 unboxingCandidate item = isJust (unboxFunction undefined item)
 
-
 isEnum (NV _ []) = True
 isEnum _ = False
-
 
 unboxFunction :: Monad m => Atom -> Item -> m (Exp -> Exp, Exp -> Exp, Ty, Item)
 unboxFunction _ x | getType x == tyUnit = fail "unboxFunction: return type is already ()"
@@ -101,7 +98,6 @@ unboxReturnValues grin = do
         }
     if Map.null fns then return newgrin else unboxReturnValues newgrin
 
-
 convertReturns unboxReturn lam = g lam where
     g (l :-> e) = l :-> f e
     f (e :>>= l) = e :>>= g l
@@ -117,4 +113,3 @@ convertApps doApp lam = g lam where
     f e@Let { expDefs = defs, expBody = b } = e { expBody = f b, expDefs = [ createFuncDef True (funcDefName d) (g $ funcDefBody d) | d <- defs ] }
     f e@MkCont { expCont = c , expLam = b } = e { expCont = g c, expLam = g b }
     f e = doApp e
-

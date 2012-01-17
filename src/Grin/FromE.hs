@@ -6,12 +6,12 @@ import Data.IORef
 import Data.Monoid
 import List
 import Maybe
-import qualified Data.Set as Set
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 
-import StringTable.Atom
 import C.FFI hiding(Primitive)
 import C.Prims
+import Cmm.Op(ToCmmTy(..))
 import Control.Monad.Identity
 import DataConstructors
 import Doc.DocLike
@@ -32,20 +32,18 @@ import Name.Name
 import Name.Names
 import Options
 import Stats(mtick)
+import StringTable.Atom
 import Support.CanType
 import Support.FreeVars
+import Util.GMap
 import Util.Graph as G
 import Util.Once
 import Util.SetLike as SL
-import Util.GMap
 import Util.UniqueMonad()
 import qualified Cmm.Op as Op
-import Cmm.Op(ToCmmTy(..))
 import qualified FlagDump as FD
 import qualified Info.Info as Info
 import qualified Stats
-
-
 
 {- | Tags
  'f' - normal function
@@ -62,7 +60,6 @@ import qualified Stats
 -------------------
 -- Compile E -> Exp
 -------------------
-
 
 unboxedMap :: [(Name,Ty)]
 unboxedMap = [
@@ -101,24 +98,18 @@ dumpTyEnv (TyEnv tt) = mapM_ putStrLn $ sort [ fromAtom n <+> hsep (map show as)
 
 tagArrow = convertName tc_Arrow
 
-
 flattenScc xs = concatMap f xs where
     f (AcyclicSCC x) = [x]
     f (CyclicSCC xs) = xs
-
 
 instance Op.ToCmmTy Name where
     toCmmTy n = do
         RawType <- return $ nameType n
         toCmmTy $ show n
 
-
-
 instance Op.ToCmmTy E where
     toCmmTy (ELit LitCons { litName = tname, litArgs = [], litAliasFor = af, litType = eh  }) | eh == eHash = toCmmTy tname `mplus` (af >>= toCmmTy)
     toCmmTy _ = Nothing
-
-
 
 scTag n
     | Just nm <- fromId (tvrIdent n) = toAtom ('f':show nm)
@@ -127,8 +118,6 @@ cafNum n = V $ - fromAtom (partialTag (scTag n) 0)
 
 toEntry (n,as,e) = f (scTag n) where
         f x = (x,map (toType tyINode . tvrType )  as,toTypes TyNode (getType (e::E) :: E))
-
-
 
 toType :: Ty -> E -> Ty
 toType node = toty . followAliases mempty where
@@ -152,7 +141,6 @@ toTypes node = toty . followAliases mempty where
     toty _ = [node]
 
 toTyTy (as,r) = tyTy { tySlots = as, tyReturn = r }
-
 
 {-# NOINLINE compile #-}
 compile :: Program -> IO Grin
@@ -209,7 +197,6 @@ compile prog@Program { progDataTable = dataTable } = do
     epv <- liftM concat $ mapM ep entries
     enames <- mapM tvrAtom entries
 
-
     TyEnv endTyEnv <- readIORef tyEnv
     -- FIXME correct types.
     let newTyEnv = TyEnv $ fromList (toList endTyEnv ++ [(funcMain, toTyTy ([],[]))] ++ [(en, toTyTy ([],[])) | en <- enames])
@@ -247,7 +234,6 @@ compile prog@Program { progDataTable = dataTable } = do
 
 discardResult exp = exp :>>= map (Var v0) (getType exp) :-> Return []
 
-
 shouldKeep :: E -> Bool
 shouldKeep e = TyUnit /= toType TyNode e
 
@@ -277,7 +263,6 @@ primTyEnv = TyEnv . fmap toTyTy $ fromList $ [
     (tagArrow,([tyDNode, tyDNode],[TyNode])),
     (tagHole, ([],[TyNode]))
     ]
-
 
 -- | constant CAF analysis
 -- In grin, partial applications are constant data, rather than functions. Since
@@ -333,7 +318,6 @@ instance ToVal TVr where
     toVal TVr { tvrType = ty, tvrIdent = num } = case toType TyINode ty of
 --        TyTup [] -> Tup []
         ty -> Var (V $ idToInt num) ty
-
 
 doApply x y ty | not (keepIt y) = BaseOp (Apply ty) [x]
 doApply x y ty = BaseOp (Apply ty) [x,y]
@@ -415,7 +399,6 @@ compile' cenv (tvr,as,e) = ans where
     ce e | Just [z@NodeC {}] <- con e = return (dstore z)
     ce e | Just z <- con e = return (Return z)
 
-
     ce (EPrim ap@(APrim (PrimPrim prim) _) as _) = f (fromAtom prim) as where
 
 --        pconst s = Prim (APrim CConst { primConst = s, primRetType = "int" } mempty) [] [tEnumzh]
@@ -464,7 +447,6 @@ compile' cenv (tvr,as,e) = ans where
             let [v'] = args [v]
             return $ Return [v']
         f p xs = fail $ "Grin.FromE - Unknown primitive: " ++ show (p,xs)
-
 
     -- other primitives
     ce (EPrim ap@(APrim p _) xs ty) = do
@@ -638,7 +620,6 @@ compile' cenv (tvr,as,e) = ans where
         return $ Return [toVal v]
     cc e = return $ error ("cc: " ++ show e)
 
-
     doLet ds e = f (decomposeDs ds) e where
         f [] x = x
         f (Left te@(_,ELam {}):ds) x = f (Right [te]:ds) x
@@ -667,7 +648,6 @@ compile' cenv (tvr,as,e) = ans where
                 defs <- mapM g bs
                 return $ grinLet (concat defs) v
 
-
         f (Right bs:ds) x = do
             let u [] ss dus = return (\y -> ss (dus y))
                 u ((tvr,e):rs) ss dus = do
@@ -692,8 +672,6 @@ compile' cenv (tvr,as,e) = ans where
         f x | Just z <- constant x =  z
         f (EVar tvr) = toVal tvr
         f x = error $ "invalid argument: " ++ show x
-
-
 
     -- | Takes an E and returns something constant which is either a pointer to
     -- a constant heap location only pointing to global values or constants.
@@ -734,7 +712,6 @@ compile' cenv (tvr,as,e) = ans where
 
     con _ = fail "not constructor"
 
-
     scInfo tvr | Just n <- mlookup (tvrIdent tvr) (scMap cenv) = return n
     scInfo tvr = fail $ "not a supercombinator:" <+> show tvr
     newNodeVar =  fmap (\x -> Var x TyNode) newVar
@@ -745,7 +722,6 @@ compile' cenv (tvr,as,e) = ans where
         liftIO $ (writeIORef (counter cenv) $! (i + 2))
         return $! V i
 
-
 -- | converts an unboxed literal
 literal :: Monad m =>  E -> m [Val]
 literal (ELit LitCons { litName = n, litArgs = xs })  |  Just xs <- mapM literal xs, Just _ <- fromUnboxedNameTuple n = return (keepIts $ concat xs)
@@ -755,6 +731,5 @@ literal (EPrim aprim@(APrim p _) xs ty) | Just ptype <- toCmmTy ty, primIsConsta
     xs <- mapM literal xs
     return $ [ValPrim aprim (concat xs) (TyPrim ptype)]
 literal _ = fail "not a literal term"
-
 
 bool b x y = if b then x else y

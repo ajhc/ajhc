@@ -2,9 +2,9 @@ module Grin.Devolve(twiddleGrin,devolveTransform) where
 
 import Control.Monad.Identity
 import Control.Monad.RWS
+import Data.Functor
 import Data.IORef
 import Data.Maybe
-import Data.Functor
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -63,7 +63,6 @@ devolveGrin grin = do
     return $  setGrinFunctions (lf ++ nf) grin { grinPhase = PostDevolve, grinTypeEnv = ntenv }
     --if null lf then return ng else devolveGrin ng
     --if null lf then return ng else devolveGrin ng
-
 
 -- twiddle does some final clean up before translation to C
 -- it replaces unused arguments with 'v0' and adds GC notations
@@ -157,7 +156,6 @@ instance Twiddle Lam where
 --        vs <- censor (const mempty) . local (\e -> e { envMap = fvp' }) $ twiddle vs
 --        return (vs :-> y)
 
-
 twiddleGrin grin = grinFunctions_s fs' grin where
     fs' = runR . twiddle  $ grinFunctions grin
 
@@ -171,9 +169,3 @@ twiddleVal x = f x where
             Just n -> tell (Set.singleton n) >> return (Var n ty)
             Nothing -> tell (Set.singleton v) >> return var
     f x = mapValVal f x
-
-
-
-
-
-

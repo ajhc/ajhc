@@ -12,13 +12,14 @@ module Grin.Val(
     region_block
     ) where
 
-import StringTable.Atom
 import Char
-import Grin.Grin
-import Name.VConsts
-import Name.Names
-import Name.Name
+
 import Cmm.Number
+import Grin.Grin
+import Name.Name
+import Name.Names
+import Name.VConsts
+import StringTable.Atom
 
 nil      = convertName dc_EmptyList
 cons     = convertName dc_Cons
@@ -51,11 +52,9 @@ class FromVal a where
     fromUnVal :: Monad m => Val -> m a
     fromUnVal x = fromVal x
 
-
 instance ToVal Bool where
     toVal True = vTrue
     toVal False = vFalse
-
 
 instance ToVal a => ToVal [a] where
     toVal [] = NodeC nil []
@@ -70,10 +69,8 @@ instance ToVal Int where
     toVal c = NodeC cInt [toUnVal c]
     toUnVal c =  Lit (fromIntegral c) tIntzh
 
-
 instance ToVal Val where
     toVal x = x
-
 
 instance FromVal Int where
     fromVal (NodeC _ [Lit i _]) | Just x <- toIntegral i = return x
@@ -93,7 +90,6 @@ instance FromVal a => FromVal [a] where
         xs <- fromVal b
         return (x:xs)
     fromVal n = fail $ "Val is not [a]: " ++ show n
-
 
 instance FromVal Bool  where
     fromVal n
@@ -115,5 +111,3 @@ convertName n = toAtom (t':s) where
        | t == DataConstructor = 'C'
        | t == Val = 'f'
        | otherwise = error $ "convertName: " ++ show (t,s)
-
-

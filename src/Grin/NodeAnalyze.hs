@@ -1,4 +1,3 @@
-
 -- a fast, straightforward points to analysis
 -- meant to determine nodes that are always in whnf
 -- and find out evals or applys that always
@@ -6,9 +5,9 @@
 
 module Grin.NodeAnalyze(nodeAnalyze) where
 
-import Control.Monad.Trans
 import Control.Monad.Identity hiding(join)
 import Control.Monad.RWS hiding(join)
+import Control.Monad.Trans
 import Data.Maybe
 import Text.Printf
 import qualified Data.Map as Map
@@ -27,13 +26,10 @@ import Util.UnionSolve
 import Util.UniqueMonad
 import qualified Stats
 
-
-
 data NodeType
     = WHNF       -- ^ guarenteed to be a WHNF
     | Lazy       -- ^ a suspension, a WHNF, or an indirection to a WHNF
     deriving(Eq,Ord,Show)
-
 
 data N = N !NodeType (Topped (Set.Set Atom))
     deriving(Eq)
@@ -51,14 +47,12 @@ instance Fixable NodeType where
     eq = (==)
     lte x y = x <= y
 
-
 instance Fixable N where
     isBottom (N a b) = isBottom a && isBottom b
     isTop (N a b) = isTop a && isTop b
     join  (N x y) (N x' y') = N (join x x') (join y y')
     meet  (N x y) (N x' y') = N (meet x x') (meet y y')
     lte   (N x y) (N x' y') = lte x x' && lte y y'
-
 
 data V = V Va Ty | VIgnore
     deriving(Eq,Ord)
@@ -105,7 +99,6 @@ runM :: Grin -> M a -> C N V
 runM grin (M w) = case runRWS w (grinTypeEnv grin) 1 of
     (_,_,w) -> w
 
-
 {-# NOINLINE nodeAnalyze #-}
 nodeAnalyze :: Grin -> IO Grin
 nodeAnalyze grin' = do
@@ -130,7 +123,6 @@ nodeAnalyze grin' = do
     let cmap = Map.map (fromJust . flip Map.lookup res) rm
     (grin',stats) <- Stats.runStatT $ tickleM (fixupfs cmap (grinTypeEnv grin)) grin
     return $ transformFuncs (fixupFuncs (grinSuspFunctions grin) (grinPartFunctions grin) cmap) grin' { grinStats = stats `mappend` grinStats grin' }
-
 
 data Todo = Todo !Bool [V] | TodoNothing
 
@@ -244,7 +236,6 @@ doFunc (name,arg :-> body) = ans where
             fn ret e
         f exp = error $ "NodeAnalyze.f: " ++ show exp
 
-
     convertVal (Const n@(NodeC _ _)) = convertVal n
     convertVal (Const _) = return $ Right (N WHNF Top)
     convertVal (NodeC t vs) = case tagUnfunction t of
@@ -278,7 +269,6 @@ data WhatToDo
 
 isWhatUnchanged WhatUnchanged = True
 isWhatUnchanged _ = False
-
 
 transformFuncs :: (Atom -> [Ty] -> Maybe [Ty] -> (Maybe [WhatToDo],Maybe [WhatToDo])) -> Grin -> Grin
 transformFuncs fn grin = grin'' where
@@ -320,8 +310,6 @@ transformFuncs fn grin = grin'' where
         f ((Var v oty,WhatSubs nty tt _):xs) rs = tt (Var v oty) :>>= [Var v nty] :-> f xs (Var v nty:rs)
         f [] rs = BaseOp (StoreNode False) [NodeC a (reverse rs)]
 
-
-
     j app@(App a xs ts) = res where
         res = if isNothing ats' && isNothing rts'  then app else e'
         ats = maybe (repeat WhatUnchanged) id ats'
@@ -342,7 +330,6 @@ transformFuncs fn grin = grin'' where
         g ((v,WhatConstant c):xs) vs rs = Return [c] :>>= [v] :-> g xs vs (v:rs)
         g ((v,WhatSubs _ _ ft):xs) (n:ns) rs = ft n :>>= [v] :-> g xs ns (v:rs)
 
-
         rvars = zipWith Var [ v1 .. ] ts'
         rvars' = zipWith Var (drop (length rvars) [ v1 .. ]) ts
         ts' = concatMap g (zip ts rts) where
@@ -352,9 +339,7 @@ transformFuncs fn grin = grin'' where
             g (t,WhatSubs nty _ _) = [nty]
 
     j Let { expDefs = ds, expBody = e } =  grinLet [ updateFuncDefProps d { funcDefBody = snd $ fs (funcDefName d, funcDefBody d) } | d <- ds ] (j e)
-
     j e = runIdentity $ mapExpExp (return . j) e
-
 
 fixupFuncs sfuncs pfuncs cmap  = ans where
     ans a as jrs | a `Set.member` pfuncs = (Nothing,Nothing)
@@ -412,7 +397,6 @@ fixupfs cmap tyEnv l = tickleM f (l::Lam) where
 
 dstore x = BaseOp (StoreNode True) [x]
 
-
 renameUniqueGrin :: Grin -> Grin
 renameUniqueGrin grin = res where
     (res,()) = evalRWS (execUniqT 1 ans) ( mempty :: Map.Map Atom Atom) (fromList [ x | (x,_) <- grinFuncs grin ] :: Set.Set Atom)
@@ -446,6 +430,5 @@ renameUniqueGrin grin = res where
             nn <- cfname
             lift $ modify (insert nn)
             return (nn,(a,nn))
-
 
 bool x y b = if b then x else y

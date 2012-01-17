@@ -14,7 +14,6 @@ import IO
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import StringTable.Atom
 import C.Prims
 import Data.Graph.Inductive.Graph(mkGraph)
 import Data.Graph.Inductive.Tree
@@ -24,18 +23,16 @@ import Doc.Pretty
 import Grin.Grin
 import Grin.Noodle
 import Grin.Val
+import Name.VConsts
 import Options
+import StringTable.Atom
 import Support.CanType
 import Support.FreeVars
 import Util.Graphviz
 import qualified Cmm.Op as Op
-import Name.VConsts
-
-
 
 instance DocLike d => PPrint d Val   where
     pprintAssoc _ _ v = prettyVal v
-
 
 instance PPrint Doc Exp   where
     pprint v = prettyExp empty v
@@ -49,13 +46,11 @@ prettyVals [] = prettyVal Unit
 prettyVals [x] = prettyVal x
 prettyVals xs = tupled (map prettyVal xs)
 
-
 operator = text
 keyword = text
 tag x = text x
 func = text
 prim = text
-
 
 isComplex (_ :>>= _) = True
 isComplex _ = False
@@ -146,7 +141,6 @@ instance DocLike d => PPrint d Var where
 --pv (V 0) = char '_'
 --pv (V i) = char 'v' <> tshow i
 
-
 prettyFun :: (Atom,Lam) -> Doc
 prettyFun (n,(as :-> e)) = func (fromAtom n) <+> hsep (map prettyVal as) <+> operator "=" <+> keyword "do" <$> indent 2 (prettyExp empty e)
 
@@ -166,7 +160,6 @@ hPrintGrin handle grin@Grin { grinCafs = cafs } = do
         hPutStrLn handle . render $ func (fromAtom n) <+> operator "::" <+> tupled (map (tshow . getType) l)  <+> operator "->" <+> tupled (map tshow (getType e))
         hPutStrLn handle (render $ prettyFun f)
         hPutStrLn handle ""
-
 
 {-# NOINLINE graphGrin #-}
 
@@ -188,7 +181,6 @@ hasError x = isNothing (hasError' x)
 hasError' Error {} = Nothing
 hasError' e = mapExpExp hasError' e
 
-
 data CallType = TailCall | StandardCall
     deriving(Ord,Show,Eq)
 
@@ -196,5 +188,3 @@ instance FreeVars Exp (Set.Set (CallType,Atom)) where
     freeVars (a :>>= _ :-> b) = freeVars b `Set.union` Set.map (\ (_ :: CallType,y) -> (StandardCall, y)) (freeVars a)
     freeVars (App a _ _) = Set.singleton (TailCall,a)
     freeVars e = execWriter $ mapExpExp (\e -> tell (freeVars e) >> return e) e
-
-

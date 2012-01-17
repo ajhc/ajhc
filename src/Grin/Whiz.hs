@@ -3,10 +3,10 @@ module Grin.Whiz(whiz, fizz, WhizState, whizState, normalizeGrin,normalizeGrin',
 import Control.Monad.Identity
 import Control.Monad.State
 import Control.Monad.Writer
-import qualified Data.Set as Set
 import Util.GMap
-import Util.SetLike
 import Util.HasSize
+import Util.SetLike
+import qualified Data.Set as Set
 
 import Grin.Grin
 import Grin.Noodle
@@ -104,7 +104,6 @@ whiz sub te tf inState start = res where
         put g
         return (p :-> z)
 
-
 -- | magic traversal and flattening routine.
 -- whiz traverses Grin code and right assosiates it as well as renaming and
 -- repeated variables along the way.
@@ -176,15 +175,12 @@ fizz sub te tf inState start = res where
         put g
         return (p :-> z)
 
-
 applySubstE env x = mapExpVal (applySubst env) x
 
 applySubst env x = f x where
     f var@(Var v _)
         | Just n <- mlookup v env =  return n
     f x = mapValVal f x
-
-
 
 renamePattern :: MonadState (WhizState) m => [Val] ->  m ([Val],WhizEnv)
 renamePattern x = runWriterT (mapM f x) where
@@ -213,6 +209,3 @@ newVarName (V sv) = do
         Right n -> do
             put $! (Right $! (n + 1))
             return $ V n
-
-
-

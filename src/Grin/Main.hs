@@ -71,8 +71,6 @@ compileToGrin prog = do
     dumpFinalGrin x
     compileGrinToC x
 
-
-
 dumpFinalGrin grin = do
     wdump FD.GrinGraph $ do
         let dot = graphGrin grin

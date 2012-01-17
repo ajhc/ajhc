@@ -18,7 +18,6 @@ import Util.Gen
 import Util.SetLike
 import Util.HasSize
 
-
 modifyTail :: Lam -> Exp -> Exp
 modifyTail lam@(_ :-> lb) te = f (sempty :: GSet Atom) te where
     lamFV = freeVars lam :: GSet Var
@@ -103,8 +102,6 @@ mapExpLam fn e = f e where
         return $ e { expCont = c, expLam = l }
     f e = return e
 
-
-
 mapExpExp fn e = f e where
     f (a :>>= b) = return (:>>=) `ap` fn a `ap` g b
     f l@Let { expBody = b, expDefs = defs } = do
@@ -124,7 +121,6 @@ funcDefBody_uM f fd@FuncDef { funcDefBody = b } = do
     return $  updateFuncDefProps fd { funcDefBody = b' }
 
 grinFunctions_s nf grin = grin { grinFunctions = nf }
-
 
 --------------------------
 -- examining and reporting
@@ -148,7 +144,6 @@ isManifestNode e = f (sempty :: GSet Atom) e where
         return $ concat cs
     f lf (_ :>>= _ :-> e) = isManifestNode e
     f lf _ = fail "not manifest node"
-
 
 -- | Is a Val constant?
 valIsConstant :: Val -> Bool
@@ -238,7 +233,6 @@ updateLetProps lt@Let { expBody = body, expDefs = defs } =
     myDefs = fromList $ map funcDefName defs
 updateLetProps e = e
 
-
 data ReturnInfo = ReturnNode (Maybe Atom,[Ty]) | ReturnConst Val | ReturnCalls Atom | ReturnOther | ReturnError
     deriving(Eq,Ord)
 
@@ -261,9 +255,5 @@ getReturnInfo  e = ans where
     f _ (App a _ _) = tells $ ReturnCalls a
     f _ e = tells ReturnOther
 
-
-
 mapGrinFuncsM :: Monad m => (Atom -> Lam -> m Lam) -> Grin -> m Grin
 mapGrinFuncsM f grin = liftM (`setGrinFunctions` grin) $ mapM  (\x -> do nb <- f (funcDefName x) (funcDefBody x); return (funcDefName x, nb)) (grinFunctions grin)
-
-

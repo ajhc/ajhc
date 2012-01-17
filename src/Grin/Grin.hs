@@ -275,12 +275,10 @@ funcProps = FuncProps {
     funcLoops = Maybe
     }
 
-
 data Phase = PhaseInit | PostInlineEval | PostAeOptimize | PostDevolve
     deriving(Show,Eq,Ord,Enum)
 
 phaseEvalInlined e = e >= PostInlineEval
-
 
 data Grin = Grin {
     grinEntryPoints :: GMap Atom FfiExport,
@@ -292,7 +290,6 @@ data Grin = Grin {
     grinStats :: !Stats.Stat,
     grinCafs :: [(Var,Val)]
 }
-
 
 emptyGrin = Grin {
     grinEntryPoints = mempty,
@@ -555,8 +552,6 @@ instance FreeVars Exp (Set.Set (Var,Ty)) where
     freeVars MkCont { expCont = v, expLam = as} = freeVars (v,as)
     freeVars GcRoots { expValues = v, expBody = b } = freeVars (v,b)
 
-
-
 instance FreeVars Val (Set.Set Tag) where
     freeVars (NodeC t xs) = Set.singleton t `Set.union` freeVars xs
     freeVars (Index a b) = freeVars (a,b)
@@ -571,7 +566,6 @@ instance FreeVars Exp [Tag] where
 
 instance FreeVars Lam (Set.Set Tag) where
     freeVars (a :-> b) = freeVars (a,b)
-
 
 instance FreeVars Exp (Set.Set Tag) where
     freeVars (a :>>= b) = freeVars (a,b)
@@ -603,7 +597,6 @@ instance FreeVars Val (GSet Var) where
     freeVars (Var v _) = singleton v
     freeVars _ = sempty
 
-
 instance FreeVars FuncProps (GSet Var) where
     freeVars FuncProps { funcFreeVars = fv } = fromDistinctAscList $ toList fv
 
@@ -634,7 +627,6 @@ instance FreeVars Val [Var] where
 instance FreeVars Lam [Var] where
     freeVars e = toList $ (freeVars e :: GSet Var)
 
-
 instance FreeVars Val (GSet Tag) where
     freeVars (NodeC t xs) = singleton t `union` freeVars xs
     freeVars (Index a b) = freeVars (a,b)
@@ -643,7 +635,6 @@ instance FreeVars Val (GSet Tag) where
 
 instance FreeVars Lam (GSet Tag) where
     freeVars (a :-> b) = freeVars (a,b)
-
 
 instance FreeVars Exp (GSet Tag) where
     freeVars (a :>>= b) = freeVars (a,b)
@@ -678,7 +669,6 @@ instance Show Ty where
     show (TyRegister t) = 'r':show t
     show (TyCall c as rt) = show c <> tupled (map show as) <+> "->" <+> show rt
     show TyUnknown = "?"
-
 
 instance Show Val where
     -- showsPrec _ s | Just st <- fromVal s = text $ show (st::String)
@@ -718,11 +708,9 @@ instance TypeNames Ty where
     tEnumzh = TyPrim (Op.bits16)
     tCharzh = TyPrim (Op.bits32)
 
-
 instance Intjection Var where
     toIntjection i = V (fromIntegral i)
     fromIntjection (V i) = fromIntegral i
-
 
 newtype instance GSet Var = GSetVar (IntjectionSet Var)
     deriving(Monoid,IsEmpty,HasSize,Collection,Unionize,SetLike,Eq,Ord)

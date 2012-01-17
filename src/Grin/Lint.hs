@@ -15,13 +15,13 @@ import Doc.DocLike
 import Grin.Grin
 import Grin.Show
 import Options
-import Support.FreeVars
 import Support.CanType
-import Support.Transform
 import Support.Compat
+import Support.FreeVars
+import Support.Transform
+import Text.Printf
 import Util.Gen
 import Util.SetLike
-import Text.Printf
 import qualified FlagDump as FD
 import qualified Stats
 
@@ -86,14 +86,12 @@ instance DShow Var where
 instance DShow Ty where
     dshow v = dshow $ show v
 
-
 instance (DShow a,DShow b) => DShow (Either a b) where
     dshow (Left x) = dshow x
     dshow (Right x) = dshow x
 
 funArg n i = show n ++ "@arg@" ++ show i
 funRet n i = show n ++ "@ret@" ++ show i
-
 
 printFunc h n (l :-> e) = do
     hPrintf h "func(%s,%i).\n" (dshow n) (length l)
@@ -122,8 +120,6 @@ bindUnknown h l r = do
 
 setUnknown :: DShow a => Handle -> a -> String -> IO ()
 setUnknown h x r = do hPrintf h "unknown(%s,%s).\n" (dshow x) (dshow r)
-
-
 
 printDL h n fs e = f fs e where
     f fs (x :>>= l :-> y) = do
@@ -210,18 +206,14 @@ transformGrin tp prog = do
 --    if doIterate iterate (estat /= mempty) then transformGrin tp { transformIterate = iterateStep iterate } prog' { progStats = istat `mappend` estat } else
 --        return prog' { progStats = istat `mappend` estat, progPasses = name:progPasses prog' }
 
-
 maybeDie = case optKeepGoing options of
     True -> return ()
     False -> putErrDie "Internal Error"
-
 
 data TcEnv = TcEnv {
     envTyEnv :: TyEnv,
     envInScope :: Set.Set Var
 }
-
-
 
 newtype Tc a = Tc (ReaderT TcEnv (Either String) a)
     deriving(Monad,MonadReader TcEnv)

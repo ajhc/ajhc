@@ -6,10 +6,10 @@ import Data.Maybe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Options
 import Grin.Grin
 import Grin.Noodle
 import Grin.Val
+import Options
 import StringTable.Atom
 import Support.FreeVars
 import Support.Tickle
@@ -47,7 +47,6 @@ instance Show Vr where
     showsPrec _ (Va a i) = shows (a,i)
     showsPrec _ (Vr (V n)) = showChar 'r' . shows n
 
-
 {-# NOINLINE storeAnalyze #-}
 storeAnalyze :: Grin -> IO Grin
 storeAnalyze grin | fopts FO.Jgc = return grin
@@ -72,7 +71,6 @@ storeAnalyze grin = do
     mapM_ (\ (x,y) -> putStrLn $ show x ++ " -> " ++ show y) (Map.toList cmap)
     let grin'' = runIdentity $ tickleM (lastLam cmap) grin'
     return grin''
-
 
 isHeap TyNode = True
 isHeap TyINode = True
@@ -122,9 +120,6 @@ firstLam fname lam = g Nothing fname lam where
         b <- g wtd fname b
         return (fname,b)
 
-
-
-
 lastLam :: Map.Map Vr T -> Lam -> Identity Lam
 lastLam cmap  lam = tickleM f lam where
     f (BaseOp (StoreNode sh) [n,Var r TyRegion]) = do
@@ -132,8 +127,3 @@ lastLam cmap  lam = tickleM f lam where
             Just S -> return (BaseOp (StoreNode sh) [n,region_stack])
             _ ->  return (BaseOp (StoreNode sh) [n])
     f e = tickleM f e
-
-
-
-
-

@@ -524,7 +524,7 @@ boxifyProgram prog = ans where
         e <- return $ runReader (g e) Set.empty
         tt <- return $ runReader (boxify (tvrType t)) Set.empty
         return (t {tvrType = tt},e)
-    tv t = t { tvrType = boxify (tvrType t) }
+    _tv t = t { tvrType = boxify (tvrType t) }
     g e = do
         emapEG g (boxify) e -- (\e -> do putStrLn ("box: " ++ pprint e) ; return $ boxify e) e
 --    boxify t | Just e <- followAlias (progDataTable prog) t = boxify e

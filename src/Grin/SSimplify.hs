@@ -1,10 +1,9 @@
 module Grin.SSimplify(simplify,explicitRecurse) where
 
-
 import Control.Monad.Identity
 import Control.Monad.Reader
-import Control.Monad.Writer
 import Control.Monad.State
+import Control.Monad.Writer
 import Data.Maybe
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
@@ -35,7 +34,6 @@ import qualified Stats
 --
 -- all variables and function names are unique in their scope.
 
-
 data SEnv = SEnv {
     envSubst :: IM.IntMap Val,   -- renaming substitution
     envCSE   :: Map.Map Exp (Atom,Exp),
@@ -65,16 +63,13 @@ instance Stats.MonadStats S where
     mtickStat s = S (tell mempty { colStats = s })
     mticks' n a = S (tell mempty { colStats = Stats.singleStat n a })
 
-
 tellFV v = tell mempty { colFreeVars = freeVars v }
-
 
 simplify :: Grin -> IO Grin
 simplify grin = do
     let (fs,_,SCol { colStats = stats}) = runRWS fun mempty SState { usedVars = mempty }
         S fun = simpFuncs (grinFunctions grin)
     return grin { grinFunctions = fs, grinStats = grinStats grin `mappend` stats }
-
 
 simpFuncs :: [FuncDef] -> S [FuncDef]
 simpFuncs fd = do
@@ -91,9 +86,7 @@ simpLam (ps :-> e) = do
     ps <- mapM (zeroVars (`member` colFreeVars col)) ps
     return (ps :-> e)
 
-
 dstore x = BaseOp (StoreNode True) [x]
-
 
 simpDone :: Exp -> S Exp
 simpDone e = do
@@ -154,8 +147,6 @@ simpBind p e cont = f p e where
 
 extEnv :: Var -> Val -> SEnv -> SEnv
 extEnv (V vn) v s = s { envSubst = IM.insert vn v (envSubst s) }
-
-
 
 simpExp :: Exp -> S Exp
 simpExp e = f e [] where
@@ -252,8 +243,6 @@ simpExp e = f e [] where
             _ -> return $ updateLetProps lt { expBody = body, expDefs = defs }
     g x = applySubstE x
 
-
-
 applySubstE :: Exp -> S Exp
 applySubstE x = mapExpVal applySubst x
 
@@ -289,9 +278,6 @@ newVarName (V sv) = do
             | otherwise = n
     modify (\e -> e { usedVars = IS.insert nv s })
     return (V nv)
-
-
-
 
 isHoly (NodeC _ as) | any isValUnknown as = True
 isHoly n = False
@@ -363,7 +349,6 @@ unboxModify ur = f ur where
     mApp f (App f' as tys) | f == f' = return $ Return as
     mApp f e  = error $ "mApp: " ++ show (f,e)
 
-
 combineUnboxing :: UnboxingResult -> UnboxingResult -> UnboxingResult
 combineUnboxing ub1 ub2 = f ub1 ub2 where
     f UnErr {} x = x
@@ -432,4 +417,3 @@ explicitRecurse grin =  mapGrinFuncsM f grin where
             g (App n rs t) | n == name = App nname rs t
             g e = tickle g e
         return $ as :-> grinLet [createFuncDef True nname (as :-> g e) ] (App nname as (getType e))
-
