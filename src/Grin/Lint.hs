@@ -275,8 +275,10 @@ tcExp e = f e where
         [NodeC {}] <- return vs
         mapM_ tcVal vs
         return (getType e)
-    f Alloc { expValue = v } = do
+    f Alloc { expValue = v, expCount = c, expRegion = r } = do
         t <- tcVal v
+        tcVal c
+        tcVal r
         return [TyPtr t]
     f (Return v) = mapM tcVal v
     f (BaseOp Promote [v]) = do
