@@ -1,3 +1,4 @@
+{-# OPTIONS -funbox-strict-fields #-}
 module Cmm.Op where
 
 import Data.Binary
@@ -146,7 +147,7 @@ data ArchBits = BitsMax | BitsPtr | BitsUnknown
     deriving(Eq,Ord)
     {-! derive: Binary !-}
 
-data TyBits = Bits {-# UNPACK #-} !Int | BitsArch {-# UNPACK #-} !ArchBits |  BitsExt String
+data TyBits = Bits {-# UNPACK #-} !Int | BitsArch !ArchBits |  BitsExt String
     deriving(Eq,Ord)
     {-! derive: Binary !-}
 
@@ -160,7 +161,7 @@ data TyHint
     {-! derive: Binary !-}
 
 data Ty
-    = TyBits !TyBits {-# UNPACK #-} !TyHint
+    = TyBits !TyBits !TyHint
     | TyBool
     deriving(Eq,Ord)
     {-! derive: Binary !-}

@@ -8,20 +8,14 @@ module Grin.NodeAnalyze(nodeAnalyze) where
 
 import Control.Monad.Trans
 import Control.Monad.Identity hiding(join)
-import Control.Monad(forM, forM_, when)
-import Control.Monad.RWS(MonadWriter(..), RWS(..))
 import Control.Monad.RWS hiding(join)
-import Data.Monoid
 import Data.Maybe
-import IO
 import Text.Printf
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Grin.Grin hiding(V)
-import Grin.Lint
 import Grin.Noodle
-import Grin.Whiz
 import Options
 import StringTable.Atom
 import Support.CanType

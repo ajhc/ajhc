@@ -92,7 +92,7 @@ module Util.IntBag  (
 --            , fromListWithKey
 
             -- ** Ordered lists
---            , toAscList
+            , toAscList
 --            , fromAscList
 --            , fromAscListWith
 --            , fromAscListWithKey
@@ -124,22 +124,13 @@ module Util.IntBag  (
 
 import Prelude hiding (lookup,map,filter,foldr,foldl,null)
 import Data.Bits
-import Data.Int
-import qualified Data.IntSet as IntSet
 import Data.Monoid (Monoid(..))
-import Data.Typeable
-import Data.Foldable (Foldable(foldMap))
 
 
-#if __GLASGOW_HASKELL__
-import Text.Read
-import Data.Generics.Basics
-import Data.Generics.Instances
-#endif
 
 #if __GLASGOW_HASKELL__ >= 503
 import GHC.Word
-import GHC.Exts ( Word(..), Int(..), shiftRL# )
+import GHC.Exts (  Int(..), shiftRL# )
 #elif __GLASGOW_HASKELL__
 import Word
 import GlaExts ( Word(..), Int(..), shiftRL# )
@@ -1154,11 +1145,11 @@ zero :: Key -> Mask -> Bool
 zero i m
   = (natFromInt i) .&. (natFromInt m) == 0
 
-nomatch,match :: Key -> Prefix -> Mask -> Bool
+nomatch,_match :: Key -> Prefix -> Mask -> Bool
 nomatch i p m
   = (mask i m) /= p
 
-match i p m
+_match i p m
   = (mask i m) == p
 
 mask :: Key -> Mask -> Prefix

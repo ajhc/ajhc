@@ -2,7 +2,6 @@ module Support.MapBinaryInstance where
 
 
 import Data.Binary
-import Data.Word
 import Data.Map as Map
 import Data.Set as Set
 import Control.Monad
