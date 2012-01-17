@@ -1,3 +1,4 @@
+{-# OPTIONS -XDeriveDataTypeable #-}
 module Util.Histogram(
     Histogram,
     singleton,
@@ -20,6 +21,7 @@ module Util.Histogram(
 import qualified Data.Map as Map
 import Data.Monoid
 import Data.Typeable
+import qualified Data.List as L
 
 newtype Histogram a = Histogram (Map.Map a Int)
     deriving(Show,Typeable)
@@ -27,7 +29,6 @@ newtype Histogram a = Histogram (Map.Map a Int)
 instance Ord a => Monoid (Histogram a) where
     mempty = Histogram Map.empty
     mappend (Histogram a) (Histogram b) = Histogram $ Map.unionWith (+) a b
-
 
 singleton :: a -> Histogram a
 singleton a = Histogram (Map.singleton a 1)
@@ -67,7 +68,7 @@ mapM_ :: (Monad m) => (a -> m b) -> Histogram a -> m ()
 mapM_ f (Histogram m) = sequence_ [ do f k >>= return . flip (,) i  | (k,i) <- Map.toList m ]
 
 fromList :: Ord a => [a] -> Histogram a
-fromList xs = foldr insert empty xs
+fromList xs = L.foldl' (flip insert) empty xs
 
 empty :: Histogram a
 empty = Histogram Map.empty
@@ -76,6 +77,3 @@ union :: Ord a => Histogram a -> Histogram a -> Histogram a
 union = mappend
 unions :: Ord a => [Histogram a] -> Histogram a
 unions = mconcat
-
-
-
