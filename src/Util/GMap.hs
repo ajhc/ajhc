@@ -1,3 +1,4 @@
+{-# OPTIONS -XTypeFamilies #-}
 module Util.GMap where
 
 import Data.Monoid

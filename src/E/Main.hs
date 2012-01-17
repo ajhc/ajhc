@@ -6,15 +6,16 @@ import Control.Exception
 import Control.Monad.Identity
 import Control.Monad.State
 import Control.Monad.Writer
+import Control.Monad.Reader
 import System.Mem
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified List
 
+import Data.List
 import DataConstructors
 import Doc.PPrint
 import E.Annotate(annotateDs,annotateCombs,annotateProgram)
-import E.Diff
 import E.E
 import E.Eta
 import E.FromHs
@@ -24,7 +25,6 @@ import E.LetFloat
 import E.Lint
 import E.Program
 import E.Rules
-import E.Subst(subst)
 import E.Traverse
 import E.TypeAnalysis
 import E.TypeCheck
@@ -46,7 +46,6 @@ import Util.Gen
 import Util.Graph
 import Util.Progress
 import Util.SetLike as S
-import Data.List
 import qualified E.CPR
 import qualified E.Demand as Demand(analyzeProgram)
 import qualified E.SSimplify as SS
@@ -522,20 +521,28 @@ boxifyProgram :: Program -> IO Program
 boxifyProgram prog = ans where
     ans = do programMapDs f (progCombinators_u (map $ combRules_s []) prog)
     f (t,e) = do
-        e <- g e
-        return (tv t,e)
+        e <- return $ runReader (g e) Set.empty
+        tt <- return $ runReader (boxify (tvrType t)) Set.empty
+        return (t {tvrType = tt},e)
     tv t = t { tvrType = boxify (tvrType t) }
     g e = do
-        emapEG g (return . boxify) e -- (\e -> do putStrLn ("box: " ++ pprint e) ; return $ boxify e) e
-    boxify t | Just e <- followAlias (progDataTable prog) t = boxify e
-    boxify (EPi t e) = EPi t { tvrType = boxify (tvrType t) } (boxify e)
-    boxify v@EVar {} | canBeBox v = mktBox (getType v)
-    boxify (ELit lc) = ELit lc { litArgs = map boxify (litArgs lc) }
+        emapEG g (boxify) e -- (\e -> do putStrLn ("box: " ++ pprint e) ; return $ boxify e) e
+--    boxify t | Just e <- followAlias (progDataTable prog) t = boxify e
+    boxify (EPi t e) = local (Set.insert (tvrIdent t)) $ do
+        nt <- boxify $ tvrType t
+        ne <- boxify e
+        return $ EPi t { tvrType = nt } ne
+    boxify v@(EVar vr) | canBeBox v = do
+        s <- ask
+        if tvrIdent vr `Set.member` s then return v else return $ mktBox (tvrType vr)
+    boxify (ELit lc) = do
+        na <- mapM boxify (litArgs lc)
+        return $ ELit lc { litArgs = na }
 --    boxify v@(EAp _ _) | canBeBox v = mktBox (getType v)
-    boxify (EAp (ELam t b) e) = boxify (subst t e b)
+--    boxify (EAp (ELam t b) e) = boxify (subst t e b)
  --   boxify (EAp a b) = EAp (boxify a) b -- TODO there should be no applications at the type level by now (boxify b)
-    boxify (EAp a b) = EAp (boxify a) (boxify b)
-    boxify s@ESort {} = s
+    boxify (EAp a b) = liftM2 eAp (boxify a) (boxify b)
+    boxify s@ESort {} = return s
     boxify x = error $ "boxify: " ++ show x
 
 -- | get rid of unused bindings

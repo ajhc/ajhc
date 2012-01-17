@@ -74,16 +74,10 @@ data Env = Env {
     envVar   :: Var
     }
 
-data Written = Written {
-    wPotentialRoots :: Set.Set Val,
-    wIsAllocing  :: Bool
-    }
-
 newtype R a = R (RWS Env (Set.Set Var) () a)
     deriving(Monad,Functor,MonadReader Env,MonadWriter (Set.Set Var))
 
 runR (R x) = fst $ evalRWS x Env { envRoots = mempty, envMap = mempty, envVar = v1 } ()
-
 
 class Twiddle a where
     twiddle :: a -> R a
@@ -99,6 +93,8 @@ instance Twiddle a => Twiddle [a] where
     twiddle xs = mapM twiddle xs
 
 twiddleExp e = f e where
+--    f (BaseOp Promote vs :>>= rest) = f (Return vs :>>= rest)
+--    f (BaseOp Demote vs :>>= rest) = f (Return vs :>>= rest)
     f (x :>>= lam) | fopts FO.Jgc && isAllocing x = do
         roots <- asks envRoots
         let nroots = Set.fromList [ Var v t | (v,t) <- Set.toList (freeVars (if isUsing x then ([] :-> x :>>= lam) else lam)), isNode t, v > v0] Set.\\ roots

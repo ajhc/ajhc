@@ -1,3 +1,4 @@
+{-# OPTIONS -XTypeFamilies #-}
 module Util.SetLike where
 
 import Data.List(foldl')
