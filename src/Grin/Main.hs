@@ -1,9 +1,10 @@
 module Grin.Main(compileToGrin) where
 
 import Control.Monad
+import Data.Monoid(mappend)
 import Directory
-import qualified Data.ByteString.Lazy.UTF8 as LBS
 import qualified Data.ByteString.Lazy as LBS
+import qualified Data.ByteString.Lazy.UTF8 as LBS
 import qualified Data.Map as Map
 import qualified System
 
@@ -18,7 +19,6 @@ import Grin.Optimize
 import Grin.SSimplify
 import Grin.Show
 import Grin.StorageAnalysis
-import Grin.Whiz(normalizeGrin')
 import Options
 import Support.Transform
 import Util.Gen
@@ -38,23 +38,16 @@ compileToGrin prog = do
     wdump FD.GrinNormalized $ do dumpGrin "normalized" x
     x <- explicitRecurse x
     lintCheckGrin x
-    let pushGrin grin = do
-            nf   <- mapMsnd (grinPush undefined) (grinFuncs grin)
-            return $ setGrinFunctions nf grin
-    putProgressLn "-- Dead Code Analysis"
-    x <- deadCode stats (grinEntryPointNames x) x  -- XXX
+    x <- transformGrin deadCodeParms x
     x <- transformGrin simplifyParms x
-    x <- pushGrin x
-    lintCheckGrin x
+    x <- transformGrin pushParms x
     x <- transformGrin simplifyParms x
     putProgressLn "-- Speculative Execution Optimization"
     x <- grinSpeculate x
     lintCheckGrin x
-    x <- deadCode stats (grinEntryPointNames x) x  -- XXX
-    lintCheckGrin x
+    x <- transformGrin deadCodeParms x
     x <- transformGrin simplifyParms x
-    x <- pushGrin x
-    lintCheckGrin x
+    x <- transformGrin pushParms x
     x <- transformGrin simplifyParms x
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
     putProgressLn "-- Node Usage Analysis"
@@ -66,7 +59,6 @@ compileToGrin prog = do
     x <- transformGrin simplifyParms x
     x <- createEvalApply x
     x <- transformGrin simplifyParms x
-    lintCheckGrin x
     putProgressLn "-- Grin Devolution"
     wdump FD.GrinFinal $ dumpGrin "predevolve" x
     x <- transformGrin devolveTransform x
@@ -115,23 +107,42 @@ compileGrinToC grin = do
     unless (dump FD.C) $ removeFile cf
     return ()
 
-simplifyParms = transformParms {
+grinParms = transformParms {
     transformDumpProgress = verbose,
+    transformPass = "Grin"
+    }
+
+simplifyParms = grinParms {
     transformCategory = "Simplify",
-    transformPass = "Grin",
     transformOperation = Grin.SSimplify.simplify,
     transformIterate = IterateDone
     }
 
-nodeAnalyzeParms = transformParms {
-    transformDumpProgress = verbose,
+nodeAnalyzeParms = grinParms {
     transformCategory = "NodeAnalyze",
-    transformPass = "Grin",
     transformOperation = nodealyze
-    }  where
+    } where
         nodealyze grin = do
             stats <- Stats.new
             g <- deadCode stats (grinEntryPointNames grin) grin
             g <- nodeAnalyze g
-            return g
+            st <- Stats.readStat stats
+            return g { grinStats = grinStats grin `mappend` st }
 
+pushParms = grinParms {
+    transformCategory = "Push",
+    transformOperation = pushGrin
+    } where
+        pushGrin grin = do
+            nf   <- mapMsnd (grinPush undefined) (grinFuncs grin)
+            return $ setGrinFunctions nf grin
+
+deadCodeParms = grinParms {
+    transformCategory = "DeadCode",
+    transformOperation = op
+    } where
+        op grin = do
+            stats <- Stats.new
+            g <- deadCode stats (grinEntryPointNames grin) grin
+            st <- Stats.readStat stats
+            return g { grinStats = grinStats grin `mappend` st }

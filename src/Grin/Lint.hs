@@ -25,7 +25,6 @@ import Text.Printf
 import qualified FlagDump as FD
 import qualified Stats
 
-
 lintCheckGrin grin = when flint $ typecheckGrin grin
 
 lintCheckGrin' onerr grin | flint = do
@@ -158,8 +157,6 @@ printDL h n fs e = f fs e where
     --    forM_ (zip naturals as) $ \ (i,a) -> do
     --        assign "assign" (Left $ funArg fn i) a
     --app _ _ = return ()
-
-
     assign op b v = genAssign op b (Right v)
 
     genAssign :: String -> Either String Val -> Either String Val -> IO ()
@@ -171,10 +168,7 @@ printDL h n fs e = f fs e where
     genAssign op (Left b) (Right v) = when (tyInteresting $ getType v) $ setUnknown h b (show (op,v))
     genAssign op (Right b) rv =  bindUnknown h b (take 20 $ show (op,rv))
 
-
 tyInteresting ty = ty == TyNode || ty == tyINode
-
-
 
 transformGrin :: TransformParms Grin -> Grin -> IO Grin
 
@@ -232,12 +226,14 @@ data TcEnv = TcEnv {
 newtype Tc a = Tc (ReaderT TcEnv (Either String) a)
     deriving(Monad,MonadReader TcEnv)
 
+tcErr :: String -> Tc a
+tcErr s = Tc $ lift (Left s)
 
 runTc :: TcEnv -> Tc a -> Either String a
 runTc env (Tc r) = runReaderT r env
 
 same _ t1 t2 | t1 == t2 = return t1
-same msg t1 t2 = fail $ "Types not the same:" <+> parens msg <+> parens (tshow t1) <+> parens (tshow t2)
+same msg t1 t2 = tcErr $ "Types not the same:" <+> parens msg <+> parens (tshow t1) <+> parens (tshow t2)
 
 tcLam :: Maybe [Ty] -> Lam -> Tc [Ty]
 tcLam mty (v :-> e) = f mty where
@@ -258,19 +254,19 @@ tcExp e = f e where
     f ap@(BaseOp (Apply t) vs) = do
         (v':_) <- mapM tcVal vs
         if v' == TyNode then return t
-         else fail $ "App apply arg doesn't match: " ++ show ap
+         else tcErr $ "App apply arg doesn't match: " ++ show ap
     f ap@(BaseOp Eval [v]) = do
         v' <- tcVal v
         if v' == tyINode then return [TyNode]
-         else fail $ "App eval arg doesn't match: " ++ show ap
+         else tcErr $ "App eval arg doesn't match: " ++ show ap
     f a@(App fn as t) = do
         te <- asks envTyEnv
         (as',t') <- findArgsType te fn
         as'' <- mapM tcVal as
         if t' == t then
             if as'' == as' then return t' else
-                fail $ "App: arguments do not match: " ++ show (a,as',t')
-         else fail $ "App: results do not match: " ++ show (a,t,(as',t'))
+                tcErr $ "App: arguments do not match: " ++ show (a,as',t')
+         else tcErr $ "App: results do not match: " ++ show (a,t,(as',t'))
     f e@(BaseOp (StoreNode _) vs) = do
         [NodeC {}] <- return vs
         mapM_ tcVal vs
@@ -297,12 +293,12 @@ tcExp e = f e where
         TyPtr t <- tcVal w
         tv <- tcVal v
         when (t /= tv) $
-            fail "PokeVal: types don't match"
+            tcErr "PokeVal: types don't match"
         return []
     f e@(BaseOp PeekVal [w]) = do
         TyPtr t <- tcVal w
         return [t]
-    f (Case _ []) = fail "empty case"
+    f (Case _ []) = tcErr "empty case"
     f (Case v as) = do
         tv <- tcVal v
         es <- mapM (tcLam (Just [tv])) as
@@ -319,7 +315,7 @@ tcVal v = f v where
         s <- asks envInScope
         case v `member` s of
             True -> return t
-            False -> fail $ "variable not in scope: " ++ show e
+            False -> tcErr $ "variable not in scope: " ++ show e
     f (Lit _ t) = return t
     f Unit = return TyUnit
     f (Const t) = do
@@ -338,7 +334,5 @@ tcVal v = f v where
         (as',_) <- findArgsType te tg
         as'' <- mapM f as
         if as'' == as' then return TyNode else
-            fail $ "NodeC: arguments do not match " ++ show n ++ show (as'',as')
+            tcErr $ "NodeC: arguments do not match " ++ show n ++ show (as'',as')
     f (Item _ t) = return t
-
-

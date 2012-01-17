@@ -28,9 +28,9 @@ module Stats(
     runStatIO,
     runStatM,
     -- combined
-    tickStat
+    tickStat,
+    readStat
     ) where
-
 
 import Control.Monad.Identity
 import Control.Monad.Reader
@@ -69,9 +69,6 @@ print greets stats = do
         p (x,0) = x
         p (x,n) = x ++ ": " ++ show n
 
-
-
-
 createForest :: a -> [([String],a)] -> Forest (String,a)
 createForest def xs = map f gs where
     f [(xs,ys)] =  Node (intercalate "." xs,ys) []
@@ -93,8 +90,6 @@ draw (Node x ts0) = x : drawSubTrees ts0
         shift first other = zipWith (++) (first : repeat other)
         --vLine = chr 0x254F
 
-
-
 -- Pure varients
 
 newtype Stat = Stat IB.IntBag
@@ -115,9 +110,6 @@ printLStat n greets (Stat s) = do
         p (x,0) = x
         p (x,n) = x ++ ": " ++ show n
 
-
-
-
 --------------
 -- monad stats
 --------------
@@ -127,15 +119,11 @@ class Monad m => MonadStats m where
     mticks' ::  Int -> Atom -> m ()
     mtickStat :: Stat -> m ()
 
-
-
 newtype StatT m a = StatT (WriterT Stat m a)
     deriving(MonadIO, Functor, MonadFix, MonadTrans, Monad)
 
-
 runStatT :: Monad m => StatT m a -> m (a,Stat)
 runStatT (StatT m) =  runWriterT m
-
 
 data StatM a = StatM a !Stat
 
@@ -152,11 +140,8 @@ instance Stats.MonadStats StatM where
    mticks' n k = StatM () $ Stats.singleStat n k
    mtickStat s = StatM () s
 
-
-
 runStatM ::  StatM a -> (a,Stat)
 runStatM (StatM a s) = (a,s)
-
 
 -- These are inlined so the 'toAtom' can become a caf and be shared
 {-# INLINE mtick  #-}
@@ -164,7 +149,6 @@ runStatM (StatM a s) = (a,s)
 mtick k = mticks 1 k
 mticks 0 _ = return ()
 mticks n k = let k' = toAtom k in k' `seq` n `seq` mticks' n k'
-
 
 instance MonadStats Identity where
     mticks' _ _ = return ()
@@ -201,8 +185,6 @@ instance MonadStats IO where
         p <- readIORef printStats
         when p $ forM_ (IB.toList s) $ \ (x,y) -> do
             putStrLn (show (unsafeIntToAtom x) ++ ": " ++ show y)
-
-
 
 --------------------
 -- Stateful IO stats
@@ -245,7 +227,6 @@ ticks (Stats r) c k = modifyIORef r (mappend $ singleStat c k)
 -- pure + mutable
 -----------------
 
-
 tickStat ::  Stats -> Stat -> IO ()
 tickStat (Stats r) s = modifyIORef r (mappend s)
 
@@ -256,3 +237,5 @@ runStatIO stats action = do
     liftIO $ tickStat stats s
     return a
 
+readStat :: Stats -> IO Stat
+readStat (Stats r) = readIORef r
