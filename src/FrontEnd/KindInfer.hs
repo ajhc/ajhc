@@ -20,7 +20,7 @@ module FrontEnd.KindInfer (
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.Writer
-import Data.Generics
+import Data.Generics(Typeable, everything, mkQ, Data)
 import Data.IORef
 import Data.List
 import Data.Binary

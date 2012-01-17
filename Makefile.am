@@ -49,7 +49,7 @@ PACKAGES= -package fgl -package regex-compat -package random -package array -pac
           -package bytestring -package binary -package pretty -package mtl -package containers \
 	  -package unix -package haskell98 -package utf8-string -package zlib
 
-GHCLANG= -XTypeFamilies -XViewPatterns -XUndecidableInstances -XOverlappingInstances -fglasgow-exts -XRecordWildCards -XRecursiveDo -XTupleSections
+GHCLANG= -XTypeFamilies -XViewPatterns -XUndecidableInstances -XOverlappingInstances -XRecordWildCards -XRecursiveDo -XTupleSections -XParallelListComp -XGeneralizedNewtypeDeriving -XScopedTypeVariables -XFlexibleInstances -XTypeSynonymInstances -XMultiParamTypeClasses -XDeriveDataTypeable -fglasgow-exts -XNoMonoLocalBinds
 GHCOPTS= $(HSOPTS) -XBangPatterns -O @GHCFLAGS@ $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 
 JHC_LIBS = jhc-1.0.hl base-1.0.hl haskell98-1.0.hl applicative-1.0.hl flat-foreign-1.0.hl

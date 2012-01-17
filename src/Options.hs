@@ -391,6 +391,7 @@ findHoCache = do
 
 
 
+configs :: Node
 configs = toNode [
     "jhclibpath" ==> initialLibIncludes,
     "version" ==> version,
@@ -400,6 +401,7 @@ configs = toNode [
     "libraryInstall" ==> libraryInstall,
     "host" ==> host
     ] where
+    (==>) :: ToNode b => String -> b -> (String,Node)
     a ==> b = (a,toNode b)
 
 

@@ -1,3 +1,4 @@
+{-# LANGUAGE NoMonoLocalBinds #-}
 module FrontEnd.Class(
     printClassHierarchy,
     instanceToTopDecls,
@@ -21,7 +22,7 @@ module FrontEnd.Class(
 
 import Control.Monad.Identity
 import Control.Monad.Writer
-import Data.Generics
+import Data.Generics hiding(empty)
 import Data.List(nub)
 import Debug.Trace
 import Text.PrettyPrint.HughesPJ(render,Doc())

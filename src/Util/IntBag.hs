@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP,NoBangPatterns #-}
+{-# LANGUAGE CPP,NoBangPatterns,MagicHash #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.IntBag

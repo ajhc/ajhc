@@ -6,7 +6,6 @@ AM_INIT_AUTOMAKE([foreign no-dependencies std-options])
 
 SHORTVERSION=0.7
 
-
 AC_CANONICAL_HOST
 
 AC_PROG_LN_S

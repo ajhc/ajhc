@@ -1,5 +1,5 @@
+{-# OPTIONS -XNoMonoLocalBinds #-}
 module Grin.DeadCode(deadCode) where
-
 
 import Control.Monad
 import Data.Monoid
@@ -16,7 +16,6 @@ import Support.CanType
 import Support.FreeVars
 import Util.Gen
 import Util.SetLike hiding(Value)
-
 
 implies :: Value Bool -> Value Bool -> Rule
 implies x y = y `isSuperSetOf` x

@@ -9,13 +9,11 @@ data Node = Leaf String | List [Node] | Map [(String,Node)] | Null
 class MapKey a where
     showMapKey :: a -> String
 
-
 instance MapKey String where
     showMapKey s = s
 
 class ToNode a where
     toNode :: a -> Node
-
 
 instance ToNode Node where
     toNode x = x
@@ -71,4 +69,3 @@ showString' x y = if all isGood x then x ++ y else '"':f x y where
                 | otherwise  = '\\':x:f xs ys
     isGood x = isAlphaNum x || x `elem` "_-.@/"
     isQuoteGood x = isGood x || isSpace x || x `elem` "!@#$%^&*(){}/"
-
