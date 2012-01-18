@@ -1,0 +1,19 @@
+Announcing jhc 0.7.8! This is mainly a bug fix release.
+
+  http://repetae.net/computer/jhc/
+
+Changes include: 
+
+ * Now compiles under ghc 7.0.x as well as 6.12 
+ * new standard libraries
+    * filepath
+    * deepseq
+ * new platforms supported
+    Nintendo DSi, GBA, and GP32 (thanks to Brian McKenna)
+ * bug fixes for various reported issues
+ * LIB_OPTIONS respected when building external libraries
+ * better float outward optimization
+ * better diagnostics/dumping of core/grin on internal type errors
+ * rewrite UnionSolve to be much faster, node analysis sped up accordingly
+
+        John
