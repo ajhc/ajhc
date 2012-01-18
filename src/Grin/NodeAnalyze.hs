@@ -22,7 +22,7 @@ import Support.FreeVars
 import Support.Tickle
 import Util.Gen
 import Util.SetLike
-import Util.UnionSolve
+import Util.UnionSolve2 as Util.UnionSolve
 import Util.UniqueMonad
 import qualified Stats
 
@@ -113,8 +113,8 @@ nodeAnalyze grin' = do
     --print cs
     --putStrLn "----------------------------"
     --putStrLn "-- NodeAnalyze"
-    (rm,res) <- solve (const (return ())) cs
-    --(rm,res) <- solve putStrLn cs
+    --(rm,res) <- solve (const (return ())) cs
+    (rm,res) <- solve putStrLn cs
     --putStrLn "----------------------------"
     --mapM_ (\ (x,y) -> putStrLn $ show x ++ " -> " ++ show y) (Map.toList rm)
     --putStrLn "----------------------------"

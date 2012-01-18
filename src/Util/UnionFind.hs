@@ -28,9 +28,8 @@ new w x = liftIO $  do
     n <- liftM hashUnique newUnique
     return $ Element x n r
 
-new_ :: MonadIO m =>  a -> m (Element () a)
+new_ :: MonadIO m => a -> m (Element () a)
 new_ x = new () x
-
 
 find :: MonadIO m => Element w a -> m (Element w a)
 find x@(Element a _ r) = liftIO $  do
@@ -75,11 +74,8 @@ union comb e1 e2 = liftIO $ do
 union_ :: MonadIO m =>  Element () a -> Element () a -> m ()
 union_ x y = union (\_ _ -> ()) x y
 
-
-
 fromElement :: Element w a -> a
 fromElement (Element a _ _) = a
-
 
 instance Eq (Element w a) where
     Element _ x _ == Element _ y _ = x == y
@@ -92,5 +88,3 @@ instance Ord (Element w a) where
 
 instance Show a => Show (Element w a) where
     showsPrec n (Element x _ _) = showsPrec n x
-
-

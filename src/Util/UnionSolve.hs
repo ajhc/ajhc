@@ -15,10 +15,10 @@ import qualified Data.Sequence as S
 import qualified Data.Foldable as S
 import qualified Data.Set as Set
 import qualified Data.Map as Map
+
 import Util.UnionFind as UF
 
 -- simple constraint solver based on ideas from 'Once upon a polymorphic type' paper.
-
 
 class Fixable a where
     -- determine if we are at the top or bottom of the lattice, we can
@@ -40,7 +40,6 @@ class Fixable a where
     eq x y = lte x y && lte y x
     isBottom _ = False
     isTop _ = False
-
 
 -- arguments are the lattice and the variable type
 -- we make the fields strict because many empty values will be
@@ -102,7 +101,6 @@ showResult rb@ResultBounded {} = sb (resultLB rb) (resultLBV rb) ++ " <= " ++ sh
     sb Nothing n = show n
     sb (Just x) n = show x ++ show n
 
-
 collectVars (Cset x y:xs) = x:y:collectVars xs
 collectVars (Clte x y:xs) = x:y:collectVars xs
 collectVars (CLAnnotate s x:xs) = collectVars (x:xs)
@@ -112,7 +110,6 @@ collectVars [] = []
 -- (C l v) represents a constraint (or set of constraints) that confine the
 -- variables 'v' to within specific values of 'l'
 --
-
 
 {-# NOINLINE solve #-}
 solve :: (Fixable l, Show l, Show v, Ord v)
@@ -287,10 +284,6 @@ solve putLog (C csp _vset) = do
     let (ma,mb) = unzip rs
     return (Map.fromList ma,Map.fromList mb)
 
-
-
-
-
 -------------------
 -- useful instances
 -------------------
@@ -301,7 +294,6 @@ instance Ord n => Fixable (Set.Set n)  where
     meet a b = Set.intersection a b
     lte a b = Set.isSubsetOf a b
     eq = (==)
-
 
 instance Fixable Bool where
     isBottom x = not x
@@ -324,7 +316,6 @@ instance (Fixable a,Fixable b) => Fixable (a,b) where
     join (x,y) (x',y') = (join x x', join y y')
     meet (x,y) (x',y') = (meet x x', meet y y')
     lte (x,y) (x',y') = (lte x x' && lte y y')
-
 
 -- the maybe instance creates a new bottom of nothing. note that (Just bottom) is a distinct point.
 instance Fixable a => Fixable (Maybe a) where
@@ -365,8 +356,3 @@ instance Fixable a => Fixable (Topped a) where
     lte _ Top = True
     lte Top _ = False
     lte (Only x) (Only y) = x `lte` y
-
-
-
-
-
