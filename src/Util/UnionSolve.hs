@@ -5,7 +5,8 @@ module Util.UnionSolve(
     Topped(..),
     Result(..),
     cAnnotate,
-    islte,isgte,equals
+    islte,isgte,equals,
+    (@<=),(@>=),(@=),(@<=@),(@>=@),(@=@)
     ) where
 
 import Data.List(intersperse)
@@ -40,16 +41,9 @@ class Fixable a where
     isBottom _ = False
     isTop _ = False
 
-
 -- arguments are the lattice and the variable type
--- we make the fields strict because many empty values will be
--- mappended together when used in a writer monad.
-data C l v = C !(S.Seq (CL l v)) !(Set.Set v)
-
-instance Ord v => Monoid (C l v) where
-    mempty = C mempty mempty
-    mappend (C a b) (C c d) = C (a `mappend` c) (b `mappend` d)
-
+newtype C l v = C (S.Seq (CL l v))
+    deriving(Monoid)
 
 data Op = OpLte | OpEq | OpGte
 
@@ -61,10 +55,10 @@ instance Show Op where
 data CL l v = CV v Op v | CL v Op l | CLAnnotate String (CL l v)
 
 cAnnotate :: String -> C l v -> C l v
-cAnnotate s (C seq set) = C (fmap (CLAnnotate s) seq) set
+cAnnotate s (C seq) = C (fmap (CLAnnotate s) seq)
 
 instance (Show e,Show l) => Show (C l e) where
-    showsPrec _ (C xs _) = showString "" . foldr (.) id (intersperse (showString "\n") (map shows (S.toList xs))) . showString "\n"
+    showsPrec _ (C xs) = showString "" . foldr (.) id (intersperse (showString "\n") (map shows (S.toList xs))) . showString "\n"
 
 seither (Left x) = shows x
 seither (Right x) = shows x
@@ -76,29 +70,39 @@ instance (Show e,Show l) => Show (CL l e) where
 
 bool t f b = if b then t else f
 
+-- operator constraits, the @ is on the side that takes a variable.
+v @<= l = cL v OpLte l
+v @>= l = cL v OpGte l
+v @=  l = cL v OpEq l
+v @<=@ l = cV v OpLte l
+v @>=@ l = cV v OpGte l
+v @=@  l = cV v OpEq l
+
+cL x y z = C (S.singleton (CL x y z))
+cV x y z = C (S.singleton (CV x y z))
+
 -- basic constraints
 islte,isgte,equals :: (Fixable l,Ord v) => Either v l -> Either v l -> C l v
-islte (Left v1) (Left v2) = C (S.singleton (CV v1 OpLte v2)) mempty
-islte (Left v1) (Right v2) = C (S.singleton (CL v1 OpLte v2)) mempty
-islte (Right v1) (Left v2) = C (S.singleton (CL v2 OpGte v1)) mempty
+islte (Left v1) (Left v2) = C (S.singleton (CV v1 OpLte v2))
+islte (Left v1) (Right v2) = C (S.singleton (CL v1 OpLte v2))
+islte (Right v1) (Left v2) = C (S.singleton (CL v2 OpGte v1))
 islte (Right l1) (Right l2) = bool mempty (error $ "invalid constraint: " ++ showFixable l1 ++ " <= " ++ showFixable l2) (l1 `lte` l2)
 
-isgte (Left v1) (Left v2) = C (S.singleton (CV v2 OpLte v1)) mempty
-isgte (Left v1) (Right v2) = C (S.singleton (CL v1 OpGte v2)) mempty
-isgte (Right v1) (Left v2) = C (S.singleton (CL v2 OpLte v1)) mempty
+isgte (Left v1) (Left v2) = C (S.singleton (CV v2 OpLte v1))
+isgte (Left v1) (Right v2) = C (S.singleton (CL v1 OpGte v2))
+isgte (Right v1) (Left v2) = C (S.singleton (CL v2 OpLte v1))
 isgte (Right l1) (Right l2) = bool mempty (error $ "invalid constraint: " ++ showFixable l1 ++ " >= " ++ showFixable l2) (l2 `lte` l1)
 
-equals (Left v1) (Left v2) = C (S.singleton (CV v1 OpEq v2)) mempty
-equals (Left v1) (Right v2) = C (S.singleton (CL v1 OpEq v2)) mempty
-equals (Right v1) (Left v2) = C (S.singleton (CL v2 OpEq v1)) mempty
+equals (Left v1) (Left v2) = C (S.singleton (CV v1 OpEq v2))
+equals (Left v1) (Right v2) = C (S.singleton (CL v1 OpEq v2))
+equals (Right v1) (Left v2) = C (S.singleton (CL v2 OpEq v1))
 equals (Right l1) (Right l2) = bool mempty (error $ "invalid constraint: " ++ showFixable l1 ++ " = " ++ showFixable l2) (l1 `eq` l2)
 
 -- a variable is either set to a value or bounded by other values
 data R l a = R l |  Ri (Maybe l) (Set.Set (RS l a))  (Maybe l) (Set.Set (RS l a))
     deriving(Show)
 
-type RS l a =  Element (R l a) a
-
+type RS l a = Element (R l a) a
 data Result l a = ResultJust a l
     | ResultBounded {
         resultRep :: a,
@@ -133,7 +137,7 @@ solve :: (Fixable l, Show l, Show v, Ord v)
     => (String -> IO ())
     -> C l v
     -> IO (Map.Map v v,Map.Map v (Result l v))
-solve putLog (C csp _vset) = do
+solve putLog (C csp) = do
     let vars = Set.fromList (collectVars cs)
         cs = S.toList csp
     ufs <- flip mapM (Set.toList vars) $ \a -> do
