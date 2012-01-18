@@ -1,11 +1,11 @@
--- utilities for writing new rules.
+module DerivingDrift.RuleUtils (
+    module Text.PrettyPrint.HughesPJ,
+    module DerivingDrift.RuleUtils,
+    module DerivingDrift.DataP
+    )where
 
-module DerivingDrift.RuleUtils (module Text.PrettyPrint.HughesPJ,module DerivingDrift.RuleUtils, module DerivingDrift.DataP)where
-
-import Text.PrettyPrint.HughesPJ
 import DerivingDrift.DataP
-
--- Rule Declarations
+import Text.PrettyPrint.HughesPJ
 
 x = text "x"
 f = text "f"
@@ -15,10 +15,6 @@ lArrow = text "<-"
 --equals = text "="
 blank = text "_"
 semicolon = char ';'
-
-
-
--- New Pretty Printers ---------------
 
 texts :: [String] -> [Doc]
 texts = map text
@@ -64,7 +60,6 @@ simpleInstance s d = hsep [text "instance"
    constr = map (\(c,v) -> text c <+> text v) (constraints d) ++
 		      map (\x -> text s <+> text x) (vars d)
    parenSpace = parens . hcat . sepWith space
-
 
 -- instanceSkeleton handles most instance declarations, where instance
 -- functions are not related to one another.  A member function is generated

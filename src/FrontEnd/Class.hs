@@ -50,15 +50,13 @@ import Util.Gen
 import Util.HasSize
 import Util.Inst()
 
---------------------------------------------------------------------------------
-
 type Assump = (Name,Sigma)
 
 data Inst = Inst {
-    instSrcLoc :: SrcLoc,
-    instDerived :: Bool,   -- ^ whether this instance was derived
-    instHead :: Qual Pred,
-    instAssocs :: [(Tycon,[Tyvar],[Tyvar],Sigma)]
+    instSrcLoc  :: SrcLoc,
+    instDerived :: !Bool,   -- ^ whether this instance was derived
+    instHead    :: Qual Pred,
+    instAssocs  :: [(Tycon,[Tyvar],[Tyvar],Sigma)]
     } deriving(Eq,Ord,Show)
     {-! derive: Binary !-}
 

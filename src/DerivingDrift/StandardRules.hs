@@ -5,9 +5,6 @@ import Name.Prim
 import Name.Name
 import qualified Data.Map as Map
 
-
---- Add Rules Below Here ----------------------------------------------------
-
 standardRules :: Map.Map Name.Name.Name (Data -> Doc)
 standardRules = Map.fromList [
     (class_Eq,eqfn),
@@ -16,8 +13,6 @@ standardRules = Map.fromList [
     (class_Show,showfn),
     (class_Read,readfn),
     (class_Bounded,boundedfn)]
-
-
 
 ------------------------------------------------------------------------------
 -- Rules for the derivable Prelude Classes
@@ -75,7 +70,6 @@ ordfn d = let
 
 -- Show & Read
 -- 	won't work for infix constructors
--- 	(and anyway, neither does the parser currently)
 --
 -- Show
 
@@ -220,4 +214,3 @@ boundedSingle d@D{body=body} = let f = head $ body
 
 singleton [x] = True
 singleton _ = False
-
