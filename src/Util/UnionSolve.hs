@@ -25,15 +25,14 @@ class Fixable a where
     -- solidify bounds if we know we are at an endpoint.
     isBottom :: a -> Bool
     isTop :: a -> Bool
-
+    -- lattice operators
     join :: a -> a -> a
     meet :: a -> a -> a
-
     eq :: a -> a -> Bool
     lte :: a -> a -> Bool
-
+    -- used for debugging
     showFixable :: a -> String
-
+    -- default methods
     showFixable x | isBottom x = "B"
                   | isTop x = "T"
                   | otherwise = "*"
@@ -42,6 +41,10 @@ class Fixable a where
     isTop _ = False
 
 -- arguments are the lattice and the variable type
+-- mappended together when used in a writer monad.
+-- (C l v) represents a constraint (or set of constraints) that confine the
+-- variables 'v' to within specific values of 'l'
+
 newtype C l v = C (S.Seq (CL l v))
     deriving(Monoid)
 
@@ -59,9 +62,6 @@ cAnnotate s (C seq) = C (fmap (CLAnnotate s) seq)
 
 instance (Show e,Show l) => Show (C l e) where
     showsPrec _ (C xs) = showString "" . foldr (.) id (intersperse (showString "\n") (map shows (S.toList xs))) . showString "\n"
-
-seither (Left x) = shows x
-seither (Right x) = shows x
 
 instance (Show e,Show l) => Show (CL l e) where
     showsPrec _ x = case x of
@@ -122,15 +122,26 @@ showResult rb@ResultBounded {} = sb (resultLB rb) (resultLBV rb) ++ " <= " ++ sh
     sb Nothing n = show n
     sb (Just x) n = show x ++ show n
 
-collectVars (CV x _ y:xs) = x:y:collectVars xs
-collectVars (CL x _ _:xs) = x:collectVars xs
-collectVars (CLAnnotate s x:xs) = collectVars (x:xs)
-collectVars [] = []
-
---
--- (C l v) represents a constraint (or set of constraints) that confine the
--- variables 'v' to within specific values of 'l'
---
+-- replace variables with UnionFind elements
+prepareConstraints :: Ord v => C l v -> IO ([CL l (RS l v)], Map.Map v (RS l v))
+prepareConstraints (C cseq) = f Map.empty (S.toList cseq) id [] where
+    f m (c:cs) ar rs = do
+        let h x m = case Map.lookup x m of
+                Just v -> return (v,m)
+                Nothing -> do
+                    v <- UF.new (Ri Nothing mempty Nothing mempty) x
+                    return (v, Map.insert x v m)
+        case c of
+            CL x op l -> do
+                (x',m') <- h x m
+                f m' cs id (ar (CL x' op l):rs)
+            CV x op y -> do
+                (x',m') <- h x m
+                (y',m'') <- h y m'
+                f m'' cs id (ar (CV x' op y'):rs)
+            CLAnnotate s (CLAnnotate s' c) -> f m (CLAnnotate (s ++ "\n" ++ s') c:cs) ar rs
+            CLAnnotate s c -> f m (c:cs) (ar . CLAnnotate s) rs
+    f m [] _ rs = return (rs,m)
 
 {-# NOINLINE solve #-}
 solve :: (Fixable l, Show l, Show v, Ord v)
@@ -138,52 +149,29 @@ solve :: (Fixable l, Show l, Show v, Ord v)
     -> C l v
     -> IO (Map.Map v v,Map.Map v (Result l v))
 solve putLog (C csp) = do
-    let vars = Set.fromList (collectVars cs)
-        cs = S.toList csp
-    ufs <- flip mapM (Set.toList vars) $ \a -> do
-        uf <- UF.new (Ri Nothing mempty Nothing mempty) a
-        return (a,uf)
+    (pcs,varMap) <- prepareConstraints (C csp)
     let prule (CLAnnotate s cr) =  putLog s >> prule cr
-        prule (CV x OpLte y) = ans where
-            Just xe = Map.lookup x umap
-            Just ye = Map.lookup y umap
-            ans = do
-                xe <- UF.find xe
-                ye <- UF.find ye
-                xe `lessThenOrEqual` ye
+        prule (CV xe OpLte ye) = do
+            xe <- UF.find xe
+            ye <- UF.find ye
+            xe `lessThanOrEqual` ye
         prule (CV x OpGte y) = prule (CV y OpLte x)
-        prule (CL y OpGte x) = ans where
-            Just ye = Map.lookup y umap
-            ans = do
-                ye <- UF.find ye
-                x `lessThen` ye
-        prule (CL x OpLte y) = ans where
-            Just xe = Map.lookup x umap
-            ans = do
-                xe <- UF.find xe
-                y `greaterThen` xe
-        prule (CL x OpEq v) = ans where
-            Just xe = Map.lookup x umap
-            ans = do
-                xe <- UF.find xe
-                xe `setValue` v
-        prule (CV x OpEq y) = ans where
-            Just xe = Map.lookup x umap
-            Just ye = Map.lookup y umap
-            ans = do
-                xe <- UF.find xe
-                ye <- UF.find ye
-                xe `lessThenOrEqual` ye
-                xe <- UF.find xe
-                ye <- UF.find ye
-                ye `lessThenOrEqual` xe
-        -- handle constant cases, just check if valid, and perhaps report error
-     --   prule (Right x `Cset` Right y)
-    --        | x `eq` y = return ()
-    --        | otherwise = fail $ "equality of two different values" ++ show (x,y)
-    --    prule (Right x `Clte` Right y)
-    --        | x `lte` y = return ()
-    --        | otherwise = fail $ "invalid constraint: " ++ show x ++ " <= " ++ show y
+        prule (CL ye OpGte x) = do
+            ye <- UF.find ye
+            x `lessThan` ye
+        prule (CL xe OpLte y) =  do
+            xe <- UF.find xe
+            y `greaterThan` xe
+        prule (CL xe OpEq v) = do
+            xe <- UF.find xe
+            xe `setValue` v
+        prule (CV xe OpEq ye) = do
+            xe <- UF.find xe
+            ye <- UF.find ye
+            xe `lessThanOrEqual` ye
+            xe <- UF.find xe
+            ye <- UF.find ye
+            ye `lessThanOrEqual` xe
         setValue xe v = do
             putLog $ "Setting value of " ++ show (fromElement xe) ++ " to " ++ show v
             xw <- getW xe
@@ -191,35 +179,35 @@ solve putLog (C csp) = do
                 R c | c `eq` v -> return ()
                     | otherwise -> fail $ "UnionSolve: equality constraints don't match " ++ show (c,v)  ++ " when setting " ++ show (fromElement xe)
                 Ri ml lb mu ub | testBoundLT ml v && testBoundGT mu v -> do
-                    mapM_ (v `greaterThen`) (Set.toList lb)
-                    mapM_ (v `lessThen`)    (Set.toList ub)
+                    mapM_ (v `greaterThan`) (Set.toList lb)
+                    mapM_ (v `lessThan`)    (Set.toList ub)
                     updateW (const (R v)) xe
-                _ -> error "Util.UnionSolve: invalid Ri"
+                _ -> fail $ "UnionSolve: setValue " ++ show (fromElement xe,xw,v)
         testBoundLT Nothing _ = True
         testBoundLT (Just x) y = x `lte` y
         testBoundGT Nothing _ = True
         testBoundGT (Just x) y = y `lte` x
-        v `greaterThen` xe = do
+        v `greaterThan` xe = do
             putLog $ "make sure " ++ show (fromElement xe) ++ " is less than " ++ show v
             xw <- UF.getW xe
             case xw of
                 R c | c `lte` v -> return ()
-                    | otherwise -> fail $ "UnionSolve: greaterThen " ++ show (v,c)
+                    | otherwise -> fail $ "UnionSolve: greaterThan " ++ show (v,c)
                 Ri _ _ (Just n) _ | n `lte` v -> return ()
                 Ri ml lb mu ub | testBoundLT ml v -> do
                     doUpdate (Ri ml lb (mmeet (Just v) mu) ub) xe
-                    mapM_ (greaterThen v) (Set.toList lb)
+                    mapM_ (greaterThan v) (Set.toList lb)
                                | otherwise -> fail $ "UnionSolve: testBoundLT " ++ show (ml,v)
-        v `lessThen` xe = do
+        v `lessThan` xe = do
             putLog $ "make sure " ++ show (fromElement xe) ++ " is greater than " ++ show v
             xw <- getW xe
             case xw of
                 R c | v `lte` c -> do return ()
-                    | otherwise -> fail $ "UnionSolve: lessThen " ++ show (v,c)
+                    | otherwise -> fail $ "UnionSolve: lessThan " ++ show (v,c)
                 Ri (Just n) _ _ _ |  v `lte` n -> do return ()
                 Ri ml lb mu ub | testBoundGT mu v -> do
                     doUpdate (Ri (mjoin (Just v) ml) lb mu ub) xe
-                    mapM_ (lessThen v) (Set.toList ub)
+                    mapM_ (lessThan v) (Set.toList ub)
                                | otherwise -> fail $ "UnionSolve: testBoundGT " ++ show (mu,v)
         --checkRS :: R l a -> RS l a -> IO ()
         checkRS (Ri (Just l) _ (Just u) _) xe | l `eq` u = do
@@ -233,11 +221,11 @@ solve putLog (C csp) = do
             putLog $ "Going down: " ++ show (fromElement xe)
             setValue xe u
         checkRS r xe = return ()
-        xe `lessThenOrEqual` ye | xe == ye = return ()
-        xe `lessThenOrEqual` ye = do
+        xe `lessThanOrEqual` ye | xe == ye = return ()
+        xe `lessThanOrEqual` ye = do
             xw <- UF.getW xe
             case xw of
-                R v -> (v `lessThen` ye)
+                R v -> (v `lessThan` ye)
                 Ri xml xlb xmu xub -> do
                     xub <- finds xub
                     if ye `Set.member` xub then return () else do
@@ -245,7 +233,7 @@ solve putLog (C csp) = do
                     if ye `Set.member` xlb then equal xe ye  else do
                     yw <- UF.getW ye
                     case yw of
-                        R v -> (v `greaterThen` xe)
+                        R v -> (v `greaterThan` xe)
                         Ri yml ylb ymu yub -> do
                             ylb <- finds ylb
                             if xe `Set.member` ylb then return () else do
@@ -254,12 +242,12 @@ solve putLog (C csp) = do
                             let newxu = mmeet ymu xmu
                             updateW (const (Ri xml xlb newxu (Set.delete xe $ Set.insert ye xub))) xe
                             case newxu of
-                                Just v -> mapM_ (v `greaterThen`) (Set.toList xlb)
+                                Just v -> mapM_ (v `greaterThan`) (Set.toList xlb)
                                 _ -> return ()
                             let newyl = mjoin yml xml
                             updateW (const (Ri newyl (Set.delete ye $ Set.insert xe ylb) ymu yub)) ye
                             case newyl of
-                                Just v -> mapM_ (v `lessThen`) (Set.toList yub)
+                                Just v -> mapM_ (v `lessThan`) (Set.toList yub)
                                 _ -> return ()
                             w <- getW xe
                             checkRS w xe
@@ -289,9 +277,8 @@ solve putLog (C csp) = do
         mmeet x Nothing = x
         mmeet (Just x) (Just y) = Just (meet x y)
         finds set = fmap Set.fromList $ mapM UF.find (Set.toList set)
-        umap = Map.fromList ufs
-    mapM_ prule cs
-    rs <- flip mapM ufs $ \ (a,e) -> do
+    mapM_ prule pcs
+    rs <- flip mapM (Map.toList varMap) $ \ (a,e) -> do
         e <- find e
         w <- getW e
         rr <- case w of
@@ -305,9 +292,9 @@ solve putLog (C csp) = do
     let (ma,mb) = unzip rs
     return (Map.fromList ma,Map.fromList mb)
 
--------------------
--- useful instances
--------------------
+-------------------------------
+-- useful instances for Fixable
+-------------------------------
 
 instance Ord n => Fixable (Set.Set n)  where
     isBottom = Set.null
