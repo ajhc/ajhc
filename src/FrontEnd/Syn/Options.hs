@@ -1,11 +1,8 @@
 module FrontEnd.Syn.Options(parseOptions) where
 
-
-import Text.ParserCombinators.ReadP
 import Char
 import List
-
-
+import Text.ParserCombinators.ReadP
 
 parseOptions :: String -> [(String,String)]
 parseOptions s = case readP_to_S parse s of
@@ -16,7 +13,6 @@ token x = x >>= \r -> spaces >> return r
 parse = do
     spaces
     many (token pragma)
-
 
 spaces = do
     skipSpaces
@@ -29,7 +25,6 @@ pragma = do
     skipSpaces
     body <- manyTill get (string "#-}")
     return $ (nn,body)
-
 
 comment = plone +++ pline +++ line +++ block where
     line = do
@@ -49,6 +44,3 @@ comment = plone +++ pline +++ line +++ block where
         satisfy (/= '#')
         manyTill get (string "-}")
         return ()
-
-
-
