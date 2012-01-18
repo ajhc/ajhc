@@ -17,7 +17,7 @@ import Data.IORef
 import Data.Unique
 import Monad(when,liftM)
 
-data Element w a = Element a {-# UNPACK #-} !Int {-# UNPACK #-} !(IORef (Link w a))
+data Element w a = Element a {-# UNPACK #-} !Unique {-# UNPACK #-} !(IORef (Link w a))
 data Link w a = Weight {-# UNPACK #-} !Int w | Next (Element w a)
 
 type T = Element
@@ -25,7 +25,7 @@ type T = Element
 new :: MonadIO m => w -> a -> m (Element w a)
 new w x = liftIO $  do
     r <- newIORef (Weight 1 w)
-    n <- liftM hashUnique newUnique
+    n <- newUnique
     return $ Element x n r
 
 new_ :: MonadIO m => a -> m (Element () a)
