@@ -4,17 +4,16 @@ module Util.UnionSolve(
     Fixable(..),
     Topped(..),
     Result(..),
-    islte,isgte,equals,
     cAnnotate,
-    varIsInteresting
+    islte,isgte,equals
     ) where
 
 import Data.List(intersperse)
 import Data.Monoid
-import qualified Data.Sequence as S
 import qualified Data.Foldable as S
-import qualified Data.Set as Set
 import qualified Data.Map as Map
+import qualified Data.Sequence as S
+import qualified Data.Set as Set
 
 import Util.UnionFind as UF
 
@@ -41,6 +40,7 @@ class Fixable a where
     isBottom _ = False
     isTop _ = False
 
+
 -- arguments are the lattice and the variable type
 -- we make the fields strict because many empty values will be
 -- mappended together when used in a writer monad.
@@ -50,8 +50,15 @@ instance Ord v => Monoid (C l v) where
     mempty = C mempty mempty
     mappend (C a b) (C c d) = C (a `mappend` c) (b `mappend` d)
 
-data CL l v = (Either v l) `Clte` (Either v l) | (Either v l) `Cset` (Either v l) | CLAnnotate String (CL l v)
-    deriving(Eq,Ord)
+
+data Op = OpLte | OpEq | OpGte
+
+instance Show Op where
+    show OpEq  = " = "
+    show OpGte = " >= "
+    show OpLte = " <= "
+
+data CL l v = CV v Op v | CL v Op l | CLAnnotate String (CL l v)
 
 cAnnotate :: String -> C l v -> C l v
 cAnnotate s (C seq set) = C (fmap (CLAnnotate s) seq) set
@@ -63,18 +70,28 @@ seither (Left x) = shows x
 seither (Right x) = shows x
 
 instance (Show e,Show l) => Show (CL l e) where
-    showsPrec _ (x `Clte` y) = seither x . showString " <= " . seither y
-    showsPrec _ (x `Cset` l) = seither x . showString " := " . seither l
-    showsPrec _ (CLAnnotate s w) = showString s . showChar '@' . shows w
+    showsPrec _ x = case x of
+        CV v1 op v2 -> shows v1 . shows op . shows v2
+        CL v1 op v2 -> shows v1 . shows op . shows v2
+
+bool t f b = if b then t else f
 
 -- basic constraints
-islte,isgte,equals :: Ord v => Either v l -> Either v l -> C l v
-islte  x y = C (S.singleton (x `Clte` y)) mempty
-isgte  x y = islte y x
-equals x y = C (S.singleton (x `Cset` y)) mempty
+islte,isgte,equals :: (Fixable l,Ord v) => Either v l -> Either v l -> C l v
+islte (Left v1) (Left v2) = C (S.singleton (CV v1 OpLte v2)) mempty
+islte (Left v1) (Right v2) = C (S.singleton (CL v1 OpLte v2)) mempty
+islte (Right v1) (Left v2) = C (S.singleton (CL v2 OpGte v1)) mempty
+islte (Right l1) (Right l2) = bool mempty (error $ "invalid constraint: " ++ showFixable l1 ++ " <= " ++ showFixable l2) (l1 `lte` l2)
 
-varIsInteresting :: v -> C l v
-varIsInteresting v = C mempty (Set.singleton v)
+isgte (Left v1) (Left v2) = C (S.singleton (CV v2 OpLte v1)) mempty
+isgte (Left v1) (Right v2) = C (S.singleton (CL v1 OpGte v2)) mempty
+isgte (Right v1) (Left v2) = C (S.singleton (CL v2 OpLte v1)) mempty
+isgte (Right l1) (Right l2) = bool mempty (error $ "invalid constraint: " ++ showFixable l1 ++ " >= " ++ showFixable l2) (l2 `lte` l1)
+
+equals (Left v1) (Left v2) = C (S.singleton (CV v1 OpEq v2)) mempty
+equals (Left v1) (Right v2) = C (S.singleton (CL v1 OpEq v2)) mempty
+equals (Right v1) (Left v2) = C (S.singleton (CL v2 OpEq v1)) mempty
+equals (Right l1) (Right l2) = bool mempty (error $ "invalid constraint: " ++ showFixable l1 ++ " = " ++ showFixable l2) (l1 `eq` l2)
 
 -- a variable is either set to a value or bounded by other values
 data R l a = R l |  Ri (Maybe l) (Set.Set (RS l a))  (Maybe l) (Set.Set (RS l a))
@@ -101,8 +118,8 @@ showResult rb@ResultBounded {} = sb (resultLB rb) (resultLBV rb) ++ " <= " ++ sh
     sb Nothing n = show n
     sb (Just x) n = show x ++ show n
 
-collectVars (Cset x y:xs) = x:y:collectVars xs
-collectVars (Clte x y:xs) = x:y:collectVars xs
+collectVars (CV x _ y:xs) = x:y:collectVars xs
+collectVars (CL x _ _:xs) = x:collectVars xs
 collectVars (CLAnnotate s x:xs) = collectVars (x:xs)
 collectVars [] = []
 
@@ -117,36 +134,36 @@ solve :: (Fixable l, Show l, Show v, Ord v)
     -> C l v
     -> IO (Map.Map v v,Map.Map v (Result l v))
 solve putLog (C csp _vset) = do
-    let vars = Set.fromList [ x | Left x <- collectVars cs]
+    let vars = Set.fromList (collectVars cs)
         cs = S.toList csp
     ufs <- flip mapM (Set.toList vars) $ \a -> do
         uf <- UF.new (Ri Nothing mempty Nothing mempty) a
         return (a,uf)
     let prule (CLAnnotate s cr) =  putLog s >> prule cr
-        prule (Left x `Clte` Left y) = ans where
+        prule (CV x OpLte y) = ans where
             Just xe = Map.lookup x umap
             Just ye = Map.lookup y umap
             ans = do
                 xe <- UF.find xe
                 ye <- UF.find ye
                 xe `lessThenOrEqual` ye
-        prule (Right x `Clte` Left y) = ans where
+        prule (CV x OpGte y) = prule (CV y OpLte x)
+        prule (CL y OpGte x) = ans where
             Just ye = Map.lookup y umap
             ans = do
                 ye <- UF.find ye
                 x `lessThen` ye
-        prule (Left x `Clte` Right y) = ans where
+        prule (CL x OpLte y) = ans where
             Just xe = Map.lookup x umap
             ans = do
                 xe <- UF.find xe
                 y `greaterThen` xe
-        prule (Right v `Cset` Left x) = prule (Left x `Cset` Right v)
-        prule (Left x `Cset` Right v) = ans where
+        prule (CL x OpEq v) = ans where
             Just xe = Map.lookup x umap
             ans = do
                 xe <- UF.find xe
                 xe `setValue` v
-        prule (Left x `Cset` Left y) = ans where
+        prule (CV x OpEq y) = ans where
             Just xe = Map.lookup x umap
             Just ye = Map.lookup y umap
             ans = do
@@ -157,12 +174,12 @@ solve putLog (C csp _vset) = do
                 ye <- UF.find ye
                 ye `lessThenOrEqual` xe
         -- handle constant cases, just check if valid, and perhaps report error
-        prule (Right x `Cset` Right y)
-            | x `eq` y = return ()
-            | otherwise = fail $ "equality of two different values" ++ show (x,y)
-        prule (Right x `Clte` Right y)
-            | x `lte` y = return ()
-            | otherwise = fail $ "invalid constraint: " ++ show x ++ " <= " ++ show y
+     --   prule (Right x `Cset` Right y)
+    --        | x `eq` y = return ()
+    --        | otherwise = fail $ "equality of two different values" ++ show (x,y)
+    --    prule (Right x `Clte` Right y)
+    --        | x `lte` y = return ()
+    --        | otherwise = fail $ "invalid constraint: " ++ show x ++ " <= " ++ show y
         setValue xe v = do
             putLog $ "Setting value of " ++ show (fromElement xe) ++ " to " ++ show v
             xw <- getW xe
@@ -303,7 +320,7 @@ instance Fixable Bool where
     eq = (==)
     lte = (<=)
 
--- bottom is zero and the join is the maximum of integer values, as in this is the lattice of maximum, not the additive one.
+-- join is the maximum of integer values, as in this is the lattice of maximum, not the additive one.
 instance Fixable Int where
     join a b = max a b
     meet a b = min a b

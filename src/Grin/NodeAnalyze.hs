@@ -22,7 +22,7 @@ import Support.FreeVars
 import Support.Tickle
 import Util.Gen
 import Util.SetLike
-import Util.UnionSolve2 as Util.UnionSolve
+import Util.UnionSolve
 import Util.UniqueMonad
 import qualified Stats
 
