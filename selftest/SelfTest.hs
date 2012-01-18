@@ -175,3 +175,7 @@ instance Arbitrary Info.Types.Property where
 
 instance Arbitrary Properties where
     arbitrary = fromList `fmap` arbitrary
+
+instance Arbitrary Char where
+    arbitrary     = Test.QuickCheck.choose ('\32', '\128')
+    coarbitrary c = variant (fromEnum c `rem` 4)

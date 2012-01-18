@@ -7,7 +7,9 @@ GHCOPTS= -fallow-overlapping-instances -fallow-undecidable-instances -fglasgow-e
 
 HC= ghc
 
-all: md5 sha1 TestParse cff SelfTest
+all: md5 sha1 TestParse cff SelfTest UnionSolve
+
+UnionSolve: UnionSolve.hs ../src/Util/UnionSolve.hs
 
 
 %: %.hs
