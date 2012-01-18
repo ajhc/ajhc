@@ -53,6 +53,8 @@ instance Fixable N where
     join  (N x y) (N x' y') = N (join x x') (join y y')
     meet  (N x y) (N x' y') = N (meet x x') (meet y y')
     lte   (N x y) (N x' y') = lte x x' && lte y y'
+    eq    (N x y) (N x' y') = eq x x' && eq y y'
+    showFixable n = show n
 
 data V = V Va Ty | VIgnore
     deriving(Eq,Ord)
