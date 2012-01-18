@@ -1,3 +1,4 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Util.UnionSolve(
     C(),
     solve,
@@ -9,6 +10,7 @@ module Util.UnionSolve(
     (@<=),(@>=),(@=),(@<=@),(@>=@),(@=@)
     ) where
 
+import Control.Monad(unless, forM_)
 import Data.List(intersperse)
 import Data.Monoid
 import qualified Data.Foldable as S
@@ -50,6 +52,10 @@ newtype C l v = C (S.Seq (CL l v))
 
 data Op = OpLte | OpEq | OpGte
 
+flipOp OpLte = OpGte
+flipOp OpGte = OpLte
+flipOp OpEq = OpEq
+
 instance Show Op where
     show OpEq  = " = "
     show OpGte = " >= "
@@ -67,6 +73,7 @@ instance (Show e,Show l) => Show (CL l e) where
     showsPrec _ x = case x of
         CV v1 op v2 -> shows v1 . shows op . shows v2
         CL v1 op v2 -> shows v1 . shows op . shows v2
+        CLAnnotate _ c -> shows c
 
 bool t f b = if b then t else f
 
@@ -135,22 +142,153 @@ solve :: (Fixable l, Show l, Show v, Ord v)
     -> IO (Map.Map v v,Map.Map v (Result l v))
 solve putLog csp = do
     (pcs,varMap) <- prepareConstraints csp
+    let procVar (CV x op y) = do
+            xe <- UF.find x
+            ye <- UF.find y
+            doVar "" xe op ye
+        procVar (CLAnnotate s CL {}) =  return ()
+        procVar CL {} = return ()
+        procVar (CLAnnotate s cr) =  putLog s >>  procVar cr
+        doVar _ xe _ ye | xe == ye = return ()
+        doVar lvl xe op ye = do
+            putLog $ lvl ++ "Constraining: " ++ show (fromElement xe) ++ show op ++ show (fromElement ye)
+            xw <- UF.getW xe
+            yw <- UF.getW ye
+            case (xw,yw) of
+                (Ri xml xlb xmu xub,Ri yml ylb ymu yub) -> do
+                    xub <- finds xub
+                    xlb <- finds xlb
+                    yub <- finds yub
+                    ylb <- finds ylb
+                    case op of
+                        OpEq  ->  doEq lvl xe (Ri xml xlb xmu xub) ye (Ri yml ylb ymu yub)
+                        OpLte -> doLte lvl xe (Ri xml xlb xmu xub) ye (Ri yml ylb ymu yub)
+                        OpGte -> doLte lvl ye (Ri yml ylb ymu yub) xe (Ri xml xlb xmu xub)
+
+        doEq lvl xe ~(Ri _ xlb _ xub) ye ~(Ri _ ylb _ yub) = do
+            union const xe ye
+            ne <- find xe
+            nlb <- finds (xlb `Set.union` ylb)
+            nub <- finds (yub `Set.union` xub)
+            UF.putW ne (Ri Nothing nlb Nothing nub)
+            checkRS lvl ne
+        doLte lvl xe ~xw@(Ri xml xlb xmu xub) ye ~yw@(Ri yml ylb ymu yub) = do
+            let done = UF.putW xe (Ri xml xlb xmu xub) >> UF.putW ye (Ri yml ylb ymu yub)
+            if ye `Set.member` xub then done else do
+            if xe `Set.member` ylb then done else do
+            if ye `Set.member` xlb then doEq lvl xe xw ye yw else do
+            if xe `Set.member` yub then doEq lvl xe xw ye yw else do
+            UF.putW xe (Ri xml xlb xmu (Set.insert ye (xub `Set.union` yub)))
+            UF.putW ye (Ri yml (Set.insert xe (ylb `Set.union` xlb)) ymu yub)
+            checkRS lvl xe
+            checkRS lvl ye
+        checkRS lvl ve = do
+            ve <- UF.find ve
+            Ri l lb h ub <- UF.getW ve
+            lb <- finds lb
+            ub <- finds ub
+            UF.putW ve (Ri l (Set.delete ve lb) h (Set.delete ve ub))
+            let equiv = lb `Set.intersection` ub
+            forM_ (Set.toList equiv) $ doVar ('#':lvl) ve OpEq
+        finds set = fmap Set.fromList $ mapM UF.find (Set.toList set)
+    mapM_ procVar pcs
+
+    let procLit (CL x op y) = do
+            xe <- UF.find x
+            doOp "" xe op y
+        procLit (CLAnnotate s CV {}) =  return ()
+        procLit CV {} = return ()
+        procLit (CLAnnotate s cr) =  putLog s >>  procLit cr
+
+        doOp lvl ve op l = do
+            let doOp' ve op l = doOp ('-':lvl) ve op l
+            putLog $ lvl ++ "Constraining: " ++ show (fromElement ve) ++ show op ++ show l
+            vw <- getW ve
+            case (op,vw) of
+                (_,R c) | check op c l -> return ()
+                        | otherwise -> fail $ "UnionSolve: constraint doesn't match (" ++ show c ++ show op ++ show l ++ ") when setting " ++ show (fromElement ve)
+                (OpEq,Ri ml lb mu ub) | testBoundLT ml l && testBoundGT mu l -> do
+                    updateW (const (R l)) ve
+                    mapM_ (\v -> doOp' v OpLte l) (Set.toList lb)
+                    mapM_ (\v -> doOp' v OpGte l) (Set.toList ub)
+                (OpEq,_) | otherwise -> fail $ "UnionSolve: setValue " ++ show (fromElement ve,vw,l)
+                (OpLte,Ri _ _ (Just n) _) | n `lte` l -> return ()
+                (OpGte,Ri (Just n) _ _ _) | l `lte` n -> return ()
+                (OpLte,Ri (Just n) _ _ _) | n `eq` l -> doOp' ve OpEq l
+                (OpGte,Ri _ _ (Just n) _) | n `eq` l -> doOp' ve OpEq l
+                (OpLte,Ri (Just n) _ _ _) | l `lte` n -> fail $ "UnionSolve: lower than lower bound  " ++ show (fromElement ve,vw,l,n)
+                (OpGte,Ri _ _ (Just n) _) | n `lte` l -> fail $ "UnionSolve: higher than higher bound  " ++ show (fromElement ve,vw,l,n)
+                (OpLte,Ri ml lb mu ub) -> do
+                    doUpdate (Ri ml lb (mmeet (Just l) mu) ub) ve
+                    mapM_ (\v -> doOp' v OpLte l) (Set.toList lb)
+                (OpGte,Ri ml lb mu ub) -> do
+                    doUpdate (Ri (mjoin (Just l) ml) lb mu ub) ve
+                    mapM_ (\v -> doOp' v OpGte l) (Set.toList ub)
+                _ -> fail $ "UnionSolve: bad " ++  show (fromElement ve,vw,op,l)
+        testBoundLT Nothing _ = True
+        testBoundLT (Just x) y = x `lte` y
+        testBoundGT Nothing _ = True
+        testBoundGT (Just x) y = y `lte` x
+        --checkRS :: R l a -> RS l a -> IO ()
+        checkRS (Ri (Just l) _ (Just u) _) xe | l `eq` u = do
+            putLog $ "Boxed in value of " ++ show (fromElement xe) ++ " being set to " ++ show l
+            doOp "&" xe OpEq l
+        checkRS (Ri (Just l) _ (Just u) _) xe | u `lte` l = fail "checkRS: you crossed the streams"
+        checkRS (Ri (Just l) _ _ _) xe  | isTop l = do
+            putLog $ "Going up:   " ++ show (fromElement xe)
+            doOp "&" xe OpEq l
+        checkRS (Ri  _ _ (Just u) _) xe | isBottom u = do
+            putLog $ "Going down: " ++ show (fromElement xe)
+            doOp "&" xe OpEq u
+        checkRS r xe = return ()
+        doUpdate r xe = do
+            updateW (const r) xe
+            checkRS r xe
+        mjoin Nothing b = b
+        mjoin x Nothing = x
+        mjoin (Just x) (Just y) = Just (join x y)
+        mmeet Nothing b = b
+        mmeet x Nothing = x
+        mmeet (Just x) (Just y) = Just (meet x y)
+    mapM_ procLit pcs
+    rs <- flip mapM (Map.toList varMap) $ \ (a,e) -> do
+        e <- find e
+        w <- getW e
+        rr <- case w of
+            R v -> return (ResultJust (fromElement e) v)
+            Ri ml lb mu ub -> do
+                ub <- fmap (map fromElement . Set.toList) $ finds ub
+                lb <- fmap (map fromElement . Set.toList) $ finds lb
+                return (ResultBounded { resultRep = fromElement e, resultUB = mu, resultLB = ml, resultLBV = lb, resultUBV = ub })
+        let aa = fromElement e
+        return ((a,aa),(aa,rr))
+    let (ma,mb) = unzip rs
+    return (Map.fromList ma,Map.fromList mb)
+
+{-
+{-# NOINLINE solve #-}
+solve :: (Fixable l, Show l, Show v, Ord v)
+    => (String -> IO ())
+    -> C l v
+    -> IO (Map.Map v v,Map.Map v (Result l v))
+solve putLog csp = do
+    (pcs,varMap) <- prepareConstraints csp
     let prule (CLAnnotate s cr) =  putLog s >> prule cr
-        prule (CV x OpGte y) = prule (CV y OpLte x)
-        prule (CV xe OpEq ye) = do
-            prule (CV xe OpGte ye)
-            prule (CV xe OpLte ye)
-        prule (CV xe OpLte ye) = do
-            xe <- UF.find xe
-            ye <- UF.find ye
-            xe `lessThanOrEqual` ye
+        prule (CV x op y) = do
+            xe <- UF.find x
+            ye <- UF.find y
+            doVar "" xe op ye
         prule (CL v op l) = do
             ve <- UF.find v
             doOp "" ve op l
-            --case op of
-            --    OpGte -> l `lessThan` ve
-            --    OpLte -> l `greaterThan` ve
-            --    OpEq -> ve `setValue` l
+--        prule (CV x OpGte y) = prule (CV y OpLte x)
+--        prule (CV xe OpEq ye) = do
+--            prule (CV xe OpGte ye)
+--            prule (CV xe OpLte ye)
+--        prule (CV xe OpLte ye) = do
+--            xe <- UF.find xe
+--            ye <- UF.find ye
+--            xe `lessThanOrEqual` ye
         doOp lvl ve op l = do
             let doOp' ve op l = doOp ('-':lvl) ve op l
             ve <- UF.find ve
@@ -171,58 +309,20 @@ solve putLog csp = do
                     (OpGte,Ri _ _ (Just n) _) | n `eq` l -> doOp' ve OpEq l
                     (OpLte,Ri (Just n) _ _ _) | l `lte` n -> fail $ "UnionSolve: lower than lower bound  " ++ show (fromElement ve,vw,l,n)
                     (OpGte,Ri _ _ (Just n) _) | n `lte` l -> fail $ "UnionSolve: higher than higher bound  " ++ show (fromElement ve,vw,l,n)
-                    (OpLte,Ri ml lb mu ub) | testBoundLT ml l -> do
+                    (OpLte,Ri ml lb mu ub) -> do
                         doUpdate (Ri ml lb (mmeet (Just l) mu) ub) ve
                         mapM_ (\v -> doOp' v OpGte l) (Set.toList lb)
-                    (OpGte,Ri ml lb mu ub) | testBoundGT mu l -> do
+                    (OpGte,Ri ml lb mu ub) -> do
                         doUpdate (Ri (mjoin (Just l) ml) lb mu ub) ve
                         mapM_ (\v -> doOp' v OpLte l) (Set.toList ub)
                     _ -> fail $ "UnionSolve: bad " ++  show (fromElement ve,vw,op,l)
-                        --mapM_ (lessThan v) (Set.toList ub)
-                   --     doUpdate (Ri ml lb (mmeet (Just l) mu) ub) xe
-                  --      mapM_ (\v -> CL v OpGte) (Set.toList lb)
-         --               mapM_ (greaterThan v) (Set.toList lb)
-          --                     | otherwise -> fail $ "UnionSolve: testBoundLT " ++ show (ml,v)
         setValue xe v = doOp "*" xe OpEq v
         greaterThan v xe = doOp "*" xe OpLte v
         lessThan v xe = doOp "*" xe OpGte v
---        setValue xe v = do
---            putLog $ "Setting value of " ++ show (fromElement xe) ++ " to " ++ show v
---            xw <- getW xe
---            case xw of
---                R c | c `eq` v -> return ()
---                    | otherwise -> fail $ "UnionSolve: equality constraints don't match " ++ show (c,v)  ++ " when setting " ++ show (fromElement xe)
---                Ri ml lb mu ub | testBoundLT ml v && testBoundGT mu v -> do
---                    mapM_ (v `greaterThan`) (Set.toList lb)
---                    mapM_ (v `lessThan`)    (Set.toList ub)
---                    updateW (const (R v)) xe
---                _ -> fail $ "UnionSolve: setValue " ++ show (fromElement xe,xw,v)
         testBoundLT Nothing _ = True
         testBoundLT (Just x) y = x `lte` y
         testBoundGT Nothing _ = True
         testBoundGT (Just x) y = y `lte` x
---        v `greaterThan` xe = do
---            putLog $ "make sure " ++ show (fromElement xe) ++ " is less than " ++ show v
---            xw <- UF.getW xe
---            case xw of
---                R c | c `lte` v -> return ()
---                    | otherwise -> fail $ "UnionSolve: greaterThan " ++ show (v,c)
---                Ri _ _ (Just n) _ | n `lte` v -> return ()
---                Ri ml lb mu ub | testBoundLT ml v -> do
---                    doUpdate (Ri ml lb (mmeet (Just v) mu) ub) xe
---                    mapM_ (greaterThan v) (Set.toList lb)
---                               | otherwise -> fail $ "UnionSolve: testBoundLT " ++ show (ml,v)
---        v `lessThan` xe = do
---            putLog $ "make sure " ++ show (fromElement xe) ++ " is greater than " ++ show v
---            xw <- getW xe
---            case xw of
---                R c | v `lte` c -> do return ()
---                    | otherwise -> fail $ "UnionSolve: lessThan " ++ show (v,c)
---                Ri (Just n) _ _ _ |  v `lte` n -> do return ()
---                Ri ml lb mu ub | testBoundGT mu v -> do
---                    doUpdate (Ri (mjoin (Just v) ml) lb mu ub) xe
---                    mapM_ (lessThan v) (Set.toList ub)
---                               | otherwise -> fail $ "UnionSolve: testBoundGT " ++ show (mu,v)
         --checkRS :: R l a -> RS l a -> IO ()
         checkRS (Ri (Just l) _ (Just u) _) xe | l `eq` u = do
             putLog $ "Boxed in value of " ++ show (fromElement xe) ++ " being set to " ++ show l
@@ -235,56 +335,104 @@ solve putLog csp = do
             putLog $ "Going down: " ++ show (fromElement xe)
             setValue xe u
         checkRS r xe = return ()
-        xe `lessThanOrEqual` ye | xe == ye = return ()
-        xe `lessThanOrEqual` ye = do
-            putLog $ "+Constraining: " ++ show (fromElement xe) ++ show OpLte ++ show (fromElement ye)
+        doVar _ xe _ ye | xe == ye = return ()
+        doVar lvl xe op ye = do
+            putLog $ lvl ++ "Constraining: " ++ show (fromElement xe) ++ show op ++ show (fromElement ye)
             xw <- UF.getW xe
-            case xw of
-                R v -> (v `lessThan` ye)
-                Ri xml xlb xmu xub -> do
+            yw <- UF.getW ye
+            case (xw,yw) of
+                (R v,Ri {}) -> (doOp ('%':lvl) ye (flipOp op) v)
+                (Ri {}, R v) -> (doOp ('%':lvl) xe op v)
+                (R xv, R yv) | check op xv yv -> return ()
+                             | otherwise -> fail $ "UnionSolve: variable " ++ show (xe,xv,op,ye,yv)
+                (Ri xml xlb xmu xub,Ri yml ylb ymu yub) -> do
                     xub <- finds xub
-                    if ye `Set.member` xub then return () else do
                     xlb <- finds xlb
-                    if ye `Set.member` xlb then equal xe ye  else do
-                    yw <- UF.getW ye
-                    case yw of
-                        R v -> (v `greaterThan` xe)
-                        Ri yml ylb ymu yub -> do
-                            ylb <- finds ylb
-                            if xe `Set.member` ylb then return () else do
-                            yub <- finds yub
-                            if xe `Set.member` yub then equal xe ye  else do
-                            let newxu = mmeet ymu xmu
-                            updateW (const (Ri xml xlb newxu (Set.delete xe $ Set.insert ye xub))) xe
-                            case newxu of
-                                Just v -> mapM_ (v `greaterThan`) (Set.toList xlb)
-                                _ -> return ()
-                            let newyl = mjoin yml xml
-                            updateW (const (Ri newyl (Set.delete ye $ Set.insert xe ylb) ymu yub)) ye
-                            case newyl of
-                                Just v -> mapM_ (v `lessThan`) (Set.toList yub)
-                                _ -> return ()
-                            w <- getW xe
-                            checkRS w xe
-                            w <- getW ye
-                            checkRS w ye
+                    yub <- finds yub
+                    ylb <- finds ylb
+                    case op of
+                        OpEq ->   doEq lvl xe (Ri xml xlb xmu xub) ye (Ri yml ylb ymu yub)
+                        OpLte -> doLte lvl xe (Ri xml xlb xmu xub) ye (Ri yml ylb ymu yub)
+                        OpGte -> doLte lvl ye (Ri yml ylb ymu yub) xe (Ri xml xlb xmu xub)
+
+        doEq _lvl xe ~(Ri xml xlb xmu xub) ye ~(Ri yml ylb ymu yub) = do
+            union const xe ye
+            ne <- find xe
+            let nml = xml `mjoin` yml
+                nmu = xmu `mmeet` ymu
+            nlb <- finds (xlb `mappend` ylb)
+            nub <- finds (yub `mappend` xub)
+            doUpdate (Ri nml (Set.delete ne nlb) nmu (Set.delete ne nub)) xe
+        doLte lvl xe ~xw@(Ri xml xlb xmu xub) ye ~yw@(Ri yml ylb ymu yub) = do
+            let done = UF.putW xe (Ri xml xlb xmu xub) >> UF.putW ye (Ri yml ylb ymu yub)
+            if ye `Set.member` xub then done else do
+            if xe `Set.member` ylb then done else do
+            if ye `Set.member` xlb then doEq lvl xe xw ye yw else do
+            if xe `Set.member` yub then doEq lvl xe xw ye yw else do
+            let newxu = mmeet ymu xmu
+            UF.putW xe (Ri xml xlb newxu (Set.delete xe $ Set.insert ye xub))
+            unless (newxu `eq` xmu) $ do
+                let Just v = newxu
+                mapM_ (v `greaterThan`) (Set.toList xlb)
+            let newyl = mjoin yml xml
+            UF.putW ye (Ri newyl (Set.delete ye $ Set.insert xe ylb) ymu yub)
+            unless (newyl `eq` yml) $ do
+                let Just v = newyl
+                mapM_ (v `lessThan`) (Set.toList yub)
+            w <- getW xe
+            checkRS w xe
+            w <- getW ye
+            checkRS w ye
+
+--        xe `lessThanOrEqual` ye = do
+--            putLog $ "+Constraining: " ++ show (fromElement xe) ++ show OpLte ++ show (fromElement ye)
+--            xw <- UF.getW xe
+--            case xw of
+--                R v -> (v `lessThan` ye)
+--                Ri xml xlb xmu xub -> do
+--                    xub <- finds xub
+--                    if ye `Set.member` xub then return () else do
+--                    xlb <- finds xlb
+--                    if ye `Set.member` xlb then equal xe ye  else do
+--                    yw <- UF.getW ye
+--                    case yw of
+--                        R v -> (v `greaterThan` xe)
+--                        Ri yml ylb ymu yub -> do
+--                            ylb <- finds ylb
+--                            if xe `Set.member` ylb then return () else do
+--                            yub <- finds yub
+--                            if xe `Set.member` yub then equal xe ye  else do
+--                            let newxu = mmeet ymu xmu
+--                            updateW (const (Ri xml xlb newxu (Set.delete xe $ Set.insert ye xub))) xe
+--                            case newxu of
+--                                Just v -> mapM_ (v `greaterThan`) (Set.toList xlb)
+--                                _ -> return ()
+--                            let newyl = mjoin yml xml
+--                            updateW (const (Ri newyl (Set.delete ye $ Set.insert xe ylb) ymu yub)) ye
+--                            case newyl of
+--                                Just v -> mapM_ (v `lessThan`) (Set.toList yub)
+--                                _ -> return ()
+--                            w <- getW xe
+--                            checkRS w xe
+--                            w <- getW ye
+--                            checkRS w ye
         doUpdate r xe = do
             updateW (const r) xe
             checkRS r xe
-        equal xe ye | xe == ye = return ()
-        equal xe ye = do
-            xw <- getW xe
-            yw <- getW ye
-            union const xe ye
-            xe <- find xe
-            case (xw,yw) of
-                (Ri xml xlb xmu xub,Ri yml ylb ymu yub) -> do
-                    let nml = xml `mjoin` yml
-                        nmu = xmu `mmeet` ymu
-                    nlb <- finds (xlb `mappend` ylb)
-                    nub <- finds (yub `mappend` xub)
-                    doUpdate (Ri nml (Set.delete xe nlb) nmu (Set.delete xe nub)) xe
-                _ -> error "Util.UnionSolve: equality, can't happen."
+--        equal xe ye | xe == ye = return ()
+--        equal xe ye = do
+--            xw <- getW xe
+--            yw <- getW ye
+--            union const xe ye
+--            xe <- find xe
+--            case (xw,yw) of
+--                (Ri xml xlb xmu xub,Ri yml ylb ymu yub) -> do
+--                    let nml = xml `mjoin` yml
+--                        nmu = xmu `mmeet` ymu
+--                    nlb <- finds (xlb `mappend` ylb)
+--                    nub <- finds (yub `mappend` xub)
+--                    doUpdate (Ri nml (Set.delete xe nlb) nmu (Set.delete xe nub)) xe
+--                _ -> error "Util.UnionSolve: equality, can't happen."
         mjoin Nothing b = b
         mjoin x Nothing = x
         mjoin (Just x) (Just y) = Just (join x y)
@@ -306,6 +454,7 @@ solve putLog csp = do
         return ((a,aa),(aa,rr))
     let (ma,mb) = unzip rs
     return (Map.fromList ma,Map.fromList mb)
+    -}
 
 -----------------------------------------------------------
 -- The data type the results of the analysis are placed in.

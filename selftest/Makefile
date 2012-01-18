@@ -1,8 +1,8 @@
 
 
+INC= -i -i../drift_processed -i../src
 GHCOPTS= -fallow-overlapping-instances -fallow-undecidable-instances -fglasgow-exts \
-	 -XBangPatterns \
-	 -i -i../drift_processed -i../drift_processed/FrontEnd -i../src \
+	 -XBangPatterns $(INC) \
 	 -O -package QuickCheck -ignore-package lang  -optc-std=c99 -optc-g
 
 HC= ghc
@@ -10,6 +10,8 @@ HC= ghc
 all: md5 sha1 TestParse cff SelfTest UnionSolve
 
 UnionSolve: UnionSolve.hs ../src/Util/UnionSolve.hs
+	ghc $(INC) --make $<
+
 
 
 %: %.hs

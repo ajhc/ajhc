@@ -115,8 +115,8 @@ nodeAnalyze grin' = do
     --print cs
     --putStrLn "----------------------------"
     --putStrLn "-- NodeAnalyze"
-    --(rm,res) <- solve (const (return ())) cs
-    (rm,res) <- solve putStrLn cs
+    (rm,res) <- solve (const (return ())) cs
+    --(rm,res) <- solve putStrLn cs
     --putStrLn "----------------------------"
     --mapM_ (\ (x,y) -> putStrLn $ show x ++ " -> " ++ show y) (Map.toList rm)
     --putStrLn "----------------------------"
@@ -169,7 +169,7 @@ doFunc (name,arg :-> body) = ans where
         f body = gn ret body
     isfn _ x y | not (isGood x) = mempty
     isfn (Todo True  _) x y = cAnnotate "isfn True" $ Left x `equals` y
-    isfn (Todo False _) x y = Left x `isgte` y
+    isfn (Todo False _) x y = cAnnotate "isfn False" $ Left x `isgte` y
     --isfn (Todo _ _) x y = Left x `isgte` y
     isfn TodoNothing x y =  mempty
     equals x y | isGood x && isGood y = Util.UnionSolve.equals x y
@@ -186,6 +186,7 @@ doFunc (name,arg :-> body) = ans where
             dres [Right (if TyNode == t then N WHNF Top else top) | t <- ty ]
         dres res = do
             case ret of
+                Todo b vs | length res /= length vs -> error "lengths don't match!"
                 Todo b vs -> forM_ (zip vs res) $ \ (v,r) -> tell (isfn ret v r)
                 _ -> return ()
         f (_ :>>= _) = error $ "Grin.NodeAnalyze: :>>="
