@@ -195,6 +195,11 @@ built-sources: $(BUILT_SOURCES)
 i: $(BUILT_SOURCES)
 	$(HC) --interactive $(GHCOPTS) src/Main.hs $(CFILES)
 
+lint:
+	perl utils/hslint.prl `darcs wh -s | sed -e 's/^..//' -e 's/ .*$$//' | grep '.hs$$'`
+hlint:
+	hlint `darcs wh -s | sed -e 's/^..//' -e 's/ .*$$//' | grep '.hs$$'`
+
 .PHONY: ho-clean hl-clean built-sources i manual man
 
 ho-clean:
