@@ -4,7 +4,11 @@ AC_CONFIG_MACRO_DIR(ac-macros)
 AC_CONFIG_AUX_DIR(ac-macros)
 AM_INIT_AUTOMAKE([foreign no-dependencies std-options])
 
-SHORTVERSION=0.7
+VERSION_MAJOR=$(echo $VERSION | cut -d'.' -f1)
+VERSION_MINOR=$(echo $VERSION | cut -d'.' -f2)
+VERSION_PATCH=$(echo $VERSION | cut -d'.' -f3)
+
+SHORTVERSION="$VERSION_MAJOR.$VERSION_MINOR"
 
 AC_CANONICAL_HOST
 
@@ -73,5 +77,8 @@ AC_SUBST(BYTE_ORDER)
 AC_SUBST(JLIBPATH)
 AC_SUBST(JETCPATH)
 AC_SUBST(MINGW)
+AC_SUBST(VERSION_MAJOR)
+AC_SUBST(VERSION_MINOR)
+AC_SUBST(VERSION_PATCH)
 AC_CONFIG_FILES([Makefile jhc.spec src/Version/Config.hs docs/building.mkd src/cbits/config.h src/data/targets.ini])
 AC_OUTPUT
