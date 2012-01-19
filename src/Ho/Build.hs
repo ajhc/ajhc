@@ -8,7 +8,6 @@ module Ho.Build (
     buildLibrary
     ) where
 
-
 import Control.Concurrent
 import Control.Monad.Identity
 import Data.Char
@@ -17,9 +16,10 @@ import Data.List hiding(union)
 import Data.Monoid
 import Data.Tree
 import Data.Version(Version,parseVersion,showVersion)
+import Data.Yaml.Syck
 import Maybe
-import System.Mem
 import System.Directory (removeFile)
+import System.Mem
 import System.Random (randomIO)
 import Text.Printf
 import qualified Data.ByteString as BS
@@ -55,7 +55,7 @@ import Ho.Type
 import Name.Name
 import Options
 import PackedString(PackedString,packString,unpackPS)
-import RawFiles(prelude_m4)
+import Support.Yaml
 import Util.FilterInput
 import Util.Gen
 import Util.SetLike
@@ -67,8 +67,6 @@ import qualified FlagOpts as FO
 import qualified Support.MD5 as MD5
 import qualified Util.Graph as G
 
-
---
 -- Ho File Format
 --
 -- ho files are standard CFF format files (PNG-like) as described in the Support.CFF modules.
@@ -137,7 +135,7 @@ findHoFile done_ref fp mm sh = do
     let honame = hoFile (hoCache done) fp mm sh
     writeIORef done_ref (done { validSources = Set.insert sh (validSources done) })
     if sh `Set.member` validSources done || optIgnoreHo options then return (False,honame) else do
-    onErr (return (False,honame)) (readHoFile honame) $ \ (hoh,hidep,ho) -> do
+    onErr (return (False,honame)) (readHoFile honame) $ \ (hoh,hidep,ho) ->
         case hohHash hoh `Map.lookup` hosEncountered done of
             Just (fn,_,_,a) -> return (True,fn)
             Nothing -> do
@@ -147,7 +145,7 @@ findHoFile done_ref fp mm sh = do
                 return (True,honame)
 
 onErr :: IO a -> IO b -> (b -> IO a) -> IO a
-onErr err good cont = catch (good >>= \c -> return (cont c)) (\_ -> return err) >>= id
+onErr err good cont = join $ catch (good >>= return . cont) (\_ -> return err)
 
 fetchSource :: IORef Done -> [FilePath] -> Maybe Module -> IO Module
 fetchSource _ [] _ = fail "No files to load"
@@ -161,7 +159,7 @@ fetchSource done_ref fs mm = do
     (foundho,mho) <- findHoFile done_ref fn mm hash
     done <- readIORef done_ref
     (mod,m,ds) <- case mlookup hash (knownSourceMap done) of
-        Just (m,ds) -> do return (Left lbs,m,ds)
+        Just (m,ds) -> return (Left lbs,m,ds)
         Nothing -> do
             (hmod,_) <- parseHsSource fn lbs
             let m = hsModuleName hmod
@@ -181,9 +179,9 @@ fetchSource done_ref fs mm = do
             modifyIORef done_ref (modEncountered_u $ Map.insert m (Found (sc mod)))
             fn' <- shortenPath fn
             mho' <- shortenPath mho
-            case foundho of
-                False -> putProgressLn $ printf "%-23s [%s]" (show m) fn'
-                True -> putProgressLn $ printf "%-23s [%s] <%s>" (show m) fn' mho'
+            putProgressLn $ if foundho
+                then printf "%-23s [%s] <%s>" (show m) fn' mho'
+                else printf "%-23s [%s]" (show m) fn'
             mapM_ (resolveDeps done_ref) ds
             return m
 
@@ -220,10 +218,10 @@ dumpDeps targets memap cug = case optDeps options of
         let (sfps,sdps,ls) = collectDeps memap cug
         let yaml = Map.fromList [
                 ("Target",toNode targets),
-                ("LibraryDesc",toNode $ [ fp | BuildHl fp  <- [optMode options]]),
-                ("LibraryDeps",toNode $ ls),
+                ("LibraryDesc",toNode [ fp | BuildHl fp  <- [optMode options]]),
+                ("LibraryDeps",toNode ls),
                 ("ModuleSource",toNode sfps),
-                ("ModuleDeps",toNode $ sdps)
+                ("ModuleDeps",toNode sdps)
                 ]
         writeFile fp (showYAML yaml)
 
@@ -244,7 +242,7 @@ data CompUnit
     | CompLibrary Ho Library
 
 instance Show CompUnit where
-    showsPrec _ cu = shows $ providesModules cu
+    showsPrec _ = shows . providesModules
 
 data SourceInfo = SI {
     sourceHash :: SourceHash,
@@ -258,17 +256,17 @@ data SourceCode
     = SourceParsed     { sourceInfo :: !SourceInfo, sourceModule :: HsModule }
     | SourceRaw        { sourceInfo :: !SourceInfo, sourceLBS :: LBS.ByteString }
 
-sourceIdent sp = show . sourceModName $ sourceInfo sp
+sourceIdent = show . sourceModName . sourceInfo
 
 class ProvidesModules a where
     providesModules :: a -> [Module]
     providesModules _ = []
 
 instance ProvidesModules HoIDeps where
-    providesModules hoh = fsts $ hoDepends hoh
+    providesModules = fsts . hoDepends
 
 instance ProvidesModules HoLib where
-    providesModules hl = Map.keys (hoModuleMap hl)
+    providesModules = Map.keys . hoModuleMap
 
 instance ProvidesModules CompUnit where
     providesModules (CompHo _ hoh _)   = providesModules hoh
@@ -283,7 +281,6 @@ instance ProvidesModules CompLink where
 
 instance ProvidesModules SourceCode where
     providesModules sp = [sourceModName (sourceInfo sp)]
-
 
 -- | this walks the loaded modules and ho files, discarding out of
 -- date ho files and organizing modules into their binding groups.
@@ -384,7 +381,6 @@ toCompUnitGraph done roots = do
         mapM_ (putErrLn . show) [ (snd $ snd v, map (snd . snd) vs) | (v,vs) <- G.fromGraph gr']
     return (rhash,[ (h,([ d | (d,_) <- ns ],cu)) | ((h,(_,cu)),ns) <- G.fromGraph gr' ])
 
-
 parseFiles
     :: [FilePath]                                           -- ^ Targets we are building, used when dumping dependencies
     -> [String]                                             -- ^ Extra libraries to load
@@ -396,19 +392,16 @@ parseFiles targets elibs need ifunc func = do
     putProgressLn "Finding Dependencies..."
     (ksm,chash,cug) <- loadModules targets (optHls options ++ elibs) need
     cnode <- processCug cug chash
-    when (optMode options == StopParse) $
-        exitSuccess
+    when (optMode options == StopParse) exitSuccess
     performGC
     putProgressLn "Typechecking..."
     typeCheckGraph cnode
     if isJust (optAnnotate options) then exitSuccess else do
-    when (optMode options  == StopTypeCheck) $
-        exitSuccess
+    when (optMode options  == StopTypeCheck) exitSuccess
     performGC
     putProgressLn "Compiling..."
     cho <- compileCompNode ifunc func ksm cnode
     return (cnode,cho)
-
 
 -- this takes a list of modules or files to load, and produces a compunit graph
 loadModules
@@ -457,8 +450,6 @@ loadModules targets libs need = do
     dumpDeps targets (modEncountered done) cug
     return (Map.filterWithKey (\k _ -> k `Set.member` validSources done) (knownSourceMap done),chash,cug)
 
-
-
 -- turn the list of CompUnits into a true mutable graph.
 processCug :: CompUnitGraph -> HoHash -> IO CompNode
 processCug cug root = mdo
@@ -476,7 +467,6 @@ mkPhonyCompUnit need cs = (fhash,(fhash,(fdeps,CompDummy)):cs) where
         fhash = MD5.md5String $ show (sort fdeps)
         fdeps = [ h | (h,(_,cu)) <- cs, not . null $ providesModules cu `intersect` need ]
 
-
 printModProgress :: Int -> Int -> IO Int -> [HsModule] -> IO ()
 printModProgress _ _ _ [] = return ()
 printModProgress _ _ tickProgress ms | not progress = mapM_ (const tickProgress) ms
@@ -487,7 +477,6 @@ printModProgress fmtLen maxModules tickProgress ms = f "[" ms where
             [x] -> g curModule bl "]" x
             (x:xs) -> do g curModule bl "-" x; putErrLn ""; f "-" xs
     g curModule bl el modName = putErr $ printf "%s%*d of %*d%s %-17s" bl fmtLen curModule fmtLen maxModules el (show $ hsModuleName modName)
-
 
 countNodes cn = do
     seen <- newIORef Set.empty
@@ -507,7 +496,6 @@ countNodes cn = do
             CompSources sc      -> Set.fromList (map sourceIdent sc)
             _                   -> Set.empty
     h cn
-
 
 typeCheckGraph :: CompNode -> IO ()
 typeCheckGraph cn = do
@@ -626,10 +614,6 @@ compileCompNode ifunc func ksm cn = do
                     CompSources _ -> error "sources still exist!?"
     f cn
 
-
-
-
-
 hsModuleRequires x = snub (Module "Jhc.Prim":ans) where
     noPrelude =   or $ not (optPrelude options):[ opt == c | opt <- hsModuleOptions x, c <- ["-N","--noprelude"]]
     ans = (if noPrelude then id else  (Module "Prelude":)) [  hsImportDeclModule y | y <- hsModuleImports x]
@@ -639,12 +623,6 @@ searchPaths m = ans where
     f m | (xs,'.':ys) <- span (/= '.') m = let n = (xs ++ "/" ++ ys) in m:f n
         | otherwise = [m]
     ans = [ (root ++ suf,root ++ ".ho") | i <- optIncdirs options, n <- f m, suf <- [".hs",".lhs"], let root = i ++ "/" ++ n]
-
-
-m4Prelude :: IO FilePath
-m4Prelude = (randomIO :: IO Integer) >>= \salt ->
-    let m4p_filename = "/tmp/jhc_prelude-" ++ show salt ++ ".m4"
-    in BS.writeFile m4p_filename prelude_m4 >> return m4p_filename
 
 langmap = [
     "m4" ==> "m4",
@@ -664,21 +642,6 @@ collectFileOpts fn s = opt where
 preprocessHs :: FilePath -> LBS.ByteString -> IO LBS.ByteString
 preprocessHs fn lbs = preprocess (collectFileOpts fn (LBSU.toString $ LBS.take 2048 lbs)) fn lbs
 
-preprocess :: Opt -> FilePath -> LBS.ByteString -> IO LBS.ByteString
-preprocess opt fn lbs = do
-    let fopts s = s `member` optFOptsSet opt
-        incFlags = [ "-I" ++ d | d <- optIncdirs options ++ optIncs opt]
-        defFlags = ("-D__JHC__=" ++ revision):("-D__JHC_VERSION__=" ++ version):[ "-D" ++ d | d <- optDefs opt]
-    lbs' <- case () of
-        _ | fopts FO.Cpp -> readSystem "cpp" $ ["-CC","-traditional"] ++ incFlags ++ defFlags ++ [fn]
-          | fopts FO.M4 -> do
-            m4p <- m4Prelude
-            result <- readSystem "m4" $ ["-s", "-P"] ++ incFlags ++ defFlags ++ [m4p,fn]
-            removeFile m4p >> return result
-          | otherwise -> return lbs
-    return lbs'
-
-
 parseHsSource :: String -> LBS.ByteString -> IO (HsModule,LBS.ByteString)
 parseHsSource fn lbs = do
     let fileOpts = collectFileOpts fn (LBSU.toString $ LBS.take 2048 lbs)
@@ -697,25 +660,19 @@ parseHsSource fn lbs = do
                       (ws,ParseOk e) -> processErrors ws >> return (e,LBSU.fromString s')
                       (_,ParseFailed sl err) -> putErrDie $ show sl ++ ": " ++ err
 
-
 mapHoBodies  :: (E -> E) -> Ho -> Ho
 mapHoBodies sm ho = ho { hoBuild = g (hoBuild ho) } where
     g ho = ho { hoEs = map f (hoEs ho) , hoRules =  runIdentity (E.Rules.mapBodies (return . sm) (hoRules ho)) }
     f (t,e) = (t,sm e)
-
 
 eraseE :: E -> E
 eraseE e = runIdentity $ f e where
     f (EVar tv) = return $ EVar  tvr { tvrIdent = tvrIdent tv }
     f e = emapE f e
 
-
-
 ---------------------------------
 -- library specific routines
 ---------------------------------
-
-
 
 buildLibrary :: (CollectedHo -> Ho -> IO CollectedHo)
              -> (CollectedHo -> Ho -> TiData -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
@@ -779,17 +736,18 @@ buildLibrary ifunc func = ans where
     -- parse library description file
     parse fp = do
         putProgressLn $ "Creating library from description file: " ++ show fp
-        desc <- readDescFile fp
-        when verbose2 $ mapM_ print desc
-        let field x = lookup x desc
-            jfield x = maybe (fail $ "createLibrary: description lacks required field " ++ show x) return $ field x
-            mfield x = maybe [] (words . map (\c -> if c == ',' then ' ' else c)) $ field x
+        LibDesc dlist dsing <- readDescFile fp
+        when verbose2 $ do
+            mapM_ print (Map.toList dlist)
+            mapM_ print (Map.toList dsing)
+        let jfield x = maybe (fail $ "createLibrary: description lacks required field " ++ show x) return $ Map.lookup x dsing
+            mfield x = maybe [] id $ Map.lookup x dlist
+            --mfield x = maybe [] (words . map (\c -> if c == ',' then ' ' else c)) $ Map.lookup x dlist
         name <- jfield "name"
         vers <- jfield "version"
         let hmods = map Module $ snub $ mfield "hidden-modules"
             emods = map Module $ snub $ mfield "exposed-modules"
-        return (desc,name,vers,hmods,emods)
-
+        return (Map.toList dsing,name,vers,hmods,emods)
 
 ------------------------------------
 -- dumping contents of a ho file
@@ -889,4 +847,3 @@ dumpHoFile fn = ans where
         when (dump FD.EInfo || verbose2) $ putStrLn (show $ tvrInfo tvr)
         putStrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pprint (tvrType tvr)))
         putStrLn (render $ hang 4 (pprint tvr <+> equals <+> pprint e))
-

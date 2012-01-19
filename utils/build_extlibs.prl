@@ -22,14 +22,14 @@ mkdir "tmp";
 mkdir "tmp/build";
 
 sub mysystem {
-    print( (join " ", @_), '\n');
+    print( (join " ", @_), "\n");
     system @_ and die "Running Command Failed!";
 }
 
 foreach my $fn (@ARGV) {
-    next unless $fn =~ /\.cabal$/;
+    next unless $fn =~ /\.(cabal|yaml)$/;
     my $patch = $fn;
-    $patch =~ s/\.cabal$/.patch/;
+    $patch =~ s/\.(cabal|yaml)$/.patch/;
     print "Processing $fn\n" unless $opt_l;
     open my $fh, "<", $fn or die "$!: $fn";
     my ($name,$version,$options);
@@ -55,7 +55,7 @@ foreach my $fn (@ARGV) {
     mysystem "tar -zxv --directory $tmpdir -f $tmpdir/$name-$version.tar.gz" and die "$!: tar";
     my $src = -d "$tmpdir/$name-$version/src" ? "/src" : "";
     mysystem "patch -d $tmpdir/$name-$version -p1 < $patch" if -e $patch;
-    mysystem "./jhc $options $ENV{JHC_TEST} --build-hl $fn -L- -L. -i$tmpdir/$name-$version$src" and die "$!: jhc";
+    mysystem("./jhc $options " . ($ENV{JHC_TEST} || "") . " --build-hl $fn -L- -L. -i- '-i$tmpdir/$name-$version$src'") and die "$!: jhc";
 }
 
 

@@ -1,4 +1,5 @@
 module Ho.Library(
+    LibDesc(..),
     readDescFile,
     collectLibraries,
     libModMap,
@@ -8,28 +9,39 @@ module Ho.Library(
     libName,
     libBaseName,
     libHoLib,
+    preprocess,
     listLibraries
     ) where
 
-import Char
 import Control.Monad
+import Data.Char
 import Data.List
 import Data.Maybe
 import Data.Monoid
 import Data.Version
+import Data.Yaml.Syck
 import System.Directory
+import System.Random (randomIO)
 import Text.Printf
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import qualified System.FilePath as FP
 
-import Name.Name(Module)
-import Util.Gen hiding(intercalate)
 import Ho.Binary
 import Ho.Type
+import Name.Name(Module)
 import Options
 import PackedString(PackedString,packString,unpackPS)
+import RawFiles(prelude_m4)
+import Support.Yaml
+import Util.FilterInput
+import Util.Gen hiding(intercalate)
 import Util.YAML
+import Version.Config(revision,version)
 import qualified FlagDump as FD
+import qualified FlagOpts as FO
 import qualified Support.MD5 as MD5
 
 libModMap = hoModuleMap . libHoLib
@@ -43,51 +55,9 @@ libModules l = let lib = libHoLib l in ([ m | (m,_) <- Map.toList (hoModuleMap l
 
 libVersionCompare l1 l2 = compare (libVersion l1) (libVersion l2)
 
-
----------------------------------------
--- parse description file (.cabal file)
----------------------------------------
-
-readDescFile :: FilePath -> IO [(String,String)]
-readDescFile fp = do
-    wdump FD.Progress $ putErrLn $ "Reading: " ++ show fp
-    fc <- readFile fp
-    case parseLibraryDescription fc of
-        Left err -> fail $ "Error reading library description file: " ++ show fp ++ " " ++ err
-        Right ps -> return ps
-
-parseLibraryDescription :: Monad m => String -> m [(String,String)]
-parseLibraryDescription fs =  g [] (lines (f [] fs)) where
-    --f rs ('\n':s:xs) | isSpace s = f rs (dropWhile isSpace xs)
-    f rs ('-':'-':xs) = f rs (dropWhile (/= '\n') xs)
-    f rs ('{':'-':xs) = eatCom rs xs
-    f rs (x:xs) = f (x:rs) xs
-    f rs [] = reverse rs
-    eatCom rs ('\n':xs) = eatCom ('\n':rs) xs
-    eatCom rs ('-':'}':xs) = f rs xs
-    eatCom rs (_:xs) = eatCom rs xs
-    eatCom rs [] = f rs []
-    g rs (s:ss) | all isSpace s = g rs ss
-    g rs (s:s':ss) | all isSpace s' = g rs (s:ss)
-    g rs (s:(h:cl):ss) | isSpace h = g rs ((s ++ h:cl):ss)
-    g rs (r:ss) | (':':bd') <- bd = g ((map toLower $ condenseWhitespace nm,condenseWhitespace bd'):rs) ss
-         | otherwise = fail $ "could not find ':' marker: " ++ show (rs,(r:ss)) where
-            (nm,bd) = break (== ':') r
-    g rs [] = return rs
-
-condenseWhitespace xs =  reverse $ dropWhile isSpace (reverse (dropWhile isSpace (cw xs))) where
-    cw (x:y:zs) | isSpace x && isSpace y = cw (' ':zs)
-    cw (x:xs) = x:cw xs
-    cw [] = []
-
-
 --------------------------------
 -- finding and listing libraries
 --------------------------------
-
-
-
-
 
 instance ToNode Module where
     toNode m = toNode $ show m
@@ -112,13 +82,6 @@ listLibraries = do
           (mod,rmod) = libModules l
     putStr $ showYAML (map f libs)
 
-
-
-
---maxBy c x1 x2 = case x1 `c` x2 of
---    LT -> x2
---    _ -> x1
-
 -- Collect all libraries and return those which are explicitly and implicitly imported.
 --
 -- The basic process is:
@@ -140,7 +103,6 @@ listLibraries = do
 --    - We have all dependencies of all libraries and the hash matches the proper library name
 --    - no libraries directly export the same modules, (but re-exporting the same module is fine)
 --    - conflicting versions of any particular library are not required due to dependencies
---
 
 fetchAllLibraries :: IO (Map.Map PackedString [Library],Map.Map HoHash Library)
 fetchAllLibraries = ans where
@@ -149,23 +111,19 @@ fetchAllLibraries = ans where
         let bynames = Map.map (reverse . sortBy libVersionCompare) $ Map.unionsWith (++) bynames'
             byhashes = Map.unions byhashes'
         return (bynames,byhashes)
-
     f fp = do
         fs <- flip catch (\_ -> return [] ) $ getDirectoryContents fp
-        flip mapM fs $ \e -> case reverse e of
-            ('l':'h':'.':r)  -> do
-                flip catch (\_ -> return mempty) $ do
-                    lib <- readHlFile  (fp ++ "/" ++ e)
-                    return (Map.singleton (libBaseName lib) [lib], Map.singleton (libHash lib) lib)
+        forM fs $ \e -> case reverse e of
+            ('l':'h':'.':r)  -> flip catch (\_ -> return mempty) $ do
+                lib <- readHlFile  (fp ++ "/" ++ e)
+                return (Map.singleton (libBaseName lib) [lib], Map.singleton (libHash lib) lib)
             _               -> return mempty
-
 
 splitOn' :: (a -> Bool) -> [a] -> [[a]]
 splitOn' f xs = split xs
   where split xs = case break f xs of
-          (chunk,[])     -> chunk : []
+          (chunk,[])     -> [chunk]
           (chunk,_:rest) -> chunk : split rest
-
 
 splitVersion :: String -> (String,Data.Version.Version)
 splitVersion s = ans where
@@ -186,7 +144,7 @@ collectLibraries libs = ans where
                 lhash pn vrs = do
                     [] <- return $ versionBranch vrs
                     Map.lookup pn byhashes'
-            byhashes' = Map.fromList $ [ (show x,y) | (x,y) <- Map.toList byhashes]
+            byhashes' = Map.fromList [ (show x,y) | (x,y) <- Map.toList byhashes]
         let es' = [ (x,f $ splitVersion x) | x <- libs ]
             es = [ l | (_,Just l) <- es' ]
             bad = [ n | (n,Nothing) <- es' ]
@@ -206,7 +164,7 @@ collectLibraries libs = ans where
               where newdeps = [ (False,fromMaybe (error $ printf "Dependency '%s' with hash '%s' needed by '%s' was not found" (unpackPS p) (show h) (libName l)) (Map.lookup h byhashes)) | let HoHeader { hohLibDeps = ldeps } = libHoHeader l , (p,h) <- ldeps ]
         finalmap <- f Map.empty Set.empty [ (True,l) | l <- es ]
         checkForModuleConficts [ l | (_,l) <- Map.elems finalmap ]
-        when verbose $ forM_ (Map.toList finalmap) $ \ (n,(e,l)) -> do
+        when verbose $ forM_ (Map.toList finalmap) $ \ (n,(e,l)) ->
             printf "-- Base: %s Exported: %s Hash: %s Name: %s\n" (unpackPS n) (show e) (show $ libHash l) (libName l)
 
         return ([ l | (True,l) <- Map.elems finalmap ],[ l | (False,l) <- Map.elems finalmap ])
@@ -216,4 +174,114 @@ collectLibraries libs = ans where
         forM_ mbad $ \ (m,l) -> putErrLn $ printf "Module '%s' is exported by multiple libraries: %s" (show m) (show $ map libName l)
         unless (null mbad) $ putErrDie "There were conflicting modules!"
 
+parseLibraryDescription :: Monad m => String -> m [(String,String)]
+parseLibraryDescription fs =  g [] (lines (f [] fs)) where
+    --f rs ('\n':s:xs) | isSpace s = f rs (dropWhile isSpace xs)
+    f rs ('-':'-':xs) = f rs (dropWhile (/= '\n') xs)
+    f rs ('{':'-':xs) = eatCom rs xs
+    f rs (x:xs) = f (x:rs) xs
+    f rs [] = reverse rs
+    eatCom rs ('\n':xs) = eatCom ('\n':rs) xs
+    eatCom rs ('-':'}':xs) = f rs xs
+    eatCom rs (_:xs) = eatCom rs xs
+    eatCom rs [] = f rs []
+    g rs (s:ss) | all isSpace s = g rs ss
+    g rs (s:s':ss) | all isSpace s' = g rs (s:ss)
+    g rs (s:(h:cl):ss) | isSpace h = g rs ((s ++ h:cl):ss)
+    g rs (r:ss) | (':':bd') <- bd = g ((map toLower $ condenseWhitespace nm,condenseWhitespace bd'):rs) ss
+         | otherwise = fail $ "could not find ':' marker: " ++ show (rs,r:ss) where
+            (nm,bd) = break (== ':') r
+    g rs [] = return rs
 
+condenseWhitespace xs =  reverse $ dropWhile isSpace (reverse (dropWhile isSpace (cw xs))) where
+    cw (x:y:zs) | isSpace x && isSpace y = cw (' ':zs)
+    cw (x:xs) = x:cw xs
+    cw [] = []
+
+procCabal :: [(String,String)] -> LibDesc
+procCabal xs = f xs mempty mempty where
+    f [] dlm dsm = LibDesc (combineAliases dlm) dsm
+    f ((map toLower -> x,y):rs) dlm dsm | x `Set.member` list_fields = f rs (Map.insert x (spit y) dlm) dsm
+                                        | otherwise = f rs dlm (Map.insert x y dsm)
+    spit = words . map (\c -> if c == ',' then ' ' else c)
+
+
+procYaml :: YamlNode -> LibDesc
+procYaml MkNode { n_elem = EMap ms } = f ms mempty mempty where
+    f [] dlm dsm = LibDesc (combineAliases dlm) dsm
+    f ((n_elem -> EStr (map toLower . unpackBuf -> x),y):rs) dlm dsm = if x `Set.member` list_fields then dlist y else dsing y where
+        dlist (n_elem -> EStr y)  = f rs (Map.insert x [unpackBuf y] dlm) dsm
+        dlist (n_elem -> ESeq ss) = f rs (Map.insert x [ unpackBuf y | (n_elem -> EStr y) <- ss ] dlm) dsm
+        dlist _ = f rs dlm dsm
+        dsing (n_elem -> EStr y) = f rs dlm (Map.insert x (unpackBuf y) dsm)
+        dsing _ = f rs dlm dsm
+procYaml _ = LibDesc mempty mempty
+
+ypath' :: FromNode r => String -> YamlNode -> r
+ypath' s n = case ypath s n of
+    Nothing -> error $ "Ypath lookup failed: " ++ s
+    Just n -> n
+
+list_fields = Set.fromList $ [
+    "exposed-modules",
+    "include-dirs",
+    "extensions",
+    "options",
+    "build-depends"
+    ] ++ map fst alias_fields
+      ++ map snd alias_fields
+
+alias_fields = [
+   ("other-modules","hidden-modules"),
+   ("hs-source-dir","hs-source-dirs")
+   ]
+
+combineAliases mp = f alias_fields mp where
+    f [] mp = mp
+    f ((x,y):rs) mp = case Map.lookup x mp of
+        Nothing -> f rs mp
+        Just ys -> f rs $ Map.delete x $ Map.insertWith (++) y ys mp
+
+
+data LibDesc = LibDesc (Map.Map String [String]) (Map.Map String String)
+
+readDescFile :: FilePath -> IO LibDesc
+readDescFile fp = do
+    wdump FD.Progress $ putErrLn $ "Reading: " ++ show fp
+    let doYaml opt = do
+            lbs <- LBS.readFile fp
+            dt <- preprocess opt fp lbs
+            desc <- catch (parseYamlBytes $ BS.concat (LBS.toChunks dt))
+                (\e -> putErrDie $ "Error parsing desc file '" ++ fp ++ "'\n" ++ show e)
+            when verbose2 $ do
+                yaml <- emitYaml desc
+                putStrLn yaml
+            return $ procYaml desc
+        doCabal = do
+            fc <- readFile fp
+            case parseLibraryDescription fc of
+                Left err -> fail $ "Error reading library description file: " ++ show fp ++ " " ++ err
+                Right ps -> return $ procCabal ps
+    case FP.splitExtension fp of
+        (_,".cabal") -> doCabal
+        (_,".yaml") -> doYaml options
+        (FP.takeExtension -> ".yaml",".m4") -> doYaml options { optFOptsSet = FO.M4 `Set.insert` optFOptsSet options }
+        _ -> putErrDie $ "Do not recoginize description file type: " ++ fp
+
+preprocess :: Opt -> FilePath -> LBS.ByteString -> IO LBS.ByteString
+preprocess opt fn lbs = do
+    let fopts s = s `Set.member` optFOptsSet opt
+        incFlags = [ "-I" ++ d | d <- optIncdirs options ++ optIncs opt]
+        defFlags = ("-D__JHC__=" ++ revision):("-D__JHC_VERSION__=" ++ version):[ "-D" ++ d | d <- optDefs opt]
+    case () of
+        _ | fopts FO.Cpp -> readSystem "cpp" $ ["-CC","-traditional"] ++ incFlags ++ defFlags ++ [fn]
+          | fopts FO.M4 -> do
+            m4p <- m4Prelude
+            result <- readSystem "m4" $ ["-s", "-P"] ++ incFlags ++ defFlags ++ [m4p,fn]
+            removeFile m4p >> return result
+          | otherwise -> return lbs
+
+m4Prelude :: IO FilePath
+m4Prelude = (randomIO :: IO Integer) >>= \salt ->
+    let m4p_filename = "/tmp/jhc_prelude-" ++ show salt ++ ".m4"
+    in BS.writeFile m4p_filename prelude_m4 >> return m4p_filename

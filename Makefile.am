@@ -47,7 +47,8 @@ GHCINC=  -i -i$(srcdir)/drift_processed \
 
 PACKAGES= -package fgl -package regex-compat -package random -package array -package directory \
           -package bytestring -package binary -package pretty -package mtl -package containers \
-	  -package unix -package haskell98 -package utf8-string -package zlib
+	  -package unix -package haskell98 -package utf8-string -package zlib -package HsSyck \
+	  -package filepath
 
 GHCLANG= -XTypeFamilies -XViewPatterns -XUndecidableInstances -XOverlappingInstances -XRecordWildCards -XRecursiveDo -XTupleSections -XParallelListComp -XGeneralizedNewtypeDeriving -XScopedTypeVariables -XFlexibleInstances -XTypeSynonymInstances -XMultiParamTypeClasses -XDeriveDataTypeable -fglasgow-exts -XNoMonoLocalBinds
 GHCOPTS= $(HSOPTS) -XBangPatterns -O @GHCFLAGS@ $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
@@ -57,7 +58,7 @@ JHC_LIBS = jhc-1.0.hl base-1.0.hl haskell98-1.0.hl applicative-1.0.hl flat-forei
 EXTRA_DIST = src/data src/rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
              lib/jhc lib/base lib/haskell98 lib/flat-foreign $(JHC_LIBS) $(JHC_EXT_LIBS) \
 	     src/StringTable/StringTable_cbits.c src/StringTable/StringTable_cbits.h src/cbits/md5sum.c jhc.1 \
-	     src/StringTable/Atom.hsc jhc.spec lib/applicative/applicative.cabal \
+	     src/StringTable/Atom.hsc jhc.spec lib/applicative/applicative.yaml \
 	     manual.html lib/applicative examples/HelloWorld.hs examples/Calendar.hs \
 	     src/FlagOpts.flags src/FlagDump.flags lib/ext
 
@@ -216,11 +217,11 @@ CLEANFILES= $(JHC_LIBS) $(JHC_EXT_LIBS)
 
 LIB_OPTIONS=$(RTSOPTS) $(JHC_TEST) --noauto -L- -L. # --deps tmp/$@.yaml
 
-jhc-prim-0.7.0.hl: lib/jhc-prim/jhc-prim.cabal
+jhc-prim-0.7.0.hl: lib/jhc-prim/jhc-prim.yaml
 	./jhc $(LIB_OPTIONS) -N -funboxed-tuples -fffi -ilib/jhc-prim --build-hl $< -o $@
-jhc-1.0.hl: lib/jhc/jhc.cabal
+jhc-1.0.hl: lib/jhc/jhc.yaml
 	./jhc $(LIB_OPTIONS) -N -ilib/jhc --build-hl $< -o $@
-base-1.0.hl: lib/base/base.cabal jhc-1.0.hl
+base-1.0.hl: lib/base/base.yaml jhc-1.0.hl
 	./jhc $(LIB_OPTIONS) -ilib/base -pjhc --build-hl $< -o $@
 applicative-1.0.hl: lib/applicative/applicative.cabal base-1.0.hl
 	./jhc $(LIB_OPTIONS) -ilib/applicative -pbase --build-hl $< -o $@
@@ -275,7 +276,7 @@ manual.html :
 .PHONY: libs
 libs: $(JHC_LIBS) $(JHC_EXT_LIBS)
 
-show_elibs: lib/ext/*.cabal
+show_elibs: lib/ext/*.cabal  lib/ext/*.yaml
 	-perl utils/build_extlibs.prl -l $^
 
 %: examples/%.hs jhc
@@ -285,7 +286,7 @@ show_elibs: lib/ext/*.cabal
 
 applicative-1.0.hl: lib/applicative/applicative.cabal lib/applicative/Control/Arrow.hs lib/applicative/Control/Applicative.hs lib/applicative/Data/Foldable.hs \
     lib/applicative/Control/Category.hs lib/applicative/Data/Traversable.hs base-1.0.hl jhc-1.0.hl
-base-1.0.hl: lib/base/base.cabal lib/base/Debug/Trace.hs lib/base/Data/Array.hs \
+base-1.0.hl: lib/base/base.yaml lib/base/Debug/Trace.hs lib/base/Data/Array.hs \
     lib/base/Data/Typeable.hs lib/base/Text/Printf.hs lib/base/System/Directory.hs lib/base/Data/Maybe.hs \
     lib/base/System/IO/Error.hs lib/base/System/IO/Binary.hs lib/base/System/CPUTime.hs lib/base/System/IO/Pipe.hs \
     lib/base/Control/Monad/Instances.hs lib/base/Foreign/Marshal/Error.hs lib/base/System/Exit.hs lib/base/System/Environment.hs \
@@ -307,7 +308,7 @@ haskell98-1.0.hl: lib/haskell98/haskell98.cabal lib/haskell98/System.hs lib/hask
     lib/haskell98/CPUTime.hs lib/haskell98/Ratio.hs lib/haskell98/Monad.hs lib/haskell98/Directory.hs \
     lib/haskell98/IO.hs lib/haskell98/Ix.hs lib/haskell98/Char.hs lib/haskell98/Maybe.hs \
     base-1.0.hl jhc-1.0.hl
-jhc-1.0.hl: lib/jhc/jhc.cabal lib/jhc/Jhc/Prim.hs lib/jhc/Jhc/IO.hs lib/jhc/Jhc/Int.hs \
+jhc-1.0.hl: lib/jhc/jhc.yaml lib/jhc/Jhc/Prim.hs lib/jhc/Jhc/IO.hs lib/jhc/Jhc/Int.hs \
     lib/jhc/Jhc/Inst/Enum.hs lib/jhc/Data/Int.hs lib/jhc/Prelude/IO.hs lib/jhc/Jhc/Order.hs \
     lib/jhc/System/C/Stdio.hs lib/jhc/Jhc/JumpPoint.hs lib/jhc/Data/Word.hs lib/jhc/Foreign/C/String.hs \
     lib/jhc/Jhc/Show.hs lib/jhc/Jhc/Handle.hs lib/jhc/Jhc/Addr.hs lib/jhc/Numeric.hs \
