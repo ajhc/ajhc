@@ -455,7 +455,7 @@ flint = FlagOpts.Lint `S.member` optFOptsSet options
 initialIncludes :: [String]
 initialIncludes = unsafePerformIO $ do
     p <- lookupEnv "JHC_PATH"
-    let x = maybe "" id p
+    let x = fromMaybe "" p
     return (".":(tokens (== ':') x))
 
 
@@ -490,7 +490,7 @@ withOptions opt (OptT x) = runIdentity (runReaderT x opt)
 withOptionsT :: Opt -> OptT m a -> m a
 withOptionsT opt (OptT x) = runReaderT x opt
 
-outputName = maybe "hs.out" id (optOutName options)
+outputName = fromMaybe "hs.out" (optOutName options)
 
 flagOpt :: OptionMonad m => FlagOpts.Flag -> m Bool
 flagOpt flag = do

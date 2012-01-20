@@ -38,7 +38,7 @@ newName ns nc ni = VarName $ do
     (nim,ncm) <- get
     let no = ns!!i
         Just i = fmap (subtract 1) $ Map.lookup nc ncm'
-        ncm' = Map.insertWith (+) nc 1 ncm
+        ncm' = Map.insertWith' (+) nc 1 ncm
     put (Map.insert ni no nim, ncm')
     return no
 
@@ -64,7 +64,7 @@ newLookupName ns nc ni = VarName $ do
         Nothing -> do
             let no = ns!!i
                 Just i = fmap (subtract 1) $ Map.lookup nc ncm'
-                ncm' = Map.insertWith (+) nc 1 ncm
+                ncm' = Map.insertWith' (+) nc 1 ncm
             put (Map.insert ni no nim, ncm')
             return no
 
