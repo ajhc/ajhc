@@ -27,7 +27,7 @@ HSFILES=src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/
        	src/Grin/NodeAnalyze.hs src/Grin/Noodle.hs src/Grin/Optimize.hs src/Grin/Show.hs src/Grin/Val.hs \
 	src/Grin/Whiz.hs src/Ho/Binary.hs src/Ho/Collected.hs src/Ho/Library.hs src/Info/Binary.hs src/Info/Info.hs src/Info/Properties.hs \
 	src/Info/Types.hs src/Interactive.hs src/Main.hs src/Name/Binary.hs src/Name/Id.hs src/Name/Name.hs src/Name/Names.hs \
-	src/Name/Prim.hs src/PackedString.hs src/PrimitiveOperators.hs \
+	src/Name/Prim.hs src/PackedString.hs src/PrimitiveOperators.hs src/Ho/ReadSource.hs \
 	src/RawFiles.hs src/RtsFiles.hs src/Stats.hs src/Support/CanType.hs src/Support/CFF.hs src/Support/Compat.hs \
 	src/Support/FreeVars.hs src/Support/MapBinaryInstance.hs src/Support/MD5.hs src/Support/Tickle.hs src/Support/Transform.hs \
 	src/Support/Tuple.hs src/Support/Unparse.hs src/Util/BitSet.hs src/Util/ContextMonad.hs src/Util/FilterInput.hs \

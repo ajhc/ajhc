@@ -13,11 +13,11 @@ import Control.Monad.Identity
 import Data.Char
 import Data.IORef
 import Data.List hiding(union)
+import Data.Maybe
 import Data.Monoid
 import Data.Tree
 import Data.Version(Version,parseVersion,showVersion)
 import Data.Yaml.Syck
-import Maybe
 import System.Directory (removeFile)
 import System.Mem
 import System.Random (randomIO)
@@ -45,12 +45,12 @@ import FrontEnd.HsSyn
 import FrontEnd.Infix
 import FrontEnd.ParseMonad
 import FrontEnd.SrcLoc
-import FrontEnd.Syn.Options
 import FrontEnd.Unlit
 import FrontEnd.Warning
 import Ho.Binary
 import Ho.Collected()
 import Ho.Library
+import Ho.ReadSource
 import Ho.Type
 import Name.Name
 import Options
@@ -622,43 +622,7 @@ searchPaths :: String -> [(String,String)]
 searchPaths m = ans where
     f m | (xs,'.':ys) <- span (/= '.') m = let n = (xs ++ "/" ++ ys) in m:f n
         | otherwise = [m]
-    ans = [ (root ++ suf,root ++ ".ho") | i <- optIncdirs options, n <- f m, suf <- [".hs",".lhs"], let root = i ++ "/" ++ n]
-
-langmap = [
-    "m4" ==> "m4",
-    "cpp" ==> "cpp",
-    "foreignfunctioninterface" ==> "ffi",
-    "noimplicitprelude" ==> "--noprelude",
-    "unboxedtuples" ==> "unboxed-tuples"
-    ] where x ==> y = (x,if head y == '-' then y else "-f" ++ y)
-
-collectFileOpts fn s = opt where
-    Just opt = fileOptions opts `mplus` Just options
-    popts = parseOptions $ if "shl." `isPrefixOf` reverse fn  then unlit fn s else s
-    opts' = concat [ words as | (x,as) <- popts, x `elem` ["OPTIONS","JHC_OPTIONS","OPTIONS_JHC"]]
-    opts = opts' ++ [ "--noprelude" | ("NOPRELUDE",_) <- popts] ++ langs
-    langs = catMaybes $ map (flip lookup langmap) $ concat [ words (map (\c -> if c == ',' then ' ' else toLower c) as) | ("LANGUAGE",as) <- popts ]
-
-preprocessHs :: FilePath -> LBS.ByteString -> IO LBS.ByteString
-preprocessHs fn lbs = preprocess (collectFileOpts fn (LBSU.toString $ LBS.take 2048 lbs)) fn lbs
-
-parseHsSource :: String -> LBS.ByteString -> IO (HsModule,LBS.ByteString)
-parseHsSource fn lbs = do
-    let fileOpts = collectFileOpts fn (LBSU.toString $ LBS.take 2048 lbs)
-    lbs' <- preprocess fileOpts fn lbs
-    let s = LBSU.toString lbs'
-    let s' = if "shl." `isPrefixOf` reverse fn  then unlit fn s'' else s''
-        s'' = case s of
-            '#':' ':_   -> '\n':s                --  line pragma
-            '#':'l':'i':'n':'e':' ':_  -> '\n':s --  line pragma
-            '#':'!':_ -> dropWhile (/= '\n') s   --  hashbang
-            _ -> s
-    wdump FD.Preprocessed $ do
-        putStrLn s'
-    fn <- shortenPath fn
-    case runParserWithMode (parseModeOptions $ collectFileOpts fn s) { parseFilename = fn } parse  s'  of
-                      (ws,ParseOk e) -> processErrors ws >> return (e,LBSU.fromString s')
-                      (_,ParseFailed sl err) -> putErrDie $ show sl ++ ": " ++ err
+    ans = [ (root ++ suf,root ++ ".ho") | i <- optIncdirs options, n <- f m, suf <- [".hs",".lhs",".hsc"], let root = i ++ "/" ++ n]
 
 mapHoBodies  :: (E -> E) -> Ho -> Ho
 mapHoBodies sm ho = ho { hoBuild = g (hoBuild ho) } where

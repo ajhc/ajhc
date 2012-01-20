@@ -21,7 +21,6 @@ import Data.Monoid
 import Data.Version
 import Data.Yaml.Syck
 import System.Directory
-import System.Random (randomIO)
 import Text.Printf
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
@@ -30,16 +29,13 @@ import qualified Data.Set as Set
 import qualified System.FilePath as FP
 
 import Ho.Binary
+import Ho.ReadSource
 import Ho.Type
 import Name.Name(Module)
 import Options
 import PackedString(PackedString,packString,unpackPS)
-import RawFiles(prelude_m4)
-import Support.Yaml
-import Util.FilterInput
-import Util.Gen hiding(intercalate)
+import Util.Gen
 import Util.YAML
-import Version.Config(revision,version)
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Support.MD5 as MD5
@@ -215,12 +211,8 @@ procYaml MkNode { n_elem = EMap ms } = f ms mempty mempty where
         dlist _ = f rs dlm dsm
         dsing (n_elem -> EStr y) = f rs dlm (Map.insert x (unpackBuf y) dsm)
         dsing _ = f rs dlm dsm
+    f (_:xs) dlm dsm = f xs dlm dsm
 procYaml _ = LibDesc mempty mempty
-
-ypath' :: FromNode r => String -> YamlNode -> r
-ypath' s n = case ypath s n of
-    Nothing -> error $ "Ypath lookup failed: " ++ s
-    Just n -> n
 
 list_fields = Set.fromList $ [
     "exposed-modules",
@@ -267,21 +259,3 @@ readDescFile fp = do
         (_,".yaml") -> doYaml options
         (FP.takeExtension -> ".yaml",".m4") -> doYaml options { optFOptsSet = FO.M4 `Set.insert` optFOptsSet options }
         _ -> putErrDie $ "Do not recoginize description file type: " ++ fp
-
-preprocess :: Opt -> FilePath -> LBS.ByteString -> IO LBS.ByteString
-preprocess opt fn lbs = do
-    let fopts s = s `Set.member` optFOptsSet opt
-        incFlags = [ "-I" ++ d | d <- optIncdirs options ++ optIncs opt]
-        defFlags = ("-D__JHC__=" ++ revision):("-D__JHC_VERSION__=" ++ version):[ "-D" ++ d | d <- optDefs opt]
-    case () of
-        _ | fopts FO.Cpp -> readSystem "cpp" $ ["-CC","-traditional"] ++ incFlags ++ defFlags ++ [fn]
-          | fopts FO.M4 -> do
-            m4p <- m4Prelude
-            result <- readSystem "m4" $ ["-s", "-P"] ++ incFlags ++ defFlags ++ [m4p,fn]
-            removeFile m4p >> return result
-          | otherwise -> return lbs
-
-m4Prelude :: IO FilePath
-m4Prelude = (randomIO :: IO Integer) >>= \salt ->
-    let m4p_filename = "/tmp/jhc_prelude-" ++ show salt ++ ".m4"
-    in BS.writeFile m4p_filename prelude_m4 >> return m4p_filename
