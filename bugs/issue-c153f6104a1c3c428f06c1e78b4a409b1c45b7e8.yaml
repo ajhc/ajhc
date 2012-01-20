@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: swith from gzip to DEFLATE for ho/hl contents
+desc: deflate from zlib omits headers and redundant crcs that are not needed for embedded data
+type: :task
+component: jhc
+release: 0.8.0
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2012-01-20 03:56:34.295093 Z
+references: []
+
+id: c153f6104a1c3c428f06c1e78b4a409b1c45b7e8
+log_events: 
+- - 2012-01-20 03:56:36.075093 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""

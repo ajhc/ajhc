@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: support compression of rawfiles
+desc: RawFiles embedded in the executable should be compressed via gzip/zlib
+type: :task
+component: jhc
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2012-01-20 03:57:31.795093 Z
+references: []
+
+id: 47c1b974ea8d0cc54976901f075b9cdd4eb2ec6e
+log_events: 
+- - 2012-01-20 03:57:32.905093 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""
