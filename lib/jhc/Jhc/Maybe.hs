@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -fffi #-}
+{-# OPTIONS_JHC -fno-prelude -fffi #-}
 module Jhc.Maybe where
 
 import Jhc.Basics
@@ -32,5 +32,3 @@ maybe :: b -> (a -> b) -> Maybe a -> b
 maybe n f m = case m of
     Just x -> f x
     Nothing -> n
-
-

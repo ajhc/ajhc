@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N #-}
+{-# OPTIONS_JHC -fno-prelude #-}
 
 module Jhc.Inst.Show() where
 
@@ -67,4 +67,3 @@ showWordMax :: WordMax -> String -> String
 showWordMax w rest = w `seq` case quotRem w 10 of
     (n',d) -> n' `seq` d `seq` rest' `seq` if n' == 0 then rest' else showWordMax n' rest'
         where rest' = chr (fromIntegral d + ord '0') : rest
-

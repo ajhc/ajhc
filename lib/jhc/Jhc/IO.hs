@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -funboxed-tuples -fffi #-}
+{-# OPTIONS_JHC -fno-prelude -funboxed-tuples -fffi #-}
 
 module Jhc.IO(
     IO(..),
@@ -179,4 +179,3 @@ putChar c = c_putwchar (charToInt c)
 
 foreign import primitive "U2U" charToInt :: Char -> Int
 foreign import ccall "stdio.h jhc_utf8_putchar" c_putwchar :: Int -> IO ()
-

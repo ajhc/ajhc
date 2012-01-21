@@ -1,6 +1,6 @@
 -- module for things dealing with string constants needed by the compiler internally
 {-# LANGUAGE NoImplicitPrelude, MagicHash #-}
-{-# OPTIONS_JHC -N -fffi -funboxed-values #-}
+{-# OPTIONS_JHC -fffi -funboxed-values #-}
 module Jhc.String(
     eqString,
     eqUnpackedString,
@@ -97,8 +97,3 @@ foreign import primitive increment :: Addr__ -> Addr__
 foreign import primitive "Eq" equalsChar :: Char__ -> Char__ -> Bool__
 -- returns it in an Char__ even though it is just a byte
 foreign import primitive constPeekByte :: Addr__ -> Char__
-
-
-
-
-

@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -fffi #-}
+{-# OPTIONS_JHC -fno-prelude -fffi #-}
 module Jhc.Basics(module Jhc.Basics, module Jhc.Prim) where
 
 import Jhc.Prim
@@ -177,4 +177,3 @@ chr i = case unboxInt i of
 unsafeChr :: Int -> Char
 unsafeChr i = Char (unboxInt i)
 -}
-

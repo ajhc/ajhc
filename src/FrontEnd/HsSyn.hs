@@ -7,6 +7,7 @@ import C.FFI
 import FrontEnd.SrcLoc
 import Name.Name
 import Name.Names
+import Options
 import StringTable.Atom
 import StringTable.Atom()
 
@@ -40,7 +41,8 @@ data HsModule = HsModule {
     hsModuleExports :: (Maybe [HsExportSpec]),
     hsModuleImports :: [HsImportDecl],
     hsModuleDecls :: [HsDecl],
-    hsModuleOptions :: [String]
+    hsModuleOptions :: [String],
+    hsModuleOpt :: Opt
     }
   {-! derive: update !-}
 

@@ -1,10 +1,10 @@
-{-# OPTIONS_JHC -N #-}
+{-# OPTIONS_JHC -fno-prelude #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Foreign
 -- Copyright   :  (c) The FFI task force 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  ffi@haskell.org
 -- Stability   :  provisional
 -- Portability :  portable

@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N #-}
+{-# OPTIONS_JHC -fno-prelude #-}
 module Jhc.List where
 
 import Jhc.Basics
@@ -343,4 +343,3 @@ span p xs@(x:xs')
 
 {-# INLINE break #-}
 break p                 =  span (not . p)
-

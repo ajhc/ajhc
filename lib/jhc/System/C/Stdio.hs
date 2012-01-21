@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -fffi #-}
+{-# OPTIONS_JHC -fno-prelude -fffi #-}
 module System.C.Stdio where
 
 import Foreign.C.Types

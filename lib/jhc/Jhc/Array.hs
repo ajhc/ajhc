@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -funboxed-tuples -fffi #-}
+{-# OPTIONS_JHC -fno-prelude -funboxed-tuples -fffi #-}
 module Jhc.Array where
 
 import Jhc.Basics
@@ -33,4 +33,3 @@ newArray init n xs = case unboxInt n of
         f arr w [] = w
         f arr w ((i,v):xs) = case unboxInt i of i' -> case writeArray__ arr i' v w of w -> f arr w xs
             in case f arr w xs of w -> case unsafeFreezeArray__ arr w  of (# _, r #) -> r
-

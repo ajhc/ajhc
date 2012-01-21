@@ -14,13 +14,14 @@ import qualified Data.Set as Set
 import Doc.DocLike
 import FindFixpoint
 import FlagDump as FD
-import FrontEnd.SrcLoc
+import FlagOpts as FO
 import FrontEnd.HsSyn
+import FrontEnd.SrcLoc
+import FrontEnd.Warning
 import Name.Name as Name
 import Options
-import Util.SetLike as SL
 import Util.Relation as R
-import FrontEnd.Warning
+import Util.SetLike as SL
 
 data ModInfo = ModInfo {
     modInfoName :: Module,
@@ -42,7 +43,7 @@ instance Ord ModInfo where
 modInfoModImports m =  mp  [ i | i <- hsModuleImports (modInfoHsModule m)] where
     mp xs
         | any ((== Module "Prelude") . hsImportDeclModule) xs = xs
-        | optPrelude (modInfoOptions m) = (prelude:xs)
+        | FO.Prelude `Set.member` (optFOptsSet $ modInfoOptions m) = (prelude:xs)
         | otherwise = xs
     prelude = HsImportDecl { hsImportDeclSrcLoc = bogusASrcLoc, hsImportDeclModule = Module "Prelude", hsImportDeclSpec = Nothing, hsImportDeclAs = Nothing, hsImportDeclQualified = False }
 
@@ -125,9 +126,8 @@ determineExports' owns doneMods todoMods = mdo
     entSpec isHiding rel (HsEThingAll n) = rdl `mappend` restrictRange (`elem` ss) rel where
         ct = [toName TypeConstructor n, toName ClassName n]
         ss = concat $ concat [ maybeToList (Map.lookup x ownsMap) | x <- Set.toList $ range rdl ]
-        cd n =  [toName DataConstructor n, toName Val n, toName FieldLabel n ]               
+        cd n =  [toName DataConstructor n, toName Val n, toName FieldLabel n ]
         rdl = (restrictDomain (`elem` ct) rel)
-
 
 defsToRel xs = fromList $ map f xs where
     f (n,_,_) = (toUnqualified n,n)
@@ -138,4 +138,3 @@ importToExport x = f x where
     f (HsIAbs n) = HsEAbs n
     f (HsIThingAll n) = HsEThingAll n
     f (HsIThingWith n xs) = HsEThingWith n xs
-

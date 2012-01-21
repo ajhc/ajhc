@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N #-}
+{-# OPTIONS_JHC -fno-prelude #-}
 
 -- | A place to collect the tuple instances.
 
@@ -128,4 +128,3 @@ instance (Eq t1,Eq t2,Eq t3,Eq t4,Eq t5,Eq t6) => Eq (t1,t2,t3,t4,t5,t6) where
 instance (Eq t1,Eq t2,Eq t3,Eq t4,Eq t5,Eq t6,Eq t7) => Eq (t1,t2,t3,t4,t5,t6,t7) where
     (x1,x2,x3,x4,x5,x6,x7) == (y1,y2,y3,y4,y5,y6,y7) = and [x1 == y1,x2 == y2,x3 == y3,x4 == y4,x5 == y5,x6 == y6,x7 == y7]
     (x1,x2,x3,x4,x5,x6,x7) /= (y1,y2,y3,y4,y5,y6,y7) = or [x1 /= y1,x2 /= y2,x3 /= y3,x4 /= y4,x5 /= y5,x6 /= y6,x7 /= y7]
-

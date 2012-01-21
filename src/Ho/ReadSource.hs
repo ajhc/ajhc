@@ -22,12 +22,13 @@ import qualified Data.Set as Set
 import FrontEnd.HsParser
 import FrontEnd.HsSyn
 import FrontEnd.ParseMonad
-import Support.TempDir
+import FrontEnd.SrcLoc
 import FrontEnd.Syn.Options
 import FrontEnd.Unlit
 import FrontEnd.Warning
 import Options
 import RawFiles(prelude_m4)
+import Support.TempDir
 import Util.FilterInput
 import Util.Gen
 import Version.Config(revision,version)
@@ -35,7 +36,7 @@ import qualified FlagDump as FD
 import qualified FlagOpts as FO
 
 preprocessHs :: FilePath -> LBS.ByteString -> IO LBS.ByteString
-preprocessHs fn lbs = preprocess (collectFileOpts fn (LBSU.toString $ LBS.take 2048 lbs)) fn lbs
+preprocessHs fn lbs = preprocess (fst $ collectFileOpts fn (LBSU.toString $ LBS.take 2048 lbs)) fn lbs
 
 preprocess :: Opt -> FilePath -> LBS.ByteString -> IO LBS.ByteString
 preprocess opt fn lbs = do
@@ -56,20 +57,29 @@ m4Prelude = do
     BS.writeFile fp prelude_m4
     return fp
 
-collectFileOpts fn s = opt where
-    Just opt = fileOptions opts `mplus` Just options
+collectFileOpts fn s = (opt,isJust fopts)  where
+    copts os = [ as | (x,as) <- popts, x `elem` os]
+    Just opt = fopts `mplus` Just options
+    fopts = fileOptions opts
     popts = parseOptions $ if FP.takeExtension fn == ".lhs" then unlit fn s else s
-    opts' = concat [ words as | (x,as) <- popts, x `elem` ["OPTIONS","JHC_OPTIONS","OPTIONS_JHC"]]
-    opts = opts' ++ [ "--noprelude" | ("NOPRELUDE",_) <- popts] ++ langs
-    langs = catMaybes $ map (flip lookup langmap) $ concat [ words (map (\c -> if c == ',' then ' ' else toLower c) as) | ("LANGUAGE",as) <- popts ]
+    opts' = concatMap words (copts ["OPTIONS","JHC_OPTIONS","OPTIONS_JHC"])
+    opts = opts' ++ [ "-fno-prelude" | ("NOPRELUDE",_) <- popts] ++ langs
+    langs = catMaybes $ map (`lookup` langmap) $ concatMap
+        (words . (map (\c -> if c == ',' then ' ' else toLower c)))
+        (copts ["LANGUAGE","JHC_LANGUAGE"] ++ optExtensions options ++ [ o | '-':'X':o <- opts'])
 
 langmap = [
     "m4" ==> "m4",
     "cpp" ==> "cpp",
     "foreignfunctioninterface" ==> "ffi",
-    "noimplicitprelude" ==> "--noprelude",
-    "unboxedtuples" ==> "unboxed-tuples"
-    ] where x ==> y = (x,if head y == '-' then y else "-f" ++ y)
+    "noimplicitprelude" ==> "no-prelude",
+    "implicitprelude" ==> "prelude",
+    "unboxedtuples" ==> "unboxed-tuples",
+    "unboxedvalues" ==> "unboxed-values",
+    "monomorphismrestriction" ==> "monomorphism-restriction",
+    "nomonomorphismrestriction" ==> "no-monomorphism-restriction",
+    "magichash" ==> "unboxed-values"
+    ] where x ==> y = (x,"-f" ++ y) -- if head y == '-' then y else "-f" ++ y)
 
 parseHsSource :: FilePath -> LBS.ByteString -> IO (HsModule,LBS.ByteString)
 parseHsSource fp@(FP.splitExtension -> (base,".hsc")) _ = do
@@ -86,8 +96,7 @@ parseHsSource fp@(FP.splitExtension -> (base,".hsc")) _ = do
     parseHsSource out lbs
 
 parseHsSource fn lbs = do
-    let fileOpts = collectFileOpts fn (LBSU.toString $ LBS.take 2048 lbs)
-    lbs' <- preprocess fileOpts fn lbs
+    lbs' <- preprocessHs fn lbs
     let s = LBSU.toString lbs'
     let s' = if FP.takeExtension fn == ".lhs" then unlit fn s'' else s''
         s'' = case s of
@@ -98,6 +107,9 @@ parseHsSource fn lbs = do
     wdump FD.Preprocessed $ do
         putStrLn s'
     fn <- shortenPath fn
-    case runParserWithMode (parseModeOptions $ collectFileOpts fn s) { parseFilename = fn } parse  s'  of
-                      (ws,ParseOk e) -> processErrors ws >> return (e,LBSU.fromString s')
+    let (fileOpts',ogood) = collectFileOpts fn s
+    unless ogood $
+        warn (bogusASrcLoc { srcLocFileName = fn }) "unknown-option" "Unknown OPTIONS pragma"
+    case runParserWithMode (parseModeOptions fileOpts') { parseFilename = fn } parse  s'  of
+                      (ws,ParseOk e) -> processErrors ws >> return (e { hsModuleOpt = fileOpts' },LBSU.fromString s')
                       (_,ParseFailed sl err) -> putErrDie $ show sl ++ ": " ++ err

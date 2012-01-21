@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N #-}
+{-# OPTIONS_JHC -fno-prelude #-}
 module Data.Ix ( Ix(range, index, inRange, rangeSize) ) where
 
 import Jhc.Int

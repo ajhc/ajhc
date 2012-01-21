@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fm4 -N -fffi -funboxed-values #-}
+{-# OPTIONS_JHC -fm4 -fno-prelude -fffi -funboxed-values #-}
 module Jhc.Enum(Enum(..),Bounded(..)) where
 -- Enumeration and Bounded classes
 
@@ -95,6 +95,3 @@ foreign import primitive "increment" bits32Increment :: Bits32_ -> Bits32_
 
 foreign import primitive "Add"       bits32Add       :: Bits32_ -> Bits32_ -> Bits32_
 foreign import primitive "Sub"       bits32Sub       :: Bits32_ -> Bits32_ -> Bits32_
-
-
-

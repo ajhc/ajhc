@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -fffi -funboxed-values #-}
+{-# OPTIONS_JHC -fno-prelude -fffi -funboxed-values #-}
 module Prelude.IO(
     IO(),
     ioError,
@@ -125,6 +125,3 @@ getChar = do
 
 foreign import primitive "I2I" cwintToChar :: CWint -> Char
 foreign import primitive "U2U" charToCWchar :: Char -> CWchar
-
-
-

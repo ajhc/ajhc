@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fm4 -N -fffi -funboxed-tuples -funboxed-values #-}
+{-# OPTIONS_JHC -fm4 -fno-prelude -fffi -funboxed-tuples -funboxed-values #-}
 module Jhc.Inst.Storable() where
 
 
@@ -52,4 +52,3 @@ INST_STORABLE_XXX(CUInt,BitsInt_,bits<int>)
 INST_STORABLE_XXX(CWchar,BitsWchar_,bits<wchar_t>)
 --XINST_STORABLE_XXX(CWchar,BitsWchar_,bits32)
 INST_STORABLE_XXX(CSize,BitsSize_,bits<size_t>)
-

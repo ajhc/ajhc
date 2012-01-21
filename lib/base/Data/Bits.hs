@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fm4 -N -fffi  #-}
+{-# OPTIONS_JHC -fm4 -fno-prelude -fffi  #-}
 module Data.Bits where
 
 

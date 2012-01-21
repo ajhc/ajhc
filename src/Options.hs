@@ -165,6 +165,7 @@ data Opt = Opt {
     optHlPath      ::  [String],  -- ^ Path to look for libraries.
     optIncs        ::  [String],
     optDefs        ::  [String],
+    optExtensions  ::  [String],
     optAnnotate    ::  Maybe FilePath,
     optDeps        ::  Maybe FilePath,
     optHoDir       ::  Maybe FilePath,
@@ -176,7 +177,6 @@ data Opt = Opt {
     optArch        ::  [String],           -- ^ target architecture
     optCross       ::  Bool,
     optOutName     ::  Maybe String,           -- ^ Name of output file.
-    optPrelude     :: !Bool,                   -- ^ No implicit Prelude.
     optIgnoreHo    :: !Bool,                   -- ^ Ignore ho-files.
     optNoWriteHo   :: !Bool,                   -- ^ Don't write ho-files.
     optNoAuto      :: !Bool,                   -- ^ Don't autoload packages
@@ -198,6 +198,7 @@ emptyOpt = Opt {
     optHlPath      = initialLibIncludes,
     optIncs        = [],
     optDefs        = [],
+    optExtensions  = [],
     optDump        = [],
     optStale       = [],
     optStmts       = [],
@@ -212,7 +213,6 @@ emptyOpt = Opt {
     optMainFunc    = Nothing,
     optArch        = ["default"],
     optOutName     = Nothing,
-    optPrelude     = True,
     optVerbose     = 0,
     optStatLevel   = 1,
     optNoAuto      = False,
@@ -233,12 +233,12 @@ theoptions =
     , Option ['z'] []            (NoArg  (optStatLevel_u (+1)))        "Increase verbosity of statistics"
     , Option ['d'] []            (ReqArg (\d -> optDump_u (d:)) "[no-]flag")  "dump specified data during compilation"
     , Option ['f'] []            (ReqArg (\d -> optFOpts_u (d:)) "[no-]flag") "set or clear compilation options"
+    , Option ['X'] []            (ReqArg (\d -> optExtensions_u (d:)) "ExtensionName") "enable the given language extension"
     , Option ['o'] ["output"]    (ReqArg (optOutName_s . Just) "FILE")        "output to FILE"
     , Option ['i'] ["include"]   (ReqArg (optIncdirs_u . idu) "DIR")   "where to look for source files"
     , Option ['I'] []            (ReqArg (optIncs_u . idu) "DIR")       "add to preprocessor include path"
     , Option ['D'] []            (ReqArg (\d -> optDefs_u (d:)) "NAME=VALUE") "add new definitions to set in preprocessor"
     , Option []    ["optc"]      (ReqArg (optCCargs_u . idu) "option") "extra options to pass to c compiler"
-    , Option ['N'] ["noprelude"] (NoArg  (optPrelude_s False))         "do not automatically import the prelude"
     , Option ['c'] []            (NoArg  (optMode_s CompileHo))        "just compile the modules, caching the results."
     , Option ['C'] []            (NoArg  (optMode_s StopC))            "compile to C code"
     , Option ['E'] []            (NoArg  (optMode_s Preprocess))       "preprocess the input and print result to stdout"

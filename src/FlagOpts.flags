@@ -13,6 +13,7 @@ unboxed-values allow unboxed value syntax
 ffi support foreign function declarations
 cpp pass haskell source through c preprocessor
 m4 pass haskell source through m4 preprocessor
+prelude implicitly import Prelude
 
 !Typechecking
 monomorphism-restriction enforce monomorphism restriction
@@ -38,4 +39,4 @@ debug enable debugging code in generated executable
 raw just evaluate main to WHNF and nothing else.
 
 !Default settings
-@default inline-pragmas rules wrapper defaulting type-analysis monomorphism-restriction global-optimize full-int
+@default inline-pragmas rules wrapper defaulting type-analysis monomorphism-restriction global-optimize full-int prelude

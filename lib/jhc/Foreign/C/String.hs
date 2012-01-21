@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -fffi #-}
+{-# OPTIONS_JHC -fno-prelude -fffi #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Foreign.C.String
@@ -455,6 +455,3 @@ charsToCWchars xs  = map castCharToCWchar xs
 
 foreign import primitive "U2U" castCWcharToChar :: CWchar -> Char
 foreign import primitive "U2U" castCharToCWchar :: Char -> CWchar
-
-
-

@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N #-}
+{-# OPTIONS_JHC -fno-prelude #-}
 module Jhc.Text.Read where
 
 import Jhc.Basics
@@ -119,4 +119,3 @@ lexDigits        =  nonnull isDigit
 
 nonnull          :: (Char -> Bool) -> ReadS String
 nonnull p s      =  [(cs,t) | (cs@(_:_),t) <- [span p s]]
-

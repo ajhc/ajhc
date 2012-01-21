@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -fffi -fcpp -funboxed-values #-}
+{-# OPTIONS_JHC -fno-prelude -fffi -fcpp -funboxed-values #-}
 {-# LANGUAGE CPP #-}
 
 module Jhc.Options(
@@ -46,4 +46,3 @@ foreign import primitive options_isBigEndian :: () -> Bool__
 foreign import primitive options_isConsole   :: () -> Bool__
 
 #endif
-

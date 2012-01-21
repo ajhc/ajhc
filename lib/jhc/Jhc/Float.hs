@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -fffi -fm4 #-}
+{-# OPTIONS_JHC -fno-prelude -fffi -fm4 #-}
 
 module Jhc.Float(
     Float(..),
@@ -226,4 +226,3 @@ foreign import primitive "FGte" fgte$2 :: $2 -> $2 -> Bool__
 
 NUMINSTANCE(Float,Float32_)
 NUMINSTANCE(Double,Float64_)
-

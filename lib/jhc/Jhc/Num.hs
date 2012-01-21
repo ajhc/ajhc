@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N #-}
+{-# OPTIONS_JHC -fno-prelude #-}
 module Jhc.Num where
 
 import Jhc.Basics
@@ -104,4 +104,3 @@ subtract         =  flip (-)
 even, odd        :: (Integral a) => a -> Bool
 even n           =  n `rem` 2 == 0
 odd              =  not . even
-

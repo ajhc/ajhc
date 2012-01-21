@@ -218,9 +218,9 @@ CLEANFILES= $(JHC_LIBS) $(JHC_EXT_LIBS)
 LIB_OPTIONS=$(RTSOPTS) $(JHC_TEST) --noauto -L- -L. # --deps tmp/$@.yaml
 
 jhc-prim-0.7.0.hl: lib/jhc-prim/jhc-prim.yaml
-	./jhc $(LIB_OPTIONS) -N -funboxed-tuples -fffi -ilib/jhc-prim --build-hl $< -o $@
+	./jhc $(LIB_OPTIONS) -fno-prelude -funboxed-tuples -fffi -ilib/jhc-prim --build-hl $< -o $@
 jhc-1.0.hl: lib/jhc/jhc.yaml
-	./jhc $(LIB_OPTIONS) -N -ilib/jhc --build-hl $< -o $@
+	./jhc $(LIB_OPTIONS) -fno-prelude -ilib/jhc --build-hl $< -o $@
 base-1.0.hl: lib/base/base.yaml jhc-1.0.hl
 	./jhc $(LIB_OPTIONS) -ilib/base -pjhc --build-hl $< -o $@
 applicative-1.0.hl: lib/applicative/applicative.cabal base-1.0.hl

@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N #-}
+{-# OPTIONS_JHC -fno-prelude #-}
 module Prelude.Text (
     ReadS, ShowS,
     Read(readsPrec, readList),
@@ -124,4 +124,3 @@ instance (Read a) => Read (Maybe a) where
 	       [((Just aa) , rest) | ("Just" , inp) <- lex inp ,
 		(aa , rest) <- readsPrec 10 inp])
 	      input
-

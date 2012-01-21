@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N  -fffi #-}
+{-# OPTIONS_JHC -fno-prelude  -fffi #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Foreign.C.Error
@@ -543,4 +543,3 @@ foreign import ccall  "string.h strerror" strerror :: Errno -> IO (Ptr CChar)
 foreign import primitive "const.EINTR" eINTR :: Errno
 foreign import primitive "const.EWOULDBLOCK" eWOULDBLOCK :: Errno
 foreign import primitive "const.EAGAIN" eAGAIN :: Errno
-

@@ -1,5 +1,5 @@
 
-{-# OPTIONS_JHC -N -fffi #-}
+{-# OPTIONS_JHC -fno-prelude -fffi #-}
 
 import Jhc.Addr
 import Jhc.Basics

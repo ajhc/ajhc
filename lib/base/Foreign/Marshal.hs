@@ -1,11 +1,11 @@
 {-# OPTIONS_GHC -fno-implicit-prelude #-}
-{-# OPTIONS_JHC -N #-}
+{-# OPTIONS_JHC -fno-prelude #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Foreign.Marshal
 -- Copyright   :  (c) The FFI task force 2003
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  ffi@haskell.org
 -- Stability   :  provisional
 -- Portability :  portable

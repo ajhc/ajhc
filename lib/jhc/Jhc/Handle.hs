@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -fffi -funboxed-values #-}
+{-# OPTIONS_JHC -fno-prelude -fffi -funboxed-values #-}
 module Jhc.Handle(
     Handle(..),
     IOMode(..),
@@ -123,5 +123,3 @@ toStr ReadMode = "r"#
 toStr WriteMode = "w"#
 toStr AppendMode = "a"#
 toStr ReadWriteMode = "r+"#
-
-

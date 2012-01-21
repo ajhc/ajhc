@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -fffi #-}
+{-# OPTIONS_JHC -fno-prelude -fffi #-}
 module Jhc.JumpPoint(JumpPoint(), withJumpPoint__, jumpJumpPoint__, errorJumpPoint) where
 
 import Jhc.IO
@@ -32,6 +32,3 @@ foreign import ccall jhc_longjmp :: JumpPoint -> IO ()
 foreign import primitive "const.sizeof(jmp_buf)" jmp_buf_size  :: Int
 foreign import ccall "malloc.h malloc" _malloc :: Int -> IO (Ptr a)
 foreign import ccall "malloc.h free" _free :: Ptr a -> IO ()
-
-
-

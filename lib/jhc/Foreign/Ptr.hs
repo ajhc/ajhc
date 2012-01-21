@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -fffi -funboxed-tuples #-}
+{-# OPTIONS_JHC -fno-prelude -fffi -funboxed-tuples #-}
 
 module Foreign.Ptr(
     Ptr(),
@@ -64,5 +64,3 @@ wordPtrToPtr w = Ptr (unboxWordPtr w)
 
 foreign import primitive "box" boxWordPtr :: BitsPtr_ -> WordPtr
 foreign import primitive "unbox" unboxWordPtr :: WordPtr -> BitsPtr_
-
-

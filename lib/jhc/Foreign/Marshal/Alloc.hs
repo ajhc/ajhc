@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -fffi #-}
+{-# OPTIONS_JHC -fno-prelude -fffi #-}
 module Foreign.Marshal.Alloc (
   -- * Memory allocation
   -- ** Local allocation
@@ -139,5 +139,3 @@ foreign import ccall "stdlib.h realloc" _realloc :: Ptr a -> CSize -> IO (Ptr b)
 -- used as a finalizer (cf 'Foreign.ForeignPtr.ForeignPtr') for storage
 -- allocated with 'malloc', 'mallocBytes', 'realloc' or 'reallocBytes'.
 foreign import ccall unsafe "stdlib.h &free" finalizerFree :: FunPtr (Ptr a -> IO ())
-
-

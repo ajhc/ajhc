@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -fm4 #-}
+{-# OPTIONS_JHC -fno-prelude -fm4 #-}
 
 module Jhc.Inst.Read() where
 

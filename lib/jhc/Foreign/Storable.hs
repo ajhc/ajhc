@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -fm4 -funboxed-values -funboxed-tuples -fffi #-}
+{-# OPTIONS_JHC -fno-prelude -fm4 -funboxed-values -funboxed-tuples -fffi #-}
 module Foreign.Storable(Storable(..)) where
 
 

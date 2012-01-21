@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fm4 -N -fffi #-}
+{-# OPTIONS_JHC -fm4 -fno-prelude -fffi #-}
 module Jhc.Inst.Num() where
 
 m4_include(Jhc/Num.m4)
@@ -49,5 +49,3 @@ SIGNED(CSize)
 SIGNED(CInt)
 SIGNED(CUInt)
 UNSIGNED(CWchar)
-
-

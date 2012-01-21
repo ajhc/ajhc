@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -fffi -funboxed-values -fm4 #-}
+{-# OPTIONS_JHC -fno-prelude -fffi -funboxed-values -fm4 #-}
 
 
 module Jhc.Addr(
@@ -53,4 +53,3 @@ castPtr (Ptr addr) = Ptr addr
 
 castFunPtr :: FunPtr a -> FunPtr b
 castFunPtr (FunPtr addr) = FunPtr addr
-

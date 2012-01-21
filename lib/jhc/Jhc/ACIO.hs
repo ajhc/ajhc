@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N  #-}
+{-# OPTIONS_JHC -fno-prelude  #-}
 module Jhc.ACIO where
 
 import Jhc.IORef

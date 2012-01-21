@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -funboxed-tuples #-}
+{-# OPTIONS_JHC -fno-prelude -funboxed-tuples #-}
 
 module Jhc.Monad where
 
@@ -92,5 +92,3 @@ instance Monad IO where
 
 instance Functor IO where
     fmap f a = a >>= \x -> return (f x)
-
-

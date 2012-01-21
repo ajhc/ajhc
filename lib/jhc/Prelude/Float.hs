@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -fffi -fm4  #-}
+{-# OPTIONS_JHC -fno-prelude -fffi -fm4  #-}
 
 module Prelude.Float(readDouble,doubleToDigits,doubleToRational) where
 
@@ -299,5 +299,3 @@ doubleToRational :: Double -> Rational
 doubleToRational x  =  (m:%1)*(b:%1)^^n where
     (m,n) = decodeFloat x
     b     = floatRadix  x
-
-

@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N #-}
+{-# OPTIONS_JHC -fno-prelude #-}
 module Data.Maybe (
     Maybe(Nothing, Just),  maybe,  isJust,  isNothing,  fromJust,  fromMaybe,
     listToMaybe,  maybeToList,  catMaybes,  mapMaybe

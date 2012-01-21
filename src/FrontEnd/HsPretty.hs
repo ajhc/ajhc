@@ -186,7 +186,7 @@ render = renderWithMode defaultMode
 
 -------------------------  Pretty-Print a Module --------------------
 ppHsModule :: HsModule -> Doc
-ppHsModule (HsModule mod _ mbExports imp decls _) =
+ppHsModule (HsModule mod _ mbExports imp decls _ _) =
    topLevel (ppHsModuleHeader mod mbExports)
             (map ppHsImportDecl imp ++ map ppHsDecl decls)
 
@@ -721,6 +721,3 @@ instance P.PPrint P.Doc  HsTyVarBind where
 
 instance P.PPrint P.Doc  HsPat where
     pprint d = unDocM (ppHsPat d) defaultMode
-
-
-

@@ -615,7 +615,7 @@ compileCompNode ifunc func ksm cn = do
     f cn
 
 hsModuleRequires x = snub (Module "Jhc.Prim":ans) where
-    noPrelude =   or $ not (optPrelude options):[ opt == c | opt <- hsModuleOptions x, c <- ["-N","--noprelude"]]
+    noPrelude = FO.Prelude `Set.notMember` optFOptsSet (hsModuleOpt x)
     ans = (if noPrelude then id else  (Module "Prelude":)) [  hsImportDeclModule y | y <- hsModuleImports x]
 
 searchPaths :: String -> [(String,String)]

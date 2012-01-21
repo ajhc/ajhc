@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -fffi #-}
+{-# OPTIONS_JHC -fno-prelude -fffi #-}
 module Foreign.StablePtr(
     StablePtr(),
     castStablePtrToPtr,

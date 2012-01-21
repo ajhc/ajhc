@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# OPTIONS_JHC -N  #-}
 module Jhc.Types where
 
 data Bits1_ :: #

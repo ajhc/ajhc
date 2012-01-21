@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -fffi #-}
+{-# OPTIONS_JHC -fno-prelude -fffi #-}
 
 -- just a few basic operations on integers to jumpstart things
 module Jhc.Int(Int(),Int__(),increment,decrement,plus,minus,times,divide,modulus,zero,one,boxInt,unboxInt) where

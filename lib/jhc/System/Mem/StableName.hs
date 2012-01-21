@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -fffi -fm4   #-}
+{-# OPTIONS_JHC -fno-prelude -fffi -fm4   #-}
 
 module System.Mem.StableName(StableName(),makeStableName,hashStableName) where
 

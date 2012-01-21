@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -fffi -funboxed-values -fm4 #-}
+{-# OPTIONS_JHC -fno-prelude -fffi -funboxed-values -fm4 #-}
 
 module Jhc.Inst.Enum() where
 
@@ -56,5 +56,3 @@ instance Enum () where
     enumFromThen () () 	= let many = ():many in many
     enumFromTo () () 	= [()]
     enumFromThenTo () () () = let many = ():many in many
-
-

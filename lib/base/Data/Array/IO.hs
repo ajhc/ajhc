@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -funboxed-tuples -fffi #-}
+{-# OPTIONS_JHC -fno-prelude -funboxed-tuples -fffi #-}
 module Data.Array.IO where
 
 import Jhc.Basics
@@ -18,7 +18,7 @@ newIOArray_ rng@(l,h) fill w1 =
     case unboxInt (rangeSize rng) of
       size__ -> case newMutArray__ size__ fill w1 of
                   (# w2, arr #) -> (# w2, IOA l h arr #)
-                                     
+
 boundsIOArray :: Ix a => IOArray a b -> IO (a,a)
 boundsIOArray (IOA l h _) = returnIO (l,h)
 
@@ -26,7 +26,7 @@ readIOArray :: Ix a => IOArray a b -> a -> IO b
 readIOArray (IOA l h arr) i =
     case unboxInt (index (l,h) i) of
       i' -> IO (readArray__ arr i')
-    
+
 writeIOArray :: Ix a => IOArray a b -> a -> b -> IO ()
 writeIOArray (IOA l h arr) i x =
     case unboxInt (index (l,h) i) of
@@ -46,6 +46,6 @@ freezeIOArray :: Ix a => IOArray a b -> IO (Array a b)
 thawIOArray :: Ix a => Array a b -> IO (IOArray a b)
 
 unsafeFreezeIOArray :: Ix a => IOArray a b -> IO (Array a b)
-unsafeFreezeIOArray (IOA l h arr) = 
+unsafeFreezeIOArray (IOA l h arr) =
     IO (\w1 -> unsafeFreezeArray__ )
 -}

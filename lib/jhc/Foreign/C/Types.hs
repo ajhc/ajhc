@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N #-}
+{-# OPTIONS_JHC -fno-prelude #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 module Foreign.C.Types where
 

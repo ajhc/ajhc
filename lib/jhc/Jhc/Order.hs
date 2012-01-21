@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fm4 -N -fffi #-}
+{-# OPTIONS_JHC -fm4 -fno-prelude -fffi #-}
 
 
 module Jhc.Order(
@@ -120,5 +120,3 @@ not x = if x then False else True
 
 otherwise        :: Bool
 otherwise        =  True
-
-

@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -fffi -funboxed-tuples #-}
+{-# OPTIONS_JHC -fno-prelude -fffi -funboxed-tuples #-}
 -- | this module provides a once-updatable value that may be used in pure code.
 -- it is an _unchecked_ error to read a hole before it has been filled in.
 -- filling in a hole has the effect of 'seq'ing its value immediatly so lift it in
@@ -34,4 +34,3 @@ fillHole r v = IO (\world -> case fillHole__ r v world of
 
 foreign import primitive newHole__  :: World__ -> (# World__, Hole a #)
 foreign import primitive fillHole__ :: Hole a -> a -> World__ -> World__
-

@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N #-}
+{-# OPTIONS_JHC -fno-prelude #-}
 module Jhc.Show where
 
 import Jhc.Int
@@ -63,5 +63,3 @@ instance Show Ordering where
     showsPrec d (LT) = showString "LT"
     showsPrec d (EQ) = showString "EQ"
     showsPrec d (GT) = showString "GT"
-
-

@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -fffi -funboxed-values #-}
+{-# OPTIONS_JHC -fno-prelude -fffi -funboxed-values #-}
 
 -- | helper routines for deriving(Enum) instances
 -- these routines help out the compiler when

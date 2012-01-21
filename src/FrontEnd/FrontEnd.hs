@@ -29,9 +29,9 @@ doModules' htc ms  = do
     Tc.tiModules htc ms
 
 modInfo m = do
-    opt <- case fileOptions (hsModuleOptions m) of
-        Just o -> return o
-        Nothing -> warn (srcLoc m) "unknown-option" ("Unknown OPTIONS in pragma module" <+> fromModule (hsModuleName m) <+>  show (hsModuleOptions m)) >> return options
+    --opt <- case fileOptions (hsModuleOptions m) of
+    --    Just o -> return o
+    --    Nothing -> warn (srcLoc m) "unknown-option" ("Unknown OPTIONS in pragma module" <+> fromModule (hsModuleName m) <+>  show (hsModuleOptions m)) >> return options
     let (xs,ys) = collectDefsHsModule m
     return ModInfo {
         modInfoName = hsModuleName m,
@@ -40,7 +40,5 @@ modInfo m = do
         modInfoConsArity = ys,
         modInfoExport = error "modInfoExport",
         modInfoImport = error "modInfoImport",
-        modInfoOptions = opt
+        modInfoOptions = hsModuleOpt m
         }
-
-

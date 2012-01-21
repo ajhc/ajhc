@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -fffi -funboxed-tuples #-}
+{-# OPTIONS_JHC -fno-prelude -fffi -funboxed-tuples #-}
 {-# LANGUAGE UnboxedTuples, ForeignFunctionInterface, NoImplicitPrelude #-}
 module Jhc.Prim where
 
