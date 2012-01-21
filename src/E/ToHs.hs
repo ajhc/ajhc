@@ -1,24 +1,23 @@
 module E.ToHs(compileToHs) where
 
 import Char
-import Control.Monad.Identity
 import Control.Monad
+import Control.Monad.Identity
 import Control.Monad.RWS
 import Control.Monad.Trans
 import Control.Monad.Writer
 import Data.Monoid
 import System.IO
 import Text.PrettyPrint.HughesPJ(render,($$),nest,Doc())
+import qualified Data.Set as Set
 import qualified Data.Traversable as T
 import qualified System
-import qualified Data.Set as Set
 
-import PackedString
-import C.Prims
 import C.Arch
+import C.Prims
 import DataConstructors
-import Doc.PPrint
 import Doc.DocLike
+import Doc.PPrint
 import E.E
 import E.FreeVars
 import E.Program
@@ -32,6 +31,7 @@ import Name.Prim
 import Name.VConsts
 import Numeric
 import Options
+import PackedString
 import RawFiles(viaghc_hs)
 import Support.CanType
 import Support.FreeVars
@@ -41,12 +41,10 @@ import qualified FlagDump as FD
 
 progress str = wdump FD.Progress $  (putErrLn str) >> hFlush stderr
 
-
 {-# NOINLINE compileToHs #-}
 compileToHs :: Program -> IO ()
 compileToHs prog = do
     (v,_,Coll { collNames = ns, collPrims = prims }) <- runRWST (fromTM $ transE (programE prog)) emptyEnvironment 1
-
 
     let rv = render (text "theRealMain = " <> v)
     let data_decls = render (transDataTable (progDataTable prog) ns) ++ "\n"
@@ -87,8 +85,6 @@ restate = vcat $ map f restated where
         (dc_EmptyList,0,"jhc_EmptyList"),
         (tc_List,1,"ListTCon")
         ]
-
-
 
 transForeign ps = vcat (map f ps) where
     f (AddrOf s) = text $ "foreign import ccall \"&" ++ unpackPS s ++ "\" addr_" ++ mangleIdent (unpackPS s) ++ " :: Ptr ()"
@@ -167,7 +163,6 @@ data Collect = Coll { collNames :: Set.Set (Name,Int,Bool), collPrims :: Set.Set
 newtype TM a = TM { fromTM :: RWST Environment Collect Int IO a }
     deriving(MonadState Int,MonadReader Environment,MonadWriter Collect,Monad,Functor,MonadIO)
 
-
 mparen xs = do
     Env { envParen = p } <- ask
     x <- local (\e -> e { envParen = True }) xs
@@ -193,7 +188,6 @@ showCon c ts = parens $ hsep (showTCName (length ts) c:ts)
 
 showTCName n c | nameType c == TypeConstructor = showCName c <> text "_" <> tshow n
 showTCName _ c = showCName c
-
 
 showCName c  | c == dc_Char = text "C#"
 showCName c  | c == dc_Int = text "I#"
@@ -465,9 +459,6 @@ transAlt dobind b (Alt LitCons { litName = c, litArgs = ts } e) = do
     e <- noParens $ transE e
     return ( (if dobind then b <> char '@' else empty) <> showCon c ts <+> text "->" <+> e)
 
-
-
-
 transTVr :: TVr -> TM Doc
 transTVr TVr { tvrIdent = 0 } = return $ char '_'
 transTVr tvr = return (text $ 'v':mangleIdent (pprint tvr))
@@ -492,5 +483,3 @@ mangleIdent xs =  concatMap f xs where
         f '_' = "_u"
         f c | isAlphaNum c = [c]
         f c = '_':'x':showHex (ord c) ""
-
-

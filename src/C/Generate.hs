@@ -79,13 +79,12 @@ import Text.PrettyPrint.HughesPJ(Doc,render,nest,($$),($+$))
 import qualified Data.Foldable as Seq
 import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
-import qualified Data.Traversable as Seq
 import qualified Data.Set as Set
+import qualified Data.Traversable as Seq
 
 import Doc.DocLike
 import Util.Gen
 import Util.SetLike
-
 
 data Env = Env {
     envUsedLabels :: Set.Set Name,
@@ -99,13 +98,11 @@ emptyEnv = Env { envUsedLabels = mempty, envInScope = mempty }
 newtype G a = G (RWS Env [(Name,Type)] (Int,Map.Map [Type] Name) a)
     deriving(Monad,MonadWriter [(Name,Type)],MonadState (Int,Map.Map [Type] Name),MonadReader Env,MonadFix)
 
-
 newtype Name = Name String
     deriving(Eq,Ord)
 
 instance Show Name where
     show (Name n) = n
-
 
 data TypeHint = TypeHint {
     thPtr :: !Bool,
@@ -148,7 +145,6 @@ stmtMapStmt f s = g s where
         return $ SSwitch e ss
     g s = return s
     h (St sms) = return St `ap` Seq.mapM f sms
-
 
 -- The Bool in TB and is whether the GC needs to consider the types to
 -- possibly contain garbage collectable pointers.
@@ -218,7 +214,6 @@ instance Draw Expression where
     pdraw (Exp _ e) = pdraw e
     err s = (Exp typeHint (err s))
 
-
 instance Draw Name where
     draw (Name s) = text s
     err s = Name $ terr s
@@ -249,7 +244,6 @@ sizeof t = expC (text "sizeof" <> parens $ draw t)
 
 cast :: Type -> Expression -> Expression
 cast t e = expDC (parens (draw t) <> pdraw e)
-
 
 functionCall' fe es = expD (draw fe <> tupled (map draw es))
 
@@ -291,8 +285,6 @@ localVariable t n = expD $ do
 statementOOB :: Statement -> Statement
 statementOOB s = (sd $ draw s >> return empty)
 
-
-
 instance Monoid Statement where
     mempty = St mempty
     mappend (St as) (St bs) = St $ pairOpt stmtPairOpt as bs
@@ -314,7 +306,6 @@ pairOpt peep as bs = f as bs where
         Just ab -> as' `f` Seq.singleton ab `f` bs'
         Nothing -> as Seq.>< bs
     f as bs =  as Seq.>< bs
-
 
 emptyExpression = Exp typeHint EE
 
@@ -342,7 +333,6 @@ structAnon es = Exp typeHint $ ED $ do
     let nm = name ("_t" ++ show n)
         lv = localVariable (anonStructType (snds es)) nm
     draw $ commaExpression $ [operator "=" (projectAnon i lv) e | e <- fsts es | i <- [0..] ] ++ [lv]
-
 
 operator :: (ToExpression a,ToExpression b) => String -> a -> b -> Expression
 operator o x y = expDC (pdraw (toExpression x) <+> text o <+> pdraw (toExpression y))
@@ -386,7 +376,6 @@ expr :: Expression -> Statement
 expr e | isEmptyExpression e = mempty
 expr e = sd $ draw e <> char ';'
 
-
 creturn :: Expression -> Statement
 creturn e = stmt $ SReturn e
 
@@ -424,25 +413,20 @@ newVar t = do
     let n = name $ 'x':show u
     return (localVariable t n)
 
-
 newDeclVar t = do
     u <- newUniq
     let n = name $ 'x':show u
     return (sd (tell [(n,t)] >> return mempty),variable n)
-
 
 labelPull :: Statement -> (Statement,Statement)
 labelPull (St ss) = f ss mempty where
     f ss rr | ss' Seq.:> l@SLabel {} <- Seq.viewr ss = f ss' (Seq.singleton l `mappend` rr)
             | otherwise = (St ss,St rr)
 
-
-
 switch' :: Expression -> [(Maybe Constant,Statement)]  -> Statement
 switch' e es = (stmt $ SSwitch e es') `mappend` ls where
      (es',ls) = runWriter $ mapM f es
      f (c,s) = tell l >> return (c,s') where (s',l) = labelPull s
-
 
 cif :: Expression -> Statement -> Statement -> Statement
 cif exp thn els = (stmt $ SIf exp thn' els') `mappend` la `mappend` lb where
@@ -460,8 +444,6 @@ forLoop i from to body = sd $ do
     body <- draw body
     return $ text "for" <> parens (i <+> equals <+> from <> semi <+> i <+> text "<" <+> to <> semi <+> i <> text "++" ) <+> lbrace <$> nest 4 body <$> rbrace
 
-
-
 data Function = F {
     functionName :: Name,
     functionReturnType :: Type,
@@ -475,7 +457,6 @@ data FunctionOpts = Public | Attribute String
 
 function :: Name -> Type -> [(Name,Type)] -> [FunctionOpts] -> Statement -> Function
 function n t as o s = F n t as o s
-
 
 drawFunction :: Function -> G (Doc,Doc)
 drawFunction f = do
@@ -532,15 +513,12 @@ voidStarType = ptrType voidType
 voidType :: Type
 voidType = basicType "void"
 
-
-
 class Annotate e where
     annotate :: String -> e -> e
 
 instance Annotate Statement where
     --annotate c s@(SD si _) = SD si ((text "/* " <> text c <> text " */") <$> draw s)
     annotate c s = sd (text "/* " <> text c <> text " */") `mappend` s
-
 
 mangleIdent xs = f xs where
     f (x:xs) | isAlphaNum x = x:f xs
@@ -634,10 +612,8 @@ generateC fs ss = ans where
             return $ t <+> tshow n <> semi
         return $ text "struct" <+> tshow n <+> lbrace $$ nest 4 (vcat $ (if structureNeedsDiscriminator s  then text "what_t what;" else empty):ts') $$ rbrace <> semi
 
-
 line = text ""
 vsep xs = vcat $ intersperse line xs
-
 
 instance Show Expression where
     show e = renderG e
@@ -648,7 +624,6 @@ drawG :: Draw d => d -> Doc
 drawG x = fns where
     G ga = draw x
     (fns,_,_) = runRWS ga emptyEnv (1,Map.empty)
-
 
 ------------
 -- C helpers
@@ -707,4 +682,3 @@ infixl 1 &
 
 (&) :: (ToStatement a,ToStatement b) => a -> b -> Statement
 x & y = toStatement x `mappend` toStatement y
-

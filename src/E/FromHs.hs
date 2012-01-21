@@ -9,15 +9,14 @@ module E.FromHs(
 import Char
 import Control.Monad.Identity
 import Control.Monad.RWS
-import qualified Data.Traversable as T
 import List(isPrefixOf,nub)
 import Prelude
 import qualified Data.Map as Map
+import qualified Data.Traversable as T
 import qualified Text.PrettyPrint.HughesPJ as PPrint
 
 import C.FFI
 import C.Prims as CP
-import StringTable.Atom
 import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
@@ -33,6 +32,7 @@ import E.Traverse
 import E.TypeCheck
 import E.Values
 import FrontEnd.Class
+import FrontEnd.HsSyn as HS
 import FrontEnd.Rename(unRename)
 import FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse(getNamesFromHsPat)
@@ -40,15 +40,15 @@ import FrontEnd.Tc.Main(isTypePlaceholder)
 import FrontEnd.Tc.Module(TiData(..))
 import FrontEnd.Tc.Type hiding(Rule(..))
 import FrontEnd.Warning
-import FrontEnd.HsSyn as HS
 import Info.Types
+import Name.Id
 import Name.Name as Name
 import Name.Names
-import Name.Id
 import Name.VConsts
 import Options
 import PackedString
 import PrimitiveOperators
+import StringTable.Atom
 import Support.CanType
 import Support.FreeVars
 import Util.Gen
@@ -60,7 +60,6 @@ import qualified FrontEnd.Tc.Type as Type
 import qualified Info.Info as Info
 
 ump sl e = EError (show sl ++ ": Unmatched pattern") e
-
 
 createIf e a b = do
     [tv] <- newVars [Unknown]
@@ -109,10 +108,6 @@ kind (Kfun k1 k2) = EPi (tVr emptyId (kind k1)) (kind k2)
 kind (KVar _) = error "Kind variable still existing."
 kind _ = error "E.FromHs.kind: unknown"
 
-
-
-
-
 fromTyvar (Tyvar n k) = tVr (toId n) (kind k)
 
 fromSigma (TForAll vs (_ :=> t)) = (map fromTyvar vs, tipe t)
@@ -136,13 +131,9 @@ convertValue n = do
         Just ~(CTAbs ts) -> do return $ \e -> foldr eLam e (map fromTyvar ts)
     return (tVr (toId n) ty,ty,lm)
 
-
-
-
 --convertType t = do
 --    dataTable <- asks ceDataTable
 --    return $ removeNewtypes dataTable (tipe t)
-
 
 matchesConv ms = map v ms where
     v (HsMatch _ _ ps rhs wh) = (ps,rhs,wh)
@@ -154,7 +145,6 @@ argTypes e = span (sortSortLike . getType) (map tvrType xs) where
     (_,xs) = fromPi e
 argTypes' :: E -> ([E],E)
 argTypes' e = let (x,y) = fromPi e in (map tvrType y,x)
-
 
 getMainFunction :: Monad m => DataTable -> Name -> (Map.Map Name (TVr,E)) -> m (TVr,E)
 getMainFunction dataTable name ds = do
@@ -237,8 +227,6 @@ getTypeCons (TCon (Tycon n _)) = n
 getTypeCons (TAp a _) = getTypeCons a
 getTypeCons (TArrow {}) = tc_Arrow
 getTypeCons x = error $ "getTypeCons: " ++ show x
-
-
 
 unbox :: DataTable -> E -> Id -> (E -> E) -> E
 unbox dataTable e _vn wtd | getType (getType e) == eHash = wtd e
@@ -350,7 +338,6 @@ applyCoersion ct e = etaReduce `liftM` f ct e where
         [y] <- newVars [ty]
         fgy <- f ct (EAp e (EVar y))
         return (eLam y fgy)
-
 
 {-# NOINLINE convertDecls #-}
 convertDecls :: Monad m => TiData -> IdMap Properties -> ClassHierarchy -> Map.Map Name Type -> DataTable -> [HsDecl] -> m [(Name,TVr,E)]
@@ -541,7 +528,6 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
             [v] <- newVars [ty']
             e <- marshallFromC dataTable (EVar v) ty
             return (e,v,ty')
-
 
         let argEs   = [ e | (e,_,_) <- aets ]
             argTvrs = [ v | (_,v,_) <- aets ]
@@ -761,13 +747,10 @@ convertTyp n = do
     (_,t,_) <- convertValue n
     return t
 
-
 toTVr assumps dataTable n = tVr (toId n) typeOfName where
     typeOfName = case Map.lookup n assumps of
         Just z -> removeNewtypes dataTable (tipe z)
         Nothing -> error $ "convertVal.Lookup failed: " ++ (show n)
-
-
 
 integer_cutoff = 500000000
 
@@ -785,7 +768,6 @@ litconvert (HsChar i) t | t == tChar =  LitInt (fromIntegral $ ord i) tCharzh
 litconvert (HsCharPrim i) t | t == tCharzh =  LitInt (fromIntegral $ ord i) tCharzh
 litconvert (HsIntPrim i) t  =  LitInt (fromIntegral $  i) t
 litconvert e t = error $ "litconvert: shouldn't happen: " ++ show (e,t)
-
 
 fromHsPLitInt (HsPLit l@(HsInt _)) = return l
 fromHsPLitInt (HsPLit l@(HsFrac _)) = return l
@@ -807,7 +789,6 @@ patVar p t = do
     [nv] <- newVars [t]
     return (p,nv)
     -}
-
 
 tidyPat ::
     Monad m
@@ -864,7 +845,6 @@ tidyHeads b ps = mapM f ps where
     f (~(p:ps),fe) = do
         (p',fe') <- tidyPat p b
         return (p',ps,fe' . fe)
-
 
 convertMatches ::
     Monad m
@@ -978,7 +958,6 @@ packupString :: String -> (E,Bool)
 packupString s | all (\c -> c > '\NUL' && c <= '\xff') s = (EPrim (APrim (PrimString (packString s)) mempty) [] r_bits_ptr_,True)
 packupString s = (toE s,False)
 
-
 actuallySpecializeE :: Monad m
     => E   -- ^ the general expression
     -> E   -- ^ the specific type
@@ -1004,7 +983,6 @@ specializeE gt st = do
                                <$> tshow st)
     f [] gt
 
-
 procAllSpecs :: Monad m => DataTable -> [Type.Rule] -> [(TVr,E)] -> m ([(TVr,E)],Rules)
 procAllSpecs dataTable rs ds = do
     let specMap = Map.fromListWith (++) [ (toId n,[r]) | r@Type.RuleSpec { Type.ruleName = n } <- rs]
@@ -1014,7 +992,6 @@ procAllSpecs dataTable rs ds = do
         f _ = return mempty
     (nds,rules) <- mconcat `liftM` mapM f ds
     return $ (nds,fromRules rules)
-
 
 makeSpec :: Monad m => DataTable -> (TVr,E) -> T.Rule -> m ((TVr,E),Rule)
 makeSpec dataTable (t,e) T.RuleSpec { T.ruleType = rt, T.ruleUniq = (Module m,ui), T.ruleSuper = ss } = do
@@ -1031,7 +1008,6 @@ makeSpec dataTable (t,e) T.RuleSpec { T.ruleType = rt, T.ruleUniq = (Module m,ui
     return ((ntvr,nbody),ar)
 makeSpec _ _ _ = fail "E.FromHs.makeSpec: invalid specialization"
 
-
 deNewtype :: DataTable -> E -> E
 deNewtype dataTable e = removeNewtypes dataTable (f e) where
     f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (LitCons { litName = n, litArgs = [v], litType = t }) z):_) } | alias == ErasedAlias = f (eLet v e z) where
@@ -1039,6 +1015,3 @@ deNewtype dataTable e = removeNewtypes dataTable (f e) where
     f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (LitCons { litName = n, litArgs = [v], litType = t }) z):_) } | alias == RecursiveAlias = f $ eLet v (prim_unsafeCoerce e (getType v)) z where
         Identity Constructor { conAlias = alias } = getConstructor n dataTable
     f e = runIdentity $ emapE (return . f) e
-
-
-

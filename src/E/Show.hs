@@ -151,7 +151,6 @@ showTVr' TVr { tvrIdent = i} = do
     ii <- showI i
     return $ atom ii
 
-
 allocTVr :: TVr -> SEM a -> SEM a
 allocTVr _tvr action | dump FD.EVerbose = action
 allocTVr tvr action | tvrIdent tvr == emptyId = action
@@ -266,7 +265,6 @@ showE e = do
                     x <- x
                     return $ x `inhabit` t
         mt _ x = x
-
 
     f e
 

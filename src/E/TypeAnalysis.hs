@@ -6,11 +6,11 @@ module E.TypeAnalysis(typeAnalyze, Typ(),expandPlaceholder) where
 import Control.Monad.Error
 import Control.Monad.Identity
 import Control.Monad.State
-import Data.Monoid
 import Data.Maybe
-import qualified Data.Set as Set
-import qualified Data.Map as Map
+import Data.Monoid
 import qualified Data.Foldable as T
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 import DataConstructors
 import Doc.PPrint
@@ -33,9 +33,8 @@ import Name.Names
 import Support.CanType
 import Util.Gen
 import Util.SetLike hiding(Value)
-import qualified Stats
 import qualified Info.Info as Info
-
+import qualified Stats
 
 type Typ = VMap () Name
 data Env = Env {
@@ -124,7 +123,6 @@ calcComb env@Env { envRuleSupply = ur, envValSupply = uv } comb = do
         mapM_ hr rs
         calcE env $ combBody comb
 
-
 calcDef :: Env -> (TVr,E) -> IO ()
 calcDef env@Env { envValSupply = uv } (t,e) = do
     valUsed <- supplyValue uv t
@@ -170,7 +168,6 @@ calcAlt env v (Alt LitCons { litName = n, litArgs = xs } e) = do
         forMn_ xs $ \ (t,i) -> do
             let Just t' = Info.lookup (tvrInfo t)
             addRule $ modifiedSuperSetOf t' v (vmapArg n i)
-
 
 calcE :: Env -> E -> IO ()
 calcE env (ELetRec ds e) = calcDs nenv ds >> calcE nenv e where
@@ -223,16 +220,12 @@ typConstant :: Monad m => E -> m Typ
 typConstant e | Just (n,as) <- toLit e = return (vmapValue n) `ap` mapM typConstant as
 typConstant e = fail $ "typConstant: " ++ show e
 
-
-
 data SpecEnv = SpecEnv {
     senvUnusedRules :: Set.Set (Module,Int),
     senvUnusedVars  :: Set.Set TVr,
     senvDataTable :: DataTable,
     senvArgs      :: Map.Map TVr [Int]
     }
-
-
 
 getTyp :: Monad m => E -> DataTable -> Typ -> m E
 getTyp kind dataTable vm = f (10::Int) kind vm where
@@ -259,7 +252,6 @@ specializeProgram doSpecialize unusedRules unusedValues prog = do
                                                     , senvDataTable = progDataTable prog
                                                     , senvArgs = mempty } (progCombinators prog)
     return $ progCombinators_s nds prog
-
 
 repi (ELit LitCons { litName = n, litArgs = [a,b] }) | n == tc_Arrow = EPi tvr { tvrIdent = emptyId, tvrType = repi a } (repi b)
 repi e = runIdentity $ emapE (return . repi ) e
@@ -298,7 +290,6 @@ instance Error () where
     noMsg = ()
     strMsg _ = ()
 
-
 evalErrorT :: Monad m => a -> ErrorT () m a -> m a
 evalErrorT err action = liftM f (runErrorT action) where
     f (Left _) = err
@@ -315,7 +306,6 @@ eToPatM cv e = f e where
         b <- cv b
         return litCons { litName = tc_Arrow, litArgs = [a,b], litType = eStar }
     f x = fail $ "E.Values.eToPatM: " ++ show x
-
 
 caseCast :: TVr -> E -> E -> E
 caseCast t ty e = evalState  (f t ty e) (newIds (freeIds e),[]) where
@@ -417,12 +407,9 @@ expandPlaceholder comb  | getProperty prop_PLACEHOLDER (combHead comb) = do
 
 expandPlaceholder _x = fail "not placeholder"
 
-
-
 {-
 
 -- pruning the unused branches of typecase statements
-
 
 pruneE :: E -> IO E
 pruneE e = return $ runIdentity (prune e)  where

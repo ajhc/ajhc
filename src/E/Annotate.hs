@@ -8,10 +8,10 @@ import E.E
 import E.Program
 import E.Subst
 import GenUtil
-import Name.Id
 import Info.Info(Info)
-import Util.SetLike
+import Name.Id
 import Util.HasSize
+import Util.SetLike
 
 annotateCombs :: forall m . Monad m =>
     (IdMap (Maybe E))
@@ -67,7 +67,6 @@ annotateProgram :: Monad m =>
 annotateProgram imap idann letann lamann prog = do
     ds <- annotateCombs imap idann letann lamann (progCombinators prog)
     return $ programUpdate $ prog { progCombinators = ds }
-
 
 type AM m = ReaderT (IdMap (Maybe E)) m
 
@@ -154,5 +153,3 @@ mnv xs i ss
     | isInvalidId i || i `member` ss  = newId (size ss) isOkay
     | otherwise = i
     where isOkay i = (i `notMember` ss) && (i `notElem` xs)
-
-

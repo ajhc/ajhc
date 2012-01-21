@@ -1,13 +1,13 @@
 module C.Prims where
 
+import Data.Binary
 import Data.Monoid
 import Data.Typeable
-import Data.Binary
 
-import StringTable.Atom
 import Doc.DocLike
 import Doc.PPrint
 import PackedString
+import StringTable.Atom
 import qualified Cmm.Op as Op
 
 data PrimTypeType = PrimTypeIntegral | PrimTypeFloating | PrimTypePointer | PrimTypeVoid
@@ -103,7 +103,6 @@ primIsCheap _ = False
 
 aprimIsCheap (APrim p _) = primIsCheap p
 
-
 -- | whether a primitive represents a constant expression (assuming all its arguments are constant)
 -- TODO needs grin support
 primIsConstant :: Prim -> Bool
@@ -124,8 +123,6 @@ primEagerSafe PrimTypeInfo {} = True
 primEagerSafe Op { primCOp = op } = Op.isEagerSafe op
 primEagerSafe _ = False
 
-
-
 parsePrimString s = do
     ws@(_:_) <- return $ words s
     let v = case last ws of
@@ -134,7 +131,6 @@ parsePrimString s = do
     let f opt@('-':'l':_) = Requires [] [opt]
         f s = Requires [s] []
     return (APrim v (mconcat (map f (init ws))))
-
 
 primPrim s = APrim (PrimPrim $ toAtom s) mempty
 
@@ -186,5 +182,3 @@ parseDotNetFFI s = ans where
     g dn ['[':rs] | (as,']':nm) <- span (/= ']') rs = return dn { primAssembly = packString as, primDotNetName = packString nm }
     g dn [n] = return dn { primDotNetName = packString n }
     g _ _ = fail "invalid .NET ffi specification"
-
-

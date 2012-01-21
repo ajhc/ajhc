@@ -1,11 +1,9 @@
 module Grin.Interpret(evaluate) where
 
-import StringTable.Atom
-import Support.CanType
+import C.Prims
 import Char
 import CharIO
 import Control.Monad.Identity
-import C.Prims
 import Data.IORef
 import Data.Map as Map hiding(map)
 import Data.Monoid
@@ -16,6 +14,8 @@ import Grin.Grin
 import Grin.Show
 import Name.VConsts
 import Options
+import StringTable.Atom
+import Support.CanType
 import qualified FlagDump as FD
 import qualified Stats
 
@@ -185,6 +185,3 @@ interpret stats te cafMap primMap scMap e = f mempty e where
         liftM mconcat $ sequence $  zipWith bind vs vs'
     bind v r | getType v == getType r = fail $ "unbindable: "  ++ show (v,r,getType v,getType r)   -- check type to be sure
     bind x y = error $ "bad bind: " ++ show (x,y)
-
-
-

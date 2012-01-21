@@ -11,9 +11,9 @@ module Name.Names(module Name.Names,module Name.Prim) where
 
 import Char(isDigit)
 
-import Name.VConsts
 import Name.Name
 import Name.Prim
+import Name.VConsts
 
 instance TypeNames Name where
     tInt = tc_Int
@@ -48,7 +48,6 @@ instance FromTupname Name where
 
 tc_Arrow = toName TypeConstructor  ("Jhc.Basics","->")
 
-
 s_Star = toName SortName ("Jhc@","*")
 s_Hash = toName SortName ("Jhc@","#")
 s_Bang = toName SortName ("Jhc@","!")
@@ -57,7 +56,6 @@ s_QuestQuest = toName SortName ("Jhc@","??")
 s_StarBang = toName SortName ("Jhc@","*!")
 
 u_instance = toName UnknownType ("Jhc@","instance")
-
 
 sFuncNames = FuncNames {
     func_equals = v_equals,
@@ -70,7 +68,3 @@ sFuncNames = FuncNames {
     func_runNoWrapper = v_runNoWrapper,
     func_runRaw = v_runRaw
     }
-
-
-
-

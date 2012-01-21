@@ -13,8 +13,8 @@ import Char(chr)
 import Maybe
 import qualified Data.Traversable as T
 
-import Control.Monad.Identity
 import C.Prims
+import Control.Monad.Identity
 import E.FreeVars
 import E.Type
 import Name.Id

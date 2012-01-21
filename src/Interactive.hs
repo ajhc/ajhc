@@ -11,37 +11,35 @@ import System
 import Text.Regex
 import qualified Data.Map as Map
 
-
 import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
+import FrontEnd.Desugar(desugarHsStmt)
 import FrontEnd.HsParser(parseHsStmt)
+import FrontEnd.HsPretty()
+import FrontEnd.HsSyn
 import FrontEnd.KindInfer
 import FrontEnd.ParseMonad
 import FrontEnd.Rename
+import FrontEnd.Tc.Class
 import FrontEnd.Tc.Main
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
-import FrontEnd.Tc.Class
-import FrontEnd.Desugar(desugarHsStmt)
-import GenUtil
-import Ho.Type
-import FrontEnd.HsPretty()
-import FrontEnd.HsSyn
-import Support.Compat
-import Name.Name
-import Options
-import qualified FrontEnd.Infix
-import qualified FrontEnd.HsPretty as HsPretty
-import qualified Text.PrettyPrint.HughesPJ as PP
+import FrontEnd.TypeSigs
 import FrontEnd.TypeSynonyms(showSynonym)
 import FrontEnd.TypeSyns
-import FrontEnd.TypeSigs
+import FrontEnd.Warning
+import GenUtil
+import Ho.Type
+import Name.Name
+import Options
+import Support.Compat
 import Util.Interact
 import Version.Version(versionString)
-import FrontEnd.Warning
-
+import qualified FrontEnd.HsPretty as HsPretty
+import qualified FrontEnd.Infix
+import qualified Text.PrettyPrint.HughesPJ as PP
 
 printDoc doc = do
     displayIO stdout (renderPretty 0.9 80 doc)
@@ -77,7 +75,6 @@ isInitial = IS {
     stateOptions = options
     }
 
-
 newtype In a = MkIn (ReaderT InteractiveState IO a)
     deriving(MonadIO,Monad,Functor,MonadReader InteractiveState)
 
@@ -89,8 +86,6 @@ instance OptionMonad In where
 
 instance MonadWarn In where
     addWarning x = liftIO $ addWarning x
-
-
 
 interact :: CollectedHo -> IO ()
 interact cho = mre where
@@ -173,7 +168,6 @@ procErrors act = do
     b <- liftIO $ printIOErrors
     if b then return () else act >> return ()
 
-
 executeStatement :: HsStmt -> In ()
 executeStatement stmt = do
     is@IS { stateHo = hoE } <- ask
@@ -215,7 +209,6 @@ tcStatement (HsQualifier e) = do
     liftIO $ putStrLn $ show (text "::" <+> pprint vv :: P.Doc)
     -}
 
-
 tcStatementTc :: HsStmt -> In ()
 tcStatementTc HsLetStmt {} = liftIO $ putStrLn "let statements not yet supported"
 tcStatementTc HsGenerator {} = liftIO $ putStrLn "generators not yet supported"
@@ -240,7 +233,6 @@ tcStatementTc (HsQualifier e) = do
     liftIO $ putStrLn $   "::" <+> prettyPrintType (TForAll vs (ps :=> t))
     ce <- getCollectedEnv
     liftIO $ mapM_ putStrLn [ pprint n <+>  "::" <+> prettyPrintType s |  (n,s) <- Map.toList ce]
-
 
 calcImports :: Monad m => HoTcInfo -> Bool -> Module -> m [(Name,[Name])]
 calcImports ho qual mod = case Map.lookup mod (hoExports ho) of

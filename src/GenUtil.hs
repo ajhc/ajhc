@@ -1,7 +1,5 @@
-
 --  $Id: GenUtil.hs,v 1.53 2009/06/04 04:39:15 john Exp $
 -- arch-tag: 835e46b7-8ffd-40a0-aaf9-326b7e347760
-
 
 -- Copyright (c) 2002 John Meacham (john@foo.net)
 --
@@ -115,7 +113,6 @@ module GenUtil(
     on,
     mapMsnd,
     mapMfst,
-
 
     -- * Classes
     UniqueProducer(..)
@@ -263,18 +260,15 @@ putErr s = IO.hFlush IO.stdout >> IO.hPutStr IO.stderr s
 putErrLn :: String -> IO ()
 putErrLn s = IO.hFlush IO.stdout >> IO.hPutStrLn IO.stderr s
 
-
 -- | Flush stdout, write string and newline to standard error,
 -- then exit program with failure.
 putErrDie :: String -> IO a
 putErrDie s = putErrLn s >> System.exitFailure
 
-
 -- | exit program successfully. 'exitFailure' is
 -- also exported from System.
 exitSuccess :: IO a
 exitSuccess = System.exitWith System.ExitSuccess
-
 
 {-# INLINE fromRight #-}
 fromRight :: Either a b -> b
@@ -302,13 +296,11 @@ liftT3 (f,g,h) (x,y,z) = (f x, g y, h z)
 liftT2 :: (a -> b, c -> d) -> (a,c) -> (b,d)
 liftT2 (f,g) (x,y) = (f x, g y)
 
-
 -- | class for monads which can generate
 -- unique values.
 class Monad m => UniqueProducer m where
     -- | produce a new unique value
     newUniq :: m Int
-
 
 rtup a b = (b,a)
 triple a b c = (a,b,c)
@@ -378,7 +370,6 @@ foldlM _ v [] = return v
 foldl1M :: Monad m => (a -> a -> m a) ->  [a] -> m a
 foldl1M f (x:xs) = foldlM f x xs
 foldl1M _ _ = error "foldl1M"
-
 
 foldlM_ :: Monad m => (a -> b -> m a) -> a -> [b] -> m ()
 foldlM_ f v xs = foldlM f v xs >> return ()
@@ -501,12 +492,9 @@ expandTabs' sz _ ('\n':s) = '\n': expandTabs' sz 0 s
 expandTabs' sz off (c:cs) = c: expandTabs' sz (off + 1) cs
 expandTabs' _ _ "" = ""
 
-
 -- | expand tabs into spaces in a string assuming tabs are every 8 spaces and we are starting at column 0.
 expandTabs :: String -> String
 expandTabs s = expandTabs' 8 0 s
-
-
 
 -- | Translate characters to other characters in a string, if the second argument is empty,
 -- delete the characters in the first argument, else map each character to the
@@ -521,7 +509,6 @@ tr as bs s = map (f as bs) s where
     f [] _ c = c
     f as' [] c = f as' bs c
     --f _ _ _ = error "invalid tr"
-
 
 -- | quote strings rc style. single quotes protect any characters between
 -- them, to get an actual single quote double it up. Inverse of 'simpleUnquote'
@@ -551,7 +538,6 @@ shellQuote ss = unwords (map f ss) where
     f s = s
     dquote s = concatMap (\c -> if c == '\'' then "'\\''" else [c]) s
     isGood c = isAlphaNum c || c `elem` "@/.-_"
-
 
 -- | looks up an enviornment variable and returns it in an arbitrary Monad rather
 -- than raising an exception if the variable is not set.
@@ -643,8 +629,6 @@ powerSet (x:xs) = xss /\/ map (x:) xss
 []     /\/ ys = ys
 (x:xs) /\/ ys = x : (ys /\/ xs)
 
-
-
 readHexChar a | a >= '0' && a <= '9' = return $ ord a - ord '0'
 readHexChar a | z >= 'a' && z <= 'f' = return $ 10 + ord z - ord 'a' where z = toLower a
 readHexChar x = fail $ "not hex char: " ++ [x]
@@ -654,7 +638,6 @@ readHex [] = fail "empty string"
 readHex cs = mapM readHexChar cs >>= \cs' -> return (rh $ reverse cs') where
     rh (c:cs) =  c + 16 * (rh cs)
     rh [] =  0
-
 
 {-# SPECIALIZE overlaps :: (Int,Int) -> (Int,Int) -> Bool #-}
 
@@ -696,7 +679,6 @@ getOptContents args = do
     cs <- mapM f as
     s <- if null as then getContents else return $ concat cs
     return (s,o1,o2)
-
 
 -- | Process options with an option string like the standard C getopt function call.
 parseOpt :: Monad m =>
@@ -756,7 +738,6 @@ split p s = case rest of
 tokens :: (a -> Bool) -> [a] -> [[a]]
 tokens p = filter (not.null) . split p
 
-
 buildTable ::  [String] -> [(String,[String])] -> String
 buildTable ts rs = bt [ x:xs | (x,xs) <- ("",ts):rs ] where
     bt ts = unlines (map f ts) where
@@ -781,10 +762,6 @@ getPrefix a b = f a b where
         | p == s = f ps ss
         | otherwise = fail $ "getPrefix: " ++ a ++ " " ++ b
 
-
 {-# INLINE naturals #-}
 naturals :: [Int]
 naturals = [0..]
-
-
-

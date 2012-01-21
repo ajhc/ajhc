@@ -1,9 +1,9 @@
 module Name.VConsts where
 
-import Data.Traversable
-import Data.Foldable
 import Control.Applicative
+import Data.Foldable
 import Data.Monoid
+import Data.Traversable
 
 -- This is much more verbose/complicated than it needs be.
 
@@ -38,7 +38,6 @@ class TypeNames a where
     tHash = error "tHash"
     tWorld__ = error "tWorld"
 
-
 class ConNames a where
     vTrue :: a
     vFalse :: a
@@ -65,7 +64,6 @@ instance FromTupname (String,String) where
     fromTupname ("Jhc.Basics",n) = fromTupname n
     fromTupname xs =  fail $ "fromTupname: not tuple " ++ show xs
 
-
 class ToTuple a where
     toTuple :: Int -> a
 
@@ -74,9 +72,6 @@ instance ToTuple String where
 
 instance ToTuple (String,String) where
     toTuple n = ("Jhc.Basics",toTuple n)
-
-
-
 
 -- | various functions needed for desugaring.
 data FuncNames a = FuncNames {
@@ -91,6 +86,3 @@ data FuncNames a = FuncNames {
     func_runRaw :: a
     }
     {-! derive: Functor, Traversable, Foldable !-}
-
-
-

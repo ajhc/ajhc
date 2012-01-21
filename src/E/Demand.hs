@@ -8,13 +8,13 @@ module E.Demand(
     lazy
     ) where
 
-
 import Control.Monad.Reader
 import Control.Monad.Writer hiding(Product(..))
 import Data.Binary
 import Data.List hiding(union,delete)
 import Data.Typeable
 
+--import Debug.Trace
 import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
@@ -23,10 +23,9 @@ import E.Program
 import GenUtil
 import Info.Types
 import Name.Id
-import qualified Info.Info as Info
 import Util.HasSize
 import Util.SetLike
---import Debug.Trace
+import qualified Info.Info as Info
 
 trace _ x = x
 
@@ -55,8 +54,6 @@ data DemandSignature = DemandSignature {-# UNPACK #-} !Int !DemandType
     deriving(Eq,Ord,Typeable)
         {-! derive: Binary !-}
 
-
-
 idGlb = Absent
 
 absType = (DemandEnv mempty idGlb) :=> []
@@ -71,8 +68,6 @@ class Lattice a where
     glb :: a -> a -> a
     lub :: a -> a -> a
 
-
-
 -- Sp [L .. L] = S
 -- Sp [.. _|_ ..] = _|_
 
@@ -84,7 +79,6 @@ l (Product xs) = lp xs
 
 s None = S None
 s (Product xs) = sp xs
-
 
 allLazy xs | all (== lazy) xs = None
 allLazy xs = Product xs
@@ -107,7 +101,6 @@ sp s = sp' True s where
     sp' _ (_:rs) = sp' False rs
 -}
 
-
 instance Lattice DemandType where
     lub (env :=> ts) (env' :=> ts') | length ts < length ts' = (env `lub` env') :=> strictList (zipWith lub (ts ++ repeat lazy) ts')
                                     | otherwise = (env `lub` env') :=> strictList (zipWith lub ts (ts' ++ repeat lazy))
@@ -118,7 +111,6 @@ lazy = L None
 strict = S None
 err = Error None
 
-
 strictList (x:xs) = x `seq` xs' `seq` (x:xs') where
     xs' = strictList xs
 strictList [] = []
@@ -127,7 +119,6 @@ comb _ None None = None
 comb f None (Product xs) = Product $ zipWith f (repeat lazy) xs
 comb f (Product xs) None = Product $ zipWith f xs (repeat lazy)
 comb f (Product xs) (Product ys) = Product $ zipWith f xs ys
-
 
 instance Lattice Demand where
     lub Bottom s = s
@@ -153,7 +144,6 @@ instance Lattice Demand where
     lub (L x) (Error y) = lazy
     lub (Error x) (L y) = lazy
 
-
     glb Bottom Bottom = Bottom
     glb Absent sa = sa
     glb sa Absent = sa
@@ -174,8 +164,6 @@ instance Lattice Demand where
     glb (L _) (Error _) = err
     glb (Error _) (L _) = err
 
-
-
 lenv e (DemandEnv m r) = case mlookup e m of
     Nothing -> r
     Just x -> x
@@ -193,7 +181,6 @@ instance Lattice DemandEnv where
     glb d1@(DemandEnv m1 r1) d2@(DemandEnv m2 r2) = DemandEnv m (r1 `glb` r2) where
         m = fromList [ (x,lenv x d1 `glb` lenv x d2) | x <- keys (m1 `union` m2)]
 
-
 newtype IM a = IM (Reader (Env,DataTable) a)
     deriving(Monad,Functor,MonadReader (Env,DataTable))
 
@@ -202,13 +189,11 @@ type Env = IdMap (Either DemandSignature E)
 getEnv :: IM Env
 getEnv = asks fst
 
-
 extEnv TVr { tvrIdent = i } _ | isEmptyId i = id
 extEnv t e = local (\ (env,dt) -> (minsert (tvrIdent t) (Left e) env,dt))
 
 extEnvE TVr { tvrIdent = i } _ | isEmptyId i = id
 extEnvE t e = local (\ (env,dt) -> (minsert (tvrIdent t) (Right e) env,dt))
-
 
 instance DataTableMonad IM where
     getDataTable = asks snd
@@ -260,7 +245,6 @@ analyze el@(ELit lc@LitCons { litName = h, litArgs = ts@(_:_) }) (S (Product ss)
         _ -> do
             rts <- mapM (\e -> analyze e lazy) ts
             return (ELit lc { litArgs = fsts rts }, foldr glb absType (snds rts))
-
 
 analyze (ELit lc@LitCons { litArgs = ts }) _s = do
     rts <- mapM (\e -> analyze e lazy) ts
@@ -341,8 +325,6 @@ analyzeCase ec s = do
 
 denvDelete x (DemandEnv m r) = DemandEnv (delete (tvrIdent x) m) r
 
-
-
 topAnalyze :: TVr -> E -> IM (E,DemandSignature)
 topAnalyze tvr e | getProperty prop_PLACEHOLDER tvr = return (e,DemandSignature 0 absType)
 topAnalyze _tvr e = clam e strict 0 where
@@ -352,8 +334,6 @@ topAnalyze _tvr e = clam e strict 0 where
         return (e,DemandSignature n dt)
 
 fixupDemandSignature (DemandSignature n (DemandEnv _ r :=> dt)) = DemandSignature n (DemandEnv mempty r :=> dt)
-
-
 
 shouldBind ELit {} = True
 shouldBind EVar {} = True
@@ -397,8 +377,6 @@ analyzeProgram prog = do
     --    putStrLn $ "strictness: " ++ pprint t ++ ": " ++ show (maybe absSig id $ Info.lookup (tvrInfo t))
     return $ programSetDs' nds prog
 
-
-
 ----------------------------
 -- show and pprint instances
 ----------------------------
@@ -425,7 +403,5 @@ instance Show DemandEnv where
     showsPrec _ (DemandEnv _ Bottom) = showString "_|_"
     showsPrec _ (DemandEnv m demand) = showString "{" . shows demand . showString " - " . foldr (.) id (intersperse (showString ",") [ showString (pprint t) . showString " -> " . shows v | (t,v) <- idMapToList m]) . showString "}"
 
-
 instance Show DemandSignature where
     showsPrec _ (DemandSignature n dt) = showString "<" . shows n . showString "," . shows dt . showString ">"
-

@@ -2,12 +2,9 @@ module E.Binary() where
 
 import Data.Binary
 import E.Type
-import Name.Binary()
 import FrontEnd.HsSyn()
+import Name.Binary()
 import {-# SOURCE #-} Info.Binary(putInfo,getInfo)
-
-
-
 
 instance Binary TVr where
     put TVr { tvrIdent = eid, tvrType =  e, tvrInfo = nf} = do
@@ -19,7 +16,6 @@ instance Binary TVr where
         e <- get
         nf <- getInfo
         return $ TVr x e nf
-
 
 instance Data.Binary.Binary RuleType where
     put RuleSpecialization = do
@@ -69,7 +65,6 @@ instance Data.Binary.Binary ARules where
     ab <- get
     return (ARules aa ab)
 
-
 instance (Data.Binary.Binary e,
 	  Data.Binary.Binary t) => Data.Binary.Binary (Lit e t) where
     put (LitInt aa ab) = do
@@ -96,7 +91,6 @@ instance (Data.Binary.Binary e,
 		    af <- Data.Binary.get
 		    return (LitCons ac ad ae af)
 	      _ -> fail "invalid binary data found"
-
 
 instance Data.Binary.Binary ESort where
     put EStar = do
@@ -133,7 +127,6 @@ instance Data.Binary.Binary ESort where
 		    aa <- Data.Binary.get
 		    return (ESortNamed aa)
 	      _ -> fail "invalid binary data found"
-
 
 instance Data.Binary.Binary E where
     put (EAp aa ab) = do
@@ -229,8 +222,6 @@ instance Data.Binary.Binary E where
 		    return (ECase aq ar as at au av)
 	      _ -> fail "invalid binary data found"
 
-
-
 instance (Data.Binary.Binary e) => Data.Binary.Binary (Alt e) where
     put (Alt aa ab) = do
 	    Data.Binary.put aa
@@ -239,5 +230,3 @@ instance (Data.Binary.Binary e) => Data.Binary.Binary (Alt e) where
     aa <- get
     ab <- get
     return (Alt aa ab)
-
-

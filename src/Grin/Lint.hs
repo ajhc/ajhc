@@ -64,7 +64,6 @@ dumpGrin pname grin = do
         printGrin grin
         putErrLn $ "^-- " ++ pname ++ " Grin"
 
-
 class DShow a where
     dshow :: a -> String
 

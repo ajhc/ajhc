@@ -201,7 +201,6 @@ procCabal xs = f xs mempty mempty where
                                         | otherwise = f rs dlm (Map.insert x y dsm)
     spit = words . map (\c -> if c == ',' then ' ' else c)
 
-
 procYaml :: YamlNode -> LibDesc
 procYaml MkNode { n_elem = EMap ms } = f ms mempty mempty where
     f [] dlm dsm = LibDesc (combineAliases dlm) dsm
@@ -233,7 +232,6 @@ combineAliases mp = f alias_fields mp where
     f ((x,y):rs) mp = case Map.lookup x mp of
         Nothing -> f rs mp
         Just ys -> f rs $ Map.delete x $ Map.insertWith (++) y ys mp
-
 
 data LibDesc = LibDesc (Map.Map String [String]) (Map.Map String String)
 

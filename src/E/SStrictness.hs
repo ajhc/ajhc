@@ -2,22 +2,21 @@ module E.SStrictness(
     analyzeProgram
     ) where
 
-
 import Control.Monad
-import Data.List
-import Data.FunctorM
 import Control.Monad.RWS
-import qualified Data.Map as Map
+import Data.FunctorM
+import Data.List
 import Data.Typeable
+import qualified Data.Map as Map
 
 import Doc.PPrint
+import E.E
 import E.Program
-import Util.SetLike
+import GenUtil
+import Info.Info as Info
 import Name.Id
 import Util.BooleanSolver
-import E.E
-import Info.Info as Info
-import GenUtil
+import Util.SetLike
 
 -- our 2 point lattice
 -- True == strict
@@ -25,10 +24,8 @@ import GenUtil
 
 type SL = Bool
 
-
 x `islte` y = x `implies` y
 x `isgte` y = y `implies` x
-
 
 data TAnot l = TAnot l (TTyp l)
     deriving (Eq,Typeable)
@@ -61,7 +58,6 @@ instance Show l => Show (TTyp l) where
     showsPrec d (t1 `TFun` t2) = showParen (d > 9) $ showsPrec 10 t1 . showString " -> " . showsPrec 10 t2
     showsPrec _ TAtomic = showString "@"
     showsPrec d (TCPR ts) = showParen True $ foldr (.) id (intersperse (showString ",") (map shows ts))
-
 
 newtype Var = V Int
     deriving(Eq,Ord,Typeable)
@@ -117,7 +113,6 @@ collect t = execWriter $ f Positive t where
     g p TAtomic = return ()
     g p (x `TFun` y) = f (flipVariance p) x >> f p y
 
-
 {-# NOINLINE analyzeProgram #-}
 analyzeProgram prog = do
     flip mapM_ (programDs prog) $ \ (t,e) -> case (runIM (infer e)) of
@@ -154,7 +149,6 @@ analyzeProgram prog = do
 --            --print (fmap (zz . CJust . fromCA) cc)
 
     return ()
-
 
 runIM :: MonadIO m => IM a -> m (Constraints,a)
 runIM (IM s) = do
@@ -217,7 +211,6 @@ infer (EAp a b) = do
     return (TAnot res s2,EAp a b)
 --infer (ELetRec ds e) = do
 
-
 infer e = fail $ "infer: unsupported\n" ++ show e
 
 caseBodiesMapM' :: Monad m => (E -> m (t,E)) -> E -> m ([t],E)
@@ -255,7 +248,6 @@ freshGLB (TAnot k1 TAtomic) (TAnot k2 TAtomic) = do
     tell (v `islte` k2)
     return (TAnot v TAtomic)
 
-
 freshGLB (TAnot k1 (TFun a1 b1)) (TAnot k2 (TFun a2 b2)) = do
     v <- mkVar
     tell (v `islte` k1)
@@ -286,6 +278,3 @@ subs TAtomic TAtomic = return ()
 subsA (TAnot a t1) (TAnot b t2) = do
     tell (a `islte` b)
     t1 `subs` t2
-
-
-

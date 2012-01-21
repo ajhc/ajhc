@@ -81,7 +81,6 @@ programPruneOccurance prog =
     in --trace ("dsIn: "++show (length dsIn)) $
        (progCombinators_s dsIn' prog) { progFreeIds = idMapToIdSet fvs, progUsedIds = uids }
 
-
 newtype OM a = OM (ReaderWriter IdSet (OMap,IdSet) a)
     deriving(Monad,Functor,MonadWriter (OMap,IdSet),MonadReader IdSet)
 
@@ -97,7 +96,6 @@ type instance Elem OMap = (Key OMap,Value OMap)
 instance Monoid OMap where
     mempty = OMap mempty
     mappend (OMap a) (OMap b) = OMap (andOM a b)
-
 
 maybeLetRec [] e = e
 maybeLetRec ds e = ELetRec ds e
@@ -258,7 +256,6 @@ collectDs ds (OMap fve) = do
 -- loopFunc t _ | getProperty prop_PLACEHOLDER t = -100  -- we must not choose the placeholder as the loopbreaker
 loopFunc t e = negate (baseInlinability t e)
 
-
 inLam (OMap om) = OMap (fmap il om) where
     il ui@UseInfo { useOccurance = Once } = ui { useOccurance = OnceInLam }
     il ui = ui { useOccurance = Many }
@@ -281,8 +278,6 @@ orMany xs = f (filter ((/= Unused) . useOccurance) xs) where
         good ManyBranch = True
         good _ = False
         ui x = UseInfo { minimumArgs =  minimum (map minimumArgs xs), useOccurance = x }
-
-
 
 data SimplifyOpts = SimpOpts {
     so_noInlining :: {-# UNPACK #-} !Bool, -- ^ this inhibits all inlining inside functions which will always be inlined
@@ -312,7 +307,6 @@ cacheSimpOpts opts = opts {
     initScope = fmap (\ c -> isBoundTo opts (combHead c) noUseInfo (combBody c)) (so_boundVars opts)
     rules = mapMaybeIdMap f (so_boundVars opts)
     f Comb { combRules = rs } = if null rs then Nothing else Just $ arules rs
-
 
 data Range = Done OutE | Susp InE Subst
     deriving(Show,Eq,Ord)
@@ -344,7 +338,6 @@ isBoundTo opt v o e = fixInline (so_finalPhase opt) v $ IsBoundTo {
     } where
     atomic = isAtomic e
 
-
 instance Monoid Forced where
     mempty = NotForced
     mappend NotForced x = x
@@ -362,7 +355,6 @@ calcForced finalPhase v =
             (False,_,True) -> ForceInline
             (False,True,_) -> NotForced
             (False,False,False) -> NotForced
-
 
 data Env = Env {
     envCachedSubst :: IdMap E,
@@ -394,7 +386,6 @@ insertDoneSubst' :: Id -> OutE -> Env -> Env
 insertDoneSubst' z _e env | isEmptyId z = env
 insertDoneSubst' t e env = insertRange t (Done e) env
 
-
 insertInScope :: Id -> Binding -> Env -> Env
 insertInScope z _b env | isEmptyId z = env
 insertInScope t b env = extendScope (msingleton t b) env
@@ -418,7 +409,6 @@ substLookup :: Id -> SM (Maybe Range)
 substLookup id = SM $ ask >>= return . mlookup id . envSubst
 
 substAddList ls env = cacheSubst env { envSubst = fromList ls `union` envSubst env }
-
 
 applySubst :: Subst -> IdMap a -> IdMap OutE
 applySubst s nn = applySubst' s where
@@ -450,7 +440,6 @@ programSSimplifyPStat sopts prog = do
     setPrintStats True
     dsIn <- simplifyDs prog sopts (progCombinators prog)
     return (progCombinators_s dsIn prog)
-
 
 type InE = E
 type OutE = E
@@ -785,7 +774,6 @@ simplifyDs prog sopts dsIn = ans where
         return Nothing
     match m as d = error $ "Odd Match: " ++ show ((m,getType m),as,d)
 
-
     applyRule :: OutTVr -> [OutE] -> SM (Maybe (OutE,[OutE]))
     applyRule v xs  = do
         inb <- ask
@@ -921,10 +909,8 @@ simplifyDs prog sopts dsIn = ans where
         ds' <- if so_postLift sopts then return ds' else  sequence [ etaExpandDef' (progDataTable prog) (minArgs t) t e | (t,e) <- ds']
         return (ds',inb')
 
-
 data KnowSomething = KnowNothing | KnowNotOneOf [Name] | KnowIsCon Name | KnowIsNum Number | KnowSomething
     deriving(Eq)
-
 
 someBenefit _ e _ | isAtomic e = True
 someBenefit _ ELit {} _ = True
@@ -975,14 +961,12 @@ exprSize max e discount known = f max e >>= \n -> return (max - n) where
         n <- foldM f n (snds ds)
         f n e
 
-
 noSizeIncrease e xs = f e xs where
     currentSize = 1 + length xs
     f (ELam t e) (x:xs) = f e xs
     f ELam {} [] = False -- ^ abort if we will create a lambda
     f e [] = isJust $ exprSize currentSize  e 3 []
     f e xs = isJust $ exprSize (currentSize - length xs) e 3 []
-
 
 --multiInline _ e xs | isSmall (f e xs) = True  where -- should be noSizeIncrease
 --    f e [] = e
@@ -1004,13 +988,10 @@ multiInline v e xs = f e xs [] where
     f e xs rs = isJust $ exprSize (knowSomethingDiscount*(length rs) + discount + currentSize + (if null xs then 0 else extraArgDiscount)) e scrutineeDiscount rs where
            discount = if safeToDup e then 4 else 0
 
-
-
 worthStricting EError {} = True
 worthStricting ELit {} = False
 worthStricting ELam {} = False
 worthStricting x = sortTermLike x
-
 
 coerceOpt :: MonadStats m =>  (E -> m E) -> E -> m E
 coerceOpt fn e = do
@@ -1020,7 +1001,6 @@ coerceOpt fn e = do
     return (p e'')
 
 stat_unsafeCoerce = toAtom "E.Simplify.unsafeCoerce"
-
 
 -----------------------
 -- simplification Monad
@@ -1038,7 +1018,6 @@ newtype SM a = SM (RWS Env Stats.Stat SmState a)
     deriving(Monad,Functor,MonadReader Env, MonadState SmState)
 
 localEnv f (SM action) = SM $ local (cacheSubst . f) action
-
 
 runSM :: Env -> SM a -> (a,Stat)
 runSM env (SM x) = (r,s) where
@@ -1083,13 +1062,9 @@ instance NameMonad Id SM where
 smUsedNames = SM $ gets idsUsed
 smBoundNames = SM $ gets idsBound
 
-
-
 smAddNamesIdSet nset = --trace ("addNamesIdSet: "++ show (size nset)) $
    do modifyIds (\ (used,bound) -> (nset `union` used, bound) )
 smAddBoundNamesIdSet nset = --trace ("addBoundNamesIdSet: "++show (size nset)) $
    do modifyIds (\ (used,bound) -> (nset `union` used, nset `union` bound) )
 
 smAddBoundNamesIdMap = smAddNamesIdSet . idMapToIdSet
-
-

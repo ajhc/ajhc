@@ -52,7 +52,6 @@ import Util.HasSize
 import Util.Inst()
 import Util.NameMonad
 import Util.SetLike as S
---import Debug.Trace
 
 {-
  - An Id is an opaque type with equality and ordering, Its range is split into the following categories

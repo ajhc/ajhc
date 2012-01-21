@@ -2,19 +2,19 @@ module E.CPR(Val(..), cprAnalyzeDs, cprAnalyzeProgram) where
 
 import Control.Monad.Writer hiding(Product(..))
 import Data.Binary
-import Data.Typeable
 import Data.Monoid()
+import Data.Typeable
 import qualified Data.Map as Map
 
+import Cmm.Number
 import DataConstructors
 import Doc.DocLike
 import E.E
-import GenUtil
 import E.Program
+import GenUtil
 import Name.Name
 import Name.Names
 import Name.VConsts
-import Cmm.Number
 import Util.SameShape
 import qualified Doc.Chars as C
 import qualified E.Demand as Demand
@@ -39,11 +39,9 @@ trimVal v = f (0::Int) v where
     f n (Fun v) = Fun (f n v)
     f _ x = x
 
-
 toVal c = case conSlots c of
     [] -> Tag [conName c]
     ss -> Tup (conName c) [ Top | _ <- ss]
-
 
 instance Show Val where
     showsPrec _ Top = C.top
@@ -74,11 +72,9 @@ lub (Tup _ _) (Tag _) = Top
 lub _ _ = Top
 --lub a b = error $ "CPR.lub: " ++ show (a,b)
 
-
 instance Monoid Val where
     mempty = Bot
     mappend = lub
-
 
 {-# NOINLINE cprAnalyzeProgram #-}
 cprAnalyzeProgram :: Program -> Program
@@ -88,7 +84,6 @@ cprAnalyzeProgram prog = ans where
 
 cprAnalyzeDs :: DataTable -> [(TVr,E)] -> [(TVr,E)]
 cprAnalyzeDs dataTable ds = fst $ cprAnalyzeBinds dataTable mempty ds
-
 
 cprAnalyzeBinds :: DataTable -> Env -> [(TVr,E)] -> ([(TVr,E)],Env)
 cprAnalyzeBinds dataTable env bs = f env  (decomposeDs bs) [] where
@@ -100,7 +95,6 @@ cprAnalyzeBinds dataTable env bs = f env  (decomposeDs bs) [] where
         g n mp = g (n - 1) [ (t,cprAnalyze dataTable nenv e)  | (t,e) <- xs] where
             nenv = Env (Map.fromList [ (t,b) | (t,(e,b)) <- mp]) `mappend` env
     f env [] zs = (reverse zs,env)
-
 
 envInsert :: TVr -> Val -> Env -> Env
 envInsert tvr val (Env mp) = Env $ Map.insert tvr val mp
@@ -142,7 +136,3 @@ cprAnalyze dataTable env e = cprAnalyze' env e where
         f (EError {}) = Bot
         f e = error $ "cprAnalyze'.f: " ++ show e
         g = snd . cprAnalyze' env
-
-
-
-

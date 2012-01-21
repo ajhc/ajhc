@@ -1,6 +1,5 @@
 module Support.Transform where
 
-
 data TransformParms p = TransformParms {
     transformIterate :: Iterate,
     transformDumpProgress :: Bool,
@@ -35,4 +34,3 @@ iterateStep :: Iterate -> Iterate
 iterateStep (IterateMax n) = IterateMax (n - 1)
 iterateStep (IterateExactly n) = IterateExactly (n - 1)
 iterateStep x = x
-

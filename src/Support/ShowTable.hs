@@ -1,7 +1,7 @@
 module Support.ShowTable where
 
-import Monad
 import List
+import Monad
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 

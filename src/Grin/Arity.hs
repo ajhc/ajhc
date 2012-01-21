@@ -5,11 +5,10 @@ import qualified Data.Map as Map
 
 import Fixer.Fixer
 import Fixer.Supply
-import Grin.Grin
-import Support.ShowTable
-import Support.FreeVars
 import GenUtil
-
+import Grin.Grin
+import Support.FreeVars
+import Support.ShowTable
 
 grinRaiseArity :: Grin -> IO Grin
 grinRaiseArity grin = do
@@ -23,9 +22,7 @@ grinRaiseArity grin = do
     rv <- supplyReadValues argSupply
     printTable "Grin.Arity: arguments" rv
 
-
     return grin
-
 
 go argSupply (fn,~(Tup as) :-> e) = do
     vs <- mapM (\ (Var v _,i) -> supplyValue argSupply (fn,i)) (zip as naturals)
@@ -46,4 +43,3 @@ go argSupply (fn,~(Tup as) :-> e) = do
 
 implies :: Value Bool -> Value Bool -> Rule
 implies x y = y `isSuperSetOf` x
-

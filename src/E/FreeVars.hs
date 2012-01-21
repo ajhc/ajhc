@@ -12,8 +12,8 @@ import E.Type
 import GenUtil
 import Name.Id
 import Support.FreeVars
-import Util.SetLike as S
 import Util.Graph
+import Util.SetLike as S
 
 -------------------------
 -- finding free variables
@@ -32,7 +32,6 @@ instance FreeVars E t => FreeVars TVr t where
 
 instance (FreeVars E x) => FreeVars (Lit TVr E) x where
     freeVars l =  mconcat $ freeVars (getLitTyp l :: E ):(map (freeVars . (tvrType :: TVr -> E) ) $ litBinds l)
-
 
 instance FreeVars (Alt E) IdSet where
     freeVars as@(Alt l e) = mconcat $ freeVars (getLitTyp l):(freeVars e S.\\ fromList [ tvrIdent t | t <- litBinds l]):(map (freeVars . tvrType) $ litBinds l)
@@ -82,7 +81,6 @@ freeIds =   fv where
     fv ESort {} = mempty
     fvLit LitCons { litArgs = es, litType = e } = mconcat $ fv e:map fv es
     fvLit l = fv (getLitTyp l)
-
 
 -- we export this to get a concrete type for free id sets.
 freeIdMap ::  E -> IdMap TVr
@@ -136,6 +134,4 @@ instance FreeVars Rule IdSet where
 --instance FreeVars Rule (IdMap TVr) where
 --    freeVars rule = freeVars (ruleBody rule) S.\\ fromList [ (tvrIdent t,t) | t <- ruleBinds rule]
 
-
 ruleHeadFV r = (S.insert (tvrIdent $ ruleHead r) $ freeVars (ruleArgs r)) S.\\ fromList (map tvrIdent $ ruleBinds r)
-

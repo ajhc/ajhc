@@ -20,7 +20,6 @@ import Doc.PPrint
 import Doc.Pretty
 import E.E
 import E.Eval(strong)
-import {-# SOURCE #-} E.Show
 import E.Subst
 import GenUtil
 import Name.Id
@@ -31,7 +30,7 @@ import Util.ContextMonad
 import Util.SetLike
 import qualified Util.Seq as Seq
 import {-# SOURCE #-} DataConstructors
-
+import {-# SOURCE #-} E.Show
 
 {-@Internals
 
@@ -56,7 +55,6 @@ described by the following.
     □   superkinds inhabit this
 
     in addition there exist user defined kinds, which are always of supersort ##
-
 
 The following Rules table shows what sort of abstractions are allowed, a rule
 of the form (A,B,C) means you can have functions of things of sort A to things
@@ -155,7 +153,6 @@ code or discourse, we will ignore them from now on.
 
 -}
 
-
 ptsAxioms :: Map.Map ESort ESort
 ptsAxioms = Map.fromList [
     (EStar,EStarStar),
@@ -174,7 +171,6 @@ ptsRulesMap = Map.fromList [ ((a,b),c) | (as,bs,c) <- ptsRules, a <- as, b <- bs
         ([EStarStar],[EStarStar],EStarStar),
         ([EStarStar],[EHashHash],EHashHash)
         ]
-
 
 canBeBox x | getType (getType x) == ESort EStarStar = True
 canBeBox _ = False
@@ -212,7 +208,6 @@ instance CanType E E where
     getType (EPrim _ _ t) = t
     getType Unknown = Unknown
 
-
 instance CanType ESort ESort where
     getType (ESortNamed _) = EHashHash
     getType s = case Map.lookup s ptsAxioms of
@@ -225,7 +220,6 @@ instance CanType (Lit x t) t where
 instance CanType e t => CanType (Alt e) t where
     getType (Alt _ e) = getType e
 
-
 sortSortLike (ESort s) = isEHashHash s || isEStarStar s
 sortSortLike _ = False
 
@@ -237,10 +231,6 @@ sortTypeLike e = sortKindLike (getType e)
 
 sortTermLike ESort {} = False
 sortTermLike e = sortTypeLike (getType e)
-
-
-
-
 
 withContextDoc s a = withContext (render s) a
 
@@ -379,7 +369,6 @@ inferType dataTable ds e = rfc e where
     boxCompat (ELit (LitCons { litName = n }))  t | Just e <- fromConjured modBox n =  e == getType t
     boxCompat _ _ = False
 
-
 instance CanTypeCheck DataTable E E where
     typecheck dataTable e = case typeInfer'' dataTable [] e of
         Left ss -> fail $ "\n>>> internal error:\n" ++ unlines ss
@@ -400,7 +389,6 @@ instance CanTypeCheck DataTable (Alt E) E where
 
 instance CanTypeCheck DataTable [(TVr,E)] [E] where
     typecheck dataTable ds = do mapM (typecheck dataTable) (snds ds)
-
 
 -- | Determine type of term using full algorithm with substitutions. This
 -- should be used instead of 'typ' when let-bound type variables exist or you
@@ -502,8 +490,6 @@ typeInfer'' dataTable ds e = rfc e where
     fc Unknown = return Unknown
     fc e = failDoc $ text "what's this? " </> (ePretty e)
 
-
-
 -- | find substitution that will transform the left term into the right one,
 -- only substituting for the vars in the list
 
@@ -554,4 +540,3 @@ match lup vs = \e1 e2 -> liftM Seq.toList $ execWriterT (un e1 e2 etherealIds) w
     lam va ea vb eb (c:cs) = do
         un (tvrType va) (tvrType vb) (c:cs)
         un (subst va (EVar va { tvrIdent = c }) ea) (subst vb (EVar vb { tvrIdent = c }) eb) cs
-

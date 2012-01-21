@@ -9,7 +9,6 @@ class CanType a e | a -> e where
 instance CanType e t => CanType [e] [t] where
     getType es = map getType es
 
-
 -- This should perform a full typecheck and may take any extra information needed as an extra parameter
 class CanTypeCheck env a ty | a -> ty env where
     typecheck :: Monad m => env -> a -> m ty
@@ -18,4 +17,3 @@ infertype :: CanTypeCheck env a ty => env -> a -> ty
 infertype env a = case typecheck env a of
     Left s -> error $ "infertype: " ++ s
     Right x -> x
-

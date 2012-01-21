@@ -14,7 +14,6 @@ import qualified Data.Map as Map
 import Cmm.Number
 import Cmm.Op
 
-
 class Expression t e | e -> t where
     toConstant :: e -> Maybe (Number,t)
     toExpression :: Number -> t -> e
@@ -109,7 +108,6 @@ binOp bop t1 t2 tr e1 e2 str = f bop e1 e2 where
     true = toBool True
     false = toBool False
 
-
     f op e1 e2 | Just (v,_) <- toConstant e2 = ans v where
         ans 0 = case op of
             Shr  -> return e1
@@ -202,4 +200,3 @@ unOp op t1 tr e str | Just (v,t) <- toConstant e = f op v where
     f Sqrt v = return $ toExpression (realToFrac $ sqrt (realToFrac v :: Double)) str
     f _ _ = Nothing
 unOp op t1 tr e str = Nothing
-

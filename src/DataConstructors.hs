@@ -42,8 +42,8 @@ module DataConstructors(
 
 import Control.Monad.Identity
 import Control.Monad.Writer(tell,execWriter)
-import Data.Monoid hiding(getProduct)
 import Data.Maybe
+import Data.Monoid hiding(getProduct)
 import List(sortBy)
 import qualified Data.Map as Map hiding(map)
 
@@ -60,12 +60,11 @@ import E.Traverse
 import E.TypeCheck
 import E.Values
 import FrontEnd.Class(instanceName)
+import FrontEnd.HsSyn
 import FrontEnd.Syn.Traverse
 import FrontEnd.Tc.Type
 import GenUtil
-import FrontEnd.HsSyn
 import Info.Types
-import Support.MapBinaryInstance
 import Name.Id
 import Name.Name as Name
 import Name.Names
@@ -73,6 +72,7 @@ import Name.VConsts
 import PrimitiveOperators
 import Support.CanType
 import Support.FreeVars
+import Support.MapBinaryInstance
 import Support.Unparse
 import Util.HasSize
 import Util.SameShape
@@ -108,15 +108,12 @@ tipe' ~(TExists xs (_ :=> t)) = do
     t' <- tipe' t
     return $ ELit litCons { litName = unboxedNameTuple TypeConstructor (length xs' + 1), litArgs = (t':xs'), litType = eHash }
 
-
-
 kind (KBase KUTuple) = eHash
 kind (KBase KHash) = eHash
 kind (KBase Star) = eStar
 kind (Kfun k1 k2) = EPi (tVr emptyId (kind k1)) (kind k2)
 kind (KVar _) = error "Kind variable still existing."
 kind _ = error "DataConstructors.kind"
-
 
 data AliasType = NotAlias | ErasedAlias | RecursiveAlias
     deriving(Eq,Ord,Show)
@@ -170,7 +167,6 @@ getHsSlots ss = map f ss where
     f (SlotNormal e) = e
     f (SlotUnpacked e _ es) = e
     f (SlotExistential e) = tvrType e
-
 
 newtype DataTable = DataTable {
     constructorMap :: (Map.Map Name Constructor)
@@ -246,7 +242,6 @@ tunboxedtuple n = (typeCons,dataCons) where
         ftipe = ELit (litCons { litName = tc, litArgs = map EVar typeVars, litType = eHash })
         dtipe = foldr EPi (foldr EPi ftipe [ v { tvrIdent = emptyId } | v <- vars]) typeVars
 
-
 -- | conjured data types, these data types are created as needed and can be of any type, their
 -- actual type is encoded in their names.
 --
@@ -259,13 +254,11 @@ tunboxedtuple n = (typeCons,dataCons) where
 -- the final stages of compilation before core mangling so that optimizations
 -- that were previously blocked by type variables can be carried out.
 
-
 tAbsurd k = ELit (litCons { litName = nameConjured modAbsurd k, litArgs = [], litType = k })
 mktBox  k = ELit (litCons { litName = nameConjured modBox k, litArgs = [], litType = k, litAliasFor = af }) where
     af = case k of
         EPi TVr { tvrType = t1 } t2 -> Just (ELam tvr { tvrType = t1 } (mktBox t2))
         _ -> Nothing
-
 
 tarrow = emptyConstructor {
             conName = tc_Arrow,
@@ -283,7 +276,6 @@ primitiveConstructor name = emptyConstructor {
     conInhabits = tHash,
     conChildren = DataPrimitive
     }
-
 
 primitiveTable = concatMap f allCTypes  where
     f (dc,tc,rt) = [typeCons,dataCons] where
@@ -414,7 +406,6 @@ lookupExtTypeInfo dataTable oe = f oe where
     g e | Just e' <- followAlias dataTable e = f e'
         | otherwise = fail $ "lookupExtTypeInfo: " ++ show (oe,e)
 
-
 followAlias :: Monad m => DataTable -> E -> m E
 followAlias _ (ELit LitCons { litAliasFor = Just af, litArgs = as }) = return (foldl eAp af as)
 followAlias _  _ = fail "followAlias: not alias"
@@ -474,7 +465,6 @@ deriveClasses cmap (DataTable mp) = concatMap f (Map.elems mp) where
             fromThen_body = foldl EAp (lupvar v_enum_fromThen) [typ, box, debox, max]
             fromThenTo_body = foldl EAp (lupvar v_enum_fromThenTo) [typ, box, debox]
 
-
             ib_te = foldl EAp (lupvar v_enum_toEnum) [typ, box, toEzh (mv - 1)]
             ib_fe = ELam val1 (create_uintegralCast_toInt con tEnumzh (EVar val1))
 
@@ -489,7 +479,6 @@ deriveClasses cmap (DataTable mp) = concatMap f (Map.elems mp) where
             ib_eq = unbox (eStrictLet b3 (oper_IIB op (EVar i1) (EVar i2)) (ELit (litCons { litName = dc_Boolzh, litArgs = [EVar b3], litType = tBool })))
             iv_eq = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName fname (nameName $ conName c), tvrType = getType ib_eq }
     oper_IIB op a b = EPrim (APrim (Op (Op.BinOp op Op.bits16 Op.bits16) Op.bits16) mempty) [a,b] tBoolzh
-
 
 create_integralCast conv c1 t1 c2 t2 e t = eCase e [Alt (litCons { litName = c1, litArgs = [tvra], litType = te }) cc] Unknown  where
     te = getType e
@@ -533,7 +522,6 @@ removeNewtypes dataTable e = runIdentity (f e) where
     f e = emapEGH f f return e
     gl lc@LitCons { litAliasFor = Just e }  = lc { litAliasFor = Just $ removeNewtypes dataTable e }
     gl l = l
-
 
 {-# NOINLINE toDataTable #-}
 toDataTable :: (Map.Map Name Kind) -> (Map.Map Name Type) -> [HsDecl] -> DataTable -> DataTable
@@ -641,8 +629,6 @@ toDataTable km cm ds currentDataTable = newDataTable  where
         -- arguments that the front end passes or pulls out of this constructor
         --hsArgs = existentials ++ [ tvr {tvrIdent = x} | tvr <- origArgs | x <- drop (5 + length theTypeArgs) [2,4..] ]
 
-
-
     makeType decl = (theType,theTypeArgs,theTypeExpr) where
         theTypeName = toName Name.TypeConstructor (hsDeclName decl)
         theKind = kind $ fromJust (Map.lookup theTypeName km)
@@ -663,10 +649,8 @@ toDataTable km cm ds currentDataTable = newDataTable  where
 isHsBangedTy HsBangedTy {} = True
 isHsBangedTy _ = False
 
-
 getConstructorArities  :: DataTable -> [(Name,Int)]
 getConstructorArities (DataTable dt) = [ (n,length $ conSlots c) | (n,c) <- Map.toList dt]
-
 
 constructionExpression ::
     DataTable -- ^ table of data constructors
@@ -771,7 +755,6 @@ showDataTable (DataTable mp) = vcat xs where
     xs = [text x <+> hang 0 (c y) | (x,y) <- ds ]
     ds = sortBy (\(x,_) (y,_) -> compare x y) [(show x,y)  | (x,y) <-  Map.toList mp]
 
-
 {-# NOINLINE samplePrimitiveDataTable #-}
 samplePrimitiveDataTable :: DataTable
 samplePrimitiveDataTable = DataTable $ Map.fromList [ (x,c) | x <- xs, c <- getConstructor x mempty] where
@@ -806,14 +789,10 @@ onlyChild dt n = isJust ans where
                     DataNormal [_] -> return ()
                     _ -> fail "not cpr"
 
-
 pprintTypeOfCons :: (Monad m,DocLike a) => DataTable -> Name -> m a
 pprintTypeOfCons dataTable name = do
     c <- getConstructor name dataTable
     return $ pprintTypeAsHs (conType c)
-
-
-
 
 pprintTypeAsHs :: DocLike a => E -> a
 pprintTypeAsHs e = unparse $ runVarName (f e) where
@@ -840,11 +819,9 @@ pprintTypeAsHs e = unparse $ runVarName (f e) where
     arr = bop (R,0) (space <> text "->" <> space)
     app = bop (L,100) (text " ")
 
-
 class Monad m => DataTableMonad m where
     getDataTable :: m DataTable
     getDataTable = return mempty
-
 
 instance DataTableMonad Identity
 
@@ -870,7 +847,6 @@ primitiveAliases = Map.fromList [
     (tc_Float80, rt_float80),
     (tc_Float128, rt_float128)
     ]
-
 
 -- mapping of primitive types to the C calling convention used
 -- when passing to/from foreign functions

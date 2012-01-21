@@ -1,7 +1,6 @@
 {-# LANGUAGE ImpredicativeTypes #-}
 module Ho.Binary(readHoFile,recordHoFile,readHlFile,recordHlFile) where
 
-
 import Codec.Compression.GZip
 import Control.Monad
 import Data.Binary
@@ -12,13 +11,12 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Version
 
-import Options
-import Ho.Type
-import Support.MapBinaryInstance
-import Name.Binary()
 import FrontEnd.Rename(FieldMap(..))
+import Ho.Type
+import Name.Binary()
+import Options
 import Support.CFF
-
+import Support.MapBinaryInstance
 
 current_version :: Int
 current_version = 4
@@ -116,8 +114,6 @@ instance Binary FieldMap where
     ad <- getMap
     return (FieldMap ac ad)
 
-
-
 instance Data.Binary.Binary HoHeader where
     put (HoHeader aa ab ac ad ae) = do
 	    Data.Binary.put aa
@@ -159,12 +155,9 @@ instance Data.Binary.Binary HoLib where
     ad <- get
     return (HoLib aa ab ac ad)
 
-
 instance Binary Data.Version.Version where
     put (Data.Version.Version a b) = put a >> put b
     get = liftM2 Data.Version.Version get get
-
-
 
 instance Data.Binary.Binary HoTcInfo where
     put (HoTcInfo aa ab ac ad ae af ag ah) = do
@@ -187,7 +180,6 @@ instance Data.Binary.Binary HoTcInfo where
     ah <- get
     return (HoTcInfo aa ab ac ad ae af ag ah)
 
-
 instance Data.Binary.Binary HoBuild where
     put (HoBuild aa ab ac) = do
 	    Data.Binary.put aa
@@ -198,4 +190,3 @@ instance Data.Binary.Binary HoBuild where
     ab <- get
     ac <- get
     return (HoBuild aa ab ac)
-

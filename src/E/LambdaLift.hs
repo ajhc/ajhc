@@ -2,11 +2,10 @@ module E.LambdaLift(lambdaLift,staticArgumentTransform)  where
 
 import Control.Monad.Reader
 import Control.Monad.Writer
-import Data.Maybe
 import Data.IORef
+import Data.Maybe
 import Text.Printf
 
-import StringTable.Atom
 import Doc.PPrint
 import E.Annotate
 import E.E
@@ -21,19 +20,19 @@ import Fixer.Supply
 import GenUtil
 import Name.Id
 import Name.Name
+import Options (verbose)
 import Stats(mtick,runStatM,runStatT)
+import StringTable.Atom
 import Support.CanType
 import Support.FreeVars
 import Util.Graph as G
 import Util.HasSize
 import Util.SetLike hiding(Value)
 import Util.UniqueMonad
-import Options (verbose)
 
 annotateId mn x = case fromId x of
     Just y -> toId (toName Val (mn,'f':show y))
     Nothing -> toId (toName Val (mn,'f':show x))
-
 
 -- | transform simple recursive functions into non-recursive variants
 -- this is exactly the opposite of lambda lifting, but is a big win if the function ends up inlined
@@ -80,7 +79,6 @@ staticArgumentTransform prog = ans where
         e' <- g $ eBody elet
         return elet { eDefs = concat ds'', eBody = e' }
     g e = emapE g e
-
 
 data S = S {
     funcName :: Name,
@@ -160,7 +158,6 @@ implies :: Value Bool -> Value Bool -> IO ()
 implies x y = addRule $ y `isSuperSetOf` x
 
 assert x = value True `implies` x
-
 
 lambdaLift ::  Program -> IO Program
 lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
@@ -330,7 +327,6 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
     nz <- readIORef fm
     annotateProgram nz (\_ nfo -> return nfo) (\_ nfo -> return nfo) (\_ nfo -> return nfo) prog { progCombinators =  ncs, progStats = progStats prog `mappend` nstat }
 
-
 typeLift ECase {} = "Case"
 typeLift ELam {} = "Lambda"
 typeLift _ = "Other"
@@ -342,6 +338,3 @@ removeType t v e = ans where
     ans = foldr f (substLet [(t,v)] e) ls
     f tv@(TVr { tvrType = ty} ) e = ELam nt (subst tv (EVar nt) e) where nt = tv { tvrType = (subst t v ty) }
 -}
-
-
-

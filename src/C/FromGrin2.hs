@@ -3,8 +3,8 @@ module C.FromGrin2(compileGrin) where
 
 import Control.Monad.Identity
 import Control.Monad.RWS
-import Data.List
 import Data.Char
+import Data.List
 import Data.Maybe
 import Data.Monoid
 import Text.PrettyPrint.HughesPJ(nest,($$),fsep)
@@ -30,12 +30,12 @@ import StringTable.Atom
 import Support.CanType
 import Support.FreeVars
 import Util.Gen
-import Util.UniqueMonad
 import Util.SetLike
+import Util.UniqueMonad
 import qualified Cmm.Op as Op
-import qualified FlagOpts as FO
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.UTF8 as BS
+import qualified FlagOpts as FO
 
 ---------------
 -- C Monad
@@ -179,7 +179,6 @@ compileGrin grin = (LBS.fromChunks code, snub (reqLibraries req))  where
                 text "#define " <> tshow (varName v) <+>  text "(MKLAZY_C(&_" <> tshow (varName v) <> text "))\n";
         return ts
 
-
 convertFunc :: Maybe FfiExport -> (Atom,Lam) -> C [Function]
 convertFunc ffie (n,as :-> body) = do
         s <- localTodo TodoReturn (convertBody body)
@@ -210,7 +209,6 @@ convertFunc ffie (n,as :-> body) = do
                                                    (map variable newVars))]
 
         return (function fnname fr (mgct as') ats s : mstub)
-
 
 fetchVar :: Var -> Ty -> C Expression
 fetchVar (V 0) _ = return $ noAssign (err "fetchVar v0")
@@ -309,7 +307,6 @@ tyToC dh (Op.TyBits b h) = f b h where
         (Op.Bits 128) -> "__float128"
         _ -> error "tyToC: unknown"
     f _ _ = error "tyToC: unknown"
-
 
 opTyToCh hint opty = basicType (tyToC hint opty)
 opTyToC opty = basicType (tyToC Op.HintUnsigned opty)
@@ -444,7 +441,6 @@ convertBody (Error s t) = do
 convertBody (BaseOp (StoreNode b)  [n@NodeC {}])  = newNode region_heap (bool b wptr_t sptr_t) n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
 convertBody (BaseOp (StoreNode b)  [n@NodeC {},region]) = newNode region (bool b wptr_t sptr_t) n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
 
-
 convertBody (e :>>= [(Var vn _)] :-> e') | vn == v0 = do
     ss <- localTodo TodoNothing (convertBody e)
     ss' <- convertBody e'
@@ -513,13 +509,11 @@ convertBody (Return xs@(_:_:_)) = do
             return (mconcat ss)
         _ -> simpleRet =<< convertVals xs
 
-
 convertBody e = do
     x <- asks rTodo
     (ss,er) <- convertExp e
     r <- simpleRet er
     return (ss & r)
-
 
 simpleRet er = do
     x <- asks rTodo
@@ -569,7 +563,6 @@ convertExp (Prim p vs ty) | APrim _ req <- p  =  do
     e <- convertPrim p vs ty
     return (mempty,e)
 
-
 --convertExp (App a [fn,x] _) | a == funcApply = do
 --    fn' <- convertVal fn
 --    x' <- convertVal x
@@ -616,7 +609,6 @@ ccaf :: (Var,Val) -> P.Doc
 ccaf (v,val) = text "/* " <> text (show v) <> text " = " <> (text $ P.render (pprint val)) <> text "*/\n" <>
      text "static node_t _" <> tshow (varName v) <> text ";\n" <>
      text "#define " <> tshow (varName v) <+>  text "(MKLAZY_C(&_" <> tshow (varName v) <> text "))\n";
-
 
 buildConstants cpr grin fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
     tyenv = grinTypeEnv grin
@@ -665,7 +657,6 @@ convertConst v = return (f v) where
             Op (Op.BinOp n ta tb) r -> primBinOp n ta tb r x' y'
             x -> return $ err (show x)
     f x = fail "f"
-
 
 --convertPrim p vs = return (mempty,err $ show p)
 convertPrim p vs ty
@@ -720,7 +711,6 @@ floatOps = [
     (Op.FLte,"<=")
     ]
 
-
 binopSigned :: Op.BinOp -> Maybe String
 binopSigned b = lookup b signedOps
 
@@ -745,7 +735,6 @@ primUnOp op ta r a | Just fn <- Op.unopFloat ta op = return $ functionCall (toNa
 primUnOp n ta r a
     | otherwise = return $ err ("primUnOp: " ++ show ((n,ta,r),a))
 
-
 tagAssign :: Expression -> Atom -> C Statement
 tagAssign e t | tagIsSuspFunction t = do
     en <- declareEvalFunc False t
@@ -762,7 +751,6 @@ tagAssign e t = do
             tellTags t
             return . toStatement $ f_SET_MEM_TAG e (constant (enum $ nodeTagName t))
 
-
 tellAllTags :: Val -> C ()
 tellAllTags (NodeC n vs) = tellTags n >> mapM_ tellAllTags vs
 tellAllTags n = mapValVal tt n >> return () where
@@ -777,8 +765,6 @@ tellTags t = do
 --        Just [n'] | n' == t ->  return ()
         Just rs -> tell mempty { wEnums = Map.fromList (zip (map nodeTagName rs) [0..]) }
         Nothing -> tell mempty { wTags = Set.singleton t }
-
-
 
 newNode region ty ~(NodeC t as) = do
     let sf = tagIsSuspFunction t
@@ -811,8 +797,6 @@ newNode region ty ~(NodeC t as) = do
         let res = if sf then (f_MKLAZY tmp) else tmp
         return (mconcat $ dtmp:tagassign:ass,res)
 
-
-
 ------------------
 -- declaring stuff
 ------------------
@@ -837,7 +821,6 @@ declareStruct n = do
             structureNeedsDiscriminator =  needsDis
             }
     unless (null fields) $ tell mempty { wStructures = Map.singleton (structureName theStruct) theStruct }
-
 
 basicNode :: Atom -> [Val] -> C (Maybe Expression)
 basicNode a _ | tagIsSuspFunction a = return Nothing
@@ -881,7 +864,6 @@ declareEvalFunc isCAF n = do
     tellFunctions [function fname wptr_t (mgct [(aname,atype)]) [a_STD, a_FALIGNED] body']
     return fname
 
-
 castFunc :: Op.ConvOp -> Op.Ty -> Op.Ty -> Expression -> Expression
 castFunc co ta tb e | ta == tb = e
 castFunc co _ Op.TyBool e = cast (basicType "bool") e
@@ -898,8 +880,6 @@ castFunc Op.F2I tf tb e = cast (opTyToCh Op.HintSigned tb) e
 castFunc Op.I2F tf tb e = cast (opTyToC tb) (cast (opTyToCh Op.HintSigned tf) e)
 
 castFunc _ _ tb e = cast (opTyToC tb) e
-
-
 
 ----------------------------
 -- c constants and utilities
@@ -945,7 +925,6 @@ f_update x y  = functionCall (name "update") [x,y]
 
 arg i = name $ 'a':show i
 
-
 varName (V n) | n < 0 = name $ 'g':show (- n)
 varName (V n) = name $ 'v':show n
 
@@ -967,7 +946,6 @@ a_MALLOC = Attribute "A_MALLOC"
 concrete :: Atom -> Expression -> Expression
 concrete t e = cast (ptrType $ structType (nodeStructName t)) e
 
-
 getHead :: Expression -> Expression
 getHead e = project' (name "head") e
 
@@ -976,6 +954,5 @@ nodeType a = return $ structType (nodeStructName a)
 nodeStructName :: Atom -> Name
 nodeStructName a = toName ('s':fromAtom a)
 nodeCacheName a = toName ('c':fromAtom a)
-
 
 bool b x y = if b then x else y

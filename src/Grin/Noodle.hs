@@ -15,8 +15,8 @@ import Support.FreeVars
 import Support.Tickle
 import Util.GMap
 import Util.Gen
-import Util.SetLike
 import Util.HasSize
+import Util.SetLike
 
 modifyTail :: Lam -> Exp -> Exp
 modifyTail lam@(_ :-> lb) te = f (sempty :: GSet Atom) te where

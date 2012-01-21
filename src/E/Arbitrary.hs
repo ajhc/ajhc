@@ -1,29 +1,26 @@
 module E.Arbitrary where
 
 --import Test.QuickCheck
-import E.E
-import E.TypeCheck()
-import qualified Data.Set as Set
-import qualified Data.Map as Map
-import Random
+import Data.Monoid
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty (putDoc, Doc)
+import E.E
 import E.Show
-import Data.Monoid
+import E.TypeCheck()
 import GenUtil
-import Support.FreeVars
-import Name.VConsts
-import Support.CanType
 import Name.Id
-
-
+import Name.VConsts
+import Random
+import Support.CanType
+import Support.FreeVars
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 data EP = EP {
     canDiverge :: Bool,
     usedVars :: Set.Set TVr
     }
-
 
 choose :: [IO a] -> IO a
 choose [] = fail "nothing to choose from"
@@ -80,7 +77,6 @@ testE = do
     ge
     ge
 
-
 {-
 
 typeSet env = Map.keys env
@@ -88,7 +84,6 @@ typeCnt env a
     | Just x <- Map.lookup a env = x
     | otherwise = 0
 typeCntInc env a = Map.insert a (typeCnt env a + 1) env
-
 
 countTerm :: E -> Map.Map E Int -> Int -> Int
 countTerm _t _env 0 = 0
@@ -133,7 +128,6 @@ testE = do
         unique ss (x:xs) = unique (Set.insert x ss) xs
     --quickCheck prop_ndk
 
-
     print (ndk 4 2)
     --print (ndk 10 4)
 
@@ -155,4 +149,3 @@ genTerm a env s = genAppTerm a env s (countTerm a env s)
 genVarTerm a env | typeCnt env a == 0 = return Nothing
 
 -}
-

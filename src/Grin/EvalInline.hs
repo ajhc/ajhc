@@ -1,19 +1,17 @@
 module Grin.EvalInline(createEvalApply) where
 
-
 import Control.Monad.Identity
 import List hiding(union)
 import qualified Data.Set as Set
 
-
-import Util.SetLike
-import StringTable.Atom
+import GenUtil
 import Grin.Grin
 import Grin.Noodle
-import GenUtil
-import Support.FreeVars(freeVars)
+import StringTable.Atom
 import Support.CanType(getType)
+import Support.FreeVars(freeVars)
 import Util.Once
+import Util.SetLike
 import Util.UniqueMonad()
 
 {-
@@ -162,8 +160,3 @@ createEvalApply grin = do
         TyEnv tyEnv = grinTypeEnv grin
         appTyEnv = fromList ntyenv
     return $ setGrinFunctions (apps ++ funcs) grin { grinTypeEnv = TyEnv (tyEnv `union` appTyEnv) }
-
-
-
-
-

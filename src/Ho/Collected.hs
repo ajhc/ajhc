@@ -10,20 +10,19 @@ module Ho.Collected(
     updateChoHo
     )where
 
-import Data.Monoid
 import Control.Monad.Identity
 import Data.List
+import Data.Monoid
 
-import Util.SetLike
-import Ho.Type
-import E.E
-import Name.Name
 import DataConstructors
-import Info.Types
 import E.Annotate
-import qualified Info.Info as Info
+import E.E
+import Ho.Type
+import Info.Types
+import Name.Name
+import Util.SetLike
 import qualified Data.Map as Map
-
+import qualified Info.Info as Info
 
 choDataTable = hoDataTable . hoBuild . choHo
 choClassHierarchy = hoClassHierarchy . hoTcInfo . choHo
@@ -72,4 +71,3 @@ mergeChoCombinators x y = unionWith f x y where
         dex dummy y = g (Info.lookup (tvrInfo tb) `asTypeOf` Just dummy) where
             g Nothing = y
             g (Just x) = Info.insertWith mappend x y
-

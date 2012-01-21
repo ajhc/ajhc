@@ -7,9 +7,9 @@ module C.FFI(
     Requires(..)
     ) where
 
-import Data.Typeable
-import Data.Binary
 import C.Prims
+import Data.Binary
+import Data.Typeable
 
 type CName    = String
 
@@ -25,8 +25,6 @@ data FfiType = Import CName Requires
              | Dynamic
              deriving(Eq,Ord,Show)
 
-
-
 data FfiSpec = FfiSpec FfiType Safety CallConv
              deriving(Eq,Ord,Show)
 
@@ -34,9 +32,8 @@ data FfiExport = FfiExport {
     ffiExportCName :: CName,
     ffiExportSafety :: Safety,
     ffiExportCallConv :: CallConv,
-    ffiExportArgTypes ::[ExtType], 
+    ffiExportArgTypes ::[ExtType],
     ffiExportRetType  :: ExtType
     }
  deriving(Eq,Ord,Show,Typeable)
      {-! derive: Binary !-}
-

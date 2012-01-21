@@ -13,13 +13,10 @@ class Tuple a where
 class FromTuple a where
     fromTuple :: a -> [a]
 
-
 tuple :: Tuple a => [a] -> a
 tuple [] = tupleNil
 tuple [x] = tupleOne x
 tuple xs = tupleMany xs
 
-
 instance Tuple String where
     tupleMany xs = "(" ++ concat (intersperse "," xs) ++ ")"
-

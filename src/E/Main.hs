@@ -4,9 +4,9 @@ module E.Main(processInitialHo,processDecls,compileWholeProgram,dumpRules) where
 
 import Control.Exception
 import Control.Monad.Identity
+import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Writer
-import Control.Monad.Reader
 import System.Mem
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -54,7 +54,6 @@ import qualified FlagOpts as FO
 import qualified Info.Info as Info
 import qualified Stats
 
-
 lamann _ nfo = return nfo
 letann e nfo = return (annotateArity e nfo)
 idann ps i nfo = return (props ps i nfo) where
@@ -62,7 +61,6 @@ idann ps i nfo = return (props ps i nfo) where
     props ps i = case mlookup i ps of
         Just ps ->  modifyProperties (mappend ps)
         Nothing ->  id
-
 
 processInitialHo ::
     CollectedHo       -- ^ current accumulated ho
@@ -280,7 +278,6 @@ processDecls cho ho' tiData = do
         --mprog <- transformProgram tparms { transformSkipNoStats = True, transformCategory = "WorkWrap2", transformOperation = return . workWrapProgram } mprog
         --mprog <- simplifyProgram sopt "Simplify-Four" coreMini mprog
 
-
         -- annotate our bindings for further passes
         mprog <- return $ etaAnnotateProgram mprog
         mprog <- Demand.analyzeProgram mprog
@@ -343,15 +340,12 @@ etaExpandProg pass prog = do
     transformProgram transformParms { transformPass = pass, transformCategory = "EtaExpansion"
                                     , transformDumpProgress = miniCorePass,  transformOperation = evaluate . f } prog
 
-
 getExports ho =  Set.fromList $ map toId $ concat $  Map.elems (hoExports ho)
 shouldBeExported exports tvr
     | tvrIdent tvr `Set.member` exports || getProperty prop_SRCLOC_ANNOTATE_FUN tvr  = setProperty prop_EXPORTED tvr
     | otherwise = tvr
 
-
 transTypeAnalyze = transformParms { transformCategory = "typeAnalyze",  transformOperation = typeAnalyze True }
-
 
 simplifyProgram sopt name dodump prog = liftIO $ do
     let istat = progStats prog
@@ -388,7 +382,6 @@ simplifyProgram' sopt name dodump iterate prog = do
     when (dodump && (dump FD.Progress || coreSteps)) $ Stats.printLStat (optStatLevel options) ("Total: " ++ name) (progStats prog)
     return prog { progStats = progStats prog `mappend` istat }
 
-
 {-# NOINLINE compileWholeProgram #-}
 compileWholeProgram prog = do
     performGC
@@ -411,7 +404,6 @@ compileWholeProgram prog = do
         transformCategory = "PruneUnreachable",
         transformOperation = evaluate . programPruneUnreachable
         } prog
-
 
     prog <- if (fopts FO.TypeAnalysis) then do
       transformProgram transformParms { transformCategory = "TypeAnalyzeMethods",
@@ -512,7 +504,6 @@ compileWholeProgram prog = do
     wdump FD.CoreMangled $ dumpCore "mangled" prog
     return prog
 
-
 -- | this gets rid of all type variables, replacing them with boxes that can hold any type.
 -- The program is still type-safe, but all polymorphism has been removed in favor of
 -- implicit coercion to a universal type in preparation for the grin transformation.
@@ -552,5 +543,3 @@ cleanupE e = runIdentity (f e) where
     f (EPi t@TVr { tvrIdent = v } e) | v /= emptyId, v `notMember` freeIds e = f (EPi t { tvrIdent = emptyId } e)
     f ec@ECase { eCaseBind = t@TVr { tvrIdent = v } } | v /= emptyId, v `notMember` (freeVars (caseBodies ec)::IdSet) = f ec { eCaseBind = t { tvrIdent = emptyId } }
     f e = emapEG f f e
-
-

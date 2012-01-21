@@ -163,7 +163,6 @@ go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,as :-> b
         (nl,_) <- whiz (\_ -> id) h' f whizState (as :-> body)
         return nl
 
-
 removeDeadArgs :: MonadStats m => Bool -> Set.Set Atom -> Set.Set Atom -> (Set.Set Var) -> (Set.Set (Atom,Int)) -> (Atom,Lam) -> WhizState -> m (WhizState,(Atom,Lam))
 removeDeadArgs postInline funSet directFuncs usedCafs usedArgs (a,l) whizState =  whizExps f (margs a l) >>= \(l,ws) -> return (ws,(a,l)) where
     whizExps f l = whiz (\_ x -> x) (\(p,e) -> f e >>= \e' -> return  (Just (p,e'))) f whizState l
@@ -221,5 +220,3 @@ removeDeadArgs postInline funSet directFuncs usedCafs usedArgs (a,l) whizState =
     deadVal (Lit 0 _) = True
     deadVal x = isHole x
     removeArgs fn as = concat [ perhapsM ((fn,i) `member` usedArgs) a | a <- as | i <- naturals ]
-
-

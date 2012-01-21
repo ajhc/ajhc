@@ -32,7 +32,6 @@ import System.IO
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 
-
 type FileOffset = Word
 type ChunkLength = Word
 
@@ -66,7 +65,6 @@ chunkType [b1,b2,b3,b4] = bytesToChunkType (fi b1) (fi b2) (fi b3) (fi b4) where
 chunkType [b1,b2,b3] = chunkType [b1,b2,b3,' ']
 chunkType _ = error "chunkType: not a chunk."
 
-
 -- critical if the first letter is capitalized
 isCritical :: ChunkType -> Bool
 isCritical (ChunkType w) =  w .&. 0x20000000 == 0
@@ -78,7 +76,6 @@ isPrivate  (ChunkType w) =  w .&. 0x00200000 == 0
 -- chunk should be copied if unrecognized by an editor
 isSafeToCopy :: ChunkType -> Bool
 isSafeToCopy (ChunkType w) =  w .&. 0x00000020 == 0
-
 
 lbsCFF :: Monad m => LBS.ByteString -> m (FileType,[(ChunkType,LBS.ByteString)])
 lbsCFF bs = ans bs where
@@ -112,7 +109,6 @@ lbsCFF bs = ans bs where
             len = bsWord32 bs
             ct = ChunkType $ bsWord32 (LBS.drop 4 bs)
             (bdata,brest)  = LBS.splitAt (fromIntegral len) (LBS.drop 8 bs)
-
 
 bsCFF :: Monad m => BS.ByteString -> m (FileType,[(ChunkType,BS.ByteString)])
 bsCFF bs = ans bs where
@@ -168,7 +164,6 @@ readCFFHeader h = do
 writeCFFHeader :: Handle -> FileType -> IO ()
 writeCFFHeader h ft = BS.hPut h (mkCFFHeader ft)
 
-
 readCFFInfo :: Handle -> IO (ChunkType,[(ChunkType,FileOffset,ChunkLength)])
 readCFFInfo h = do
     cffType <- readCFFHeader h
@@ -184,7 +179,6 @@ readCFFInfo h = do
 
     xs <- readChunk (8::FileOffset)
     return (cffType,xs)
-
 
 readCFF :: Handle -> IO (ChunkType,[(ChunkType,BS.ByteString)])
 readCFF h = do
@@ -216,7 +210,6 @@ readChunk h eft ect = do
                 readChunk
     readChunk
 
-
 mkCFFfile :: FileType -> [(ChunkType,LBS.ByteString)] -> LBS.ByteString
 mkCFFfile ft cs = LBS.fromChunks [mkCFFHeader ft] `LBS.append` LBS.concat (concatMap f cs) where
     f (ChunkType ct,bs) = [hl,bs,zero]  where
@@ -245,8 +238,6 @@ lazyWriteCFF h ft xs = do
             LBS.hPut h bs
             writeWord32 h 0 -- TODO proper checksum
     mapM_ writeChunk xs
-
-
 
 -------------------------------------------------
 -- Various routines for reading and writing bytes
@@ -290,4 +281,3 @@ writeWord32 h w = do
     writeByte h b2
     writeByte h b3
     writeByte h b4
-

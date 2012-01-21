@@ -13,22 +13,22 @@ import Data.Maybe
 import Support.Compat
 import qualified Data.Set as Set
 
-import Stats
-import Name.Id
+import Data.Monoid
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
 import E.E
+import E.Program
 import E.Show
 import E.Traverse
 import E.TypeCheck
-import E.Program
-import Util.SetLike as S
-import Util.Gen
-import Data.Monoid
+import Name.Id
+import Options
+import Stats
 import Support.FreeVars
 import Support.Transform
-import Options
+import Util.Gen
+import Util.SetLike as S
 import qualified FlagDump as FD
 import qualified IO
 
@@ -148,7 +148,6 @@ dumpCoreExtra pname prog extra = do
         putErrLn $ "v-- " ++ pname ++ " Core"
         printProgram prog
         putErrLn $ "^-- " ++ pname ++ " Core"
-
 
 printESize :: String -> Program -> IO ()
 printESize str prog = putErrLn $ str ++ " program e-size: " ++ show (eSize (programE prog))

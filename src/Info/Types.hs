@@ -1,15 +1,14 @@
 -- | some useful types to use in Info's that don't really fit anywhere else
 module Info.Types(module Info.Types, module Info.Properties) where
 
-import Info.Properties
 import Data.Dynamic
 import Data.Monoid
+import Info.Properties
 
+import Util.BitSet
 import Util.HasSize
 import Util.SetLike
-import Util.BitSet
 import qualified Info.Info as Info
-
 
 -- | how many arguments a function my be applied to before it performs work and whether it bottoms out after that many arguments
 data Arity = Arity Int Bool
@@ -60,5 +59,3 @@ instance HasProperties Info.Info where
         Just p -> p
         Nothing -> mempty
     putProperties prop info = Info.insert prop info
-
-

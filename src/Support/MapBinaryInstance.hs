@@ -1,10 +1,9 @@
 module Support.MapBinaryInstance where
 
-
+import Control.Monad
 import Data.Binary
 import Data.Map as Map
 import Data.Set as Set
-import Control.Monad
 
 putMap :: (Binary k,Ord k,Binary v) => Map.Map k v -> Put
 putMap x = do
@@ -15,7 +14,6 @@ getMap = do
         sz <- get :: Get Word32
         ls <- replicateM (fromIntegral sz) get
         return (Map.fromList ls)
-
 
 putSet :: (Binary a,Ord a) => Set.Set a -> Put
 putSet x = do

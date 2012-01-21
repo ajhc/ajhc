@@ -27,12 +27,12 @@ module Name.Name(
 import Data.Char
 import Data.Data
 
-import StringTable.Atom
-import Data.Binary
 import C.FFI
+import Data.Binary
 import Doc.DocLike
 import Doc.PPrint
 import GenUtil
+import StringTable.Atom
 
 data NameType
     = TypeConstructor
@@ -45,7 +45,6 @@ data NameType
     | RawType
     | UnknownType
     deriving(Ord,Eq,Enum,Read,Show)
-
 
 newtype Name = Name Atom
     deriving(Ord,Eq,Typeable,Binary,Data,ToAtom,FromAtom)
@@ -136,7 +135,6 @@ instance ToName String where
             (Just m,i) -> m ++ "." ++ i
             (Nothing,i) -> i
 
-
 getModule :: Monad m => Name -> m Module
 getModule n = case nameParts n of
     (_,Just m,_)  -> return (Module m)
@@ -159,14 +157,12 @@ qualifyName m n = case nameParts n of
 setModule :: Module -> Name -> Name
 setModule m n = qualifyName m  $ toUnqualified n
 
-
 parseName :: NameType -> String -> Name
 parseName t name = toName t (intercalate "." ms, intercalate "." (ns ++ [last sn])) where
     sn = (split (== '.') name)
     (ms,ns) = span validMod (init sn)
     validMod (c:cs) = isUpper c && all (\c -> isAlphaNum c || c `elem` "_'") cs
     validMod _ = False
-
 
 nameType :: Name -> NameType
 nameType (Name a) = toEnum $ fromIntegral ( a `unsafeByteIndex` 0)  - ord '1'
@@ -191,7 +187,6 @@ instance Show Name where
 
 instance DocLike d => PPrint d Name  where
     pprint n = text (show n)
-
 
 mapName :: (String -> String,String -> String) -> Name -> Name
 mapName (f,g) n = case nameParts n of

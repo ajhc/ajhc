@@ -3,17 +3,15 @@ module Info.Binary(putInfo, Info.Binary.getInfo) where
 import Data.Dynamic
 import qualified Data.Map as Map
 
-import StringTable.Atom(HasHash(..))
-import Data.Binary
 import C.FFI(FfiExport)
+import Data.Binary
 import E.CPR
 import GenUtil
 import Info.Info
 import Info.Types
+import StringTable.Atom(HasHash(..))
 import Util.BitSet as BS
 import qualified E.Demand
-
-
 
 data Binable = forall a . (Typeable a, Binary a, Show a) => Binable a
 
@@ -34,7 +32,6 @@ binTable = Map.fromList [
     cb (u :: E.Demand.DemandSignature)
     ]
 
-
 putDyn :: (Word32,Dynamic,Binable) -> Put
 putDyn (ps,d,Binable (_::a)) = do
     put ps
@@ -43,7 +40,6 @@ putDyn (ps,d,Binable (_::a)) = do
 -- = case Map.lookup (packString (show d)) of
 --    Just (Binable (x::a)) -> put_ h (case fromDynamic d of Just x -> x :: a)
 --    Nothing -> return ()
-
 
 getDyn = do
     (ps::Word32) <- get
@@ -57,11 +53,9 @@ instance Binary Properties where
     put (Properties (EBS props)) = put (fromIntegral $ BS.toWord props :: Word32)
     get = (get :: Get Word32) >>= return . Properties . EBS . BS.fromWord . fromIntegral
 
-
 instance Binary Info where
     put nfo = putInfo nfo
     get = Info.Binary.getInfo
-
 
 putInfo :: Info.Info.Info -> Put
 putInfo (Info ds) = do
@@ -79,6 +73,3 @@ getInfo = do
     n <- getWord8
     xs <- replicateM (fromIntegral n) getDyn
     return (Info  [ x | x <- xs])
-
-
-

@@ -3,7 +3,6 @@ module Support.Tickle where
 import Control.Monad.Identity
 import Control.Monad.Writer
 
-
 class Tickleable a b where
     tickleM :: Monad m => (a -> m a) -> b -> m b
     tickleM_ :: Monad m => (a -> m c) -> b -> m ()

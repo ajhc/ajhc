@@ -10,8 +10,8 @@ import E.E
 import E.FreeVars()
 import E.Subst
 import E.TypeCheck
-import Info.Types
 import Info.Info(HasInfo(..))
+import Info.Types
 import Name.Id
 import Name.Name
 import Name.Names
@@ -22,12 +22,10 @@ import Support.Tuple
 import Util.SetLike
 import qualified Info.Info as Info
 
-
 instance Tuple E where
     tupleNil = vUnit
     tupleMany es = ELit litCons { litName = nameTuple DataConstructor (length es), litArgs = es, litType = ltTuple ts } where
         ts = map getType es
-
 
 eTuple :: [E] -> E
 eTuple = tuple
@@ -72,7 +70,6 @@ instance ToE Bool where
     toE False = vFalse
     typeE _ = tBool
 
-
 instance ToE Char where
     toE ch = ELit (litCons { litName = dc_Char, litArgs = [toEzh ch], litType = tChar })
     typeE _ = tChar
@@ -94,7 +91,6 @@ instance ToE a => ToE [a] where
     toE (x:xs) = eCons (toE x) (toE xs)
     typeE (_::[a]) = ELit (litCons { litName = tc_List, litArgs = [typeE (undefined::a)], litType = eStar })
 
-
 --eInt x = ELit $ LitInt x tInt
 
 eCons x xs = ELit $ litCons { litName = dc_Cons, litArgs = [x,xs], litType = getType xs }
@@ -108,7 +104,6 @@ emptyCase = ECase {
     eCaseType = error "emptyCase: type",
     eCaseScrutinee = error "emptyCase: scrutinee"
     }
-
 
 eCaseTup e vs w = caseUpdate emptyCase { eCaseScrutinee = e, eCaseBind =  (tVr emptyId (getType e)), eCaseType = getType w, eCaseAlts =  [Alt litCons { litName = nameTuple DataConstructor (length vs), litArgs = vs, litType = getType e } w] }
 eCaseTup' e vs w = caseUpdate emptyCase { eCaseScrutinee = e, eCaseBind = (tVr emptyId (getType e)), eCaseType = getType w, eCaseAlts =  [Alt litCons { litName = unboxedNameTuple DataConstructor (length vs), litArgs = vs, litType = getType e} w] }
@@ -139,7 +134,6 @@ substLet ds e  = ans where
     tas = filter (sortKindLike . tvrType . fst) nas
     ans = eLetRec (as ++ nas) (typeSubst' (fromList [ (n,e) | (TVr { tvrIdent = n },e) <- as]) (fromList [ (n,e) | (TVr { tvrIdent = n },e) <- tas]) e)
 
-
 substLet' :: [(TVr,E)] -> E -> E
 substLet' ds' e  = ans where
     (hh,ds) = partition (isUnboxed . tvrType . fst) ds'
@@ -157,17 +151,13 @@ substLet' ds' e  = ans where
 
 eLetRec = substLet'
 
-
-
 prim_seq a b | isWHNF a = b
 prim_seq a b = caseUpdate emptyCase { eCaseScrutinee = a, eCaseBind =  (tVr emptyId (getType a)), eCaseDefault = Just b, eCaseType = getType b }
-
 
 prim_unsafeCoerce e t = p e' where
     (_,e',p) = unsafeCoerceOpt $ EPrim p_unsafeCoerce [e] t
 from_unsafeCoerce (EPrim pp [e] t) | pp == p_unsafeCoerce = return (e,t)
 from_unsafeCoerce _ = fail "Not unsafeCoerce primitive"
-
 
 tWorldzh = ELit litCons { litName = tc_World__, litArgs = [], litType = eHash }
 
@@ -183,8 +173,6 @@ unsafeCoerceOpt (EPrim uc [e] t) | uc == p_unsafeCoerce = f (0::Int) e t where
     f n e t | getType e == t = (n,e,id)
     f n e t = (n,e,\z -> EPrim p_unsafeCoerce [z] t)
 unsafeCoerceOpt e = (0,e,id)
-
-
 
 instance HasInfo TVr where
     getInfo = tvrInfo
@@ -202,7 +190,6 @@ isFullyConst (EPi (TVr { tvrType = t }) x) =  isFullyConst t && isFullyConst x
 isFullyConst (EPrim (APrim p _) as _) = primIsConstant p && all isFullyConst as
 isFullyConst _ = False
 
-
 -- | whether a value may be used as an argument to an application, literal, or primitive
 -- these may be duplicated with no code size or runtime penalty
 isAtomic :: E -> Bool
@@ -219,7 +206,6 @@ isManifestAtomic EVar {}  = True
 isManifestAtomic (ELit LitInt {})  = True
 isManifestAtomic (ELit LitCons { litArgs = []})  = True
 isManifestAtomic _ = False
-
 
 -- | whether an expression is small enough that it can be duplicated without code size growing too much. (work may be repeated)
 isSmall e | isAtomic e = True
@@ -243,7 +229,6 @@ isCheap e | (EVar v,xs) <- fromAp e, Just (Arity n b) <- Info.lookup (tvrInfo v)
         (length xs < n)  -- Partial applications are cheap
           || (b && length xs >= n) -- bottoming out routines are cheap
 isCheap _ = False
-
 
 -- | determine if term can contain _|_
 isLifted :: E -> Bool
@@ -275,7 +260,6 @@ tBoolzh = ELit litCons { litName = tc_Boolzh, litType = eHash, litAliasFor = Jus
 lFalsezh = (LitInt 0 tBoolzh)
 lTruezh = (LitInt 1 tBoolzh)
 
-
 eToPat e = f e where
     f (ELit LitCons { litAliasFor = af,  litName = x, litArgs = ts, litType = t }) = do
         ts <- mapM cv ts
@@ -294,5 +278,3 @@ patToE p = f p where
     f (LitCons { litAliasFor = af,  litName = x, litArgs = ts, litType = t }) = do
        return $  ELit litCons { litAliasFor = af, litName = x, litArgs = map EVar ts, litType = t }
     f (LitInt e t) = return $ ELit (LitInt e t)
-
-

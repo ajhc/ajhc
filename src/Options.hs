@@ -359,11 +359,9 @@ processOptions = do
       True -> return o3
       False-> return o3 {  optHls  = (autoloads ++ optHls o2) }
 
-
 doShowHelp = do
     putStrLn helpUsage
     exitSuccess
-
 
 doShowConfig = do
     --mapM_ (\ (x,y) -> putStrLn (x ++ ": " ++ y))  configs
@@ -383,9 +381,6 @@ findHoCache = do
             return (Just cd)
         _  -> return Nothing
 
-
-
-
 configs :: Node
 configs = toNode [
     "jhclibpath" ==> initialLibIncludes,
@@ -398,7 +393,6 @@ configs = toNode [
     ] where
     (==>) :: ToNode b => String -> b -> (String,Node)
     a ==> b = (a,toNode b)
-
 
 {-# NOINLINE fileOptions #-}
 fileOptions :: Monad m => [String] -> m Opt
@@ -457,7 +451,6 @@ initialIncludes = unsafePerformIO $ do
     p <- lookupEnv "JHC_PATH"
     let x = fromMaybe "" p
     return (".":(tokens (== ':') x))
-
 
 -- | Include directories taken from JHCLIBPATH enviroment variable.
 initialLibIncludes :: [String]

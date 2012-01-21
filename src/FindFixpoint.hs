@@ -7,10 +7,6 @@ import Data.Graph
 import Data.IntSet as IntSet
 import Util.Gen
 
-
-
-
-
 data Env b  = Env {-# UNPACK #-} !(IOArray Int b) {-# UNPACK #-} !(IOArray Int (IntSet)) {-# UNPACK #-} !Int
 newtype Ms b c = Ms' (Env b -> IO c)
 
@@ -35,8 +31,6 @@ getVal n = Ms' $ \(Env arr ref self) ->  do
     s <- readArray ref n
     writeArray ref n $ (IntSet.insert self s)
     readArray arr n
-
-
 
 solve :: (Eq b) => Maybe String -> b -> [Ms b b] -> IO [b]
 solve str' empty vs = do
@@ -76,5 +70,3 @@ solve str' empty vs = do
     li [0 .. len - 1] IntSet.empty
     put $ " Done."
     mapM (readArray arr)  [0 .. len - 1]
-
-

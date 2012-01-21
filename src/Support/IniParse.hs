@@ -1,14 +1,13 @@
 {-# OPTIONS_GHC -fglasgow-exts #-}
 module Support.IniParse(parseIniFiles) where
 
-
 import Control.Monad.State
-import GenUtil
 import Data.Char
 import Data.List
+import GenUtil
+import qualified Data.Foldable as Seq
 import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
-import qualified Data.Foldable as Seq
 
 -- quick and dirty parser.
 
@@ -17,12 +16,10 @@ type St = (Int,FilePath,String)
 newtype P a = P (State St a)
     deriving(Monad,MonadState St)
 
-
 third (_,_,x) = x
 
 look :: P String
 look = gets third
-
 
 discard :: Int -> P ()
 discard n = do
@@ -34,7 +31,6 @@ abort :: String -> P a
 abort msg = do
     (l,fp,_)  <- get
     fail $ fp ++ ":" ++ show l ++ ": " ++ msg
-
 
 dropSpace = do
     x <- look
@@ -55,8 +51,6 @@ ptakeWhile f  = do
     discard (length ts)
     return ts
 
-
-
 pThings ch rs zs  = ans where
     ans = look >>= \x -> case x of
         '[':_ -> do
@@ -75,7 +69,6 @@ expect w = do
     cs <- look
     if w `isPrefixOf` cs then discard (length w) else abort ("expected " ++ show w)
 
-
 pValue = do
     n <- ptakeWhile (`notElem` ['\n','='])
     expect "="
@@ -87,8 +80,6 @@ pHeader = do
     n <- ptakeWhile (`notElem` "]\n")
     expect "]"
     return (trim n)
-
-
 
 -- We use laziness cleverly to avoid repeating work
 processIni :: Seq.Seq (String,Seq.Seq (String,String)) -> Map.Map String (Seq.Seq (String,String))
@@ -105,8 +96,6 @@ processIni iniRaw = iniMap' where
 --        f y x = x ++ " " ++ y
 --    res mp (k,v) = Map.insert k v mp
 
-
-
 parseIniFile :: FilePath -> IO (Seq.Seq (String,Seq.Seq (String,String)))
 parseIniFile fp = readFile fp >>= parseIniRaw fp
 
@@ -114,7 +103,6 @@ parseIniRaw :: String -> String -> IO (Seq.Seq (String,Seq.Seq (String,String)))
 parseIniRaw fp c = do
     let P act = dropSpace >> pThings "default" Seq.empty Seq.empty
     return $ evalState act (0,fp,c)
-
 
 parseIniFiles
     :: Bool          -- ^ whether verbose is enabled
@@ -138,10 +126,6 @@ parseIniFiles verbose raw fs ss = do
         res mp (k,v) = Map.insert k v mp
     return (f ss Map.empty)
 
-
-
-
-
 --main = do
 --    as <- getArgs
 --    is <- mapM parseIniFile as
@@ -152,9 +136,3 @@ parseIniFiles verbose raw fs ss = do
 --            putStrLn h
 --            mapM_ (\x -> putStr "    " >>  print x) (Map.toList rs)
 --    mapM_ f (Map.toList pi)
-
-
-
-
-
-

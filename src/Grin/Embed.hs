@@ -1,13 +1,12 @@
 module Grin.Embed((.>>=),(.>>),GG,VVar,TyNode,TyTag,TyPtr,TyRaw,embedTest) where
 
-import Grin.Grin
-import Util.UniqueMonad
-import Support.CanType
-import StringTable.Atom
-import GenUtil
-import Grin.Show
 import Doc.Pretty
-
+import GenUtil
+import Grin.Grin
+import Grin.Show
+import StringTable.Atom
+import Support.CanType
+import Util.UniqueMonad
 
 newtype GG = GG { unGG :: (Uniq Exp) }
 
@@ -89,7 +88,6 @@ instance Valable TyUnknown where
 instance TyBasic a => Valable (VVar (TyRaw a)) where
     varUp _ = vvarUp (Ty (rawType (undefined :: a)))
 
-
 instance Valable (VVar TyNode) where
     varUp _ = vvarUp TyNode
 instance Valable (VVar TyTag) where
@@ -120,7 +118,6 @@ gReturn (VVal v) = GG $ return $ Return v
 app2 :: Atom -> VVal a -> VVal b -> GG
 app2 n (VVal a) (VVal b) = GG $ return (App n [a,b])
 
-
 lLam :: Val -> Uniq Exp -> Uniq Lam
 lLam v ue = do
     e <- ue
@@ -129,9 +126,5 @@ lLam v ue = do
 fact :: (Rint,Rint) -> GG
 fact (n,r) = gCase n [unLam $ \ (x :: Rint) -> primMinus n 1 .>>= \ n' -> primTimes n r .>>= \r' -> app (toAtom "fact") [n',r'], lLam 1 (gReturn r) ]
 
-
 embedTest = do
     putDoc $ prettyFun (toAtom "fact",execUniq1 $ unLam fact)
-
-
-

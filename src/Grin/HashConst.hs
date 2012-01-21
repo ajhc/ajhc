@@ -4,8 +4,8 @@ import Control.Monad.State
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import StringTable.Atom
 import Grin.Grin
+import StringTable.Atom
 import Util.Graph
 
 -- TODO tuples
@@ -49,4 +49,3 @@ toList (HcHash _ mp) = reverse ans where
     gr = newGraph (Map.toList mp) snd (gk . fst)
     gk (HcNode _ xs) = [ i | Right i <- xs]
     ans = topSort gr
-

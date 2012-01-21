@@ -11,17 +11,17 @@ module E.Inline(
 
 import Control.Monad.Writer
 
-import StringTable.Atom
 import E.Annotate
 import E.E
 import E.Program
 import E.Subst
 import E.Values
-import Support.FreeVars
 import Info.Info(Info)
 import Info.Types
 import Options
 import Stats
+import StringTable.Atom
+import Support.FreeVars
 import Util.Graph
 import Util.SetLike
 import qualified FlagOpts as FO
@@ -86,7 +86,6 @@ app' (EError s t) xs = do
 app' e as = do
     return $ foldl EAp e as
 
-
 -- | Map recursive groups, allowing an initial map to be passed in and it will
 -- also propagate changes in the tvrInfo properly, and make sure nothing
 -- shadows one of the global names.
@@ -123,7 +122,6 @@ programDecomposedCombs prog = map f $ scc g where
     f (Left c) = (False,[c])
     f (Right cs) = (True,cs)
 
-
 programDecomposedDs :: Program -> [Either (TVr, E) [(TVr,E)]]
 programDecomposedDs prog = decomposeDs $ programDs prog
 
@@ -154,5 +152,3 @@ programMapProgGroups imap f prog = do
         unames ds prog = prog { progExternalNames = progExternalNames prog `mappend` fromList (map combIdent ds) }
     (ds,prog'') <- g prog { progStats = mempty } [] imap $ programDecomposedCombs prog
     return $ programUpdate $ prog { progCombinators = ds, progStats = progStats prog `mappend` progStats prog'' }
-
-

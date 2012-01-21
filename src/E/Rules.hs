@@ -17,10 +17,9 @@ module E.Rules(
     )where
 
 import Control.Monad.Writer
-import qualified Data.Traversable as T
 import Maybe
+import qualified Data.Traversable as T
 
-import StringTable.Atom(toAtom)
 import Data.Binary
 import Doc.DocLike
 import Doc.PPrint
@@ -32,14 +31,15 @@ import E.Subst
 import E.Values
 import GenUtil
 import Info.Types
-import Support.MapBinaryInstance()
 import Name.Id
 import Name.Name
 import Name.Names
 import Options
 import Stats
+import StringTable.Atom(toAtom)
 import Support.CanType
 import Support.FreeVars
+import Support.MapBinaryInstance()
 import Util.HasSize
 import Util.SetLike as S
 import qualified Util.Seq as Seq
@@ -83,8 +83,6 @@ mapBodies g (Rules mp) = do
     --mp' <- sequence [ do rs' <- mapM f rs; return (k,rs') | (k,rs) <- Map.toAscList mp ]
     --return $ Rules $ Map.fromAscList mp'
 
-
-
 instance FreeVars Rule [Id] where
     freeVars rule = idSetToList $ freeVars rule
 
@@ -111,10 +109,8 @@ instance Monoid Rules where
     mempty = Rules mempty
     mappend (Rules x) (Rules y) = Rules $ unionWith combineRules x y
 
-
 fromRules :: [Rule] -> Rules
 fromRules rs = Rules $ fmap snds $ fromList $ sortGroupUnderF fst [ (tvrIdent $ ruleHead r,ruleUpdate r) | r <- rs ]
-
 
 mapRBodyArgs :: Monad m => (E -> m E) -> Rule -> m Rule
 mapRBodyArgs g r = do
@@ -124,10 +120,8 @@ mapRBodyArgs g r = do
             return rule { ruleArgs = as, ruleBody = b }
     f r
 
-
 rulesFromARules :: ARules -> [Rule]
 rulesFromARules = aruleRules
-
 
 -- replace the given arguments with the E values, dropping impossible rules
 dropArguments :: [(Int,E)] -> [Rule] -> [Rule]
@@ -148,8 +142,6 @@ dropArguments os  rs  = catMaybes $  map f rs where
 -- sorted by number of arguments rule takes
 -- all hidden rule fields filled in
 -- free variables are up to date
-
-
 
 instance Show ARules where
     showsPrec n a = showsPrec n (aruleRules a)
@@ -208,7 +200,6 @@ builtinRule TVr { tvrIdent = n } (ty:s:rs)
         return $ Just ((EError ("Prelude.error: " ++ s') ty),rs)
 builtinRule _ _ = return Nothing
 
-
 makeRule ::
     String      -- ^ the rule name
     -> (Module,Int)  -- ^ a unique name for this rule
@@ -229,7 +220,6 @@ makeRule name uniq ruleType fvs head args body = rule where
         ruleUniq = uniq,
         ruleName = toAtom $ "Rule.User." ++ name
         }
-
 
 -- | find substitution that will transform the left term into the right one,
 -- only substituting for the vars in the list
@@ -270,4 +260,3 @@ match lup vs = \e1 e2 -> liftM Seq.toList $ execWriterT (un e1 e2 () etherealIds
     lam va ea vb eb mm ~(c:cs) = do
         un (tvrType va) (tvrType vb) mm (c:cs)
         un (subst va (EVar va { tvrIdent = c }) ea) (subst vb (EVar vb { tvrIdent = c }) eb) mm cs
-

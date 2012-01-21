@@ -12,16 +12,14 @@ import E.TypeCheck()
 import E.Values
 import GenUtil
 import Info.Types
+import Name.Id
 import Name.Name
 import Name.Names
-import Name.Id
 import Stats hiding(null)
 import Support.CanType
 import Util.SetLike
 import qualified E.Demand as Demand
 import qualified Info.Info as Info
-
-
 
 data Arg =
     Absent
@@ -131,7 +129,6 @@ workWrap' dataTable tvr e | isJust res = ans where
         mapM_ (argw "E.Workwrap.arg") sargs
 workWrap' _dataTable tvr e = fail "not workWrapable"
 
-
 {-# NOINLINE workWrapProgram #-}
 workWrapProgram :: Program -> Program
 workWrapProgram prog = ans where
@@ -159,4 +156,3 @@ performWorkWrap dataTable ds = runWriter (wwDs ds) where
         e' <- wwE e
         return (ELetRec ds' e')
     wwE e = emapE' wwE e
-

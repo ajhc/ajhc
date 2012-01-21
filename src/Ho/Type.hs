@@ -3,6 +3,7 @@ module Ho.Type where
 import Data.Monoid
 import qualified Data.Map as Map
 
+import Data.Version
 import DataConstructors(DataTable)
 import E.Rules(Rules)
 import E.Type
@@ -10,17 +11,16 @@ import E.TypeCheck()
 import FrontEnd.Class(ClassHierarchy)
 import FrontEnd.Infix(FixityMap)
 import FrontEnd.KindInfer(KindEnv)
+import FrontEnd.Rename(FieldMap())
 import FrontEnd.SrcLoc(SrcLoc)
 import FrontEnd.Tc.Type(Type())
-import Support.MapBinaryInstance()
+import FrontEnd.TypeSynonyms(TypeSynonyms)
 import Name.Id
 import Name.Name(Name,Module)
-import FrontEnd.TypeSynonyms(TypeSynonyms)
 import PackedString
-import qualified Support.MD5 as MD5
-import Data.Version
-import FrontEnd.Rename(FieldMap())
 import Support.CFF
+import Support.MapBinaryInstance()
+import qualified Support.MD5 as MD5
 
 cff_magic = chunkType "JHC"
 cff_link  = chunkType "LINK"
@@ -37,7 +37,6 @@ cff_idep  = chunkType "IDEP"
 type SourceHash = MD5.Hash
 -- HoHash is a unique identifier for a ho file or library.
 type HoHash     = MD5.Hash
-
 
 -- while a 'Module' is a single Module associated with a single haskell source
 -- file, a 'ModuleGroup' identifies a group of mutually recursive modules.
@@ -66,7 +65,6 @@ data CollectedHo = CollectedHo {
     choVarMap :: IdMap (Maybe E) -- ^ cache of variable substitution map
     }
     {-! derive: update !-}
-
 
 -- The header contains basic information about the file, it should be enough to determine whether
 -- we can discard the file right away or consider it further.
@@ -107,7 +105,6 @@ data HoLib = HoLib {
     hoMetaInfo   :: [(PackedString,PackedString)]
     }
 
-
 data Library = Library {
     libHoHeader :: HoHeader,
     libHoLib :: HoLib,
@@ -118,7 +115,6 @@ data Library = Library {
 
 instance Show Library where
     showsPrec n lib = showsPrec n (hohHash $ libHoHeader lib)
-
 
 -- data only needed for type checking.
 data HoTcInfo = HoTcInfo {
@@ -132,7 +128,6 @@ data HoTcInfo = HoTcInfo {
     hoFieldMap :: FieldMap
     }
     {-! derive: update, Monoid !-}
-
 
 data HoBuild = HoBuild {
     -- Filled in by E generation
@@ -180,6 +175,5 @@ instance Monoid HoBuild where
         hoEs = hoEs a `mappend` hoEs b,
         hoRules = hoRules a `mappend` hoRules b
     }
-
 
  -}

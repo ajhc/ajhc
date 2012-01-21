@@ -5,9 +5,8 @@ module E.Type where
 import Data.Foldable hiding(concat)
 import Data.Traversable
 
-
-import Cmm.Number
 import C.Prims
+import Cmm.Number
 import Doc.DocLike hiding((<$>))
 import Info.Types
 import Name.Id
@@ -34,7 +33,6 @@ level.  'enum' scrutinizations are creations may be in terms of the virtual
 constructors rather than the internal representations. let may bind unboxed
 values, which is normaly not allowed.
 
-
 normalized form beta
 : This is like alpha except all data type constructors and case scrutinizations
 are in their final form. As in, newtype coercions are removed, Enums are
@@ -49,7 +47,6 @@ normalized form larry
 
 normalized form mangled
 : All polymorphism has been replaced with subtyping
-
 
 -}
 
@@ -79,7 +76,6 @@ combRules_u f r@Comb{combRules  = x} = cp r{combRules = fx} where
 combBody_s v =  combBody_u  (const v)
 combHead_s v =  combHead_u  (const v)
 combRules_s v =  combRules_u  (const v)
-
 
 emptyComb = Comb { combHead = tvr, combBody = Unknown, combRules = [] }
 combIdent = tvrIdent . combHead
@@ -116,7 +112,6 @@ data Lit e t = LitInt { litNumber :: Number, litType :: t }
     deriving(Eq,Ord,Functor,Foldable,Traversable)
         {-!derive: is !-}
 
-
 --------------------------------------
 -- Lambda Cube (it's just fun to say.)
 -- We are now based on a PTS, which is
@@ -135,7 +130,6 @@ data ESort =
     | ESortNamed Name -- ^ user defined sorts
     deriving(Eq, Ord)
     {-! derive: is !-}
-
 
 data E = EAp E E
     | ELam TVr E
@@ -157,8 +151,6 @@ data E = EAp E E
        }
 	deriving(Eq, Ord)
     {-! derive: is, from !-}
-
-
 
 --instance Functor (Lit e) where
 --    fmap f x = runIdentity $ fmapM (return . f) x
@@ -187,7 +179,6 @@ instance Show a => Show (TVr' a) where
         Just n -> shows n . showString "::" . shows e
         Nothing  -> shows x . showString "::" . shows e
 
-
 type TVr = TVr' E
 data TVr' e = TVr { tvrIdent :: !Id, tvrType :: e, tvrInfo :: Info.Info }
     deriving(Functor,Foldable,Traversable)
@@ -206,7 +197,6 @@ instance Ord TVr where
     x > y = tvrIdent x > tvrIdent y
     x >= y = tvrIdent x >= tvrIdent y
     x <= y = tvrIdent x <= tvrIdent y
-
 
 -- simple querying routines
 altHead :: Alt E -> Lit () ()
@@ -228,7 +218,6 @@ caseBodies ec = [ b | Alt _ b <- eCaseAlts ec] ++ maybeToMonad (eCaseDefault ec)
 casePats ec =  [ p | Alt p _ <- eCaseAlts ec]
 caseBinds ec = eCaseBind ec : concat [ xs  | LitCons { litArgs = xs } <- casePats ec]
 
-
 -- | extract out EAp nodes a value and the arguments it is applied to.
 fromAp :: E -> (E,[E])
 fromAp e = f [] e where
@@ -249,7 +238,6 @@ fromLam e = f [] e where
     f as (ELam v e) = f (v:as) e
     f as e  =  (e,reverse as)
 
-
 litCons = LitCons { litName = error "litName: name not set", litArgs = [], litType = error "litCons: type not set", litAliasFor = Nothing }
 
 -----------------
@@ -264,7 +252,5 @@ eHash = ESort EHash
 
 tVr x y = tvr { tvrIdent = x, tvrType = y }
 tvr = TVr { tvrIdent = emptyId, tvrType = Unknown, tvrInfo = Info.empty }
-
-
 
 --  Imported from other files :-

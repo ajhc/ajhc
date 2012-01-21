@@ -1,14 +1,12 @@
-
 -- | Attempt to find pretty printable differences between terms.
-
 
 module E.Diff where
 
 import E.E
-import E.Traverse
 import E.FreeVars()
-import Support.FreeVars
+import E.Traverse
 import Stats
+import Support.FreeVars
 
 -- | take two expressions and return (hopefully smaller) expressions with their differences
 
@@ -18,12 +16,10 @@ diff a b = f a b where
     f a b = (a,b)
     g ds ds' = [ d | d@(v,e) <- ds, not (lookup v ds' == Just e)  ]
 
-
 -- show terms which contain interesting free variables
 findOddFreeVars  :: [TVr] -> E -> E
 findOddFreeVars fs (ELetRec ds e) = ELetRec [ ds | ds@(_,e) <- ds, any (`elem` fs) (freeVars e) ] e
 findOddFreeVars _ e = e
-
 
 printEStats :: E -> IO ()
 printEStats e = do
@@ -42,7 +38,3 @@ printEStats e = do
         f e = tick stats "other" >> emapE' f e
     f e
     Stats.print "E" stats
-
-
-
-

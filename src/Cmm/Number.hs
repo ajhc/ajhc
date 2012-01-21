@@ -1,7 +1,7 @@
 module Cmm.Number(Number(..),toIntegral) where
 
-import Ratio
 import Data.Binary
+import Ratio
 
 newtype Number = Number Rational
     deriving(Num,Eq,Ord,Binary,Real,Fractional,RealFrac,Enum)
@@ -22,4 +22,3 @@ toIntegral :: (Integral i,Monad m) => Number -> m i
 toIntegral (Number r) = case denominator r of
     1 -> return $ fromInteger (numerator r)
     _ -> fail $ "toInteger: Number not integer " ++ show r
-

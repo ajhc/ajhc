@@ -13,15 +13,14 @@ import Doc.Pretty
 import E.E
 import E.Show
 import E.TypeCheck
-import Util.Gen hiding(putErrLn)
 import Name.Id
 import Name.Name
 import Options
-import Util.SetLike
 import System.IO
+import Util.Gen hiding(putErrLn)
+import Util.SetLike
 import qualified FlagDump as FD
 import qualified Stats
-
 
 data ProgramType = SubProgram Bool | MainProgram | MainComponent
 
@@ -41,7 +40,6 @@ data Program = Program {
     progStats          :: !Stats.Stat
     }
 
-
 program = Program {
     progExternalNames  = mempty,
     progCombinators    = mempty,
@@ -57,7 +55,6 @@ program = Program {
     progCombMap        = mempty,
     progStats          = mempty
     }
-
 
 progEntryPoints prog = map combHead $ concatMap (progComb prog) (toList $ progEntry prog)
 progMainEntry prog = combHead . runIdentity $ progComb prog (progMain prog)

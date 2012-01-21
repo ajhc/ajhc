@@ -11,10 +11,8 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Unsafe as BS
 
-
 data Hash = Hash !Word32 !Word32 !Word32 !Word32
     deriving(Eq,Ord)
-
 
 md5 :: BS.ByteString -> Hash
 md5 bs = unsafePerformIO $ allocaBytes 16 $ \digest -> do
@@ -72,7 +70,6 @@ hashToBytes (Hash a b c d) = tb a . tb b . tb c . tb d $ [] where
                        (y, z) -> let c = fromIntegral z
                                  in c `seq` showIt (i-1) y (c:r)
 
-
 md5show32 :: Hash -> String
 md5show32 hash = f [] (hashToBytes hash) where
     f cs [] = cs
@@ -90,7 +87,6 @@ md5show32 hash = f [] (hashToBytes hash) where
             | otherwise = chr (ord 'a' + fromIntegral x - 10)
     f cs ns = reverse (take ((lns * 8 + 4) `div` 5) (f [] (ns ++ replicate (5 - lns) 0))) ++ cs where
         lns = length ns
-
 
 instance Show Hash where
     showsPrec _ (Hash a b c d) = showAsHex a . showAsHex b . showAsHex c . showAsHex d
@@ -137,5 +133,3 @@ md5Handle h = do
     allocaBytes 16 $ \digest -> do
         md5Data ptr (fromIntegral len) digest
         readDigest digest
-
-

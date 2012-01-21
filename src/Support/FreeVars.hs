@@ -1,4 +1,3 @@
-
 module Support.FreeVars where
 
 import Data.Monoid
@@ -8,7 +7,6 @@ class Monoid b => FreeVars a b where
 
 instance  Monoid x => FreeVars () x where
     freeVars () = mempty
-
 
 instance (FreeVars x b, FreeVars y b) => FreeVars (x,y) b where
     freeVars (x,y) = freeVars x `mappend` freeVars y
@@ -26,4 +24,3 @@ instance FreeVars a b => FreeVars (Maybe a) b where
 instance (FreeVars x b, FreeVars y b) => FreeVars (Either x y) b where
     freeVars (Left x) = freeVars x
     freeVars (Right y) = freeVars y
-

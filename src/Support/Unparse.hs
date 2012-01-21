@@ -24,7 +24,6 @@ pop = Pre
 bop :: (Side,Int) -> a -> Unparse a -> Unparse a -> Unparse a
 bop (s,i) op a b = Fix a op b s i
 
-
 data Unparsable a = Unparsable {
     unparseGroup :: a -> a,
     unparseCat :: a -> a -> a
@@ -66,14 +65,7 @@ unparse' Unparsable { unparseGroup = upg, unparseCat = (<>) } up = fst $ f up wh
     lts L (L,_) (FFix  L _ ) = True
     lts _ _ _ = False
 
-
-
-
-
-
 --lts _ (N,_) (Fix (N,_)) = False
-
-
 
 --type Unparse a = (a, Fix)
 
@@ -89,8 +81,6 @@ bop f s a (b,bf) | not (lts R f bf)  = bop f s a (mkatom (b,bf))
 pop :: Unparsable a => a -> Unparse a -> Unparse a
 pop s (x, Atom) = (unparseCat s  x, Pre)
 pop s x = pop s $ mkatom x
-
-
 
 --sop "" a b = a ++ " " ++ b
 sop op a b = unparseSpace a $ unparseSpace op b
@@ -124,7 +114,6 @@ instance Unparsable String where
     unparseSpace x y = x ++ " " ++ y
     unparseConcat xs = concat xs
 
-
 instance Unparsable () where
     unparseGroup _ = ()
     unparseCat _ _ = ()
@@ -156,7 +145,6 @@ times = bop ((L,7)) "*"
 pow = bop ((L,8)) "^"
 eq = bop ((N,4)) "=="
 
-
 a,b,c,d,x,y, abcdr, abcdl, eql :: (String, Fix)
 
 a = text "a"
@@ -172,9 +160,7 @@ eql = foldl1 eq [a,b,c]
 
 z = eq (plus a b) (pow (times b c) abcdl) `eq` eql
 
-
 g = minus (plus (times (plus a b) (plus b c)) abcdr) abcdl
-
 
 main = putStrLn $ fst $ foldl1 plus [g,eql, z ]
 -}

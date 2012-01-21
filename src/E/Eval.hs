@@ -3,16 +3,16 @@ module E.Eval(eval, strong) where
 -- Simple lambda Calculus interpreter
 -- does not handle recursive Let or Case statements, but those don't appear in types anyway.
 
-import qualified Data.Map as Map
 import Data.Monoid
+import qualified Data.Map as Map
 
 --import Debug.Trace
 import Doc.DocLike
 import Doc.PPrint
 import E.E
-import {-# SOURCE #-} E.Show
 import E.Subst
 import Name.Id
+import {-# SOURCE #-} E.Show
 
 trace _ x = x
 
@@ -48,9 +48,6 @@ eval term = eval' term []  where
 
     -- currently we do not do eta check. etas should only appear for good reason.
     check_eta x = x
-
-
-
 
 strong :: Monad m => [(TVr,E)] -> E -> m E
 strong dsMap' term = trace ("strong: " ++ show term) $ eval' dsMap term [] where
@@ -109,4 +106,3 @@ strong dsMap' term = trace ("strong: " ++ show term) $ eval' dsMap term [] where
 
     -- currently we do not do eta check. etas should only appear for good reason.
     check_eta x = return x
-

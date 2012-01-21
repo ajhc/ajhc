@@ -23,8 +23,6 @@ separate opcodes, even if it could be determined by the type they operate on.
 
 -}
 
-
-
 -- these take 2 arguments of the same type, and return one of the same type.
 -- an exception are the mulx routines, which may return a type exactly
 -- double in size of the original, and the shift and rotate routines, where the
@@ -33,7 +31,6 @@ separate opcodes, even if it could be determined by the type they operate on.
 --
 -- the invarient is that the return type is always exactly determined by the
 -- argument types
-
 
 data BinOp
     = Add
@@ -115,7 +112,6 @@ data UnOp
     deriving(Eq,Show,Ord,Read)
     {-! derive: Binary !-}
 
-
 -- conversion ops
 
 data ConvOp
@@ -132,7 +128,6 @@ data ConvOp
     | B2B         -- ^ a nop, useful for coercing hints (bits 2 bits)
     deriving(Eq,Show,Ord,Read)
     {-! derive: Binary !-}
-
 
 data ValOp
     = NaN
@@ -226,8 +221,6 @@ instance Show ArchBits where
     show BitsPtr = "ptr"
     show BitsUnknown = "?"
 
-
-
 data Op v
     = BinOp BinOp v v
     | UnOp UnOp v
@@ -235,7 +228,6 @@ data Op v
     | ConvOp ConvOp v
     deriving(Eq,Show,Ord)
     {-! derive: Binary !-}
-
 
 binopType :: BinOp -> Ty -> Ty -> Ty
 binopType Mulx  (TyBits (Bits i) h) _ = TyBits (Bits (i*2)) h
@@ -355,7 +347,6 @@ class IsOperator o where
     isCheap :: o -> Bool
     isEagerSafe :: o -> Bool
 
-
 instance IsOperator BinOp where
     isCheap FAtan2 = False
     isCheap _ = True
@@ -368,16 +359,13 @@ instance IsOperator BinOp where
     isEagerSafe UMod = False
     isEagerSafe _ = True
 
-
 instance IsOperator UnOp where
     isCheap _ = True
     isEagerSafe _ = True
 
-
 instance IsOperator ConvOp where
     isCheap _ = True
     isEagerSafe _ = True
-
 
 instance IsOperator (Op v) where
     isCheap (BinOp o _ _) = isCheap o
@@ -388,4 +376,3 @@ instance IsOperator (Op v) where
     isEagerSafe (UnOp o _) = isEagerSafe o
     isEagerSafe (ConvOp o _) = isEagerSafe o
     isEagerSafe _ = False
-

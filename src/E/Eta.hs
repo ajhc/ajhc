@@ -12,8 +12,8 @@ module E.Eta(
     ) where
 
 import Control.Monad.Identity
-import Control.Monad.Writer
 import Control.Monad.State
+import Control.Monad.Writer
 import Data.Typeable
 
 import DataConstructors
@@ -32,7 +32,6 @@ import Util.NameMonad
 import Util.SetLike
 import qualified Info.Info as Info
 import qualified Stats
-
 
 data ArityType = AFun Bool ArityType | ABottom | ATop
     deriving(Eq,Ord,Typeable)
@@ -71,12 +70,10 @@ arityType e = f e where
     f (EVar tvr) | Just at <- Info.lookup (tvrInfo tvr) = at
     f _ = ATop
 
-
 andArityType ABottom	    at2		  = at2
 andArityType ATop	    at2		  = ATop
 andArityType (AFun t1 at1)  (AFun t2 at2) = AFun (t1 && t2) (andArityType at1 at2)
 andArityType at1	    at2		  = andArityType at2 at1
-
 
 annotateArity e nfo = annotateArity' (arityType e) nfo
 
@@ -86,19 +83,15 @@ annotateArity' at nfo = Info.insert (Arity n (b == ABottom)) $ Info.insert at nf
 -- delety any arity information
 deleteArity nfo = Info.delete  (undefined :: Arity) $ Info.delete (undefined :: Arity) nfo
 
-
 expandPis :: DataTable -> E -> E
 expandPis dataTable e = f (followAliases dataTable e) where
     f (EPi v r) = EPi v (f (followAliases dataTable r))
     f e = e
 
-
 fromPi' :: DataTable ->  E -> (E,[TVr])
 fromPi' dataTable e = f [] (followAliases dataTable e) where
     f as (EPi v e) = f (v:as) (followAliases dataTable e)
     f as e  =  (e,reverse as)
-
-
 
 -- this annotates, but only expands top-level definitions
 etaExpandProgram :: Stats.MonadStats m => Program -> m Program
@@ -121,9 +114,6 @@ etaAnnotateProgram prog = runIdentity $ programMapRecGroups mempty pass iletann 
         let (ts',fs) = runState (annotateCombs mempty pass letann pass ts) False
         if fs then f (rg,ts') else return ts'
 
-
-
-
 -- | eta reduce as much as possible
 etaReduce :: E -> E
 etaReduce e = f e where
@@ -138,7 +128,6 @@ etaReduce' e = case f e 0 of
     where
         f (ELam t (EAp x (EVar t'))) n | n `seq` True, t == t' && (tvrIdent t `notMember` (freeVars x :: IdSet)) = f x (n + 1)
         f e n = (e,n)
-
 
 etaExpandDef' dataTable n t e = etaExpandDef dataTable n t e >>= \x -> case x of
     Nothing -> return (tvrInfo_u (annotateArity e) t,e)
@@ -191,8 +180,6 @@ etaExpandDef dataTable min t e  = ans where
     f _ _ e _ _ = do
         return (e,False)
 
-
-
 -- | eta expand a use of a value
 etaExpandAp :: (NameMonad Id m,Stats.MonadStats m) => DataTable -> TVr -> [E] -> m (Maybe E)
 etaExpandAp dataTable tvr xs = do
@@ -219,5 +206,3 @@ etaExpandAp dataTable t as | Just (Arity n err) <- Info.lookup (tvrInfo t) = cas
 
 etaExpandAp _ t as = return Nothing
 -}
-
-
