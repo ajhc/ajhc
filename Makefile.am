@@ -36,7 +36,7 @@ HSFILES=src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/
 	src/Util/Relation.hs src/Util/RWS.hs src/Util/SameShape.hs src/Util/Seq.hs src/Util/SetLike.hs src/Util/UnionFind.hs \
 	src/Util/UnionSolve.hs src/Util/UniqueMonad.hs src/Util/Util.hs src/Util/VarName.hs src/Version/Config.hs src/Version/Version.hs \
 	src/Support/IniParse.hs src/E/Lint.hs src/Util/Progress.hs src/Grin/StorageAnalysis.hs src/Util/YAML.hs src/Grin/Main.hs \
-        src/E/Main.hs src/Util/GMap.hs src/Util/ExitCodes.hs
+        src/E/Main.hs src/Util/GMap.hs src/Util/ExitCodes.hs src/Support/TempDir.hs
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
 GHCPROFOPTS= -prof -auto-all -osuf prof.o -hisuf prof.hi
@@ -48,7 +48,7 @@ GHCINC=  -i -i$(srcdir)/drift_processed \
 PACKAGES= -package fgl -package regex-compat -package random -package array -package directory \
           -package bytestring -package binary -package pretty -package mtl -package containers \
 	  -package unix -package haskell98 -package utf8-string -package zlib -package HsSyck \
-	  -package filepath
+	  -package filepath -package process
 
 GHCLANG= -XTypeFamilies -XViewPatterns -XUndecidableInstances -XOverlappingInstances -XRecordWildCards -XRecursiveDo -XTupleSections -XParallelListComp -XGeneralizedNewtypeDeriving -XScopedTypeVariables -XFlexibleInstances -XTypeSynonymInstances -XMultiParamTypeClasses -XDeriveDataTypeable -fglasgow-exts -XNoMonoLocalBinds
 GHCOPTS= $(HSOPTS) -XBangPatterns -O @GHCFLAGS@ $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)

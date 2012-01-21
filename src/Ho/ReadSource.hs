@@ -1,5 +1,4 @@
 -- routines dealing with reading and preprocessing source code files.
-
 module Ho.ReadSource(
    preprocess,
    preprocessHs,
@@ -10,17 +9,20 @@ import Control.Monad
 import Data.Char
 import Data.List
 import Data.Maybe
+import Foreign.C
 import System.Directory
+import System.FilePath as FP
+import System.Process
 import System.Random (randomIO)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Lazy.UTF8 as LBSU
 import qualified Data.Set as Set
-import qualified System.FilePath as FP
 
 import FrontEnd.HsParser
 import FrontEnd.HsSyn
 import FrontEnd.ParseMonad
+import Support.TempDir
 import FrontEnd.Syn.Options
 import FrontEnd.Unlit
 import FrontEnd.Warning
@@ -49,9 +51,10 @@ preprocess opt fn lbs = do
           | otherwise -> return lbs
 
 m4Prelude :: IO FilePath
-m4Prelude = (randomIO :: IO Integer) >>= \salt ->
-    let m4p_filename = "/tmp/jhc_prelude-" ++ show salt ++ ".m4"
-    in BS.writeFile m4p_filename prelude_m4 >> return m4p_filename
+m4Prelude = do
+    fp <- fileInTempDir "prelude.m4"
+    BS.writeFile fp prelude_m4
+    return fp
 
 collectFileOpts fn s = opt where
     Just opt = fileOptions opts `mplus` Just options
@@ -69,11 +72,24 @@ langmap = [
     ] where x ==> y = (x,if head y == '-' then y else "-f" ++ y)
 
 parseHsSource :: FilePath -> LBS.ByteString -> IO (HsModule,LBS.ByteString)
+parseHsSource fp@(FP.splitExtension -> (base,".hsc")) _ = do
+    let out = FP.takeFileName base ++ ".hs"
+    tdir <- getTempDir
+    let incFlags = [ "-I" ++ d | d <- optIncdirs options ++ optIncs options]
+    let hscargs =   [fp, "-o", tdir </> out] ++ incFlags
+    when verbose $
+        print ("hsc2hs",hscargs)
+    rawSystem "hsc2hs" hscargs
+    print tdir
+    print out
+    lbs <- LBS.readFile $ tdir </> out
+    parseHsSource out lbs
+
 parseHsSource fn lbs = do
     let fileOpts = collectFileOpts fn (LBSU.toString $ LBS.take 2048 lbs)
     lbs' <- preprocess fileOpts fn lbs
     let s = LBSU.toString lbs'
-    let s' = if "shl." `isPrefixOf` reverse fn  then unlit fn s'' else s''
+    let s' = if FP.takeExtension fn == ".lhs" then unlit fn s'' else s''
         s'' = case s of
             '#':' ':_   -> '\n':s                --  line pragma
             '#':'l':'i':'n':'e':' ':_  -> '\n':s --  line pragma

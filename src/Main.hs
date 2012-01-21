@@ -1,9 +1,9 @@
 module Main(main) where
 
-import System.IO
 import Control.Exception
 import Control.Monad.Identity
 import Prelude
+import System.IO
 import qualified Data.ByteString.Lazy as LBS
 
 import DataConstructors
@@ -19,14 +19,14 @@ import Ho.Collected
 import Ho.Library
 import Name.Name
 import Options
+import Support.TempDir
 import Util.Gen
 import Util.SetLike as S
 import Version.Version(versionSimple)
 import qualified FlagDump as FD
 import qualified Interactive
 
-
-main = do
+main = wrapMain $ do
     hSetEncoding stdout utf8
     hSetEncoding stderr utf8
     o <- processOptions
@@ -58,7 +58,6 @@ processFiles cs = f cs (optMainFunc options) where
         ('s':'h':'.':_)     -> Right f
         ('s':'h':'l':'.':_) -> Right f
         _                   -> Left $ Module f
-
 
 processCollectedHo cho = do
     if optMode options == CompileHo then return () else do
