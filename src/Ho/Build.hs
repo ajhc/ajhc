@@ -8,7 +8,6 @@ module Ho.Build (
     buildLibrary
     ) where
 
-
 import Control.Concurrent
 import Control.Monad.Identity
 import Data.Char
@@ -392,7 +391,8 @@ parseFiles
     -> IO (CompNode,CollectedHo)                            -- ^ Final accumulated ho
 parseFiles options targets elibs need ifunc func = do
     putProgressLn "Finding Dependencies..."
-    (ksm,chash,cug) <- loadModules options targets (snub $ optHls options ++ elibs) need
+    (ksm,chash,cug) <- loadModules options targets (snub $
+        if optNoAuto options then optHls options ++ elibs else optAutoLoads options ++ optHls options ++ elibs) need
     cnode <- processCug cug chash
     when (optMode options == StopParse) exitSuccess
     performGC

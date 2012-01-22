@@ -162,6 +162,7 @@ data Opt = Opt {
     optIncdirs     ::  [String],  -- ^ Include directories.
     optCCargs      ::  [String],  -- ^ Optional arguments to the C compiler.
     optHls         ::  [String],  -- ^ Load the specified hl-files (haskell libraries).
+    optAutoLoads   ::  [String],  -- ^ AutoLoaded haskell libraries.
     optHlPath      ::  [String],  -- ^ Path to look for libraries.
     optIncs        ::  [String],
     optDefs        ::  [String],
@@ -195,6 +196,7 @@ emptyOpt = Opt {
     optAnnotate    = Nothing,
     optDeps        = Nothing,
     optHls         = [],
+    optAutoLoads   = [],
     optHlPath      = initialLibIncludes,
     optIncs        = [],
     optDefs        = [],
@@ -354,10 +356,7 @@ processOptions = do
         putStrLn (show $ optFOptsSet o)
     -- add autoloads based on ini options
     let autoloads = maybe [] (tokens (',' ==)) (M.lookup "autoload" inis)
-        o3 = o2 { optArgs = ns, optInis = inis }
-    case optNoAuto o2 of
-      True -> return o3
-      False-> return o3 {  optHls  = (autoloads ++ optHls o2) }
+    return o2 { optArgs = ns, optInis = inis, optAutoLoads = autoloads }
 
 doShowHelp = do
     putStrLn helpUsage
