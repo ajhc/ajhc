@@ -1,25 +1,12 @@
 {-# OPTIONS_JHC -fno-prelude -fffi #-}
 module Jhc.Basics(module Jhc.Basics, module Jhc.Prim) where
 
-import Jhc.Prim
 import Jhc.Int
+import Jhc.Prim
 
-data (->) :: ?? -> ? -> *
 data Integer
 
 type String = [Char]
-
-data () = ()
-data (,) a b = (,) a b
-data (,,) a b c = (,,) a b c
-data (,,,) a b c d = (,,,) a b c d
-data (,,,,) a b c d e = (,,,,) a b c d e
-data (,,,,,) a b c d e f = (,,,,,) a b c d e f
-data (,,,,,,) a b c d e f g = (,,,,,,) a b c d e f g
-data (,,,,,,,) a b c d e f g h = (,,,,,,,) a b c d e f g h
-data (,,,,,,,,) a b c d e f g h i = (,,,,,,,,) a b c d e f g h i
-
-
 
 ------------------------
 -- the basic combinators
@@ -45,10 +32,8 @@ flip f x y = f y x
 asTypeOf         :: a -> a -> a
 asTypeOf         =  const
 
-
 {-# INLINE seq #-}
 foreign import primitive seq :: a -> b -> b
-
 
 --------------------
 -- some tuple things
@@ -61,12 +46,9 @@ snd (a,b) = b
 uncurry f (x,y) = f x y
 curry f x y = f (x,y)
 
-
-
 ----------------------
 -- Basic list routines
 ----------------------
-
 
 -- iterate f x returns an infinite list of repeated applications of f to x:
 -- iterate f x == [x, f x, f (f x), ...]
@@ -79,8 +61,6 @@ iterate f x      =  x : iterate f (f x)
 repeat           :: a -> [a]
 repeat x         =  xs where xs = x:xs
 
-
-
 -- Map and append
 
 map :: (a -> b) -> [a] -> [b]
@@ -88,26 +68,20 @@ map f xs = go xs where
     go [] = []
     go (x:xs) = f x : go xs
 
-
-
 infixr 5  ++
 
 (++) :: [a] -> [a] -> [a]
 []     ++ ys = ys
 (x:xs) ++ ys = x : (xs ++ ys)
 
-
 foldl            :: (a -> b -> a) -> a -> [b] -> a
 foldl f z []     =  z
 foldl f z (x:xs) =  foldl f (f z x) xs
-
 
 scanl            :: (a -> b -> a) -> a -> [b] -> [a]
 scanl f q xs     =  q : (case xs of
                             []   -> []
                             x:xs -> scanl f (f q x) xs)
-
-
 
 reverse          :: [a] -> [a]
 --reverse          =  foldl (flip (:)) []
@@ -115,12 +89,10 @@ reverse l =  rev l [] where
     rev []     a = a
     rev (x:xs) a = rev xs (x:a)
 
-
 -- zip takes two lists and returns a list of corresponding pairs.  If one
 -- input list is short, excess elements of the longer list are discarded.
 -- zip3 takes three lists and returns a list of triples.  Zips for larger
 -- tuples are in the List library
-
 
 zip :: [a] -> [b] -> [(a,b)]
 zip (a:as) (b:bs) = (a,b) : zip as bs
@@ -135,19 +107,16 @@ zipWith          :: (a->b->c) -> [a]->[b]->[c]
 zipWith z (a:as) (b:bs) =  z a b : zipWith z as bs
 zipWith _ _ _    =  []
 
-
 concat :: [[a]] -> [a]
 concat [] = []
 concat (x:xs) = case x of
     [] -> concat xs
     (y:ys) -> y:concat (ys:xs)
 
-
 concatMap :: (a -> [b]) -> [a] -> [b]
 concatMap f xs = g xs where
     g [] = []
     g (x:xs) = f x ++ g xs
-
 
 foldr :: (a -> b -> b) -> b -> [a] -> b
 foldr k z [] = z

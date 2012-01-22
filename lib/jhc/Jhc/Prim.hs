@@ -1,15 +1,16 @@
 {-# LANGUAGE UnboxedTuples, ForeignFunctionInterface, NoImplicitPrelude #-}
-module Jhc.Prim(module Jhc.Prim.Bits, module Jhc.Prim) where
+module Jhc.Prim(module Jhc.Prim.Bits, module Jhc.Prim, module Jhc.Prim.IO) where
 
 import Jhc.Prim.Bits
 import Jhc.String
+import Jhc.Prim.IO
 
 infixr 5  :
 data [] a =  a : ([] a) | []
 
-newtype IO a = IO (World__ -> (# World__, a #))
+--newtype IO a = IO (World__ -> (# World__, a #))
 
-data World__ :: #
+--data World__ :: #
 
 data Int
 data Char = Char Char__

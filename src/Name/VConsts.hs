@@ -13,10 +13,7 @@ class TypeNames a where
     tChar :: a
     tIntzh :: a
     tEnumzh :: a
-    tIntegerzh :: a
     tCharzh :: a
-    tStar :: a
-    tHash :: a
     tBool :: a
     tUnit :: a
     tString :: a
@@ -27,31 +24,24 @@ class TypeNames a where
     tRational = error "tRational"
     tChar = error "tChar"
     tIntzh = error "tIntzh"
---    tEnumzh = error "tEnumzh"
-    tIntegerzh = error "tIntegerzh"
+    tEnumzh = error "tEnumzh"
     tCharzh = error "tCharzh"
-    tStar = error "VConsts: tStar"
     tBool = error "tBool"
     tUnit = error "tUnit"
     tString = error "tString"
     tInteger = error "tInteger"
-    tHash = error "tHash"
     tWorld__ = error "tWorld"
 
 class ConNames a where
     vTrue :: a
     vFalse :: a
-    vEmptyList :: a
     vCons :: a
     vUnit :: a
-    vOrdering :: Ordering -> a
 
     vTrue = error "vTrue"
     vFalse = error "vFalse"
-    vEmptyList = error "vEmptyList"
     vCons = error "vCons"
     vUnit = error "vUnit"
-    vOrdering x = error $ "v" ++ show x
 
 class FromTupname a where
     fromTupname :: Monad m => a -> m Int
@@ -61,7 +51,7 @@ instance FromTupname String where
     fromTupname xs = fail $ "fromTupname: not tuple " ++ xs
 
 instance FromTupname (String,String) where
-    fromTupname ("Jhc.Basics",n) = fromTupname n
+    fromTupname ("Jhc.Prim.Prim",n) = fromTupname n
     fromTupname xs =  fail $ "fromTupname: not tuple " ++ show xs
 
 class ToTuple a where
@@ -71,7 +61,7 @@ instance ToTuple String where
     toTuple n = '(': replicate (n - 1) ',' ++ ")"
 
 instance ToTuple (String,String) where
-    toTuple n = ("Jhc.Basics",toTuple n)
+    toTuple n = ("Jhc.Prim.Prim",toTuple n)
 
 -- | various functions needed for desugaring.
 data FuncNames a = FuncNames {

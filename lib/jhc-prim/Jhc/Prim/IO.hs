@@ -1,15 +1,18 @@
 module Jhc.Prim.IO where
 
-data State_ s :: #
-data RealWorld
+data State_ :: * -> #
+data RealWorld :: *
 
-type STRep s a = State_ s -> (# State_ s, a #)
 type World__ = State_ RealWorld
-type UIO a = STRep RealWorld a
+
+type UST s a = State_ s -> (# State_ s, a #)
+type UST_ s = State_ s -> State_ s
+type UIO a = UST RealWorld a
 type UIO_ = World__ -> World__
 
-newtype IO a = IO (STRep RealWorld a)
-newtype ST s a = ST (STRep s a)
+newtype IO a = IO (UST RealWorld a)
+newtype ST s a = ST (UST s a)
+newtype ACIO a = ACIO (IO a)
 
 -- | note the implicit unsafeCoerce__ here!
 foreign import primitive catch__ :: UIO a -> (e -> UIO a) -> UIO a

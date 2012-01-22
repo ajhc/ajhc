@@ -68,9 +68,9 @@ addTopLevels  hsmod action = do
     let cdefs = map (\ (x,y,_) -> (x,y)) $ fst $ collectDefsHsModule hsmod
         nmap = foldl f [] (fsts cdefs)
         f r hsName@(getModule -> Just _)
-            | Just _ <- V.fromTupname hsName, Module "Jhc.Basics" <- mod
+            | Just _ <- V.fromTupname hsName, Module "Jhc.Prim.Prim" <- mod
                 = let nn = hsName in (nn,nn):r
-            | nameName tc_Arrow == hsName, Module "Jhc.Basics" == mod
+            | nameName tc_Arrow == hsName, Module "Jhc.Prim.Prim" == mod
                 = let nn = hsName in (nn,nn):r
  --           | otherwise = error $ "strong bad: " ++ show hsName
             | otherwise = let nn = toUnqualified hsName in (nn,hsName):(hsName,hsName):r
@@ -846,4 +846,3 @@ instance MonadSetSrcLoc RM where
     withSrcLoc sl a = local (\s -> s { envSrcLoc = sl `mappend` envSrcLoc s}) a
 instance OptionMonad RM where
     getOptions = asks envOptions
-

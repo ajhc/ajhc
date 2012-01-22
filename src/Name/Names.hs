@@ -20,14 +20,11 @@ instance TypeNames Name where
     tBool = tc_Bool
     tInteger = tc_Integer
     tChar = tc_Char
-    tStar = s_Star
-    tHash = s_Hash
     tUnit = tc_Unit
     tIntzh = rt_bits32
     tEnumzh = rt_bits16
     tCharzh = rt_bits32
-    tIntegerzh = rt_bits_max_
-    tWorld__ = tc_World__
+--    tWorld__ = tc_World__
 
 --No tuple instance because it is easy to get the namespace wrong. use 'nameTuple'
 --instance ToTuple Name where
@@ -42,11 +39,9 @@ fromUnboxedNameTuple n = case show n of
     _ -> fail $ "Not unboxed tuple: " ++ show n
 
 instance FromTupname Name where
-    fromTupname name | m == "Jhc.Basics" = fromTupname (nn::String) where
+    fromTupname name | m == "Jhc.Prim.Prim" = fromTupname (nn::String) where
         (_,(m,nn)) = fromName name
     fromTupname _ = fail "not a tuple"
-
-tc_Arrow = toName TypeConstructor  ("Jhc.Basics","->")
 
 s_Star = toName SortName ("Jhc@","*")
 s_Hash = toName SortName ("Jhc@","#")

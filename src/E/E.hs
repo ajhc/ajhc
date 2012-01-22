@@ -35,7 +35,6 @@ isWHNF _ = False
 -----------
 
 instance TypeNames E where
-    tStar = eStar
     tInt = ELit (litCons { litName = tInt, litArgs = [], litType = eStar })
     tRational = ELit (litCons { litName = tc_Ratio, litArgs = [tInteger], litType = eStar })
     tChar = ELit (litCons { litName = tChar, litArgs = [], litType = eStar })
@@ -43,11 +42,14 @@ instance TypeNames E where
     tUnit = ELit (litCons { litName = tUnit, litArgs = [], litType = eStar })
     tString =  (ELit (litCons { litName = tc_List, litArgs = [tChar], litType = eStar }))
     tInteger = ELit (litCons { litName = tInteger, litArgs = [], litType = eStar })
-    tWorld__ = ELit (litCons { litName = tWorld__, litArgs = [], litType = eHash })
+--    tWorld__ = ELit (litCons { litName = tWorld__, litArgs = [], litType = eHash })
+    tWorld__ = ELit (litCons { litName = tc_State_, litArgs = [realWorld], litType = eHash }) where
+        realWorld = ELit (litCons { litName = tc_RealWorld, litArgs = [], litType = eStar })
     tIntzh = ELit (litCons { litName = tIntzh, litArgs = [], litType = eHash })
     tEnumzh = ELit (litCons { litName = tEnumzh, litArgs = [], litType = eHash })
-    tIntegerzh = ELit (litCons { litName = tIntegerzh, litArgs = [], litType = eHash })
     tCharzh = ELit (litCons { litName = tCharzh, litArgs = [], litType = eHash })
+
+tIntegerzh = ELit (litCons { litName = rt_bits_max_, litArgs = [], litType = eHash })
 
 instance ConNames E where
     vTrue = ELit vTrue

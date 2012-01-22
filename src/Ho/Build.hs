@@ -104,7 +104,7 @@ findFirstFile err ((x,a):xs) = flip catch (\e ->   findFirstFile err xs) $ do
 
 data ModDone
     = ModNotFound
-    | ModLibrary Bool ModuleGroup Library
+    | ModLibrary !Bool ModuleGroup Library
     | Found SourceCode
 
 data Done = Done {
@@ -618,7 +618,7 @@ compileCompNode ifunc func ksm cn = do
     f cn
 
 --hsModuleRequires x = snub (Module "Jhc.Prim":ans) where
-hsModuleRequires x = snub (Module "Jhc.Prim.Bits":ans) where
+hsModuleRequires x = snub (Module "Jhc.Prim.Prim":ans) where
 --hsModuleRequires x = snub ans where
     noPrelude = FO.Prelude `Set.notMember` optFOptsSet (hsModuleOpt x)
     ans = (if noPrelude then id else  (Module "Prelude":)) [  hsImportDeclModule y | y <- hsModuleImports x]

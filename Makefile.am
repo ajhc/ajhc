@@ -68,7 +68,7 @@ dist-hook: man manual
 	cp $(srcdir)/jhc.1 $(distdir)/jhc.1
 	find $(distdir) \( -name _darcs -o -name \*.ho \) -print | xargs rm -rf --
 
-all-local: libs
+all-local: $(JHC_LIBS)
 
 install-data-hook: $(JHC_LIBS) $(JHC_EXT_LIBS)
 	$(INSTALL) -d $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@

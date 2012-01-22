@@ -63,7 +63,7 @@ import qualified Stats
 
 unboxedMap :: [(Name,Ty)]
 unboxedMap = [
-    (tc_World__,TyUnit),
+    (tc_State_,TyUnit),
     (tc_Ref__,TyPtr tyINode),
     (tc_Array__,TyPtr tyINode),
     (tc_MutArray__,TyPtr tyINode)

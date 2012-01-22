@@ -26,7 +26,8 @@ annotateCombs imap idann letann lamann cs = do
         nfo <- letann (combBody comb) (tvrInfo $ combHead comb)
         nt <- annotate imap idann letann lamann (tvrType  $ combHead comb)
         return $ combHead_u (tvrInfo_s nfo . tvrType_s nt) comb
-    let nimap = fromList [ (combIdent c, Just . EVar $ combHead c) | c <- cs ] `mappend` imap
+    let nimap = fromList [ (combIdent c, Just . EVar $ combHead c) | c <- cs ]
+            `mappend` imap
         f :: (IdMap (Maybe E)) -> E -> m E
         f ni e = annotate ni idann letann lamann e
     let mrule :: Rule -> m Rule

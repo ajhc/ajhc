@@ -159,7 +159,10 @@ prim_unsafeCoerce e t = p e' where
 from_unsafeCoerce (EPrim pp [e] t) | pp == p_unsafeCoerce = return (e,t)
 from_unsafeCoerce _ = fail "Not unsafeCoerce primitive"
 
-tWorldzh = ELit litCons { litName = tc_World__, litArgs = [], litType = eHash }
+--tWorldzh = ELit litCons { litName = tc_World__, litArgs = [], litType = eHash }
+isState_ e = case e of
+    ELit (LitCons { litName = name }) | name == tc_State_ -> True
+    _ -> False
 
 unsafeCoerceOpt (EPrim uc [e] t) | uc == p_unsafeCoerce = f (0::Int) e t where
     f n e t | Just (e',_) <- from_unsafeCoerce e = f (n + 1) e' t

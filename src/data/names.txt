@@ -1,20 +1,23 @@
-
 TypeConstructor:tc:
 
+Arrow      Jhc.Prim.Prim.->
 Ref__      Data.IORef.Ref__
 MutArray__ Jhc.Array.MutArray__
 List       Jhc.Prim.[]
 Char       Jhc.Prim.Char
-IO         Jhc.Prim.IO
-World__    Jhc.Prim.World__
-Int__      Jhc.Prim.Int__
+IO         Jhc.Prim.IO.IO
+ACIO       Jhc.Prim.IO.ACIO
+State_     Jhc.Prim.IO.State_
+RealWorld  Jhc.Prim.IO.RealWorld
+#World__   Jhc.Prim.World__
+#Int__     Jhc.Prim.Int__
 Array__    Jhc.Array.Array__
 Bool       Jhc.Order.Bool
 Boolzh     Jhc.Order.Bool#
 Ptr        Jhc.Addr.Ptr
 FunPtr     Jhc.Addr.FunPtr
 Ratio      Jhc.Num.Ratio
-Unit       Jhc.Basics.()
+Unit       Jhc.Prim.Prim.()
 Float      Jhc.Float.Float
 Double     Jhc.Float.Double
 CLong      Foreign.C.Types.CLong
@@ -70,7 +73,7 @@ DataConstructor:dc:
 Rational   Jhc.Num.:%
 Cons       Jhc.Prim.:
 EmptyList  Jhc.Prim.[]
-Unit       Jhc.Basics.()
+Unit       Jhc.Prim.Prim.()
 Boolzh     Jhc.Order.Bool#
 Char       Jhc.Prim.Char
 #Int        Int#
@@ -149,9 +152,9 @@ range                Data.Ix.range
 index                Data.Ix.index
 inRange              Data.Ix.inRange
 runExpr              Prelude.IO.runExpr
-runRaw               Jhc.Prim.runRaw
+runRaw               Jhc.Prim.Wrapper.runRaw
 runMain              Jhc.IO.runMain
-runNoWrapper         Jhc.Prim.runNoWrapper
+runNoWrapper         Jhc.Prim.Wrapper.runNoWrapper
 
 enum_succ            Jhc.Inst.PrimEnum.enum_succ
 enum_pred            Jhc.Inst.PrimEnum.enum_pred

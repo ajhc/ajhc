@@ -30,9 +30,9 @@ data BitsLLong_ :: #
 data BitsSize_  :: #
 data BitsWchar_ :: #
 
-data Complex_ :: # -> #
+-- data Complex_ :: # -> #
 
--- these newtypes exist to modify the 
+-- these newtypes exist to modify the
 -- calling convention and provide hints as
 -- to the use of the types.
 newtype Addr_ = Addr_ BitsPtr_

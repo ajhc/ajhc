@@ -83,7 +83,8 @@ fvBind (Left (_,fv)) = fv
 fvBind (Right xs) = unions (snds xs)
 
 canFloatPast t | sortKindLike . getType $ t = True
-canFloatPast t | getType t == tWorldzh = True
+--canFloatPast t | getType t == tWorldzh = True
+canFloatPast t | isState_ (getType t) = True
 canFloatPast t | getProperty prop_ONESHOT t = True
 canFloatPast _ = False
 

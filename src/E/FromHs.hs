@@ -117,10 +117,14 @@ monadicLookup k m = case Map.lookup k m of
     Just x  -> return x
     Nothing -> fail "key not found"
 
+monadicLookup' k m = case Map.lookup k m of
+    Just x  -> return x
+    Nothing -> fail $ "key not found: " ++ show k
+
 convertValue n = do
     assumps <- asks ceAssumps
     dataTable <- asks ceDataTable
-    t <- monadicLookup n assumps
+    t <- monadicLookup' n assumps
     let ty = removeNewtypes dataTable (tipe t)
     cc <- asks ceCoerce
     lm <- case Map.lookup n cc of
@@ -151,7 +155,7 @@ getMainFunction dataTable name ds = do
   mt <- case Map.lookup name ds of
     Just x -> return x
     Nothing -> fail $ "Could not find main function: " ++ show name
-  let funcs = runIdentity $ T.mapM (\n -> return . EVar . fst $ runEither (show n) $ monadicLookup n ds) sFuncNames
+  let funcs = runIdentity $ T.mapM (\n -> return . EVar . fst $ runEither (show n) $ monadicLookup' n ds) sFuncNames
   nameToEntryPoint dataTable (fst mt) (toName Name.Val "theMain") Nothing funcs
 
 nameToEntryPoint :: Monad m => DataTable -> TVr -> Name -> Maybe FfiExport -> FuncNames E -> m (TVr,E)

@@ -188,7 +188,7 @@ instance CanType E E where
     getType (EVar v) =  getType v
     getType e@(EPi TVr { tvrType = a } b)
         | isUnknown typa || isUnknown typb = Unknown
-        | otherwise = maybe (error $ "getType: " ++ show e) ESort $ do
+        | otherwise = maybe (error $ "E.TypeCheck.getType: " ++ show (e,getType a,getType b)) ESort $ do
             ESort s1 <- return $ getType a
             ESort s2 <- return $ getType b
             monadicLookup (s1,s2) ptsRulesMap

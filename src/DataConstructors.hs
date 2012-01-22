@@ -197,7 +197,7 @@ getConstructor :: Monad m => Name -> DataTable -> m Constructor
 getConstructor n _ | isJust me = return (emptyConstructor {
     conName = n, conType = e,
     conExpr = foldr ELam (foldl eAp (mktBox e) (map EVar tvrs)) tvrs,
-    conInhabits = tStar, conOrigSlots = map SlotNormal sts }) where
+    conInhabits = s_Star, conOrigSlots = map SlotNormal sts }) where
         sts = map tvrType ss
         tvrs = [ tvr { tvrIdent = i , tvrType = t } | i <- anonymousIds | t <- sts ]
         (_,ss) = fromPi e
@@ -230,7 +230,7 @@ tunboxedtuple n = (typeCons,dataCons) where
             conType = foldr EPi eHash (replicate n tvr { tvrType = eStar }),
             conOrigSlots = replicate n (SlotNormal eStar),
             conExpr = tipe,
-            conInhabits = tHash,
+            conInhabits = s_Hash,
             conChildren = DataNormal [dc]
            }
 
@@ -265,7 +265,7 @@ tarrow = emptyConstructor {
             conType = EPi (tVr emptyId eStar) (EPi (tVr emptyId eStar) eStar),
             conOrigSlots = [SlotNormal eStar,SlotNormal eStar],
             conExpr = ELam (tVr va1 eStar) (ELam (tVr va2 eStar) (EPi (tVr emptyId (EVar $ tVr va1 eStar)) (EVar $ tVr va2 eStar))),
-            conInhabits = tStar,
+            conInhabits = s_Star,
             conChildren = DataAbstract
         }
 
@@ -273,7 +273,7 @@ primitiveConstructor name = emptyConstructor {
     conName = name,
     conType = eHash,
     conExpr = ELit (litCons { litName = name, litArgs = [], litType = eHash }),
-    conInhabits = tHash,
+    conInhabits = s_Hash,
     conChildren = DataPrimitive
     }
 
@@ -290,7 +290,7 @@ primitiveTable = concatMap f allCTypes  where
             conName = tc,
             conType = eStar,
             conExpr = tipe,
-            conInhabits = tStar,
+            conInhabits = s_Star,
             conChildren = DataNormal [dc]
            }
         tipe = ELit (litCons { litName = tc, litArgs = [], litType = eStar })
@@ -385,7 +385,7 @@ extTypeInfoExtType ExtTypeVoid = "void"
 lookupExtTypeInfo :: Monad m => DataTable -> E -> m ExtTypeInfo
 lookupExtTypeInfo dataTable oe = f oe where
     -- handle the void context ones first
-    f e@(ELit LitCons { litName = c }) | c == tc_Unit || c == tc_World__ = return ExtTypeVoid
+    f e@(ELit LitCons { litName = c }) | c == tc_Unit || c == tc_State_ = return ExtTypeVoid
     -- if the constructor is in the external type map, replace its external
     -- type with the one in the map
     f e@(ELit LitCons { litName = c }) | Just et <- Map.lookup c typeTable = do
@@ -493,16 +493,6 @@ create_integralCast conv c1 t1 c2 t2 e t = eCase e [Alt (litCons { litName = c1,
 
 nameToOpTy n = do RawType <- return $ nameType n; Op.readTy (show n)
 
-{-
-create_integralCast_toInt c1 t1 e = create_integralCast Op.I2I c1 t1 dc_Int tIntzh e tInt
-create_integralCast_toInteger c1 t1 e = create_integralCast Op.Sx c1 t1 dc_Integer tIntegerzh e tInteger
-create_integralCast_fromInt c2 t2 e t = create_integralCast Op.I2I dc_Int tIntzh c2 t2 e t
-create_integralCast_fromInteger c2 t2 e t = create_integralCast Op.Lobits dc_Integer tIntegerzh c2 t2 e t
-
-create_uintegralCast_toInteger c1 t1 e = create_integralCast Op.Zx c1 t1 dc_Integer tIntegerzh e tInteger
-create_uintegralCast_fromInt c2 t2 e t = create_integralCast Op.U2U dc_Int tIntzh c2 t2 e t
-create_uintegralCast_fromInteger c2 t2 e t = create_integralCast Op.Lobits dc_Integer tIntegerzh c2 t2 e t
--}
 create_uintegralCast_toInt c1 t1 e = create_integralCast Op.U2U c1 t1 dc_Int tIntzh e tInt
 
 updateLit :: DataTable -> Lit e t -> Lit e t
@@ -555,7 +545,7 @@ toDataTable km cm ds currentDataTable = newDataTable  where
                 conName = rtypeName,
                 conType = eHash,
                 conExpr = rtype,
-                conInhabits = tHash,
+                conInhabits = s_Hash,
                 conChildren = DataEnum (length virtualCons)
                 }
         tell (Seq.fromList virtualCons)
@@ -641,7 +631,7 @@ toDataTable km cm ds currentDataTable = newDataTable  where
             conOrigSlots = map (SlotNormal . tvrType) theTypeArgs,
             conExpr = foldr ($) theTypeExpr (map ELam theTypeArgs),
             conDeriving = [ toName ClassName n | n <- hsDeclDerives decl],
-            conInhabits = if theTypeFKind == eStar then tStar else tHash,
+            conInhabits = if theTypeFKind == eStar then s_Star else s_Hash,
             conVirtual = Nothing,
             conChildren = undefined
             }
@@ -926,5 +916,5 @@ typeTable = Map.fromList [
     (tc_CTime, "time_t"),
     (tc_CSize, "size_t"),
     (tc_Unit,  "void"),
-    (tc_World__,  "void")
+    (tc_State_,  "void")
     ]

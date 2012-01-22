@@ -1077,7 +1077,7 @@ dot_name	      = toName UnknownType  "."
 prelude_mod	      = Module "Prelude"
 main_mod	      = Module "Main"
 
-tuple_con_name i      = toName DataConstructor ("Jhc.Basics","("++replicate i ','++")")
+tuple_con_name i      = toName DataConstructor ("Jhc.Prim.Prim","("++replicate i ','++")")
 
 unit_con	      = HsCon { {-hsExpSrcSpan = bogusSrcSpan,-} hsExpName = dc_Unit }
 tuple_con i	      = HsCon { {-hsExpSrcSpan = bogusSrcSpan,-} hsExpName = (tuple_con_name i) }

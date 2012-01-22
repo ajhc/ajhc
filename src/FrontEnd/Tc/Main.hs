@@ -405,7 +405,7 @@ tiPat pl@(HsPLit HsIntPrim {}) typ = do
     ty <- evalType typ
     case ty of
         TCon (Tycon n kh) | kh == kindHash -> return ()
-        _ -> ty `boxyMatch` (TCon (Tycon tc_Int__ kindHash))
+        _ -> ty `boxyMatch` (TCon (Tycon tc_Bits32 kindHash))
     return (pl,mempty)
 tiPat pl@(HsPLit HsFrac {}) typ = do
     unBox typ
@@ -866,5 +866,3 @@ collectBindDecls = filter isBindDecl where
     isBindDecl HsPatBind {} = True
     isBindDecl HsFunBind {} = True
     isBindDecl _ = False
-
-
