@@ -1,16 +1,3 @@
-{-
-        Copyright:        Mark Jones and The Hatchet Team
-                          (see file Contributors)
-        Module:           Representation
-        Primary Authors:  Mark Jones and Bernie Pope
-        Description:      The basic data types for representing objects
-                          in the type inference algorithm.
-        Notes:            See the file License for license information
-                          Large parts of this module were derived from
-                          the work of Mark Jones' "Typing Haskell in
-                          Haskell", (http://www.cse.ogi.edu/~mpj/thih/)
--}
-
 module FrontEnd.Representation(
     Type(..),
     Tyvar(..),
@@ -35,23 +22,19 @@ module FrontEnd.Representation(
     tAp
     )where
 
-
 import Control.Monad.Identity
 import Data.IORef
 
 import Data.Binary
 import Doc.DocLike
 import Doc.PPrint
+import FrontEnd.Tc.Kind
 import Name.Name
 import Name.Names
-import Support.CanType
 import Name.VConsts
+import Support.CanType
 import Support.Unparse
 import Util.VarName
-import FrontEnd.Tc.Kind
-
-
---------------------------------------------------------------------------------
 
 -- Types
 
@@ -165,7 +148,6 @@ a `fn` b    = TArrow a b
 
 --------------------------------------------------------------------------------
 
-
 -- Predicates
 data Pred   = IsIn Class Type | IsEq Type Type
               deriving(Show, Eq,Ord)
@@ -210,10 +192,8 @@ newTyvarName t = case tyvarKind t of
     z@(KBase KQuestQuest) -> newLookupName (map (('q':) . ('q':) . show) [0 :: Int ..]) z t
     z -> newLookupName (map (('t':) . show) [0 :: Int ..]) z t
 
-
 prettyPrintType :: DocLike d => Type -> d
 prettyPrintType = pprint
-
 
 instance DocLike d => PPrint d Type where
     pprintAssoc _ n t = prettyPrintTypePrec n t
@@ -275,14 +255,11 @@ prettyPrintTypePrec n t  = unparse $ zup (runIdentity (runVarNameT (f t))) where
     f (TMetaVar mv) = return $ atom $ pprint mv
     f tv = return $ atom $ parens $ text ("FrontEnd.Tc.Type.pp: " ++ show tv)
 
-
 instance DocLike d => PPrint d MetaVarType where
     pprint  t = case t of
         Tau -> char 't'
         Rho -> char 'r'
         Sigma -> char 's'
-
-
 
 instance DocLike d => PPrint d Pred where
     pprint (IsIn c t) = tshow c <+> pprintParen t
@@ -307,27 +284,30 @@ fromTArrow t = f t [] where
     f (TArrow a b) rs = f b (a:rs)
     f t rs = (reverse rs,t)
 
-
-instance CanType MetaVar Kind where
+instance CanType MetaVar where
+    type TypeOf MetaVar = Kind
     getType mv = metaKind mv
 
-instance CanType Tycon Kind where
+instance CanType Tycon where
+    type TypeOf Tycon = Kind
     getType (Tycon _ k) = k
 
-instance CanType Tyvar Kind where
+instance CanType Tyvar where
+    type TypeOf Tyvar = Kind
     getType = tyvarKind
 
-instance CanType Type Kind where
-  getType (TCon tc) = getType tc
-  getType (TVar u)  = getType u
-  getType typ@(TAp t _) = case (getType t) of
-                     (Kfun _ k) -> k
-                     x -> error $ "Representation.getType: kind error in: " ++ (show typ)
-  getType (TArrow _l _r) = kindStar
-  getType (TForAll _ (_ :=> t)) = getType t
-  getType (TExists _ (_ :=> t)) = getType t
-  getType (TMetaVar mv) = getType mv
-  getType ta@TAssoc {} = getType (tassocToAp ta)
+instance CanType Type where
+    type TypeOf Type = Kind
+    getType (TCon tc) = getType tc
+    getType (TVar u)  = getType u
+    getType typ@(TAp t _) = case (getType t) of
+                       (Kfun _ k) -> k
+                       x -> error $ "Representation.getType: kind error in: " ++ (show typ)
+    getType (TArrow _l _r) = kindStar
+    getType (TForAll _ (_ :=> t)) = getType t
+    getType (TExists _ (_ :=> t)) = getType t
+    getType (TMetaVar mv) = getType mv
+    getType ta@TAssoc {} = getType (tassocToAp ta)
 
 tTTuple ts | length ts < 2 = error "tTTuple"
 tTTuple ts = foldl TAp (toTuple (length ts)) ts

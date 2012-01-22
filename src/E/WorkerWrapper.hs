@@ -8,7 +8,7 @@ import E.CPR
 import E.E
 import E.Program
 import E.Traverse
-import E.TypeCheck()
+import E.TypeCheck
 import E.Values
 import GenUtil
 import Info.Types

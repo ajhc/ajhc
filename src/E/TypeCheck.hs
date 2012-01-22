@@ -2,6 +2,8 @@ module E.TypeCheck(
     canBeBox,
     eAp,
     inferType,
+    infertype,
+    typecheck,
     match,
     sortSortLike,
     sortKindLike,
@@ -182,7 +184,8 @@ monadicLookup key m = case Map.lookup key m of
     Nothing -> fail "Key not found"
 
 -- Fast (and lazy, and perhaps unsafe) typeof
-instance CanType E E where
+instance CanType E where
+    type TypeOf E = E
     getType (ESort s) = ESort $ getType s
     getType (ELit l) = getType l
     getType (EVar v) =  getType v
@@ -208,16 +211,20 @@ instance CanType E E where
     getType (EPrim _ _ t) = t
     getType Unknown = Unknown
 
-instance CanType ESort ESort where
+instance CanType ESort where
+    type TypeOf ESort = ESort
     getType (ESortNamed _) = EHashHash
     getType s = case Map.lookup s ptsAxioms of
         Just s -> s
         Nothing -> error $ "getType: " ++ show s
-instance CanType TVr E where
+instance CanType TVr where
+    type TypeOf TVr = E
     getType = tvrType
-instance CanType (Lit x t) t where
+instance CanType (Lit x t) where
+    type TypeOf (Lit x t) = t
     getType l = litType l
-instance CanType e t => CanType (Alt e) t where
+instance CanType e => CanType (Alt e) where
+    type TypeOf (Alt e) = TypeOf e
     getType (Alt _ e) = getType e
 
 sortSortLike (ESort s) = isEHashHash s || isEStarStar s
@@ -369,26 +376,32 @@ inferType dataTable ds e = rfc e where
     boxCompat (ELit (LitCons { litName = n }))  t | Just e <- fromConjured modBox n =  e == getType t
     boxCompat _ _ = False
 
-instance CanTypeCheck DataTable E E where
+-- This should perform a full typecheck and may take any extra information needed as an extra parameter
+class CanTypeCheck a where
+    typecheck :: Monad m => DataTable -> a -> m E
+
+infertype :: CanTypeCheck a => DataTable -> a -> E
+infertype env a = case typecheck env a of
+    Left s -> error $ "infertype: " ++ s
+    Right x -> x
+
+instance CanTypeCheck E where
     typecheck dataTable e = case typeInfer'' dataTable [] e of
         Left ss -> fail $ "\n>>> internal error:\n" ++ unlines ss
         Right v -> return v
 
-instance CanTypeCheck DataTable TVr E where
+instance CanTypeCheck TVr where
     typecheck dt tvr = do
         typecheck dt (getType tvr)
         return $ getType tvr
 
-instance CanTypeCheck DataTable (Lit a E) E where
+instance CanTypeCheck (Lit a E) where
     typecheck  dt LitCons { litType = t } = typecheck dt t >> return t
     typecheck  dt LitInt  { litType = t } = typecheck dt t >> return t
 
 -- TODO, types might be bound in scrutinization
-instance CanTypeCheck DataTable (Alt E) E where
+instance CanTypeCheck (Alt E) where
     typecheck dt (Alt l e) = typecheck dt l >> typecheck dt e
-
-instance CanTypeCheck DataTable [(TVr,E)] [E] where
-    typecheck dataTable ds = do mapM (typecheck dataTable) (snds ds)
 
 -- | Determine type of term using full algorithm with substitutions. This
 -- should be used instead of 'typ' when let-bound type variables exist or you

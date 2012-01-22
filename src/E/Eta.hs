@@ -22,6 +22,7 @@ import E.E
 import E.Inline
 import E.Program
 import E.Subst
+import E.TypeCheck
 import E.Values
 import GenUtil hiding(replicateM_)
 import Info.Types

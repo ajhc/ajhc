@@ -441,7 +441,8 @@ p3 = Var v3 TyINode
 
 -- CanType instances
 
-instance CanType Exp [Ty] where
+instance CanType Exp where
+    type TypeOf Exp = [Ty]
     getType (_ :>>= (_ :-> e2)) = getType e2
     getType (Prim _ _ ty) = ty
     getType App { expType = t } = t
@@ -472,7 +473,8 @@ instance CanType Exp [Ty] where
     getType MkClosure { expType = ty } = ty
     getType GcRoots { expBody = body } = getType body
 
-instance CanType Val Ty where
+instance CanType Val where
+    type TypeOf Val = Ty
     getType (Var _ t) = t
     getType (Lit _ t) = t
     getType (Index v _) = getType v

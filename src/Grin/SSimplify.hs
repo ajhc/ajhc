@@ -295,14 +295,16 @@ data Unbox =  UnConst Val | UnUnknown Ty | UnBaseOp BaseOp [Unbox]
 isUnUnknown UnUnknown  {} = True
 isUnUnknown _ = False
 
-instance CanType UnboxingResult [Ty] where
+instance CanType UnboxingResult where
+    type TypeOf UnboxingResult = [Ty]
     getType (UnErr tys) = tys
     getType (UnReturn us) = map getType us
     getType (UnStore b _ _) = [bool b tyDNode tyINode]
     getType (UnDemote _) = [tyINode]
     getType (UnTail _ tys _) = tys
 
-instance CanType Unbox Ty where
+instance CanType Unbox where
+    type TypeOf Unbox = Ty
     getType (UnConst v) = getType v
     getType (UnUnknown t) = t
 

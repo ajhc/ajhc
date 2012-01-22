@@ -3,17 +3,20 @@ module Support.CanType where
 import Control.Monad.Error()
 
 -- This is a simple routine meant to do the minimum amount of work to get the type of something
-class CanType a e | a -> e where
-    getType :: a -> e
+class CanType a where
+    type TypeOf a
+    getType :: a -> (TypeOf a)
 
-instance CanType e t => CanType [e] [t] where
+instance CanType e => CanType [e] where
+    type TypeOf [e] = [TypeOf e]
     getType es = map getType es
 
--- This should perform a full typecheck and may take any extra information needed as an extra parameter
-class CanTypeCheck env a ty | a -> ty env where
-    typecheck :: Monad m => env -> a -> m ty
+instance CanType e => CanType (Maybe e) where
+    type TypeOf (Maybe e) = Maybe (TypeOf e)
+    getType Nothing = Nothing
+    getType (Just x) = Just (getType x)
 
-infertype :: CanTypeCheck env a ty => env -> a -> ty
-infertype env a = case typecheck env a of
-    Left s -> error $ "infertype: " ++ s
-    Right x -> x
+instance (CanType e1, CanType e2) => CanType (Either e1 e2) where
+    type TypeOf (Either e1 e2) = Either (TypeOf e1) (TypeOf e2)
+    getType (Left x) = Left $ getType x
+    getType (Right x) = Right $ getType x
