@@ -101,8 +101,11 @@ processDecls cho ho' tiData = do
         originalDecls =  concat [ hsModuleDecls  m | (_,m) <- tiDataModules tiData ]
 
     -- build datatables
-    let dataTable = toDataTable (getConstructorKinds (hoKinds $ hoTcInfo ho')) (tiAllAssumptions tiData) originalDecls (hoDataTable $ hoBuild ho)
-        classInstances = deriveClasses (choCombinators cho) dataTable
+    let derives = (collectDeriving originalDecls)
+    mapM_ print derives
+    let dataTable = toDataTable (getConstructorKinds (hoKinds $ hoTcInfo ho'))
+            (tiAllAssumptions tiData) originalDecls (hoDataTable $ hoBuild ho)
+        classInstances = deriveClasses (choCombinators cho) fullDataTable derives
         fullDataTable = dataTable `mappend` hoDataTable (hoBuild ho)
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
 

@@ -11,6 +11,7 @@ module DataConstructors(
     dataTablePrims,
     constructionExpression,
     deconstructionExpression,
+    collectDeriving,
     followAliases,
     followAlias,
     tAbsurd,
@@ -61,6 +62,7 @@ import E.TypeCheck
 import E.Values
 import FrontEnd.Class(instanceName)
 import FrontEnd.HsSyn
+import FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse
 import FrontEnd.Tc.Type
 import GenUtil
@@ -137,7 +139,6 @@ data Constructor = Constructor {
     conType      :: E,            -- type of constructor
     conExpr      :: E,            -- expression which constructs this value
     conOrigSlots :: [Slot],       -- original slots
-    conDeriving  :: [Name],       -- classes this type derives
     conAlias     :: !AliasType,   -- whether this is a simple alias and has no tag of its own.
     conInhabits  :: Name,         -- what constructor it inhabits, similar to conType, but not quite.
     conVirtual   :: Maybe [Name], -- whether this is a virtual constructor that translates into an enum and its siblings
@@ -183,7 +184,6 @@ emptyConstructor = Constructor {
                 conOrigSlots = [],
                 conExpr = Unknown,
                 conInhabits = error "emptyConstructor.conInhabits",
-                conDeriving = [],
                 conAlias = NotAlias,
                 conVirtual = Nothing,
                 conChildren = DataNone
@@ -417,9 +417,9 @@ followAliases _dataTable e = f e where
 
 dataTablePrims = DataTable $ Map.fromList ([ (conName x,x) | x <- tarrow:primitiveTable ])
 
-deriveClasses :: IdMap Comb -> DataTable -> [(TVr,E)]
-deriveClasses cmap (DataTable mp) = concatMap f (Map.elems mp) where
-    f c | TypeConstructor == nameType (conName c), Just is <- conVirtual c = concatMap (g is c) (conDeriving c)
+deriveClasses :: IdMap Comb -> DataTable -> [(SrcLoc,Name,Name)] -> [(TVr,E)]
+deriveClasses cmap dt@(DataTable mp) ctd = concatMap f ctd where
+    f (_,cd,t) | Just c <- getConstructor t dt, TypeConstructor == nameType (conName c), Just is <- conVirtual c = g is c cd
     f _ = []
     g is c cl = h cl where
         lupvar v = EVar (combHead comb) where
@@ -512,6 +512,20 @@ removeNewtypes dataTable e = runIdentity (f e) where
     f e = emapEGH f f return e
     gl lc@LitCons { litAliasFor = Just e }  = lc { litAliasFor = Just $ removeNewtypes dataTable e }
     gl l = l
+
+collectDeriving :: [HsDecl] -> [(SrcLoc,Name,Name)]
+collectDeriving ds = concatMap f ds where
+    f decl@HsNewTypeDecl {} = g decl
+    f decl@HsDataDecl {} = g decl
+    f decl@HsDeclDeriving {} = h decl
+    f _ = []
+    g decl = [(hsDeclSrcLoc decl, toName ClassName c,
+        toName TypeConstructor (hsDeclName decl)) | c <- hsDeclDerives decl ]
+    h decl@(hsDeclClassHead -> ch) | [(ltc -> Just t)] <- hsClassHeadArgs ch = [(hsDeclSrcLoc decl,toName ClassName (hsClassHead ch), t)] where
+            ltc (HsTyApp t1 _) = ltc t1
+            ltc (HsTyCon n) = Just (toName TypeConstructor n)
+            ltc x = Nothing
+    h _ = []
 
 {-# NOINLINE toDataTable #-}
 toDataTable :: (Map.Map Name Kind) -> (Map.Map Name Type) -> [HsDecl] -> DataTable -> DataTable
@@ -630,7 +644,6 @@ toDataTable km cm ds currentDataTable = newDataTable  where
             conType = theKind,
             conOrigSlots = map (SlotNormal . tvrType) theTypeArgs,
             conExpr = foldr ($) theTypeExpr (map ELam theTypeArgs),
-            conDeriving = [ toName ClassName n | n <- hsDeclDerives decl],
             conInhabits = if theTypeFKind == eStar then s_Star else s_Hash,
             conVirtual = Nothing,
             conChildren = undefined

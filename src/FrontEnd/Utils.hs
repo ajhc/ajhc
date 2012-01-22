@@ -24,7 +24,7 @@ maybeGetDeclName HsNewTypeDecl { hsDeclName = name } = return (toName TypeConstr
 maybeGetDeclName (HsClassDecl _ qualType _) = case qualType of
             HsQualType _cntxt t -> return $ leftMostTyCon t
         where
-            leftMostTyCon (HsTyTuple ts) = error "lehtMostTyCon applied to tuple" -- toTuple (length ts)
+            leftMostTyCon (HsTyTuple ts) = error "leftMostTyCon applied to tuple" -- toTuple (length ts)
             leftMostTyCon (HsTyApp t1 _) = leftMostTyCon t1
             leftMostTyCon (HsTyVar _) = error "leftMostTyCon: applied to a variable"
             leftMostTyCon (HsTyCon n) = (toName ClassName n)
@@ -51,5 +51,3 @@ hsNameToOrig n = hsNameIdent_u (hsIdentString_u dn) n where
 
 pprintEnvMap :: (PPrint d k, PPrint d a) => Map.Map k a -> d
 pprintEnvMap m = vcat [ pprint x <+> text "::" <+> pprint y | (x,y) <- Map.toList m ]
-
-

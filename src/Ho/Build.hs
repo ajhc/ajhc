@@ -718,9 +718,12 @@ buildLibrary ifunc func = ans where
                 Just bopt = fileOptions options modOptions `mplus` Just options
                 (pfs,nfs,_) = languageFlags (mfield "extensions")
                 lproc opt = opt { optFOptsSet = Set.union pfs (optFOptsSet opt) Set.\\ nfs }
-                dirs = [ "-i" ++ (FP.takeDirectory fp FP.</> x) | x <- mfield "hs-source-dirs" ]
-                    ++ [ "-I" ++ (FP.takeDirectory fp FP.</> x) | x <- mfield "include-dirs" ]
+                dirs = [ "-i" ++ dd x | x <- mfield "hs-source-dirs" ]
+                    ++ [ "-I" ++ dd x | x <- mfield "include-dirs" ]
                 modOptions =  (mfield "options" ++ dirs)
+                dd "." = FP.takeDirectory fp
+                dd ('.':'/':x) = dd x
+                dd x = FP.takeDirectory fp FP.</> x
         when verbose $
             print (flags,optFOptsSet modOpts)
         let hmods = map Module $ snub $ mfield "hidden-modules"
