@@ -52,7 +52,6 @@ import Data.Char(ord)
 import Data.Int
 import System.IO.Error
 
-
 data BufferMode = NoBuffering | LineBuffering | BlockBuffering (Maybe Int)
     deriving(Eq, Ord, Read, Show)
 data SeekMode = AbsoluteSeek | RelativeSeek | SeekFromEnd
@@ -71,7 +70,6 @@ withFile fp iom action = do
     return r
 
 hIsClosed h = not `fmap` hIsOpen h
-
 
 hFlush :: Handle -> IO ()
 hFlush h = withHandle h c_fflush
@@ -180,8 +178,5 @@ hFileSize h = do
     hSeek h AbsoluteSeek cp
     return fl
 
-
 foreign import primitive "I2I" cwintToChar :: CWint -> Char
 foreign import ccall "jhc_wait_for_input" c_wait_for_input :: FILE -> Int -> IO Bool
-
-
