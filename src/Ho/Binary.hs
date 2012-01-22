@@ -1,7 +1,7 @@
 {-# LANGUAGE ImpredicativeTypes #-}
 module Ho.Binary(readHoFile,recordHoFile,readHlFile,recordHlFile) where
 
-import Codec.Compression.GZip
+import Codec.Compression.Zlib
 import Control.Monad
 import Data.Binary
 import System.Posix.Files
@@ -19,7 +19,7 @@ import Support.CFF
 import Support.MapBinaryInstance
 
 current_version :: Int
-current_version = 4
+current_version = 5
 
 readHFile :: FilePath -> IO (FilePath,HoHeader,forall a . Binary a => ChunkType -> a)
 readHFile fn = do
@@ -30,7 +30,6 @@ readHFile fn = do
     let fc ct = case lookup ct mp of
             Nothing -> error $ "No chunk '" ++ show ct ++ "' found in file " ++ fn
             Just x -> decode . decompress $ LBS.fromChunks [x]
-            --Just x -> trace (printf "**** Reading %s from %s ****\n" (show ct) fn') $ decode . decompress $ L.fromChunks [x]
     let hoh = fc cff_jhdr
     when (hohVersion hoh /= current_version) $ fail "invalid version in hofile"
     return (fn',hoh,fc)

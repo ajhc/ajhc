@@ -5,8 +5,8 @@ type: :task
 component: jhc
 release: 0.8.0
 reporter: John Meacham <john@repetae.net>
-status: :unstarted
-disposition: 
+status: :closed
+disposition: :fixed
 creation_time: 2012-01-20 03:56:34.295093 Z
 references: []
 
@@ -15,4 +15,8 @@ log_events:
 - - 2012-01-20 03:56:36.075093 Z
   - John Meacham <john@repetae.net>
   - created
+  - ""
+- - 2012-01-22 09:55:04.608299 Z
+  - John Meacham <john@repetae.net>
+  - closed with disposition fixed
   - ""
