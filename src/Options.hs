@@ -280,7 +280,7 @@ getColumns = read $ unsafePerformIO (getEnv "COLUMNS" `mplus` return "80")
 
 postProcessFD :: Monad m => Opt -> m Opt
 postProcessFD o = case FlagDump.process (optDumpSet o) (optDump o ++ vv) of
-        (s,[]) -> return $ o { optDumpSet = s }
+        (s,[]) -> return $ o { optDumpSet = s, optDump = [] }
         (_,xs) -> fail ("Unrecognized dump flag passed to '-d': "
                         ++ unwords xs ++ "\nValid dump flags:\n\n" ++ FlagDump.helpMsg)
     where
@@ -290,7 +290,7 @@ postProcessFD o = case FlagDump.process (optDumpSet o) (optDump o ++ vv) of
 
 postProcessFO :: Monad m => Opt -> m Opt
 postProcessFO o = case FlagOpts.process (optFOptsSet o) (optFOpts o) of
-        (s,[]) -> return $ o { optFOptsSet = s }
+        (s,[]) -> return $ o { optFOptsSet = s, optFOpts = [] }
         (_,xs) -> fail ("Unrecognized flag passed to '-f': "
                         ++ unwords xs ++ "\nValid flags:\n\n" ++ FlagOpts.helpMsg)
 
@@ -395,8 +395,8 @@ configs = toNode [
     a ==> b = (a,toNode b)
 
 {-# NOINLINE fileOptions #-}
-fileOptions :: Monad m => [String] -> m Opt
-fileOptions xs = case getOpt Permute theoptions xs of
+fileOptions :: Monad m => Opt -> [String] -> m Opt
+fileOptions options xs = case getOpt Permute theoptions xs of
     (os,[],[]) -> postProcessFD (foldl (flip ($)) options os) >>= postProcessFO
     (_,_,errs) -> fail (concat errs)
 

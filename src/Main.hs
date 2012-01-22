@@ -39,7 +39,7 @@ main = wrapMain $ do
         ShowHo ho       -> dumpHoFile ho
         Preprocess      -> forM_ (optArgs o) $ \fn -> do
             lbs <- LBS.readFile fn
-            res <- preprocessHs fn lbs
+            res <- preprocessHs options fn lbs
             LBS.putStr res
         _               -> darg >> processFiles (optArgs o)
 
@@ -53,7 +53,7 @@ processFiles cs = f cs (optMainFunc options) where
         m <- getModule (parseName Val m)
         g [Left m]
     f cs _ = g (map fileOrModule cs)
-    g fs = processCollectedHo . snd =<< parseFiles [outputName] [] fs processInitialHo processDecls
+    g fs = processCollectedHo . snd =<< parseFiles options [outputName] [] fs processInitialHo processDecls
     fileOrModule f = case reverse f of
         ('s':'h':'.':_)     -> Right f
         ('s':'h':'l':'.':_) -> Right f

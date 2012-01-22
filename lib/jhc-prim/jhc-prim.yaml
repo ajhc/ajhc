@@ -1,5 +1,7 @@
 Name: jhc-prim
 Version: 1.0
+Extensions: [ ForeignFunctionInterface, NoImplicitPrelude, UnboxedTuples, UnboxedValues ]
+Hs-Source-Dir: .
 Exposed-Modules:
         - Jhc.Prim.Bits
         - Jhc.Prim.Words

@@ -8,6 +8,7 @@ module Ho.Build (
     buildLibrary
     ) where
 
+
 import Control.Concurrent
 import Control.Monad.Identity
 import Data.Char
@@ -19,8 +20,8 @@ import Data.Tree
 import Data.Version(Version,parseVersion,showVersion)
 import Data.Yaml.Syck
 import System.Directory (removeFile)
+import System.FilePath as FP
 import System.Mem
-import System.Random (randomIO)
 import Text.Printf
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
@@ -147,9 +148,9 @@ findHoFile done_ref fp mm sh = do
 onErr :: IO a -> IO b -> (b -> IO a) -> IO a
 onErr err good cont = join $ catch (good >>= return . cont) (\_ -> return err)
 
-fetchSource :: IORef Done -> [FilePath] -> Maybe Module -> IO Module
-fetchSource _ [] _ = fail "No files to load"
-fetchSource done_ref fs mm = do
+fetchSource :: Opt -> IORef Done -> [FilePath] -> Maybe Module -> IO Module
+fetchSource _ _ [] _ = fail "No files to load"
+fetchSource modOpt done_ref fs mm = do
     let mod = maybe (head fs) show mm
         killMod = case mm of
             Nothing -> fail $ "Could not load file: " ++ show fs
@@ -161,7 +162,7 @@ fetchSource done_ref fs mm = do
     (mod,m,ds) <- case mlookup hash (knownSourceMap done) of
         Just (m,ds) -> return (Left lbs,m,ds)
         Nothing -> do
-            (hmod,_) <- parseHsSource fn lbs
+            (hmod,_) <- parseHsSource modOpt  fn lbs
             let m = hsModuleName hmod
                 ds = hsModuleRequires hmod
             writeIORef done_ref (knownSourceMap_u (Map.insert hash (m,ds)) done)
@@ -182,16 +183,16 @@ fetchSource done_ref fs mm = do
             putProgressLn $ if foundho
                 then printf "%-23s [%s] <%s>" (show m) fn' mho'
                 else printf "%-23s [%s]" (show m) fn'
-            mapM_ (resolveDeps done_ref) ds
+            mapM_ (resolveDeps modOpt done_ref) ds
             return m
 
-resolveDeps :: IORef Done -> Module -> IO ()
-resolveDeps done_ref m = do
+resolveDeps :: Opt -> IORef Done -> Module -> IO ()
+resolveDeps modOpt done_ref m = do
     done <- readIORef done_ref
     case m `mlookup` modEncountered done of
         Just (ModLibrary False _ lib) | m /= Module "Jhc.Prim" -> putErrDie $ printf  "ERROR: Attempt to import module '%s' which is a member of the library '%s'." (show m) (libName lib)
         Just _ -> return ()
-        Nothing -> fetchSource done_ref (map fst $ searchPaths (show m)) (Just m) >> return ()
+        Nothing -> fetchSource modOpt done_ref (map fst $ searchPaths modOpt (show m)) (Just m) >> return ()
 
 type LibInfo = (Map.Map Module ModuleGroup, Map.Map ModuleGroup [ModuleGroup], Set.Set Module,Map.Map ModuleGroup HoBuild,Map.Map ModuleGroup HoTcInfo)
 
@@ -382,20 +383,21 @@ toCompUnitGraph done roots = do
     return (rhash,[ (h,([ d | (d,_) <- ns ],cu)) | ((h,(_,cu)),ns) <- G.fromGraph gr' ])
 
 parseFiles
-    :: [FilePath]                                           -- ^ Targets we are building, used when dumping dependencies
+    :: Opt                                                  -- ^ Options to use when parsing files
+    -> [FilePath]                                           -- ^ Targets we are building, used when dumping dependencies
     -> [String]                                             -- ^ Extra libraries to load
     -> [Either Module FilePath]                             -- ^ Either a module or filename to find
     -> (CollectedHo -> Ho -> IO CollectedHo)                -- ^ Process initial ho loaded from file
     -> (CollectedHo -> Ho -> TiData -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
     -> IO (CompNode,CollectedHo)                            -- ^ Final accumulated ho
-parseFiles targets elibs need ifunc func = do
+parseFiles options targets elibs need ifunc func = do
     putProgressLn "Finding Dependencies..."
-    (ksm,chash,cug) <- loadModules targets (optHls options ++ elibs) need
+    (ksm,chash,cug) <- loadModules options targets (snub $ optHls options ++ elibs) need
     cnode <- processCug cug chash
     when (optMode options == StopParse) exitSuccess
     performGC
     putProgressLn "Typechecking..."
-    typeCheckGraph cnode
+    typeCheckGraph options cnode
     if isJust (optAnnotate options) then exitSuccess else do
     when (optMode options  == StopTypeCheck) exitSuccess
     performGC
@@ -405,11 +407,12 @@ parseFiles targets elibs need ifunc func = do
 
 -- this takes a list of modules or files to load, and produces a compunit graph
 loadModules
-    :: [FilePath]               -- ^ targets
+    :: Opt                      -- ^ Options to use when parsing files
+    -> [FilePath]               -- ^ targets
     -> [String]                 -- ^ libraries to load
     -> [Either Module String]   -- ^ a list of modules or filenames
     -> IO (Map.Map SourceHash (Module,[Module]),HoHash,CompUnitGraph)  -- ^ the resulting acyclic graph of compilation units
-loadModules targets libs need = do
+loadModules modOpt targets libs need = do
     theCache <- findHoCache
     case theCache of
         Just s -> putProgressLn $ printf "Using Ho Cache: '%s'" s
@@ -441,8 +444,8 @@ loadModules targets libs need = do
             forM_ libsBad $ \ (p,h) -> putErr $ printf "    %s (hash:%s)\n" (unpackPS p) (show h)
             putErrDie "\n"
     ms1 <- forM (rights need) $ \fn -> do
-        fetchSource done_ref [fn] Nothing
-    forM_ (lefts need) $ resolveDeps done_ref
+        fetchSource modOpt done_ref [fn] Nothing
+    forM_ (lefts need) $ resolveDeps modOpt done_ref
     processIOErrors
     done <- readIORef done_ref
     let needed = (ms1 ++ lefts need)
@@ -497,8 +500,8 @@ countNodes cn = do
             _                   -> Set.empty
     h cn
 
-typeCheckGraph :: CompNode -> IO ()
-typeCheckGraph cn = do
+typeCheckGraph :: Opt -> CompNode -> IO ()
+typeCheckGraph modOpt cn = do
     cur <- newMVar (1::Int)
     maxModules <- Set.size `fmap` countNodes cn
     let f (CompNode hh deps ref) = readIORef ref >>= \cn -> case cn of
@@ -524,8 +527,8 @@ typeCheckGraph cn = do
                             SourceParsed { sourceInfo = si, sourceModule = sm } ->
                                 return (sourceHash si, sm, error "SourceParsed in AnnotateSource")
                             SourceRaw { sourceInfo = si, sourceLBS = lbs } -> do
-                                (mod,lbs') <- parseHsSource (sourceFP si) lbs
-                                case optAnnotate options of
+                                (mod,lbs') <- parseHsSource modOpt (sourceFP si) lbs
+                                case optAnnotate modOpt of
                                     Just fp -> do
                                         let ann = LBSU.fromString $ unlines [
                                                 "{- --ANNOTATE--",
@@ -618,11 +621,11 @@ hsModuleRequires x = snub (Module "Jhc.Prim":ans) where
     noPrelude = FO.Prelude `Set.notMember` optFOptsSet (hsModuleOpt x)
     ans = (if noPrelude then id else  (Module "Prelude":)) [  hsImportDeclModule y | y <- hsModuleImports x]
 
-searchPaths :: String -> [(String,String)]
-searchPaths m = ans where
+searchPaths :: Opt -> String -> [(String,String)]
+searchPaths modOpt m = ans where
     f m | (xs,'.':ys) <- span (/= '.') m = let n = (xs ++ "/" ++ ys) in m:f n
         | otherwise = [m]
-    ans = [ (root ++ suf,root ++ ".ho") | i <- optIncdirs options, n <- f m, suf <- [".hs",".lhs",".hsc"], let root = i ++ "/" ++ n]
+    ans = [ (root ++ suf,root ++ ".ho") | i <- optIncdirs modOpt, n <- f m, suf <- [".hs",".lhs",".hsc"], let root = i ++ "/" ++ n]
 
 mapHoBodies  :: (E -> E) -> Ho -> Ho
 mapHoBodies sm ho = ho { hoBuild = g (hoBuild ho) } where
@@ -644,16 +647,16 @@ buildLibrary :: (CollectedHo -> Ho -> IO CollectedHo)
              -> IO ()
 buildLibrary ifunc func = ans where
     ans fp = do
-        (desc,name,vers,hmods,emods) <- parse fp
+        (desc,name,vers,hmods,emods, modOpts) <- parse fp
         vers <- runReadP parseVersion vers
         let allMods = emodSet `Set.union` hmodSet
             emodSet = Set.fromList emods
             hmodSet = Set.fromList hmods
-        let outName = case optOutName options of
+        let outName = case optOutName modOpts of
                 Nothing -> name ++ "-" ++ showVersion vers ++ ".hl"
                 Just fn -> fn
         -- TODO - must check we depend only on libraries
-        (rnode@(CompNode lhash _ _),cho) <- parseFiles [outName] [] (map Left $ Set.toList allMods) ifunc func
+        (rnode@(CompNode lhash _ _),cho) <- parseFiles modOpts [outName] [] (map Left $ Set.toList allMods) ifunc func
         (_,(mmap,mdeps,prvds,lcor,ldef)) <- let
             f (CompNode hs cd ref) = do
                 cl <- readIORef ref
@@ -709,9 +712,18 @@ buildLibrary ifunc func = ans where
             --mfield x = maybe [] (words . map (\c -> if c == ',' then ' ' else c)) $ Map.lookup x dlist
         name <- jfield "name"
         vers <- jfield "version"
+        let (modOpts,flags) = (lproc bopt,modOptions) where
+                Just bopt = fileOptions options modOptions `mplus` Just options
+                (pfs,nfs,_) = languageFlags (mfield "extensions")
+                lproc opt = opt { optFOptsSet = Set.union pfs (optFOptsSet opt) Set.\\ nfs }
+                dirs = [ "-i" ++ (FP.takeDirectory fp FP.</> x) | x <- mfield "hs-source-dirs" ]
+                    ++ [ "-I" ++ (FP.takeDirectory fp FP.</> x) | x <- mfield "include-dirs" ]
+                modOptions =  (mfield "options" ++ dirs)
+        when verbose $
+            print (flags,optFOptsSet modOpts)
         let hmods = map Module $ snub $ mfield "hidden-modules"
             emods = map Module $ snub $ mfield "exposed-modules"
-        return (Map.toList dsing,name,vers,hmods,emods)
+        return (Map.toList dsing,name,vers,hmods,emods, modOpts)
 
 ------------------------------------
 -- dumping contents of a ho file

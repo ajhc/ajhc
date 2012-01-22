@@ -8,7 +8,6 @@ type World__ = State_ RealWorld
 type UIO a = STRep RealWorld a
 type UIO_ = World__ -> World__
 
-
 newtype IO a = IO (STRep RealWorld a)
 newtype ST s a = ST (STRep s a)
 

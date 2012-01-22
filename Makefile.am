@@ -53,7 +53,7 @@ PACKAGES= -package fgl -package regex-compat -package random -package array -pac
 GHCLANG= -XTypeFamilies -XViewPatterns -XUndecidableInstances -XOverlappingInstances -XRecordWildCards -XRecursiveDo -XTupleSections -XParallelListComp -XGeneralizedNewtypeDeriving -XScopedTypeVariables -XFlexibleInstances -XTypeSynonymInstances -XMultiParamTypeClasses -XDeriveDataTypeable -fglasgow-exts -XNoMonoLocalBinds
 GHCOPTS= $(HSOPTS) -XBangPatterns -O @GHCFLAGS@ $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 
-JHC_LIBS = jhc-1.0.hl base-1.0.hl haskell98-1.0.hl applicative-1.0.hl flat-foreign-1.0.hl # jhc-prim-0.7.0.hl
+JHC_LIBS = jhc-1.0.hl base-1.0.hl haskell98-1.0.hl applicative-1.0.hl flat-foreign-1.0.hl jhc-prim-1.0.hl
 
 EXTRA_DIST = src/data src/rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
              lib/jhc lib/base lib/haskell98 lib/flat-foreign $(JHC_LIBS) $(JHC_EXT_LIBS) \
@@ -217,7 +217,7 @@ CLEANFILES= $(JHC_LIBS) $(JHC_EXT_LIBS)
 
 LIB_OPTIONS=$(RTSOPTS) $(JHC_TEST) --noauto -L- -L. # --deps tmp/$@.yaml
 
-jhc-prim-0.7.0.hl: lib/jhc-prim/jhc-prim.yaml
+jhc-prim-1.0.hl: lib/jhc-prim/jhc-prim.yaml lib/jhc-prim/Jhc/Prim.hs lib/jhc-prim/Jhc/Prim/IO.hs lib/jhc-prim/Jhc/Prim/Words.hs lib/jhc-prim/Jhc/Prim/Bits.hs
 	./jhc $(LIB_OPTIONS) -fno-prelude -funboxed-tuples -fffi -ilib/jhc-prim --build-hl $< -o $@
 jhc-1.0.hl: lib/jhc/jhc.yaml
 	./jhc $(LIB_OPTIONS) -fno-prelude -ilib/jhc --build-hl $< -o $@
