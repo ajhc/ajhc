@@ -1,6 +1,8 @@
 Name: jhc
 Version: 1.0
-Extensions: ForeignFunctionInterface
+Extensions: [ ForeignFunctionInterface, NoImplicitPrelude, UnboxedTuples, UnboxedValues ]
+Hs-Source-Dir: .
+Options: --noauto
 Hidden-Modules:
         - Jhc.Int
         - Jhc.Inst.Enum
@@ -8,7 +10,6 @@ Hidden-Modules:
         - Jhc.Inst.Read
         - Jhc.Inst.Show
         - Jhc.Inst.Storable
-
 Exposed-Modules:
         - Data.Char
         - Data.Int

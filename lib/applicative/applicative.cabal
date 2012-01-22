@@ -1,8 +1,0 @@
-Name: applicative
-Version: 1.0
-Exposed-Modules: Control.Applicative,
-                 Control.Arrow,
-                 Control.Category,
-                 Data.Foldable,
-                 Data.Traversable
-
