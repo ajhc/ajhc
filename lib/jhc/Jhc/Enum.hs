@@ -2,12 +2,12 @@
 module Jhc.Enum(Enum(..),Bounded(..)) where
 -- Enumeration and Bounded classes
 
-import Jhc.Inst.PrimEnum()
 import Data.Int
-import Jhc.Types
 import Jhc.Basics
-import Jhc.Order
+import Jhc.Inst.PrimEnum()
 import Jhc.Int
+import Jhc.Order
+import Jhc.Prim.Bits
 
 m4_include(Jhc/Enum.m4)
 
@@ -33,7 +33,6 @@ class  Enum a  where
     enumFromThen x y =  map toEnum [fromEnum x, fromEnum y ..]
     enumFromThenTo x y z =
                         map toEnum [fromEnum x, fromEnum y .. fromEnum z]
-
 
 class Bounded a  where
     minBound         :: a
@@ -61,7 +60,6 @@ instance Enum Int where
         f x | x >= z = x:f (x `plus` inc)
             | otherwise = []
 
-
 instance Enum Char where
     toEnum = chr
     fromEnum = ord
@@ -80,7 +78,6 @@ instance Enum Char where
 --                            1# -> Char x:f (x `bits32Add` inc)
 --                            0# -> []
 --             in f x
-
 
 instance Bounded Char where
     minBound = Char 0#

@@ -6,11 +6,9 @@
 
 module Jhc.Inst.PrimEnum(enum_succ,enum_pred,enum_fromTo,enum_fromThen,enum_fromThenTo,enum_toEnum,enum_from) where
 
-
-import Jhc.Prim
 import Jhc.Int
-import Jhc.Types
-
+import Jhc.Prim
+import Jhc.Prim.Bits
 
 {-# INLINE enum_toEnum, enum_succ, enum_pred, enum_fromTo, enum_fromThen, enum_fromThenTo, enum_from #-}
 

@@ -79,7 +79,7 @@ uint64_t jhc_hash64(uint64_t key)
 uintptr_t
 jhc_hashptr(uintptr_t key)
 {
-    if (sizeof uintptr_t == sizeof uint32_t) {
+    if (sizeof(uintptr_t) == sizeof(uint32_t)) {
         return (uintptr_t)jhc_hash32((uint32_t)key);
     } else {
         return (uintptr_t)jhc_hash64((uint64_t)key);

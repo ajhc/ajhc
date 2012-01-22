@@ -1,11 +1,8 @@
-{-# OPTIONS_JHC -fno-prelude -fffi -funboxed-tuples #-}
 {-# LANGUAGE UnboxedTuples, ForeignFunctionInterface, NoImplicitPrelude #-}
-module Jhc.Prim where
+module Jhc.Prim(module Jhc.Prim.Bits, module Jhc.Prim) where
 
--- this module is always included in all programs compiled by jhc. it defines some things that are needed to make jhc work at all.
-
+import Jhc.Prim.Bits
 import Jhc.String
-import Jhc.Types
 
 infixr 5  :
 data [] a =  a : ([] a) | []
@@ -22,11 +19,6 @@ type Int__  = Bits32_
 type Char__ = Bits32_
 type Enum__ = Bits16_
 type Addr__ = BitsPtr_
-
--- these exist simply to modify the calling
--- convention with unboxed types
-newtype Addr_ = Addr_ BitsPtr_
-newtype FunAddr_ = FunAddr_ BitsPtr_
 
 -- | when no exception wrapper is wanted
 runNoWrapper :: IO a -> World__ -> World__

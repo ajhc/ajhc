@@ -2,28 +2,24 @@
 
 module Prelude.Float(readDouble,doubleToDigits,doubleToRational) where
 
-import Jhc.Order
-import Jhc.Basics
-import Jhc.Monad
-import Jhc.IO
-import Jhc.Float
-import Jhc.Num
-import Jhc.Types
 import Data.Word
-import Foreign.Storable
 import Foreign.C.Types
-import Foreign.Ptr
 import Foreign.Marshal.Alloc
-import Numeric
-import Prelude.Text
+import Foreign.Ptr
+import Foreign.Storable
+import Jhc.Basics
+import Jhc.Float
+import Jhc.IO
 import Jhc.List
+import Jhc.Monad
+import Jhc.Num
+import Jhc.Order
+import Jhc.Prim.Bits
+import Numeric
 import Prelude((^),(^^),elem,take)
-
-
-
+import Prelude.Text
 
 m4_define(INST,{{
-
 
 foreign import primitive "FDiv" divide$2 ::  $2 -> $2 -> $2
 foreign import primitive "FPwr" exponent$2 ::  $2 -> $2 -> $2
@@ -72,7 +68,6 @@ instance Floating $1 where
     acosh = c_acosh$1
     atanh = c_atanh$1
 
-
 instance RealFrac $1 where
     properFraction x
       = case (decodeFloat x)      of { (m,n) ->
@@ -90,13 +85,11 @@ instance RealFrac $1 where
     ceiling x = fromInteger (toInteger$1 (ceilingf x))
     floor x = fromInteger (toInteger$1 (floorf x))
 
-
     properFractionf x = (c_trunc$1 x,x - c_trunc$1 x)
     truncatef x = c_trunc$1 x
     roundf x = c_nearbyint$1 x
     ceilingf x = c_ceil$1 x
     floorf x = c_floor$1 x
-
 
 foreign import ccall "-lm math.h asinh$3" c_asinh$1 :: $1 -> $1
 foreign import ccall "-lm math.h acosh$3" c_acosh$1 :: $1 -> $1
@@ -118,7 +111,6 @@ foreign import ccall "math.h frexp$3"  c_frexp$3 :: $1 -> Ptr CInt -> IO $1
 INST(Float,Float32_,f)
 INST(Double,Float64_)
 
-
 instance Real Float where
     toRational x	=  (m:%1)*(b:%1)^^n
 			   where (m,n) = decodeFloat x
@@ -128,9 +120,6 @@ instance Real Float where
 instance Real Double where
     toRational x = doubleToRational x
     toDouble x = x
-
-
-
 
 instance RealFloat Float where
     floatRadix _ = 2
@@ -161,9 +150,6 @@ instance RealFloat Float where
 
     atan2 = atan2Float
 
-
-
-
 instance RealFloat Double where
     floatRadix _ = 2
     floatDigits _ = 53
@@ -190,16 +176,11 @@ instance RealFloat Double where
         let x'' = c_ldexp x' (fromInt $ floatDigits x)
         return (double2integer x'', fromIntegral exp  - floatDigits x)
 
-
     atan2 = atan2Double
-
-
 
 foreign import primitive "I2F" integer2float :: Integer -> Float
 foreign import primitive "I2F" integer2double :: Integer -> Double
 foreign import primitive "F2I" double2integer :: Double -> Integer
-
-
 
 readDouble :: ReadS Double
 readDouble r    = [((fromInteger n * (10^^(k-d))),t) | (n,d,s) <- readFix r,(k,t)   <- readExp s] ++
@@ -219,7 +200,6 @@ readDouble r    = [((fromInteger n * (10^^(k-d))),t) | (n,d,s) <- readFix r,(k,t
                  readExp' ('-':s) = [(-k,t) | (k,t) <- readDec s]
                  readExp' ('+':s) = readDec s
                  readExp' s       = readDec s
-
 
 doubleToDigits :: Integer -> Double -> ([Int], Int)
 doubleToDigits n d | n `seq` d `seq` d == 0 = ([], 0)
@@ -293,7 +273,6 @@ doubleToDigits base' x =
         expt :: WordMax -> Int -> WordMax
         expt base n = base^n
     in  k `seq` f `seq` e `seq` b `seq` rrds `seq` (rrds, k)
-
 
 doubleToRational :: Double -> Rational
 doubleToRational x  =  (m:%1)*(b:%1)^^n where

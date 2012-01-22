@@ -189,7 +189,7 @@ resolveDeps :: Opt -> IORef Done -> Module -> IO ()
 resolveDeps modOpt done_ref m = do
     done <- readIORef done_ref
     case m `mlookup` modEncountered done of
-        Just (ModLibrary False _ lib) | m /= Module "Jhc.Prim" -> putErrDie $ printf  "ERROR: Attempt to import module '%s' which is a member of the library '%s'." (show m) (libName lib)
+        Just (ModLibrary False _ lib) | not ("jhc-prim-" `isPrefixOf` libName lib)  -> putErrDie $ printf  "ERROR: Attempt to import module '%s' which is a member of the library '%s'." (show m) (libName lib)
         Just _ -> return ()
         Nothing -> fetchSource modOpt done_ref (map fst $ searchPaths modOpt (show m)) (Just m) >> return ()
 
@@ -617,7 +617,9 @@ compileCompNode ifunc func ksm cn = do
                     CompSources _ -> error "sources still exist!?"
     f cn
 
-hsModuleRequires x = snub (Module "Jhc.Prim":ans) where
+--hsModuleRequires x = snub (Module "Jhc.Prim":ans) where
+hsModuleRequires x = snub (Module "Jhc.Prim.Bits":ans) where
+--hsModuleRequires x = snub ans where
     noPrelude = FO.Prelude `Set.notMember` optFOptsSet (hsModuleOpt x)
     ans = (if noPrelude then id else  (Module "Prelude":)) [  hsImportDeclModule y | y <- hsModuleImports x]
 

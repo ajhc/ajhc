@@ -1,8 +1,6 @@
 {-# OPTIONS_JHC -fm4 -fno-prelude -fffi -funboxed-tuples -funboxed-values #-}
 module Jhc.Inst.Storable() where
 
-
-
 import Data.Int
 import Data.Word
 import Foreign.C.Types
@@ -10,16 +8,15 @@ import Foreign.Storable
 import Jhc.Addr
 import Jhc.Basics
 import Jhc.Float
-import Jhc.Int
 import Jhc.IO
+import Jhc.Int
 import Jhc.Prim
-import Jhc.Types
+import Jhc.Prim.Bits
 
 m4_include(Foreign/Storable.m4)
 
 INST_STORABLE(Float,Float,Float32_,fbits32)
 INST_STORABLE(Double,Double,Float64_,fbits64)
-
 
 INST_STORABLE_XXX(Int,Bits32_,bits32)
 INST_STORABLE_XXX(Word,Bits32_,bits32)

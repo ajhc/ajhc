@@ -13,19 +13,18 @@ module Jhc.Float(
     where
 
 import Jhc.Basics
-import Jhc.Int
+import Jhc.Enum
 import Jhc.IO(error)
+import Jhc.Inst.Num
+import Jhc.Int
 import Jhc.Num
 import Jhc.Order
-import Jhc.Types
-import Jhc.Enum
-import Jhc.Inst.Num
+import Jhc.Prim.Bits
 
 infixr 8  **
 
 data Float = Float Float32_
 data Double = Double Float64_
-
 
 foreign import primitive "F2F" floatToDouble :: Float -> Double
 foreign import primitive "F2F" doubleToFloat :: Double -> Float
@@ -51,15 +50,11 @@ class  (Fractional a) => Floating a  where
     tan  x           =  sin  x / cos  x
     tanh x           =  sinh x / cosh x
 
-
-
 -- TODO Doubles
 class  (Real a, Fractional a) => RealFrac a  where
     properFraction   :: (Integral b) => a -> (b,a)
     truncate, round  :: (Integral b) => a -> b
     ceiling, floor   :: (Integral b) => a -> b
-
-
 
         -- Minimal complete definition:
         --      properFraction
@@ -91,7 +86,6 @@ class  (Real a, Fractional a) => RealFrac a  where
                         where (n,r) = properFractionf x
     floorf x          =  if r < 0 then n - 1 else n
                         where (n,r) = properFractionf x
-
 
 -- TODO Doubles
 class  (RealFrac a, Floating a) => RealFloat a  where
@@ -139,14 +133,11 @@ class  (RealFrac a, Floating a) => RealFloat a  where
     encodeFloatf     :: a -> Int -> a
     encodeFloatf a i = scaleFloat i a
 
-
-
 rationalToDouble :: Rational -> Double
 rationalToDouble (x:%y) = fromInteger x `divideDouble` fromInteger y
 
 foreign import primitive "FDiv" divideDouble ::  Double -> Double -> Double
 foreign import primitive "box" boxBool :: Bool__ -> Bool
-
 
 m4_define(NUMINSTANCE,
 instance Num $1 where
@@ -211,8 +202,6 @@ instance Ord $1 where
     $1 x <= $1 y = boxBool (flte$2 x y)
     $1 x >= $1 y = boxBool (fgte$2 x y)
 
-
-
 foreign import primitive "FEq" eq$2   :: $2 -> $2 -> Bool__
 foreign import primitive "FNEq" neq$2 :: $2 -> $2 -> Bool__
 foreign import primitive "FLt" flt$2  :: $2 -> $2 -> Bool__
@@ -221,8 +210,6 @@ foreign import primitive "FGt" fgt$2 :: $2 -> $2 -> Bool__
 foreign import primitive "FGte" fgte$2 :: $2 -> $2 -> Bool__
 
 )
-
-
 
 NUMINSTANCE(Float,Float32_)
 NUMINSTANCE(Double,Float64_)

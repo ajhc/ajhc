@@ -1,6 +1,5 @@
 {-# OPTIONS_JHC -fm4 -fno-prelude -fffi #-}
 
-
 module Jhc.Order(
     Bool(..),
     Ordering(..),
@@ -12,10 +11,9 @@ module Jhc.Order(
     otherwise
     ) where
 
-
 import Jhc.Enum
 import Jhc.Basics
-import Jhc.Types
+import Jhc.Prim.Bits
 
 m4_include(Jhc/Order.m4)
 
@@ -57,7 +55,6 @@ class  (Eq a) => Ord a  where
     min x y | x <= y    =  x
             | otherwise =  y
 
-
 instance Eq () where
     () == () = True
     () /= () = False
@@ -97,11 +94,9 @@ instance Ord a => Ord [a] where
     x >= y = not (x < y)
     x <= y = not (y < x)
 
-
 INST_EQORDER(Char,Char,Bits32_,U)
 INST_EQORDER(Int,,Int,)
 INST_EQORDER(Integer,,Integer,)
-
 
 infixr 3  &&
 infixr 2  ||
@@ -113,10 +108,8 @@ False && _       =  False
 True  || _       =  True
 False || x       =  x
 
-
 not              :: Bool -> Bool
 not x = if x then False else True
-
 
 otherwise        :: Bool
 otherwise        =  True

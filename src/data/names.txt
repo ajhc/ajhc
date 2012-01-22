@@ -40,29 +40,30 @@ CULong     Foreign.C.Types.CULong
 #WordMax    Data.Word.WordMax
 #WordPtr    Data.Word.WordPtr
 
-Bits1      Jhc.Types.Bits1_
-Bits8      Jhc.Types.Bits8_
-Bits16     Jhc.Types.Bits16_
-Bits32     Jhc.Types.Bits32_
-Bits64     Jhc.Types.Bits64_
-Bits128    Jhc.Types.Bits128_
-BitsPtr    Jhc.Types.BitsPtr_
-BitsMax    Jhc.Types.BitsMax_
+Bits1      Jhc.Prim.Bits.Bits1_
+Bits8      Jhc.Prim.Bits.Bits8_
+Bits16     Jhc.Prim.Bits.Bits16_
+Bits32     Jhc.Prim.Bits.Bits32_
+Bits64     Jhc.Prim.Bits.Bits64_
+Bits128    Jhc.Prim.Bits.Bits128_
+BitsPtr    Jhc.Prim.Bits.BitsPtr_
+BitsMax    Jhc.Prim.Bits.BitsMax_
 
-Float32    Jhc.Types.Float32_
-Float64    Jhc.Types.Float64_
-Float80    Jhc.Types.Float80_
-Float128   Jhc.Types.Float128_
+Float32    Jhc.Prim.Bits.Float32_
+Float64    Jhc.Prim.Bits.Float64_
+Float80    Jhc.Prim.Bits.Float80_
+Float128   Jhc.Prim.Bits.Float128_
 
-BitsShort  Jhc.Types.BitsShort_
-BitsInt    Jhc.Types.BitsInt_
-BitsLong   Jhc.Types.BitsLong_
-BitsLLong  Jhc.Types.BitsLLong_
-BitsSize   Jhc.Types.BitsSize_
-BitsWchar  Jhc.Types.BitsWchar_
+BitsShort  Jhc.Prim.Bits.BitsShort_
+BitsInt    Jhc.Prim.Bits.BitsInt_
+BitsLong   Jhc.Prim.Bits.BitsLong_
+BitsLLong  Jhc.Prim.Bits.BitsLLong_
+BitsSize   Jhc.Prim.Bits.BitsSize_
+BitsWchar  Jhc.Prim.Bits.BitsWchar_
 
-Addr_      Jhc.Prim.Addr_
-FunAddr_   Jhc.Prim.FunAddr_
+Addr_      Jhc.Prim.Bits.Addr_
+FunAddr_   Jhc.Prim.Bits.FunAddr_
+Char_      Jhc.Prim.Bits.Char_
 
 DataConstructor:dc:
 

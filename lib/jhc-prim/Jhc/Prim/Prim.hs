@@ -1,4 +1,4 @@
-module Jhc.Prim where
+module Jhc.Prim.Prim where
 
 data (->) :: ?? -> ? -> *
 

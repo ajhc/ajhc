@@ -4,7 +4,7 @@ module System.Mem.StableName(StableName(),makeStableName,hashStableName) where
 import Jhc.Basics
 import Jhc.IO
 import Jhc.Order
-import Jhc.Types
+import Jhc.Prim.Bits
 
 m4_include(Jhc/Order.m4)
 

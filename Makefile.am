@@ -217,9 +217,9 @@ CLEANFILES= $(JHC_LIBS) $(JHC_EXT_LIBS)
 
 LIB_OPTIONS=$(RTSOPTS) $(JHC_TEST) --noauto -L- -L. # --deps tmp/$@.yaml
 
-jhc-prim-1.0.hl: lib/jhc-prim/jhc-prim.yaml lib/jhc-prim/Jhc/Prim.hs lib/jhc-prim/Jhc/Prim/IO.hs lib/jhc-prim/Jhc/Prim/Words.hs lib/jhc-prim/Jhc/Prim/Bits.hs
+jhc-prim-1.0.hl: lib/jhc-prim/jhc-prim.yaml lib/jhc-prim/Jhc/Prim/Prim.hs lib/jhc-prim/Jhc/Prim/IO.hs lib/jhc-prim/Jhc/Prim/Words.hs lib/jhc-prim/Jhc/Prim/Bits.hs
 	./jhc $(LIB_OPTIONS) --build-hl $< -o $@
-jhc-1.0.hl: lib/jhc/jhc.yaml
+jhc-1.0.hl: lib/jhc/jhc.yaml jhc-prim-1.0.hl
 	./jhc $(LIB_OPTIONS) --build-hl $< -o $@
 base-1.0.hl: lib/base/base.yaml jhc-1.0.hl
 	./jhc $(LIB_OPTIONS) --build-hl $< -o $@
@@ -318,7 +318,7 @@ jhc-1.0.hl: lib/jhc/jhc.yaml lib/jhc/Jhc/Prim.hs lib/jhc/Jhc/IO.hs lib/jhc/Jhc/I
     lib/jhc/Jhc/Text/Read.hs lib/jhc/Foreign/C/Error.hs lib/jhc/Foreign/Storable.hs lib/jhc/Foreign/Ptr.hs \
     lib/jhc/Jhc/Inst/Order.hs lib/jhc/Jhc/Enum.hs lib/jhc/Jhc/Tuples.hs lib/jhc/Jhc/String.hs \
     lib/jhc/Prelude/Float.hs lib/jhc/Jhc/Inst/PrimEnum.hs lib/jhc/Jhc/Inst/Show.hs lib/jhc/Jhc/Array.hs \
-    lib/jhc/Prelude/Text.hs lib/jhc/Foreign/Marshal/Alloc.hs lib/jhc/Foreign/Marshal/Array.hs lib/jhc/Jhc/Types.hs \
+    lib/jhc/Prelude/Text.hs lib/jhc/Foreign/Marshal/Alloc.hs lib/jhc/Foreign/Marshal/Array.hs \
     lib/jhc/Jhc/Options.hs lib/jhc/Prelude/CType.hs lib/jhc/Jhc/Monad.hs lib/jhc/System/IO/Unsafe.hs \
     lib/jhc/System/Mem/StableName.hs lib/jhc/Jhc/Inst/Read.hs lib/jhc/Jhc/Maybe.hs
 

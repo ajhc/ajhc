@@ -15,23 +15,20 @@ module Foreign.Ptr(
     freeHaskellFunPtr
     ) where
 
-
-import Jhc.Show
+import Data.Word
+import Foreign.Storable
+import Jhc.Addr
+import Jhc.Basics
+import Jhc.IO
 import Jhc.Inst.Show
 import Jhc.Monad
-import Jhc.Order
-import Jhc.IO
-import Jhc.Basics
 import Jhc.Num
-import Jhc.Addr
-import Foreign.Storable
-import Data.Word
-import Jhc.Types
-
+import Jhc.Order
+import Jhc.Prim.Bits
+import Jhc.Show
 
 instance Show (Ptr a) where
     showsPrec n x = showsPrec n (toInteger (ptrToWordPtr  x))
-
 
 alignPtr :: Ptr a -> Int -> Ptr a
 alignPtr = error "alignPtr"
@@ -48,7 +45,6 @@ castFunPtrToPtr (FunPtr x) = Ptr x
 
 castPtrToFunPtr :: Ptr a -> FunPtr b
 castPtrToFunPtr (Ptr x) = FunPtr x
-
 
 freeHaskellFunPtr :: FunPtr a -> IO ()
 freeHaskellFunPtr _ = error "freeHaskellFunPtr"

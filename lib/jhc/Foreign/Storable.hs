@@ -1,12 +1,11 @@
 {-# OPTIONS_JHC -fno-prelude -fm4 -funboxed-values -funboxed-tuples -fffi #-}
 module Foreign.Storable(Storable(..)) where
 
-
-import Jhc.Types
-import Jhc.Basics
 import Jhc.Addr
-import Jhc.Int
+import Jhc.Basics
 import Jhc.IO
+import Jhc.Int
+import Jhc.Prim.Bits
 
 m4_include(Foreign/Storable.m4)
 
@@ -28,7 +27,6 @@ class Storable a where
 
 _f :: Ptr a -> a
 _f _ = undefined
-
 
 INST_STORABLE((Ptr a),Ptr,BitsPtr_,bits<ptr>)
 INST_STORABLE((FunPtr a),FunPtr,BitsPtr_,bits<ptr>)

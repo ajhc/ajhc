@@ -882,6 +882,7 @@ rawExtTypeMap = Map.fromList [
 typeTable :: Map.Map Name ExtType
 typeTable = Map.fromList [
     (tc_Char,"wchar_t"),
+    (tc_Char_,"wchar_t"),
     (tc_Int, "int"),
     (tc_Int8, "int8_t"),
     (tc_Int16, "int16_t"),
