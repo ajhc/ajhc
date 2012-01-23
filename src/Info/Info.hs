@@ -33,7 +33,7 @@ type T = Info
 data Entry = Entry {
     entryThing   :: Dynamic,
     entryString  :: String,
-    entryType    :: TypeRep
+    entryType    :: !TypeRep
     }
 
 instance Eq Entry where

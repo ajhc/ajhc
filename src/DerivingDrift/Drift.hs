@@ -1,7 +1,6 @@
 module DerivingDrift.Drift(driftDerive) where
 
-import Char
-import List
+import Data.Char
 import qualified Data.Map as Map
 
 import DerivingDrift.DataP
@@ -62,12 +61,13 @@ toData name args cons derives = ans where
     lb r = concat [map show xs | (xs,_) <- hsConDeclRecArg r ]
     ans = D { statement = DataStmt, vars = map show args, constraints = [], name = show name,  derives = map show derives, body = map f cons }
 
-derive True d (toName ClassName -> wh) | Just fns <- lookup wh enumDontDerive = inst fns where
-    dummy = "{- This is a dummy instance, it will be rewritten internally -}\n"
-    inst fns = dummy ++ "instance " ++ show wh ++ " " ++ name d ++ " where\n" ++ concat (intersperse "\n" (map f fns))
-    f n = "    " ++ g (show n) ++ " = " ++ g (show n)
-    g (c:cs) | c == '_' || c == '\'' || isAlpha c = c:cs
-    g x = "(" ++ x ++ ")"
+derive True d (toName ClassName -> wh) | Just fns <- lookup wh enumDontDerive = "" where
+--derive True d (toName ClassName -> wh) | Just fns <- lookup wh enumDontDerive = inst fns where
+--    dummy = "{- This is a dummy instance, it will be rewritten internally -}\n"
+--    inst fns = dummy ++ "instance " ++ show wh ++ " " ++ name d ++ " where\n" ++ concat (intersperse "\n" (map f fns))
+--    f n = "    " ++ g (show n) ++ " = " ++ g (show n)
+--    g (c:cs) | c == '_' || c == '\'' || isAlpha c = c:cs
+--    g x = "(" ++ x ++ ")"
 
 derive _ d wh | Just fn <- Map.lookup (toName ClassName wh) (Map.mapKeys (nameName . toUnqualified) standardRules) = render $ fn d
               | otherwise  = error ("derive: Tried to use non-existing rule "++show wh++" for "++name d)

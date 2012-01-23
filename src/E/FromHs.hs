@@ -608,13 +608,8 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
             z e = foldr eLam e bs'
         ms <- cMatchs bs (matchesConv ms) (ump sl rt)
         return [(name,var,lamt $ z ms )]
-    cDecl HsNewTypeDecl {  hsDeclName = dname, hsDeclArgs = dargs, hsDeclCon = dcon, hsDeclDerives = derives } = return $ makeDerives dname dargs [dcon] (map (toName ClassName) derives)
-    cDecl HsDataDecl {  hsDeclName = dname, hsDeclArgs = dargs, hsDeclCons = dcons, hsDeclDerives = derives } = return $ makeDerives dname dargs dcons (map (toName ClassName) derives)
     cDecl cd@(HsClassDecl {}) = cClassDecl cd
     cDecl _ = return []
-    makeDerives dname dargs dcons derives  = concatMap f derives where
-        f n | n == class_Bounded, all (null . hsConDeclArgs) dcons  = []
-        f _ = []
     cExpr :: Monad m => HsExp -> Ce m E
     cExpr (HsAsPat n' (HsCon n)) = return $ constructionExpression dataTable (toName DataConstructor n) rt where
         t' = getAssump n'

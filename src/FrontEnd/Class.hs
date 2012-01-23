@@ -12,10 +12,14 @@ module FrontEnd.Class(
     findClassRecord,
     asksClassRecord,
     classRecords,
+    addInstanceToHierarchy,
     makeClassHierarchy,
     scatterAliasInstances,
     derivableClasses,
+    enumDerivableClasses,
+    noNewtypeDerivable,
     makeInstanceEnv,
+    emptyInstance,
     InstanceEnv(..),
     Inst(..)
     ) where
@@ -69,19 +73,19 @@ emptyInstance = Inst { instDerived = False, instSrcLoc = bogusASrcLoc, instHead 
 -- | a class record is either a class along with instances, or just instances.
 -- you can tell the difference by the presence of the classArgs field
 
-data ClassRecord = ClassRecord      { className :: Class,
-                                      classSrcLoc :: SrcLoc,
-                                      classArgs :: [Tyvar],
-                                      classSupers :: [Class],
-                                      classInsts :: [Inst],
+data ClassRecord = ClassRecord      { className    :: Class,
+                                      classSrcLoc  :: SrcLoc,
+                                      classArgs    :: [Tyvar],
+                                      classSupers  :: [Class],
+                                      classInsts   :: [Inst],
                                       classAssumps :: [(Name,Sigma)], -- ^ method signatures
-                                      classAssocs :: [(Tycon,[Tyvar],Maybe Sigma)]
+                                      classAssocs  :: [(Tycon,[Tyvar],Maybe Sigma)]
                                     }
-                 | ClassAliasRecord { className :: Class,
-                                      classSrcLoc :: SrcLoc,
-                                      classArgs :: [Tyvar],
-                                      classSupers :: [Class],
-                                      classInsts :: [Inst],
+                 | ClassAliasRecord { className    :: Class,
+                                      classSrcLoc  :: SrcLoc,
+                                      classArgs    :: [Tyvar],
+                                      classSupers  :: [Class],
+                                      classInsts   :: [Inst],
                                       classClasses :: [Class],
                                       classMethodMap :: Map.Map Name Class
                                     }
@@ -223,14 +227,30 @@ modifyClassRecord f c (ClassHierarchy h) = case Map.lookup c h of
            Nothing -> ClassHierarchy $ Map.insert c (f (newClassRecord c)) h
            Just r -> ClassHierarchy $ Map.insert c (f r) h
 
+modifyClassRecordM :: Monad m => (ClassRecord -> m ClassRecord) -> Class ->  ClassHierarchy -> m ClassHierarchy
+modifyClassRecordM  f c (ClassHierarchy h) = ans where
+    ans = case Map.lookup c h of
+        Nothing -> g (newClassRecord c)
+        Just r -> g r
+    g r = do
+        cr <- f r
+        return $ ClassHierarchy (Map.insert c cr h)
+
 addOneInstanceToHierarchy :: ClassHierarchy -> Inst -> ClassHierarchy
 addOneInstanceToHierarchy ch inst@Inst { instHead = cntxt :=> IsIn className _ } = modifyClassRecord f className ch where
     f c = c { classInsts = inst:classInsts c }
 
+addInstanceToHierarchy :: Inst -> ClassHierarchy -> ClassHierarchy
+addInstanceToHierarchy inst@Inst { instHead = cntxt :=> IsIn className _ } ch = runIdentity $ modifyClassRecordM f className ch where
+    f c = do
+        nil <- ensureNotDup (instSrcLoc inst) inst (classInsts c)
+        return $ c { classInsts = nil }
+
 hsInstDeclToInst :: Monad m => KindEnv -> HsDecl -> m [Inst]
 hsInstDeclToInst kt (HsInstDecl sloc qType decls)
    | length classKind == length argTypeKind, and subsumptions
-        = return [emptyInstance { instSrcLoc = sloc, instDerived = False, instHead = cntxt :=> IsIn className convertedArgType, instAssocs = assocs }]
+        = return [emptyInstance { instSrcLoc = sloc, instDerived = False,
+        instHead = cntxt :=> IsIn className convertedArgType, instAssocs = assocs }]
    | otherwise = failSl sloc $ "hsInstDeclToInst: kind error, attempt to make\n" ++
                       show convertedArgType ++ " (with kind " ++ show argTypeKind ++ ")\n" ++
                       "an instance of class " ++ show className ++
@@ -509,9 +529,13 @@ makeClassHierarchy (ClassHierarchy ch) kt ds = (ClassHierarchy ans) where
                 ClassHierarchy ch -> tell $ Map.elems ch
     f _ = return ()
 
-ensureNotDup :: Monad m => SrcLoc -> Inst -> [Inst] -> m ()
-ensureNotDup sl i is | i `elem` is = failSl sl $ "Duplicate Instance: " ++ show i
-                     | otherwise = return ()
+ensureNotDup :: Monad m => SrcLoc -> Inst -> [Inst] -> m [Inst]
+ensureNotDup sl i is = f i is where
+    f i (i':is') | instHead i == instHead i' = case instDerived i && instDerived i' of
+        True -> return is
+        False -> failSl sl $ "Duplicate Instance: " ++ show i ++ "\nPrevious instance declared at " ++ show (instSrcLoc i')
+    f i (_:is') = f i is'
+    f i [] = return $ i:is
 
 accLen :: Int -> [[a]] -> [(Int, [a])]
 accLen width [] = []
@@ -557,6 +581,23 @@ derivableClasses = [
     class_Ord,
     class_Enum,
     class_Bounded,
+    class_Show,
+    class_Read
+    ]
+
+-- can be automatically derived when
+-- the class is an enumeration
+enumDerivableClasses ::  [Name]
+enumDerivableClasses = [
+    class_Eq,
+    class_Ord,
+    class_Enum
+    ]
+
+-- classes that cannot be derived by the generalized
+-- newtype deriving mechanism.
+noNewtypeDerivable :: [Name]
+noNewtypeDerivable = [
     class_Show,
     class_Read
     ]
