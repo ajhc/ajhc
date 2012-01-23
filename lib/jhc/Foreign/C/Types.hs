@@ -22,7 +22,6 @@ data CTime
 data CFloat
 data CDouble
 data CLDouble
-data CFile
 data CJmpBuf
 data CFpos
 data CWint

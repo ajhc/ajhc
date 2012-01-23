@@ -178,7 +178,7 @@ tiModules htc ms = do
         --dataTable = hoDataTable htc
         dinsts = concatMap g derivingClauses where
             g r@(_,c,t) | c `elem` enumDerivableClasses, Just (DatEnum (_:_:_)) <- Map.lookup t dataInfo = [f r]
-                        | c `elem` enumDerivableClasses, t `elem` [tc_Bool, tc_Ordering] = [f r]
+                        | c `elem` enumDerivableClasses, t `elem` [tc_Bool, tc_Ordering, tc_IOErrorType, tc_IOMode] = [f r]
             --g r@(_,c,t) | c `notElem` noNewtypeDerivable, Just (DatMany True [_]) <- Map.lookup t dataInfo = [f r]
             g _ = []
             f (sl,c,t) = emptyInstance { instSrcLoc = sl, instDerived = True, instHead = [] :=> IsIn c (TCon (Tycon t kindStar)) }

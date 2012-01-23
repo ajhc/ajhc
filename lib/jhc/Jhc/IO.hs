@@ -22,7 +22,6 @@ module Jhc.IO(
     unsafeInterleaveIO,
     error,
     IOError(),
-    showIOError,
     userError,
     unsafePerformIO,
     unsafePerformIO'
@@ -33,9 +32,9 @@ import Jhc.Basics
 import Jhc.Order
 import Jhc.Prim
 import Jhc.Prim.IO
+import Jhc.Type.Basic
+import Jhc.Type.Handle
 import qualified Jhc.Options
-
--- basic types
 
 unIO :: IO a -> UIO a
 unIO (IO x) = x
@@ -70,19 +69,11 @@ unsafeInterleaveIO :: IO a -> IO a
 unsafeInterleaveIO action = IO $ \w -> (# w , case action' w of (# _,  a #) -> a #)
     where IO action' = errorContinuation action
 
--- IO Exception handling
-
-newtype IOError = IOError String
-    deriving(Eq)
-
-showIOError :: IOError -> String
-showIOError (IOError x) = x
-
-userError       :: String  -> IOError
-userError str	=  IOError  str
-
 showError :: IOError -> IO b
-showError (IOError z) = putErrLn z `thenIO_` exitFailure
+--showError (IOError z) = putErrLn z `thenIO_` exitFailure
+showError ioe = putErrLn (ioeGetErrorString ioe) `thenIO_` exitFailure
+
+userError x = IOError User x Nothing Nothing
 
 errorContinuation :: IO a -> IO a
 errorContinuation x = catch x showError
@@ -128,7 +119,7 @@ runMain main w = case run w of
     where
     IO run = catch main $ \e ->
             putErrLn "\nUncaught Exception:" `thenIO_`
-            putErrLn (showIOError e)         `thenIO_`
+            putErrLn (ioeGetErrorString e)   `thenIO_`
             exitFailure
 
 exitFailure :: IO a

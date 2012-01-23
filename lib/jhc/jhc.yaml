@@ -29,9 +29,7 @@ Exposed-Modules:
         - Jhc.Enum
         - Jhc.Float
         - Jhc.Handle
-        - Jhc.Hole
         - Jhc.IO
-        - Jhc.JumpPoint
         - Jhc.List
         - Jhc.Maybe
         - Jhc.Monad
@@ -53,3 +51,9 @@ Exposed-Modules:
         - System.IO.Unsafe
         - System.Mem
         - System.Mem.StableName
+        - Jhc.Type.Basic
+        - Jhc.Type.Handle
+        - Jhc.Type.Ptr
+
+#        - Jhc.Hole
+#        - Jhc.JumpPoint

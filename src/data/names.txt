@@ -1,5 +1,7 @@
 TypeConstructor:tc:
 
+IOErrorType  Jhc.Type.Handle.IOErrorType
+IOMode  Jhc.Type.Handle.IOMode
 Arrow      Jhc.Prim.Prim.->
 Ref__      Data.IORef.Ref__
 MutArray__ Jhc.Array.MutArray__

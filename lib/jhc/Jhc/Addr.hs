@@ -15,11 +15,9 @@ import Jhc.Int
 import Jhc.Order
 import Jhc.Prim
 import Jhc.Prim.Bits
+import Jhc.Type.Ptr
 
 m4_include(Jhc/Order.m4)
-
-data Ptr a = Ptr BitsPtr_
-data FunPtr a = FunPtr BitsPtr_
 
 nullPtr :: Ptr a
 nullFunPtr :: FunPtr a

@@ -16,7 +16,7 @@ import Prelude
 import Numeric (readDec, readOct, lexDigits, readHex)
 import Prelude.Text
 import Jhc.Basics
-import Data.Word(Word())
+--import Data.Word(Word())
 import Prelude.CType
 import Jhc.Order
 

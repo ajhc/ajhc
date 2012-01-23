@@ -1,5 +1,4 @@
 {-# OPTIONS_JHC -fno-prelude -funboxed-tuples #-}
-
 module Jhc.Monad where
 
 import Jhc.Basics
@@ -12,13 +11,11 @@ infixr 1  =<<
 
 infixl 4  <$
 
-
 class Functor f  where
     fmap :: (a -> b) -> f a -> f b
     (<$) :: a -> f b -> f a
 
     a <$ fb = fmap (const a) fb
-
 
 {- INLINE return, fail, (>>=), (>>) -}
 class Monad m where
@@ -69,8 +66,6 @@ sequence_ xs  =  f xs where
 
 (=<<) :: Monad m => (a -> m b) -> m a -> m b
 f =<< x =  x >>= f
-
-
 
 instance Monad [] where
     return x = [x]

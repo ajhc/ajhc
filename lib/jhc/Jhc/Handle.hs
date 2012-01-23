@@ -26,24 +26,22 @@ import Jhc.Enum
 import Jhc.IO
 import Jhc.Maybe
 import Jhc.Monad
+import Jhc.Type.Handle
 import Jhc.Order
 import Jhc.Show
 import Prelude.IO
 import System.C.Stdio
 
+deriving instance Eq IOMode
+deriving instance Ord IOMode
+deriving instance Enum IOMode
+--deriving instance Bounded IOMode
 
-
-data IOMode = ReadMode | WriteMode | AppendMode | ReadWriteMode
-    deriving(Eq, Ord, Bounded, Enum, Show)
-
-
-data Handle = Handle {
-    handleName :: String,
-    handleFile :: !(Ptr FILE),
-    handleBinary :: !Bool,
-    handleIsPipe :: !Bool,
-    handleIOMode :: !IOMode
-    }
+instance Show IOMode where
+    show ReadMode = "ReadMode"
+    show WriteMode = "WriteMode"
+    show AppendMode = "AppendMode"
+    show ReadWriteMode = "ReadWriteMode"
 
 instance Show Handle where
     showsPrec _ h s = handleName h ++ s
@@ -55,12 +53,6 @@ make_builtin mode name std = Handle { handleName = "(" ++ name ++ ")", handleFil
 stdin = make_builtin ReadMode "stdin" c_stdin
 stdout = make_builtin WriteMode "stdout" c_stdout
 stderr = make_builtin WriteMode "stderr" c_stderr
-
-{-
-stdin  = Handle (unsafePerformIO (peek c_stdin))
-stdout = Handle (unsafePerformIO (peek c_stdout))
-stderr = Handle (unsafePerformIO (peek c_stderr))
--}
 
 foreign import ccall "stdio.h &stdin" c_stdin :: Ptr FILE
 foreign import ccall "stdio.h &stdout" c_stdout :: Ptr FILE
