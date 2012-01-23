@@ -6,6 +6,11 @@ Modules in jhc are searched for based on their name as in other Haskell
 compilers. However in addition to searching for 'Data/Foo.hs' for the module
 'Data.Foo', jhc will also search for 'Data.Foo.hs'.
 
+
+# Standalone deriving
+
+Jhc supports a standalone deriving mechanism under certain circumstances.
+
 # Rank-N Polymorphism
 
 Jhc supports higher ranked polymorphism. jhc will never infer types of higher
@@ -15,25 +20,37 @@ data constructors defined to by polymorphic will work.
 
 # Existential types
 
+Jhc supports first class existential types, using the 'exists' keyword. It also supports
+existential data types in a similar fashion to ghc.
+
 # Unboxed Values
 
 Unboxed values in jhc are specified in a similar fashion to GHC however the
 lexical syntax is not changed to allow # in identifiers. # is still used in
 the syntax for various unboxed constructs, but normal Haskell rules apply to
 other Haskell values. The convention is to suffix such types with '_' to
-indicate their status as unboxed.
+indicate their status as unboxed. All unboxed values other than unboxed tuples
+are enabled by the -funboxed-value flag. For compatibility with GHC, the 
+MagicHash extension name also turns on unboxed-values.
 
 ## Unboxed Tuples
 
 Jhc supports unboxed tuples with the same syntax as GHC, (# 2, 4 #) is an
-unboxed tuple of two numbers. Unboxed tuples are enabled with -funboxed-tuples
-
+unboxed tuple of two numbers. Unboxed tuples are enabled with -funboxed-tuples.
+Unboxed tuples are kind-polymorphic, able to hold both boxed and unboxed values. 
+(but not another unboxed tuple)
 
 ## Unboxed Strings
 
 Unboxed strings are enabled with the -funboxed-values flag. They are
 specified like a normal string but have a '#' at the end. Unboxed strings
-have types 'Addr__' which is as synonym for 'BitsPtr_'.
+have types 'BitsPtr_'.
+
+## Unboxed Characters
+
+Unboxed characters can be expressed by putting a hash after a normal character 
+literal. Unboxed characters are of type Char_ which is a newtype of Bits32_ and
+defined in Jhc.Prim.Bits
 
 ## Unboxed Numbers
 
@@ -42,5 +59,16 @@ with a '#' such as in 3# or 4#. Jhc supports a limited form of type inference
 for unboxed numbers, if the type is fully specified by the environment and it
 is a suitable unboxed numeric type then that type is used. Otherwise it
 defaults to Int__. Whether the type is fully specifed follows the same rules as
-rank-n types.
+rank-n types. Unboxed numbers do the right thing for enumerations, so 0# can be
+used for the unboxed False value and the appropriate type will be infered.
 
+## Operations on unboxed values
+
+To operate on unboxed vaules you need to bring the appropriate primitive operators into
+scope. You can do this via the special form of FFI declaration for importing primitives.
+Any C-- primitive may be imported as well as a variety of utility routines. the primitive
+import mechanism is 'smart' in that it will dig through newtypes and take care of boxing/unboxing
+values as needed. So you can import a primitive on Char and it will take care of boxing the
+value up in the 'Char' constructor as well as the Char_ newtype for Bits32_, ultimately choosing
+the right Bits32_ primitive. imported primitives are normal haskell declarations so may be 
+exported/imported from modules or passed as higher order functions like normal.

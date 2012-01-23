@@ -31,6 +31,7 @@ In order to build from the darcs repo, you need the following things installed:
       * bytestring
       * containers
       * one of editline or readline
+      * HsSyck
       * mtl
 
 If the dependencies are installed properly, the following will produce a working tree:
