@@ -420,8 +420,8 @@ kiAlias context tyconName args condecl = do
     kc <- lookupKind KindAny (toName TypeConstructor tyconName)
     let [a] = hsConDeclArgs condecl
     va <- newKindVar KindQuestQuest
-    kiType (KVar va) (hsBangType a)
     kiApps' kc args (KVar va)
+    kiType (KVar va) (hsBangType a)
     mapM_ kiPred context
 
 kiData context tyconName args condecls = do

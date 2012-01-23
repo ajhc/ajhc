@@ -42,14 +42,14 @@ instance TypeNames E where
     tUnit = ELit (litCons { litName = tUnit, litArgs = [], litType = eStar })
     tString =  (ELit (litCons { litName = tc_List, litArgs = [tChar], litType = eStar }))
     tInteger = ELit (litCons { litName = tInteger, litArgs = [], litType = eStar })
---    tWorld__ = ELit (litCons { litName = tWorld__, litArgs = [], litType = eHash })
     tWorld__ = ELit (litCons { litName = tc_State_, litArgs = [realWorld], litType = eHash }) where
         realWorld = ELit (litCons { litName = tc_RealWorld, litArgs = [], litType = eStar })
     tIntzh = ELit (litCons { litName = tIntzh, litArgs = [], litType = eHash })
     tEnumzh = ELit (litCons { litName = tEnumzh, litArgs = [], litType = eHash })
-    tCharzh = ELit (litCons { litName = tCharzh, litArgs = [], litType = eHash })
+    tCharzh = ELit (litCons { litName = tCharzh, litArgs = [], litType = eHash, litAliasFor = Just tBits32zh })
 
 tIntegerzh = ELit (litCons { litName = rt_bits_max_, litArgs = [], litType = eHash })
+tBits32zh = ELit (litCons { litName = tIntzh, litArgs = [], litType = eHash })
 
 instance ConNames E where
     vTrue = ELit vTrue
@@ -135,7 +135,7 @@ eToList _ = fail "eToList: not list"
 
 toString (ELit LitCons { litName = n, litArgs = [], litType = t }) = if dc_EmptyList == n && t == tString then return "" else fail "not a string"
 toString x = eToList x >>= mapM fromChar where
-    fromChar (ELit LitCons { litName = dc, litArgs = [ELit (LitInt ch t)] }) | dc == dc_Char && t == tCharzh = return (chr $ fromIntegral ch)
+    fromChar (ELit LitCons { litName = dc, litArgs = [ELit (LitInt ch t)] }) | dc == dc_Char = return (chr $ fromIntegral ch)
     fromChar _ = fail "fromChar: not char"
 
 ltTuple ts = ELit $ litCons { litName = nameTuple TypeConstructor (length ts), litArgs = ts, litType = eStar }

@@ -395,6 +395,7 @@ tiPat (HsPVar i) typ = do
         return (HsPVar i, Map.singleton (toName Val i) typ')
 
 tiPat pl@(HsPLit HsChar {}) typ = boxyMatch tChar typ >> return (pl,mempty)
+tiPat pl@(HsPLit HsCharPrim {}) typ = boxyMatch tCharzh typ >> return (pl,mempty)
 tiPat pl@(HsPLit HsString {}) typ = boxyMatch tString typ >> return (pl,mempty)
 tiPat pl@(HsPLit HsInt {}) typ = do
     unBox typ
@@ -790,6 +791,7 @@ tiProgram bgs es = ans where
 
 tiLit :: HsLiteral -> Tc Tau
 tiLit (HsChar _) = return tChar
+tiLit (HsCharPrim _) = return tCharzh
 tiLit (HsInt _) = do
     v <- newVar kindStar
     return $ TForAll [v] ([IsIn class_Num (TVar v)] :=> TVar v)

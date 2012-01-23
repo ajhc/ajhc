@@ -615,6 +615,9 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
     cExpr (HsAsPat n' (HsLit (HsIntPrim i))) = ans where
         t' = getAssump n'
         ans = return $ ELit (LitInt (fromIntegral i) (tipe t'))
+    cExpr (HsAsPat n' (HsLit (HsCharPrim i))) = ans where
+        t' = getAssump n'
+        ans = return $ ELit (LitInt (fromIntegral $ ord i) (tipe t'))
     cExpr (HsAsPat n' (HsLit (HsInt i))) = ans where
         t' = getAssump n'
         ty = tipe t'
@@ -626,6 +629,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
             --Just (cn,st,it) ->
     --cExpr (HsLit (HsInt i)) = return $ intConvert i
     cExpr (HsLit (HsChar ch)) = return $ toE ch
+    cExpr (HsLit (HsCharPrim ch)) = return $ toEzh ch
     cExpr (HsLit (HsFrac i))  = return $ toE i
     cExpr (HsLambda sl ps e) | all isHsPVar ps = do
         e <- cExpr e
@@ -761,7 +765,7 @@ intConvert' funcs typ i = EAp (EAp fun typ) (ELit (litCons { litName = con, litA
 
 litconvert (HsChar i) t | t == tChar =  LitInt (fromIntegral $ ord i) tCharzh
 litconvert (HsCharPrim i) t | t == tCharzh =  LitInt (fromIntegral $ ord i) tCharzh
-litconvert (HsIntPrim i) t  =  LitInt (fromIntegral $  i) t
+litconvert (HsIntPrim i) t  =  LitInt (fromIntegral i) t
 litconvert e t = error $ "litconvert: shouldn't happen: " ++ show (e,t)
 
 fromHsPLitInt (HsPLit l@(HsInt _)) = return l

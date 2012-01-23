@@ -5,7 +5,6 @@ module Jhc.String(
     eqString,
     eqUnpackedString,
     unpackStringFoldr,
-    eqSingleChar,
     unpackString
     )where
 
@@ -18,50 +17,32 @@ import Jhc.Prim.Bits
 unpackString :: Addr__ -> [Char]
 unpackString addr = f addr where
     f addr = case constPeekByte addr of
-        Char_ 0# -> []
+        '\0'# -> []
         c -> (Char c:f (increment addr))
 
 unpackStringFoldr :: Addr__ -> (Char -> b -> b) -> b -> b
 unpackStringFoldr addr cons nil = f addr where
     f addr = case constPeekByte addr of
-        Char_ 0# -> nil
+        '\0'# -> nil
         c -> (Char c `cons` f (increment addr))
 
 {-# NOINLINE eqUnpackedString #-}
 eqUnpackedString :: Addr__ -> [Char] -> Bool_
 eqUnpackedString addr cs = f addr cs where
     f :: Addr__ -> [Char] -> Bool_
-    f offset [] = case constPeekByte offset of Char_ 0# -> Bool_ 1#; _ -> Bool_ 0#
+    f offset [] = case constPeekByte offset of '\0'# -> 1#; _ -> 0#
     f offset (Char c:cs) = case constPeekByte offset of
-        Char_ 0# -> Bool_ 0#
+        '\0'# -> 0#
         uc -> case equalsChar uc c of
-            Bool_ 0# -> Bool_ 0#
-            Bool_ 1# -> f (increment offset) cs
-
-eqSingleChar :: Char_ -> [Char] -> Bool_
-eqSingleChar ch (Char c:cs) = case equalsChar ch c of
-    Bool_ 0# -> Bool_ 0#
-    Bool_ 1# -> case cs of
-        [] -> Bool_ 1#
-        _ -> Bool_ 0#
-
-{-# NOINLINE eqUnpacked #-}
-eqUnpacked :: Addr__ -> [Char] -> Bool_
-eqUnpacked addr cs = f addr cs where
-    f :: Addr__ -> [Char] -> Bool_
-    f offset [] = case constPeekByte offset of Char_ 0# -> Bool_ 1#; Char_ _ -> Bool_ 0#
-    f offset (Char c:cs) = case constPeekByte offset of
-        Char_ 0# -> Bool_ 0#
-        uc -> case equalsChar uc c of
-            Bool_ 0# -> Bool_ 0#
-            Bool_ 1# -> f (increment offset) cs
+            0# -> 0#
+            1# -> f (increment offset) cs
 
 eqString :: [Char] -> [Char] -> Bool_
-eqString [] [] = Bool_ 1#
+eqString [] [] = 1#
 eqString (Char x:xs) (Char y:ys) = case equalsChar x y of
-    Bool_ 0# -> Bool_ 0#
-    Bool_ 1# -> eqString xs ys
-eqString _ _ = Bool_ 0#
+    0# -> 0#
+    1# -> eqString xs ys
+eqString _ _ = 0#
 
 foreign import primitive increment :: Addr__ -> Addr__
 foreign import primitive "Eq" equalsChar :: Char_ -> Char_ -> Bool_
@@ -90,5 +71,23 @@ unpackFoldrString addr f e = unpack addr where
           unpack (nh +# 4#)
       where
 	ch = indexCharArray# addr nh
+
+eqSingleChar :: Char_ -> [Char] -> Bool_
+eqSingleChar ch (Char c:cs) = case equalsChar ch c of
+    0# -> 0#
+    1# -> case cs of
+        [] -> 1#
+        _ ->  0#
+
+{-# NOINLINE eqUnpacked #-}
+eqUnpacked :: Addr__ -> [Char] -> Bool_
+eqUnpacked addr cs = f addr cs where
+    f :: Addr__ -> [Char] -> Bool_
+    f offset [] = case constPeekByte offset of '\0'# -> 1#;  _ -> 0#
+    f offset (Char c:cs) = case constPeekByte offset of
+        '\NUL'# -> 0#
+        uc -> case equalsChar uc c of
+            0# -> 0#
+            1# -> f (increment offset) cs
 
 -}

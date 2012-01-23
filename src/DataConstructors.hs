@@ -169,10 +169,8 @@ getHsSlots ss = map f ss where
     f (SlotUnpacked e _ es) = e
     f (SlotExistential e) = tvrType e
 
-newtype DataTable = DataTable {
-    constructorMap :: (Map.Map Name Constructor)
-    }
-    {-! derive: Monoid !-}
+newtype DataTable = DataTable (Map.Map Name Constructor)
+    deriving(Monoid)
 
 instance Binary DataTable where
     put (DataTable dt) = putMap dt

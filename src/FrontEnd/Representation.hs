@@ -69,10 +69,11 @@ instance Ord MetaVar where
     compare a b = compare (metaUniq a) (metaUniq b)
 
 instance TypeNames Type where
-    tBool = TCon (Tycon tc_Bool kindStar)
+    tBool   = TCon (Tycon tc_Bool kindStar)
     tString = TAp tList tChar
-    tChar      = TCon (Tycon tc_Char kindStar)
-    tUnit = TCon (Tycon tc_Unit kindStar)
+    tChar   = TCon (Tycon tc_Char kindStar)
+    tUnit   = TCon (Tycon tc_Unit kindStar)
+    tCharzh = TCon (Tycon tc_Char_ kindHash)
 
 instance Ord (IORef a)
 instance Binary (IORef a)

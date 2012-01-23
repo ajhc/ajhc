@@ -420,7 +420,8 @@ lexToken = do
 			    matchChar '\'' "Improperly terminated character constant"
                             rest <- getInput
                             case rest of
-                                '#':_ | uval -> discard 1 >> return (UIntTok $ fromIntegral $ ord c2)
+                                --'#':_ | uval -> discard 1 >> return (UIntTok $ fromIntegral $ ord c2)
+                                '#':_ | uval -> discard 1 >> return (UCharacter c2)
                                 _ -> return (Character c2)
 
 		    '"' ->  lexString
@@ -693,5 +694,3 @@ pragmas = Map.fromList $ [ (y,Left x) | xs@(x:_)  <- pragmas_raw, y <- xs] ++  [
 
 normPragma :: String -> Either String Token
 normPragma s | ~(Just v) <- Map.lookup s pragmas  = v
-
-

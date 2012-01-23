@@ -220,8 +220,9 @@ compile prog@Program { progDataTable = dataTable } = do
         theFuncs = (funcMain ,[] :-> initCafs :>>= [] :->  discardResult (App (scTag mainEntry) [] [])) : efv ++ ds'
     return grin
     where
+    DataTable dtMap = dataTable
     scMap = fromList [ (tvrIdent t,toEntry x) |  x@(t,_,_) <- map combTriple $ progCombinators prog]
-    initTyEnv = mappend primTyEnv $ TyEnv $ fromList $ concat [ makePartials (a,b,c) | (_,(a,b,c)) <-  toList scMap] ++ concat [con x| x <- [cabsurd] ++ values (constructorMap dataTable), conType x /= eHash]
+    initTyEnv = mappend primTyEnv $ TyEnv $ fromList $ concat [ makePartials (a,b,c) | (_,(a,b,c)) <-  toList scMap] ++ concat [con x| x <- [cabsurd] ++ values dtMap, conType x /= eHash]
     Just cabsurd = getConstructor (nameConjured modAbsurd eStar) mempty
     con c | (EPi (TVr { tvrType = a }) b,_) <- fromLam $ conExpr c = return $ (tagArrow,toTyTy ([tyDNode, tyDNode],[TyNode]))
     con c | keepCon = return $ (n,TyTy { tyThunk = TyNotThunk, tySlots = keepIts as, tyReturn = [TyNode], tySiblings = fmap (map convertName) sibs}) where

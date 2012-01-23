@@ -95,10 +95,11 @@ showLit ::
 showLit showBind l = do
     let f (LitInt i (ELit LitCons { litName = n })) | Just l <- lookup n enumList, i >= 0 && fromIntegral i < length l =
             return $ atom $ ((text $ l !! (fromIntegral i)))
+        f (LitInt n (ELit LitCons { litName = t})) | t == tc_Char_ = return $ atom $ tshow (chr $ fromIntegral n) <> char '#'
+        f (LitInt i t) | dump FD.EVerbose = do
+            se <- showE t
+            return $ (atom (text $ show i) `inhabit` se )
         f (LitInt i _) = return $ atom $ ((text $ show i))
-        f (LitInt 1 e) | e == tBoolzh = return $ atom $ text "True#"
-        f (LitInt 0 e) | e == tBoolzh = return $ atom $ text "False#"
-        f (LitInt n e) | e == tCharzh = return $ atom $ tshow (chr $ fromIntegral n) <> char '#'
         f LitCons { litName = s, litArgs = es } | Just n <- fromTupname s , n == length es = do
             es' <- mapM (fmap unparse . showBind) es
             return $ atom $ tupled es'
@@ -183,7 +184,6 @@ collectAbstractions e0 = go e0 [] where
     go  e           xs = done e xs
     done e xs = (reverse xs, e)
 
-
 showE :: E -> SEM (Unparse Doc)
 showE e = do
     let f e | Just s <- E.E.toString e = return $ atom $ (text $ show s)
@@ -218,6 +218,7 @@ showE e = do
         f (EVar tvr) = if dump FD.EVerbose then showTVr tvr else showTVr' tvr
         f Unknown = return $ symbol (char  '?')
         f (ESort s) = return $ symbol (tshow s)
+        f (ELit (LitCons { litName = n, litArgs = [ELit (LitInt i _)] })) | n == dc_Char = return $ atom $ tshow $ chr (fromIntegral i)
         f (ELit l) = showLit showE l
         f (EError "" t) = do
             ty <- showE t
