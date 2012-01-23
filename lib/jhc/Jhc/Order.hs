@@ -89,7 +89,7 @@ instance Ord a => Ord [a] where
     x >= y = not (x < y)
     x <= y = not (y < x)
 
-INST_EQORDER(Char,Char,Bits32_,U)
+INST_EQORDER(Char,Char,Char_,U)
 INST_EQORDER(Int,,Int,)
 INST_EQORDER(Integer,,Integer,)
 

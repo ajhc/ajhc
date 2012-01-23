@@ -215,7 +215,7 @@ MAINTAINERCLEANFILES= $(BUILT_SOURCES) $(DRIFTFILES)
 
 CLEANFILES= $(JHC_LIBS) $(JHC_EXT_LIBS)
 
-LIB_OPTIONS=$(RTSOPTS) $(JHC_TEST) --noauto -L- -L. # --deps tmp/$@.yaml
+LIB_OPTIONS=$(RTSOPTS) $(JHC_TEST) -flint -L- -L.
 
 jhc-prim-1.0.hl: lib/jhc-prim/jhc-prim.yaml lib/jhc-prim/Jhc/Prim/Prim.hs lib/jhc-prim/Jhc/Prim/IO.hs lib/jhc-prim/Jhc/Prim/Words.hs lib/jhc-prim/Jhc/Prim/Bits.hs
 	./jhc $(LIB_OPTIONS) --build-hl $< -o $@

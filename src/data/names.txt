@@ -3,7 +3,7 @@ TypeConstructor:tc:
 Arrow      Jhc.Prim.Prim.->
 Ref__      Data.IORef.Ref__
 MutArray__ Jhc.Array.MutArray__
-List       Jhc.Prim.[]
+List       Jhc.Prim.Prim.[]
 Char       Jhc.Prim.Char
 IO         Jhc.Prim.IO.IO
 ACIO       Jhc.Prim.IO.ACIO
@@ -72,13 +72,11 @@ Char_      Jhc.Prim.Bits.Char_
 DataConstructor:dc:
 
 Rational   Jhc.Num.:%
-Cons       Jhc.Prim.:
-EmptyList  Jhc.Prim.[]
+Cons       Jhc.Prim.Prim.:
+EmptyList  Jhc.Prim.Prim.[]
 Unit       Jhc.Prim.Prim.()
 Boolzh     Jhc.Prim.Prim.Bool#
 Char       Jhc.Prim.Char
-#Int        Int#
-#Integer    Integer#
 
 ClassName:class:
 Eq              Jhc.Order.Eq

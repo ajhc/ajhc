@@ -5,10 +5,11 @@ module E.PrimOpt(
     ) where
 
 import Control.Monad.Fix()
-import Maybe
+import Data.Maybe
+import Text.Printf
 
 import C.Prims
-import Cmm.Op(stringToOpTy)
+import Cmm.Op(readTy,Ty)
 import Cmm.OpEval
 import Data.Monoid
 import DataConstructors
@@ -146,6 +147,19 @@ instance Expression E E where
 -- | this is called once after conversion to E on all primitives, it performs various
 -- one time only transformations.
 
+stringToOpTy :: String -> Ty
+stringToOpTy s = case readTy s of
+    Just t -> t
+    _ -> error $ printf "stringToOpTy(%s)" s
+
+stringToOpTy' :: String -> String -> Ty
+stringToOpTy' x s = case readTy s of
+    Just t -> t
+    _ -> error $ printf "stringToOpTy(%s): '%s'" x s
+
+stot :: Show a => a -> Int -> String -> Ty
+stot op n s = stringToOpTy' (show op ++ show n) s
+
 processPrimPrim :: DataTable -> E -> E
 processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o id (primopt (fromAtom s) es (followAliases dataTable orig_t)) where
     primBoundMap = [("maxBound",PrimMaxBound), ("minBound",PrimMinBound), ("umaxBound",PrimUMaxBound)]
@@ -155,7 +169,7 @@ processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o i
         (pa,(ta,_sta)) <- extractPrimitive dataTable a
         (pb,(tb,_stb)) <- extractPrimitive dataTable b
         (bp,(tr,str)) <- boxPrimitive dataTable
-                (EPrim (APrim Op { primCOp = Op.BinOp cop (stringToOpTy ta) (stringToOpTy tb), primRetTy = (stringToOpTy tr) } mempty) [pa, pb] str) t
+                (EPrim (APrim Op { primCOp = Op.BinOp cop (stot cop 1 ta) (stot cop 2 tb), primRetTy = (stot cop 0 tr) } mempty) [pa, pb] str) t
         return bp
     primopt op [a] t | Just cop <- readM op = mdo
         (pa,(ta,_sta)) <- extractPrimitive dataTable a

@@ -1,8 +1,9 @@
 {-# OPTIONS_JHC -fno-prelude -fffi #-}
-module Jhc.Basics(module Jhc.Basics, module Jhc.Prim) where
+module Jhc.Basics(module Jhc.Basics, module Jhc.Prim, module Jhc.Prim.Prim) where
 
 import Jhc.Int
 import Jhc.Prim
+import Jhc.Prim.Prim
 
 data Integer
 
@@ -125,10 +126,10 @@ foldr k z (x:xs) = k x (foldr k z xs)
 foreign import primitive "error.Prelude.undefined" undefined :: a
 
 ord :: Char -> Int
-ord (Char c) = boxInt c
+ord (Char (Char_ c)) = boxInt c
 
 chr :: Int -> Char
-chr i = Char (unboxInt i)
+chr i = Char (Char_ (unboxInt i))
 
 unsafeChr :: Int -> Char
 unsafeChr = chr

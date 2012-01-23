@@ -112,9 +112,9 @@ instance Bounded Char where
 BOUNDED(Int)
 BOUNDED(Integer)
 
-foreign import primitive "UGt"       bits32UGt       :: Bits32_ -> Bits32_ -> Bool__
-foreign import primitive "UGte"      bits32UGte      :: Bits32_ -> Bits32_ -> Bool__
-foreign import primitive "increment" bits32Increment :: Bits32_ -> Bits32_
+--foreign import primitive "UGt"       bits32UGt       :: Bits32_ -> Bits32_ -> Bool__
+--foreign import primitive "UGte"      bits32UGte      :: Bits32_ -> Bits32_ -> Bool__
+--foreign import primitive "increment" bits32Increment :: Bits32_ -> Bits32_
 
-foreign import primitive "Add"       bits32Add       :: Bits32_ -> Bits32_ -> Bits32_
-foreign import primitive "Sub"       bits32Sub       :: Bits32_ -> Bits32_ -> Bits32_
+--foreign import primitive "Add"       bits32Add       :: Bits32_ -> Bits32_ -> Bits32_
+--foreign import primitive "Sub"       bits32Sub       :: Bits32_ -> Bits32_ -> Bits32_
