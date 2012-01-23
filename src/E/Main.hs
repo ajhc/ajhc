@@ -102,14 +102,13 @@ processDecls cho ho' tiData = do
 
     -- build datatables
     let derives = (collectDeriving originalDecls)
-    mapM_ print derives
     let dataTable = toDataTable (getConstructorKinds (hoKinds $ hoTcInfo ho'))
             (tiAllAssumptions tiData) originalDecls (hoDataTable $ hoBuild ho)
         classInstances = deriveClasses (choCombinators cho) fullDataTable derives
         fullDataTable = dataTable `mappend` hoDataTable (hoBuild ho)
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
-
-    wdump FD.Derived $
+    wdump FD.Derived $ do
+        mapM_ print derives
         mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) classInstances
     -- initial program
     let prog = program {
@@ -117,14 +116,13 @@ processDecls cho ho' tiData = do
             progExternalNames = choExternalNames cho,
             progModule = head (fsts $ tiDataModules tiData)
             }
-
     -- Convert Haskell decls to E
     let allAssumps = (tiAllAssumptions tiData `mappend` hoAssumps (hoTcInfo ho))
         theProps = fromList [ (toId x,y) | (x,y) <- Map.toList $ tiProps tiData]
-    ds' <- convertDecls tiData theProps (hoClassHierarchy $ hoTcInfo ho') allAssumps  fullDataTable decls
-    let ds = [ (v,e) | (v,e) <- classInstances ] ++  [ (v,lc) | (n,v,lc) <- ds', v `notElem` fsts classInstances ]
- --   sequence_ [lintCheckE onerrNone fullDataTable v e | (_,v,e) <- ds ]
-
+    ds' <- convertDecls tiData theProps
+        (hoClassHierarchy $ hoTcInfo ho') allAssumps  fullDataTable decls
+    let ds = [ (v,e) | (v,e) <- classInstances ] ++
+            [ (v,lc) | (n,v,lc) <- ds', v `notElem` fsts classInstances ]
     -- Build rules from instances, specializations, and user specified rules and catalysts
     instanceRules <- createInstanceRules fullDataTable (hoClassHierarchy $ hoTcInfo ho')  (ds `mappend` hoEs (hoBuild ho))
     userRules <- convertRules (progModule prog) tiData (hoClassHierarchy  $ hoTcInfo ho') allAssumps fullDataTable decls

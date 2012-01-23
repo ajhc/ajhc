@@ -540,7 +540,7 @@ typeCheckGraph modOpt cn = do
                                     _ -> return ()
                                 return (sourceHash si,mod,lbs')
                         showProgress (map snd3 modules)
-                        (htc,tidata) <- doModules' ctc (map snd3 modules)
+                        (htc,tidata) <- doModules ctc (map snd3 modules)
                         let ctc' = htc `mappend` ctc
                         writeIORef ref (CompTcCollected ctc' (CompTCed ((htc,tidata,[ (x,y) | (x,y,_) <- modules],map (sourceHoName . sourceInfo) sc))))
                         return ctc'

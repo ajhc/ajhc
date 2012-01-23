@@ -1,44 +1,44 @@
 module DataConstructors(
+    AliasType(..),
+    boxPrimitive,
+    collectDeriving,
+    conSlots,
+    constructionExpression,
     Constructor(..),
+    DataFamily(..),
     DataTable(..),
     DataTableMonad(..),
-    AliasType(..),
-    DataFamily(..),
-    Slot(..),
+    dataTablePrims,
+    deconstructionExpression,
+    deriveClasses,
+    extractIO,
+    extractIO',
+    extractPrimitive,
     ExtTypeInfo(..),
     extTypeInfoExtType,
-    primitiveAliases,
-    dataTablePrims,
-    constructionExpression,
-    deconstructionExpression,
-    collectDeriving,
-    followAliases,
     followAlias,
-    tAbsurd,
-    mktBox,
-    modBox,
-    removeNewtypes,
+    followAliases,
     getConstructor,
     getConstructorArities,
     getProduct,
     getSiblings,
-    numberSiblings,
-    extractPrimitive,
-    boxPrimitive,
     lookupExtTypeInfo,
-    extractIO,
-    extractIO',
+    mktBox,
+    modBox,
+    numberSiblings,
+    onlyChild,
     pprintTypeOfCons,
-    showDataTable,
+    primitiveAliases,
+    removeNewtypes,
     samplePrimitiveDataTable,
+    showDataTable,
+    Slot(..),
     slotTypes,
     slotTypesHs,
+    tAbsurd,
     toDataTable,
-    updateLit,
-    deriveClasses,
-    onlyChild,
-    conSlots,
-    typesCompatable
+    typesCompatable,
+    updateLit
     ) where
 
 import Control.Monad.Identity
@@ -444,17 +444,22 @@ deriveClasses cmap dt@(DataTable mp) ctd = concatMap f ctd where
                 mkCmpFunc v_leq Op.ULte,
                 mkCmpFunc v_lt  Op.ULt,
                 mkCmpFunc v_gt  Op.UGt]
-        h cl | cl == class_Enum = funcs where
-            funcs = [
-                (iv_te,ib_te),
-                (iv_fe,ib_fe),
-                iv v_succ succ_body,
-                iv v_pred pred_body,
-                iv v_enumFrom from_body,
-                iv v_enumFromTo fromTo_body,
-                iv v_enumFromThen fromThen_body,
-                iv v_enumFromThenTo fromThenTo_body
-                ]
+        h cl | Just ans <- lookup cl mthds = ans where
+            mthds = [(class_Enum,[
+                    (iv_te,ib_te),
+                    (iv_fe,ib_fe),
+                    iv v_succ succ_body,
+                    iv v_pred pred_body,
+                    iv v_enumFrom from_body,
+                    iv v_enumFromTo fromTo_body,
+                    iv v_enumFromThen fromThen_body,
+                    iv v_enumFromThenTo fromThenTo_body
+                ]),
+                (class_Ix,[
+                    iv v_range range_body,
+--                    iv v_inRange inRange_body,
+                    iv v_index index_body
+                ])]
             iv_te = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName v_toEnum (nameName $ conName c), tvrType = getType ib_te }
             iv_fe = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName v_fromEnum (nameName $ conName c), tvrType = getType ib_fe }
             iv fname body = (setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName fname (nameName $ conName c), tvrType = getType body },body)
@@ -464,6 +469,9 @@ deriveClasses cmap dt@(DataTable mp) ctd = concatMap f ctd where
             fromTo_body = foldl EAp (lupvar v_enum_fromTo) [typ, box, debox]
             fromThen_body = foldl EAp (lupvar v_enum_fromThen) [typ, box, debox, max]
             fromThenTo_body = foldl EAp (lupvar v_enum_fromThenTo) [typ, box, debox]
+            range_body = foldl EAp (lupvar v_ix_range) [typ, box, debox]
+            --inRange_body = foldl EAp (lupvar v_ix_inRange) [typ, box, debox]
+            index_body = foldl EAp (lupvar v_ix_index) [typ, box, debox]
 
             ib_te = foldl EAp (lupvar v_enum_toEnum) [typ, box, toEzh (mv - 1)]
             ib_fe = ELam val1 (create_uintegralCast_toInt con tEnumzh (EVar val1))

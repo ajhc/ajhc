@@ -9,6 +9,8 @@ import Jhc.Prim.IO
 
 data (->) :: ?? -> ? -> *
 
+data Bool = False | True
+
 data () = ()
 data (,) a b = (,) a b
 data (,,) a b c = (,,) a b c

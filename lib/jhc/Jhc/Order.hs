@@ -14,14 +14,20 @@ module Jhc.Order(
 import Jhc.Enum
 import Jhc.Basics
 import Jhc.Prim.Bits
+import Jhc.Prim.Prim
 
 m4_include(Jhc/Order.m4)
 
-data Bool = False | True
-    deriving (Eq, Ord, Bounded, Enum)
+deriving instance Eq Bool
+deriving instance Ord Bool
+deriving instance Enum Bool
 
 data  Ordering    =  LT | EQ | GT
     deriving (Eq, Ord, Bounded, Enum)
+
+instance Bounded Bool where
+    minBound = False
+    maxBound = True
 
 infix  4  ==, /=, <, <=, >=, >
 

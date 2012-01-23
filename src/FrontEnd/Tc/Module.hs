@@ -1,6 +1,6 @@
 module FrontEnd.Tc.Module (tiModules,TiData(..)) where
 
-import Char
+import Data.Char
 import Control.Monad.Writer
 import Text.PrettyPrint.HughesPJ as PPrint
 import qualified Data.Foldable as T
@@ -31,6 +31,7 @@ import FrontEnd.Warning
 import Ho.Type
 import Info.Types
 import Name.Name as Name
+import Name.Names
 import Options
 import Util.Gen
 import Util.Inst()
@@ -97,31 +98,29 @@ or' :: [(a -> Bool)] -> a -> Bool
 or' fs x = or [ f x | f <- fs ]
 
 -- Very broad information on a data type.
--- Flag is whether it is a newtype.
 data DatDesc
-    = DatEmpty
-    | DatEnum [Name]
-    | DatMany Bool [(Name,Int)]
+    = DatEnum [Name]
+    | DatMany [(Name,Int)]
+    | DatNewT Name
+
+dtDataDesc :: Monad m => DataTable -> Name -> m DatDesc
+dtDataDesc dt n = maybe (fail "dtDataDesc") return $ do
+    c <- getConstructor n dt
+    let datEnum = conVirtual c >>= return . DatEnum
+        datNewT = do ErasedAlias <- return $ conAlias c; DataNormal [n] <- return $ conChildren c; return $ DatNewT n
+        datMany = do DataNormal ns <- return $ conChildren c ; return $ DatMany [ (n,-1) | n <- ns ]
+    datEnum `mplus` datNewT `mplus` datMany
 
 getDataDesc :: Monad m => HsDecl -> m (Name,DatDesc)
 getDataDesc d = g d where
     g desc = do
         r <- f d
         return (hsDeclName desc,r)
-    f HsNewTypeDecl { hsDeclName = n, hsDeclCon = (hsConDeclName -> cn)  } = return $ DatMany True [(cn,1)]
-    f HsDataDecl { hsDeclName = n, hsDeclCons = [] } = return $ DatEmpty
-    f HsDataDecl { hsDeclName = n, hsDeclCons = cs }
+    f HsNewTypeDecl { hsDeclCon = (hsConDeclName -> cn)  } = return $ DatNewT cn
+    f HsDataDecl { hsDeclCons = cs }
         | all null $ map hsConDeclArgs cs = return $ DatEnum (map hsConDeclName cs)
-    f HsDataDecl { hsDeclName = n, hsDeclCons = cs } = return $ DatMany True [ (hsConDeclName c, (length . hsConDeclArgs) c) | c <- cs]
+    f HsDataDecl { hsDeclCons = cs } = return $ DatMany [ (hsConDeclName c, (length . hsConDeclArgs) c) | c <- cs]
     f _ = fail "getDataDesc: not a data declaration"
-
-suitableForDeriving :: [HsDecl] -> (Set.Set Name,Set.Set Name)
-suitableForDeriving ds = f ds Set.empty Set.empty where
-    f [] a b = (a,b)
-    f (HsNewTypeDecl { hsDeclName = n }:ds) a b = f ds (Set.insert n a) b
-    f (HsDataDecl { hsDeclName = n, hsDeclCons = cs@(_:_:_) }:ds) a b
-        | all null $ map hsConDeclArgs cs = f ds a (Set.insert n b)
-    f (_:ds) a b = f ds a b
 
 -- FIXME: Use an warnings+writer+error monad instead of IO.
 tiModules ::  HoTcInfo -> [ModInfo] -> IO (HoTcInfo,TiData)
@@ -156,9 +155,6 @@ tiModules htc ms = do
 
     -- kind inference for all type constructors type variables and classes in the module
     let classAndDataDecls = filter (or' [isHsDataDecl, isHsNewTypeDecl, isHsClassDecl, isHsClassAliasDecl]) ds  -- rDataDecls ++ rNewTyDecls ++ rClassDecls
-
-    --wdump FD.Progress $ do
-    --    putErrLn $ "Kind inference"
     kindInfo <- kiDecls importKindEnv classAndDataDecls
 
     when (dump FD.Kind) $
@@ -179,12 +175,13 @@ tiModules htc ms = do
         cHierarchyWithInstances = scatterAliasInstances $ smallClassHierarchy `mappend` importClassHierarchy
         derivingClauses = collectDeriving ds
         dataInfo = Map.fromList $ concatMap getDataDesc ds
+        --dataTable = hoDataTable htc
         dinsts = concatMap g derivingClauses where
-            g r@(_,c,t) | c `elem` enumDerivableClasses, Just (DatEnum _) <- Map.lookup t dataInfo = [f r]
+            g r@(_,c,t) | c `elem` enumDerivableClasses, Just (DatEnum (_:_:_)) <- Map.lookup t dataInfo = [f r]
+                        | c `elem` enumDerivableClasses, t `elem` [tc_Bool, tc_Ordering] = [f r]
             --g r@(_,c,t) | c `notElem` noNewtypeDerivable, Just (DatMany True [_]) <- Map.lookup t dataInfo = [f r]
             g _ = []
             f (sl,c,t) = emptyInstance { instSrcLoc = sl, instDerived = True, instHead = [] :=> IsIn c (TCon (Tycon t kindStar)) }
-
 
     when (dump FD.ClassSummary) $ do
         putStrLn "  ---- class summary ---- "
@@ -195,7 +192,6 @@ tiModules htc ms = do
              printClassHierarchy smallClassHierarchy}
 
     -- lift the instance methods up to top-level decls
-
     let cDefBinds = concat [ [ z | z <- ds] | HsClassDecl _ _ ds <- ds]
     let myClassAssumps = concat  [ classAssumps as | as <- classRecords cHierarchyWithInstances, isClassRecord as ]
         instanceEnv   = Map.fromList instAssumps
@@ -239,14 +235,10 @@ tiModules htc ms = do
         putStrLn " ---- Program ---- "
         mapM_ putStrLn $ map (PPrint.render . PPrint.pprint) $  program
 
-    -- type inference/checking for all variables
-
     when (dump FD.AllTypes) $ do
         putStrLn "  ---- all types ---- "
         putStrLn $ PPrint.render $ pprintEnvMap (sigEnv `mappend` localDConsEnv `mappend` hoAssumps htc)
 
-    --wdump FD.Progress $ do
-    --    putErrLn $ "Type inference"
     let moduleName = modInfoName tms
         (tms:_) = ms
     let tcInfo = tcInfoEmpty {

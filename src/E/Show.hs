@@ -47,7 +47,7 @@ newtype SEM a = SEM { _unSEM :: VarNameT E Id String Identity a }
     deriving(Monad,Functor)
 
 enumList = [
-    (tc_Boolzh,["False#","True#"]),
+    (tc_Bool_,["False#","True#"]),
     (toName TypeConstructor ("Jhc.Order","Ordering#"),["LT#","EQ#","GT#"])
     ]
 
@@ -162,7 +162,7 @@ allocTVr tvr (SEM action) | not $ isJust (fromId (tvrIdent tvr)) = do
     SEM $ subVarName $ newName (map (('v':) . show) [1::Int ..]) Unknown (tvrIdent tvr) >> action
 allocTVr _ action = action
 
-tBoolzh = ELit litCons { litName = tc_Boolzh, litType = eHash, litAliasFor = Just tIntzh }
+tBoolzh = ELit litCons { litName = tc_Bool_, litType = eHash, litAliasFor = Just tEnumzh }
 
 -- collects lambda and pi abstractions
 collectAbstractions e0 = go e0 [] where

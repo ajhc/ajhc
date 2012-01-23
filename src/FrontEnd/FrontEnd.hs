@@ -1,5 +1,5 @@
 module FrontEnd.FrontEnd(
-    doModules',
+    doModules,
     Tc.TiData(..)
     ) where
 
@@ -19,8 +19,8 @@ import qualified FlagDump as FD
 import qualified FrontEnd.Tc.Module as Tc
 
 -- Process modules found by Ho
-doModules' :: HoTcInfo -> [HsModule] -> IO  (HoTcInfo,Tc.TiData)
-doModules' htc ms  = do
+doModules :: HoTcInfo -> [HsModule] -> IO  (HoTcInfo,Tc.TiData)
+doModules htc ms  = do
     ms <- mapM modInfo ms
     when (dump FD.Defs) $ flip mapM_ ms $ \m -> do
          putStrLn $ " ---- Definitions for" <+> show (modInfoName m) <+> "----";

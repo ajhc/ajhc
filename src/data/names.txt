@@ -12,8 +12,9 @@ RealWorld  Jhc.Prim.IO.RealWorld
 #World__   Jhc.Prim.World__
 #Int__     Jhc.Prim.Int__
 Array__    Jhc.Array.Array__
-Bool       Jhc.Order.Bool
-Boolzh     Jhc.Order.Bool#
+Bool       Jhc.Prim.Prim.Bool
+Ordering   Jhc.Order.Ordering
+Bool_      Jhc.Prim.Bits.Bool_
 Ptr        Jhc.Addr.Ptr
 FunPtr     Jhc.Addr.FunPtr
 Ratio      Jhc.Num.Ratio
@@ -74,7 +75,7 @@ Rational   Jhc.Num.:%
 Cons       Jhc.Prim.:
 EmptyList  Jhc.Prim.[]
 Unit       Jhc.Prim.Prim.()
-Boolzh     Jhc.Order.Bool#
+Boolzh     Jhc.Prim.Prim.Bool#
 Char       Jhc.Prim.Char
 #Int        Int#
 #Integer    Integer#
@@ -163,3 +164,6 @@ enum_fromTo          Jhc.Inst.PrimEnum.enum_fromTo
 enum_fromThen        Jhc.Inst.PrimEnum.enum_fromThen
 enum_fromThenTo      Jhc.Inst.PrimEnum.enum_fromThenTo
 enum_toEnum          Jhc.Inst.PrimEnum.enum_toEnum
+ix_index             Jhc.Inst.PrimEnum.ix_index
+ix_inRange           Jhc.Inst.PrimEnum.ix_inRange
+ix_range             Jhc.Inst.PrimEnum.ix_range

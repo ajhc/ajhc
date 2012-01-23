@@ -38,6 +38,7 @@ data BitsWchar_ :: #
 newtype Addr_ = Addr_ BitsPtr_
 newtype FunAddr_ = FunAddr_ BitsPtr_
 newtype Char_ = Char_ Bits32_
+newtype Bool_ = Bool_ Bits16_
 
 -- type aliases to help document whether signed or unsigned
 -- uses are intended, they have no effect other than helping

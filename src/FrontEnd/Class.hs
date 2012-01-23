@@ -582,7 +582,8 @@ derivableClasses = [
     class_Enum,
     class_Bounded,
     class_Show,
-    class_Read
+    class_Read,
+    class_Ix
     ]
 
 -- can be automatically derived when
@@ -591,7 +592,8 @@ enumDerivableClasses ::  [Name]
 enumDerivableClasses = [
     class_Eq,
     class_Ord,
-    class_Enum
+    class_Enum,
+    class_Ix
     ]
 
 -- classes that cannot be derived by the generalized
@@ -600,4 +602,14 @@ noNewtypeDerivable :: [Name]
 noNewtypeDerivable = [
     class_Show,
     class_Read
+    ]
+
+-- classes that behave identically to their component when they have a single
+-- unary constructor but are not newtypes
+unaryPassDerivable :: [Name]
+unaryPassDerivable = [
+    class_Ix,
+    class_Eq,
+    class_Ord,
+    class_Bounded
     ]

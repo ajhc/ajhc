@@ -113,10 +113,6 @@ fromTyvar (Tyvar n k) = tVr (toId n) (kind k)
 fromSigma (TForAll vs (_ :=> t)) = (map fromTyvar vs, tipe t)
 fromSigma t = ([], tipe t)
 
-monadicLookup k m = case Map.lookup k m of
-    Just x  -> return x
-    Nothing -> fail "key not found"
-
 monadicLookup' k m = case Map.lookup k m of
     Just x  -> return x
     Nothing -> fail $ "key not found: " ++ show k
