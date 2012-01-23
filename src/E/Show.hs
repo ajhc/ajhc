@@ -162,8 +162,6 @@ allocTVr tvr (SEM action) | not $ isJust (fromId (tvrIdent tvr)) = do
     SEM $ subVarName $ newName (map (('v':) . show) [1::Int ..]) Unknown (tvrIdent tvr) >> action
 allocTVr _ action = action
 
-tBoolzh = ELit litCons { litName = tc_Bool_, litType = eHash, litAliasFor = Just tEnumzh }
-
 -- collects lambda and pi abstractions
 collectAbstractions e0 = go e0 [] where
     go e1@(EPi tvr e)  xs | tvrIdent tvr == emptyId          = done e1 xs
@@ -185,7 +183,7 @@ showE e = do
             xs <- mapM (fmap unparse . showE) xs
             return $ atom $ list xs
         f e | e == tBool     = return $ atom $ text "Bool"
-        f e | e == tBoolzh   = return $ atom $ text "Bool#"
+        f e | e == tBoolzh   = return $ atom $ text "Bool_"
         f e | e == tChar     = return $ atom $ text "Char"
         f e | e == tInt      = return $ atom $ text "Int"
         f e | e == tInteger  = return $ atom $ text "Integer"

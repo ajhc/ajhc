@@ -10,6 +10,7 @@ import Jhc.Prim.IO
 data (->) :: ?? -> ? -> *
 
 data Bool = False | True
+data Ordering =  LT | EQ | GT
 
 data () = ()
 data (,) a b = (,) a b

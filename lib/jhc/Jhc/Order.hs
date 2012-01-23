@@ -11,7 +11,6 @@ module Jhc.Order(
     otherwise
     ) where
 
-import Jhc.Enum
 import Jhc.Basics
 import Jhc.Prim.Bits
 import Jhc.Prim.Prim
@@ -20,14 +19,8 @@ m4_include(Jhc/Order.m4)
 
 deriving instance Eq Bool
 deriving instance Ord Bool
-deriving instance Enum Bool
-
-data  Ordering    =  LT | EQ | GT
-    deriving (Eq, Ord, Bounded, Enum)
-
-instance Bounded Bool where
-    minBound = False
-    maxBound = True
+deriving instance Eq Ordering
+deriving instance Ord Ordering
 
 infix  4  ==, /=, <, <=, >=, >
 
@@ -73,10 +66,6 @@ instance Ord () where
     max () () = ()
     min () () = ()
     compare () () = EQ
-
-instance Bounded () where
-    minBound = ()
-    maxBound = ()
 
 instance Eq a => Eq [a] where
     [] == [] = True

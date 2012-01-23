@@ -434,7 +434,7 @@ deriveClasses cmap dt@(DataTable mp) ctd = concatMap f ctd where
         v2 = tvr { tvrIdent = anonymous 2,  tvrType = typ }
         i1 = tvr { tvrIdent = anonymous 3,  tvrType = it }
         i2 = tvr { tvrIdent = anonymous 4,  tvrType = it }
-        b3 = tvr { tvrIdent = anonymous 5, tvrType = tBoolzh }
+        b3 = tvr { tvrIdent = anonymous 5,  tvrType = tBoolzh }
         val1 = tvr { tvrIdent = anonymous 7, tvrType = typ }
         unbox e = ELam v1 (ELam v2 (ec (EVar v1) i1 (ec (EVar v2) i2 e)))  where
             ec v i e = eCase v [Alt (litCons { litName = con, litArgs = [i], litType = typ }) e] Unknown

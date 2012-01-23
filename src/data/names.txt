@@ -13,7 +13,7 @@ RealWorld  Jhc.Prim.IO.RealWorld
 #Int__     Jhc.Prim.Int__
 Array__    Jhc.Array.Array__
 Bool       Jhc.Prim.Prim.Bool
-Ordering   Jhc.Order.Ordering
+Ordering   Jhc.Prim.Prim.Ordering
 Bool_      Jhc.Prim.Bits.Bool_
 Ptr        Jhc.Addr.Ptr
 FunPtr     Jhc.Addr.FunPtr

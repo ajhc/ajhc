@@ -57,13 +57,16 @@ instance ConNames E where
     vUnit  = ELit vUnit
 
 instance ConNames (Lit E E) where
-    vTrue  = (litCons { litName = dc_Boolzh, litArgs = [ELit (LitInt 1 tEnumzh)], litType = tBool })
-    vFalse = (litCons { litName = dc_Boolzh, litArgs = [ELit (LitInt 0 tEnumzh)], litType = tBool })
+    vTrue  = (litCons { litName = dc_Boolzh, litArgs = [ELit lTruezh], litType = tBool })
+    vFalse = (litCons { litName = dc_Boolzh, litArgs = [ELit lFalsezh], litType = tBool })
     vUnit  = (litCons { litName = dc_Unit, litArgs = [], litType = tUnit })
 
 -- values
 tFunc a b = ePi (tVr emptyId a) b
 tvrSilly = tVr sillyId Unknown
+tBoolzh = ELit litCons { litName = tc_Bool_, litType = eHash, litAliasFor = Just tEnumzh }
+lFalsezh = (LitInt 0 tBoolzh)
+lTruezh = (LitInt 1 tBoolzh)
 
 -----------------
 -- E constructors

@@ -258,11 +258,6 @@ safeToDup ec@ECase {}
 safeToDup (EPrim p _ _) = aprimIsCheap p
 safeToDup e = whnfOrBot e || isELam e || isEPi e
 
-tBoolzh = ELit litCons { litName = tc_Bool_, litType = eHash, litAliasFor = Just tEnumzh }
-
-lFalsezh = (LitInt 0 tBoolzh)
-lTruezh = (LitInt 1 tBoolzh)
-
 eToPat e = f e where
     f (ELit LitCons { litAliasFor = af,  litName = x, litArgs = ts, litType = t }) = do
         ts <- mapM cv ts

@@ -2,14 +2,15 @@
 module Jhc.Enum(Enum(..),Bounded(..)) where
 -- Enumeration and Bounded classes
 
-import Data.Int
 import Jhc.Basics
 import Jhc.Inst.PrimEnum()
 import Jhc.Int
-import Jhc.Order
 import Jhc.Prim.Bits
+import Jhc.Prim.Prim
 
 m4_include(Jhc/Enum.m4)
+
+otherwise = True
 
 class  Enum a  where
     succ, pred       :: a -> a
@@ -46,19 +47,32 @@ instance Enum Int where
 
     enumFrom x  | x `seq` True  =  enumFromTo x maxBound
     enumFromThen c c' = [c, c' .. lastInt]
-                      where lastInt | c' < c    = minBound
+                      where lastInt | c' `intLt` c    = minBound
                                     | otherwise = maxBound
     enumFromTo x y = f x where
-        f x | x > y = []
+        f x | x `intGt` y = []
             | otherwise = x:f (increment x)
-    enumFromThenTo x y z | y >= x = f x where
+    enumFromThenTo x y z | y `intGte` x = f x where
         inc = y `minus` x
-        f x | x <= z = x:f (x `plus` inc)
+        f x | x `intLte` z = x:f (x `plus` inc)
             | otherwise = []
     enumFromThenTo x y z  = f x where
         inc = y `minus` x
-        f x | x >= z = x:f (x `plus` inc)
+        f x | x `intGte` z = x:f (x `plus` inc)
             | otherwise = []
+
+foreign import primitive "box" boxBool :: Bool_ -> Bool
+foreign import primitive "Gte" intGte' :: Int -> Int -> Bool_
+foreign import primitive "Gt" intGt' :: Int -> Int -> Bool_
+foreign import primitive "Lte" intLte' :: Int -> Int -> Bool_
+foreign import primitive "Lt" intLt' :: Int -> Int -> Bool_
+foreign import primitive "Lt" charLt' :: Char -> Char -> Bool_
+
+intGte x y = boxBool (intGte' x y)
+intGt x y = boxBool (intGt' x y)
+intLte x y = boxBool (intLte' x y)
+intLt x y = boxBool (intLt' x y)
+charLt x y = boxBool (charLt' x y)
 
 instance Enum Char where
     toEnum = chr
@@ -66,7 +80,7 @@ instance Enum Char where
     enumFrom c        = [c .. maxBound::Char]
     enumFromThen c c' = [c, c' .. lastChar]
                       where lastChar :: Char
-                            lastChar | c' < c    = minBound
+                            lastChar | c' `charLt` c    = minBound
                                      | otherwise = maxBound
 --    enumFromTo (Char x) (Char y) = f x where
 --        f x = case x `bits32UGt` y of
@@ -79,6 +93,18 @@ instance Enum Char where
 --                            0# -> []
 --             in f x
 
+deriving instance Enum Bool
+deriving instance Enum Ordering
+
+instance Bounded Bool where
+    minBound = False
+    maxBound = True
+instance Bounded Ordering where
+    minBound = LT
+    maxBound = GT
+instance Bounded () where
+    minBound = ()
+    maxBound = ()
 instance Bounded Char where
     minBound = Char 0#
     maxBound = Char 0x10ffff#
