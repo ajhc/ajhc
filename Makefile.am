@@ -225,8 +225,8 @@ base-1.0.hl: lib/base/base.yaml jhc-1.0.hl
 	./jhc $(LIB_OPTIONS) --build-hl $< -o $@
 applicative-1.0.hl: lib/applicative/applicative.yaml base-1.0.hl
 	./jhc $(LIB_OPTIONS) --build-hl $< -o $@
-haskell98-1.0.hl: lib/haskell98/haskell98.cabal base-1.0.hl
-	./jhc $(LIB_OPTIONS) -ilib/haskell98 -pjhc -pbase --build-hl $< -o $@
+haskell98-1.0.hl: lib/haskell98/haskell98.yaml base-1.0.hl
+	./jhc $(LIB_OPTIONS) --build-hl $< -o $@
 flat-foreign-1.0.hl: lib/flat-foreign/flat-foreign.cabal base-1.0.hl
 	./jhc $(LIB_OPTIONS) -ilib/flat-foreign -pjhc -pbase --build-hl $< -o $@
 
@@ -303,7 +303,7 @@ flat-foreign-1.0.hl: lib/flat-foreign/flat-foreign.cabal lib/flat-foreign/Stable
     lib/flat-foreign/CString.hs lib/flat-foreign/Word.hs lib/flat-foreign/CError.hs lib/flat-foreign/CTypes.hs \
     lib/flat-foreign/MarshalError.hs lib/flat-foreign/MarshalUtils.hs lib/flat-foreign/Bits.hs lib/flat-foreign/ForeignPtr.hs \
     base-1.0.hl jhc-1.0.hl
-haskell98-1.0.hl: lib/haskell98/haskell98.cabal lib/haskell98/System.hs lib/haskell98/List.hs lib/haskell98/Time.hs \
+haskell98-1.0.hl: lib/haskell98/haskell98.yaml lib/haskell98/System.hs lib/haskell98/List.hs lib/haskell98/Time.hs \
     lib/haskell98/Array.hs lib/haskell98/Random.hs lib/haskell98/Complex.hs lib/haskell98/Locale.hs \
     lib/haskell98/CPUTime.hs lib/haskell98/Ratio.hs lib/haskell98/Monad.hs lib/haskell98/Directory.hs \
     lib/haskell98/IO.hs lib/haskell98/Ix.hs lib/haskell98/Char.hs lib/haskell98/Maybe.hs \

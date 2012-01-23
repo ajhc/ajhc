@@ -720,6 +720,7 @@ buildLibrary ifunc func = ans where
                 lproc opt = opt { optFOptsSet = Set.union pfs (optFOptsSet opt) Set.\\ nfs }
                 dirs = [ "-i" ++ dd x | x <- mfield "hs-source-dirs" ]
                     ++ [ "-I" ++ dd x | x <- mfield "include-dirs" ]
+                    ++ [ "-p" ++ x | x <- mfield "build-depends" ]
                 modOptions =  (mfield "options" ++ dirs)
                 dd "." = FP.takeDirectory fp
                 dd ('.':'/':x) = dd x

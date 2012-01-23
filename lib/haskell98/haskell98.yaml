@@ -1,0 +1,6 @@
+name: 	haskell98
+version: 1.0
+options:        --noauto
+build-depends: [ base, jhc ]
+hs-source-dir: .
+exposed-modules: [ Prelude, Numeric, Array, CPUTime, Char, Complex, Directory, IO, Ix, List, Locale, Maybe, Monad, Random, Ratio, System, Time ]
