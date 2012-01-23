@@ -9,8 +9,6 @@ IO         Jhc.Prim.IO.IO
 ACIO       Jhc.Prim.IO.ACIO
 State_     Jhc.Prim.IO.State_
 RealWorld  Jhc.Prim.IO.RealWorld
-#World__   Jhc.Prim.World__
-#Int__     Jhc.Prim.Int__
 Array__    Jhc.Array.Array__
 Bool       Jhc.Prim.Prim.Bool
 Ordering   Jhc.Prim.Prim.Ordering

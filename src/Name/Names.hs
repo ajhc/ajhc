@@ -21,9 +21,10 @@ instance TypeNames Name where
     tInteger = tc_Integer
     tChar = tc_Char
     tUnit = tc_Unit
+
     tIntzh = rt_bits32
     tEnumzh = rt_bits16
-    tCharzh = rt_bits32
+    tCharzh = tc_Char_
 --    tWorld__ = tc_World__
 
 --No tuple instance because it is easy to get the namespace wrong. use 'nameTuple'

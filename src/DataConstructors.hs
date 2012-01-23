@@ -399,12 +399,12 @@ lookupExtTypeInfo dataTable oe = f oe where
     f e = g e
     -- if we are a single constructor data type with a single foreignable unboxed
     -- slot, we are foreiginable
-    g (ELit LitCons { litName = c })
+    g (ELit LitCons { litName = c, litAliasFor = Nothing })
         | Just Constructor { conChildren = DataNormal [cn] }  <- getConstructor c dataTable,
           Just Constructor { conOrigSlots = [SlotNormal st] } <- getConstructor cn dataTable,
           Just (ExtTypeRaw et) <- lookupExtTypeInfo dataTable st = return $ ExtTypeBoxed cn st et
     -- if we are a raw type, we can be foreigned
-    g (ELit LitCons { litName = c }) | Just et <- Map.lookup c rawExtTypeMap = return (ExtTypeRaw et)
+    g (ELit LitCons { litName = c, litAliasFor = Nothing }) | Just et <- Map.lookup c rawExtTypeMap = return (ExtTypeRaw et)
     g e | Just e' <- followAlias dataTable e = f e'
         | otherwise = fail $ "lookupExtTypeInfo: " ++ show (oe,e)
 

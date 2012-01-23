@@ -1,7 +1,8 @@
 module E.Show(ePretty,render,prettyE) where
 
 import Control.Monad.Identity
-import Maybe
+import Data.Char(chr)
+import Data.Maybe
 
 import Doc.DocLike
 import Doc.PPrint
@@ -95,6 +96,9 @@ showLit showBind l = do
     let f (LitInt i (ELit LitCons { litName = n })) | Just l <- lookup n enumList, i >= 0 && fromIntegral i < length l =
             return $ atom $ ((text $ l !! (fromIntegral i)))
         f (LitInt i _) = return $ atom $ ((text $ show i))
+        f (LitInt 1 e) | e == tBoolzh = return $ atom $ text "True#"
+        f (LitInt 0 e) | e == tBoolzh = return $ atom $ text "False#"
+        f (LitInt n e) | e == tCharzh = return $ atom $ tshow (chr $ fromIntegral n) <> char '#'
         f LitCons { litName = s, litArgs = es } | Just n <- fromTupname s , n == length es = do
             es' <- mapM (fmap unparse . showBind) es
             return $ atom $ tupled es'
@@ -109,6 +113,9 @@ showLit showBind l = do
             e <- showBind e
             return $  atom   (char '[' <> unparse e  <> char ']')
         f LitCons { litName = n, litArgs = [] } | dc_EmptyList == n = return $ atom $ text "[]"
+        f LitCons { litName = ((tc_Addr_ ==) -> True), litType = ((eHash ==) -> True) } = return $ atom $ text "Addr_"
+        f LitCons { litName = ((tc_FunAddr_ ==) -> True), litType = ((eHash ==) -> True) } = return $ atom $ text "FunAddr_"
+        f LitCons { litName = ((tc_Char_ ==) -> True), litType = ((eHash ==) -> True) } = return $ atom $ text "Char_"
         f LitCons { litName = n, litArgs = [v] }
             | n == dc_Integer = go "Integer#"
             | n == dc_Int     = go "Int#"
@@ -176,6 +183,7 @@ collectAbstractions e0 = go e0 [] where
     go  e           xs = done e xs
     done e xs = (reverse xs, e)
 
+
 showE :: E -> SEM (Unparse Doc)
 showE e = do
     let f e | Just s <- E.E.toString e = return $ atom $ (text $ show s)
@@ -190,9 +198,9 @@ showE e = do
         f e | e == tRational = return $ atom $ text "Rational"
         f e | e == tString   = return $ atom $ text "String"
         f e | e == tUnit     = return $ atom $ text "()"
-        --f e | e == tWorld__  = return $ atom $ text "World__"
         f e | e == vFalse    = return $ atom $ text "False"
         f e | e == vTrue     = return $ atom $ text "True"
+        f e | e == tWorld__  = return $ atom $ text "RealWorld_"
         f e | e == vUnit     = return $ atom $ text "()"
         f (EAp a b) = liftM2 app (showE a) (showE b)
         f (EPi (TVr { tvrIdent = eid, tvrType =  e1}) e2) | eid == emptyId = liftM2 arr (showE e1) (showE e2)
