@@ -336,7 +336,8 @@ extractPrimitive dataTable e = case followAliases dataTable (getType e) of
         | t == eHash -> return (e,(show c,st))
         | otherwise -> do
             Constructor { conChildren = DataNormal [cn] }  <- getConstructor c dataTable
-            Constructor { conOrigSlots = [SlotNormal st@(ELit LitCons { litName = n, litArgs = []})] } <- getConstructor cn dataTable
+            Constructor { conOrigSlots = [SlotNormal st] } <- getConstructor cn dataTable
+            (ELit LitCons { litName = n, litArgs = []}) <- return $ followAliases dataTable st
             let tvra = tVr vn st
                 (vn:_) = newIds (freeIds e)
             return (eCase e  [Alt (litCons { litName = cn, litArgs = [tvra], litType = (getType e) }) (EVar tvra)] Unknown,(show n,st))
@@ -353,7 +354,8 @@ boxPrimitive dataTable e et = case followAliases dataTable et of
         | t == eHash -> return (e,(show c,st))
         | otherwise -> do
             Constructor { conChildren = DataNormal [cn] }  <- getConstructor c dataTable
-            Constructor { conOrigSlots = [SlotNormal st@(ELit LitCons { litName = n, litArgs = []})] } <- getConstructor cn dataTable
+            Constructor { conOrigSlots = [SlotNormal st] } <- getConstructor cn dataTable
+            (ELit LitCons { litName = n, litArgs = []}) <- return $ followAliases dataTable st
             let tvra = tVr vn st
                 (vn:_) = newIds (freeVars (e,et))
             if isManifestAtomic e then

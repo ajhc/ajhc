@@ -384,7 +384,7 @@ kiDecl HsDataDecl { hsDeclContext = context, hsDeclName = tyconName, hsDeclArgs 
     kiApps' kc args (hsKindToKind kk)
     mapM_ kiPred context
 kiDecl HsDataDecl { hsDeclContext = context, hsDeclName = tyconName, hsDeclArgs = args, hsDeclCons = condecls } = kiData context tyconName args condecls
-kiDecl HsNewTypeDecl { hsDeclContext = context, hsDeclName = tyconName, hsDeclArgs = args, hsDeclCon = condecl } = kiData context tyconName args [condecl]
+kiDecl HsNewTypeDecl { hsDeclContext = context, hsDeclName = tyconName, hsDeclArgs = args, hsDeclCon = condecl } = kiAlias context tyconName args condecl
 kiDecl HsTypeDecl { hsDeclName = name, hsDeclTArgs = args, hsDeclType = ty } = do
     wh <- asks kiWhere
     let theconstraint = if wh == Other then KindAny else KindSimple
@@ -414,6 +414,15 @@ kiDecl (HsClassDecl _sloc qualType sigsAndDefaults) = ans where
     typeFromSig :: HsDecl -> HsQualType
     typeFromSig (HsTypeSig _sloc _names qualType) = qualType
 kiDecl _ = return ()
+
+kiAlias context tyconName args condecl = do
+    args <- mapM (lookupKind KindSimple . toName TypeVal) args
+    kc <- lookupKind KindAny (toName TypeConstructor tyconName)
+    let [a] = hsConDeclArgs condecl
+    va <- newKindVar KindQuestQuest
+    kiType (KVar va) (hsBangType a)
+    kiApps' kc args (KVar va)
+    mapM_ kiPred context
 
 kiData context tyconName args condecls = do
     args <- mapM (lookupKind KindSimple . toName TypeVal) args
@@ -556,4 +565,3 @@ hoistType t = f t where
         where
         na = f a
         nb = f b
-
