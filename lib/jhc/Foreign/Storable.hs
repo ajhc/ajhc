@@ -28,7 +28,7 @@ class Storable a where
 _f :: Ptr a -> a
 _f _ = undefined
 
-INST_STORABLE((Ptr a),Ptr,Addr_,bits<ptr>)
-INST_STORABLE((FunPtr a),FunPtr,FunAddr_,bits<ptr>)
+INST_STORABLE_X((Ptr a),Ptr,Addr_,bits<ptr>)
+INST_STORABLE_X((FunPtr a),FunPtr,FunAddr_,bits<ptr>)
 
 -- foreign import "Add" plusBitsPtr_ :: BitsPtr_ -> Int -> BitsPtr_

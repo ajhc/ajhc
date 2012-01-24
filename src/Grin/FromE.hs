@@ -456,6 +456,7 @@ compile' cenv (tvr,as,e) = ans where
             ty' = toTypes TyNode ty
 
         case p of
+            PrimTypeInfo {} -> return $ Prim ap xs' ty'
             Func True fn as "void" -> return $ Prim ap xs' ty'
             Func True fn as r      -> return $ Prim ap xs' ty'
             Func False _ as r | Just _ <- toCmmTy ty ->  do
