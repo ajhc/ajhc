@@ -3,20 +3,20 @@ module Ho.ReadSource(
    preprocess,
    preprocessHs,
    languageFlags,
+   fetchCompilerFlags,
    parseHsSource
 ) where
 
 import Control.Monad
 import Data.Char
 import Data.Maybe
-import System.Directory
 import System.FilePath as FP
 import System.Process
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Lazy.UTF8 as LBSU
-import qualified Data.Set as Set
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 import FrontEnd.HsParser
 import FrontEnd.HsSyn
@@ -43,18 +43,14 @@ preprocess opt fn lbs = do
         incFlags = [ "-I" ++ d | d <- optIncdirs opt ++ optIncs opt]
         defFlags = ("-D__JHC__=" ++ revision):("-D__JHC_VERSION__=" ++ version):[ "-D" ++ d | d <- optDefs opt]
     case () of
-        _ | FO.Cpp `Set.member` optFOptsSet opt -> readSystem "cpp" $ ["-CC","-traditional"] ++ incFlags ++ defFlags ++ [fn]
-          | FO.M4 `Set.member` optFOptsSet opt -> do
-            m4p <- m4Prelude
-            result <- readSystem "m4" $ ["-s", "-P"] ++ incFlags ++ defFlags ++ [m4p,fn]
-            removeFile m4p >> return result
+        _ | fopts FO.Cpp -> readSystem "cpp" $ ["-CC","-traditional"] ++ incFlags ++ defFlags ++ [fn]
+          | fopts FO.M4  -> do
+                m4p <- m4Prelude
+                readSystem "m4" $ ["-s", "-P"] ++ incFlags ++ defFlags ++ [m4p,fn]
           | otherwise -> return lbs
 
 m4Prelude :: IO FilePath
-m4Prelude = do
-    fp <- fileInTempDir "prelude.m4"
-    BS.writeFile fp prelude_m4
-    return fp
+m4Prelude = fileInTempDir "prelude.m4" $ \fp -> do putStrLn $ "Writing stuff:" ++ fp ; BS.writeFile fp prelude_m4 ; return ()
 
 collectFileOpts options fn s = (lproc opt,isJust fopts)  where
     copts os = [ as | (x,as) <- popts, x `elem` os]
@@ -77,7 +73,6 @@ languageFlags ls = f ls Set.empty Set.empty [] where
                         | otherwise = f ls pfs nfs (l:us)
         where ll = map toLower l
 
-
 langmap = Map.fromList [
     "m4" ==> FO.M4,
     "cpp" ==> FO.Cpp,
@@ -93,8 +88,9 @@ parseHsSource :: Opt -> FilePath -> LBS.ByteString -> IO (HsModule,LBS.ByteStrin
 parseHsSource options fp@(FP.splitExtension -> (base,".hsc")) _ = do
     let out = FP.takeFileName base ++ ".hs"
     tdir <- getTempDir
+    (cc,cflags) <- fetchCompilerFlags
     let incFlags = [ "-I" ++ d | d <- optIncdirs options ++ optIncs options]
-    let hscargs =   [fp, "-o", tdir </> out] ++ incFlags
+    let hscargs =   [fp, "-o", tdir </> out] ++ incFlags ++ concatMap (\x -> ["-C",x]) cflags ++ ["-c", cc]
     when verbose $
         print ("hsc2hs",hscargs)
     rawSystem "hsc2hs" hscargs
@@ -120,3 +116,16 @@ parseHsSource options fn lbs = do
     case runParserWithMode (parseModeOptions fileOpts') { parseFilename = fn } parse  s'  of
                       (ws,ParseOk e) -> processErrors ws >> return (e { hsModuleOpt = fileOpts' },LBSU.fromString s')
                       (_,ParseFailed sl err) -> putErrDie $ show sl ++ ": " ++ err
+
+fetchCompilerFlags :: IO (FilePath,     -- ^ file path to compiler
+                          [String])     -- ^ compiler arguments
+fetchCompilerFlags = return (cc,args) where
+    lup k = maybe "" id $ Map.lookup k (optInis options)
+    boehmOpts | fopts FO.Boehm = ["-D_JHC_GC=_JHC_GC_BOEHM", "-lgc"]
+              | fopts FO.Jgc   = ["-D_JHC_GC=_JHC_GC_JGC"]
+              | otherwise = []
+    profileOpts | fopts FO.Profile || lup "profile" == "true" = ["-D_JHC_PROFILE=1"]
+                | otherwise = []
+    debug = if fopts FO.Debug then words (lup "cflags_debug") else words (lup "cflags_nodebug")
+    cc = lup "cc"
+    args = words (lup "cflags") ++ debug ++ optCCargs options  ++ boehmOpts ++ profileOpts

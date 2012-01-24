@@ -2,7 +2,6 @@ module Grin.Main(compileToGrin) where
 
 import Control.Monad
 import Data.Monoid(mappend)
-import Directory
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Lazy.UTF8 as LBS
 import qualified Data.Map as Map
@@ -19,12 +18,13 @@ import Grin.Optimize
 import Grin.SSimplify
 import Grin.Show
 import Grin.StorageAnalysis
+import Ho.ReadSource
 import Options
+import Support.TempDir
 import Support.Transform
 import Util.Gen
 import qualified C.FromGrin2 as FG2
 import qualified FlagDump as FD
-import qualified FlagOpts as FO
 import qualified Stats
 
 {-# NOINLINE compileToGrin #-}
@@ -80,20 +80,14 @@ dumpFinalGrin grin = do
 compileGrinToC grin = do
     let (cg,rls) = FG2.compileGrin grin
         fn = outputName ++ lup "executable_extension"
-        cf = case (optOutName options,optMode options) of
-            (Just fn,StopC) -> fn
-            _ -> (fn ++ "_code.c")
         lup k = maybe "" id $ Map.lookup k (optInis options)
+    cf <- case (optOutName options,optMode options) of
+            (Just fn,StopC) -> return fn
+            _ | dump FD.C -> return (fn ++ "_code.c")
+              | otherwise -> fileInTempDir (fn ++ "_code.c") (\_ -> return ())
     (argstring,sversion) <- getArgString
-    let
-        boehmOpts | fopts FO.Boehm = ["-D_JHC_GC=_JHC_GC_BOEHM", "-lgc"]
-                  | fopts FO.Jgc   = ["-D_JHC_GC=_JHC_GC_JGC"]
-                  | otherwise = []
-        profileOpts | fopts FO.Profile || lup "profile" == "true" = ["-D_JHC_PROFILE=1"]
-                    | otherwise = []
-        comm = shellQuote $ [lup "cc"] ++ words (lup "cflags") ++ ["-o", fn, cf] ++
-                            (map ("-l" ++) rls) ++ debug ++ optCCargs options  ++ boehmOpts ++ profileOpts
-        debug = if fopts FO.Debug then words (lup "cflags_debug") else words (lup "cflags_nodebug")
+    (cc,args) <- fetchCompilerFlags
+    let comm = shellQuote $ [cc] ++ ["-o", fn, cf] ++ args ++ (map ("-l" ++) rls)
         globalvar n c = LBS.fromString $ "char " ++ n ++ "[] = \"" ++ c ++ "\";"
     putProgressLn ("Writing " ++ show cf)
     LBS.writeFile cf $ LBS.intercalate (LBS.fromString "\n") [globalvar "jhc_c_compile" comm, globalvar "jhc_command" argstring,globalvar "jhc_version" sversion,LBS.empty,cg]
@@ -102,7 +96,6 @@ compileGrinToC grin = do
     putProgressLn ("Running: " ++ comm)
     r <- System.system comm
     when (r /= System.ExitSuccess) $ fail "C code did not compile."
-    unless (dump FD.C) $ removeFile cf
     return ()
 
 grinParms = transformParms {

@@ -256,7 +256,7 @@ theoptions =
     , Option []    ["noauto"]    (NoArg  (optNoAuto_s True))           "Don't automatically load base and haskell98 packages"
     , Option ['p'] []            (ReqArg (\d -> optHls_u (++ [d])) "file.hl") "Load given haskell library .hl file"
     , Option ['L'] []            (ReqArg (optHlPath_u . idu) "path")   "Look for haskell libraries in the given directory"
-    , Option []    ["build-hl"]  (ReqArg (optMode_s . BuildHl) "file.cabal") "Build hakell library from given library description file"
+    , Option []    ["build-hl"]  (ReqArg (optMode_s . BuildHl) "desc.yaml") "Build hakell library from given library description file"
     , Option []    ["annotate-source"]  (ReqArg (optAnnotate_s . Just) "<dir>") "Write preprocessed and annotated source code to the directory specified"
     , Option []    ["deps"]      (ReqArg (optDeps_s . Just) "<file.yaml>") "Write dependency information to file specified"
     , Option []    ["interactive"] (NoArg  (optMode_s Interactive))    "run interactivly (for debugging only)"

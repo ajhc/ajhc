@@ -4,6 +4,7 @@ module Support.TempDir(
     getTempDir,
     createTempFile,
     fileInTempDir,
+    cleanTempDir,
     wrapMain
    ) where
 
@@ -19,17 +20,22 @@ import System.FilePath as FP
 import System.IO
 import System.IO.Unsafe
 import Text.Printf
+import qualified Data.Set as Set
 
 data TempDir = TempDir {
-    tempDirClean :: Bool,  -- ^ whether to delete the directory afterwords.
-    tempDirDump :: Bool,
-    tempDirPath :: Maybe String,
-    tempDirCleanup :: [FilePath]
+    tempDirClean   :: Bool,  -- ^ whether to delete the directory afterwords.
+    tempDirDump    :: Bool,
+    tempDirPath    :: Maybe String,
+    tempDirCleanup :: Set.Set FilePath
     }
 
 putLog :: String -> IO ()
 putLog = putStrLn
 --log _ = return ()
+
+cleanTempDir :: Bool -> IO ()
+cleanTempDir b = modifyIORef tdRef $ \x -> x { tempDirClean = b }
+
 
 getTempDir :: IO FilePath
 getTempDir = do
@@ -50,32 +56,37 @@ createTempFile fp = do
     addCleanup fp
     return (fp,h)
 
-fileInTempDir :: FilePath -> IO FilePath
-fileInTempDir fp = do
+fileInTempDir :: FilePath -> (FilePath -> IO ()) -> IO FilePath
+fileInTempDir fp action = do
     dir <- getTempDir
-    addCleanup fp
-    return (dir </> fp)
+    let nfp = dir </> fp
+    b <- addCleanup fp
+    when b $ action nfp
+    return nfp
 
 cleanUp :: IO ()
 cleanUp = do
     td <- readIORef tdRef
     if not (tempDirClean td) || isNothing (tempDirPath td) then return () else do
     dir <- getTempDir
-    forM_ (tempDirCleanup td) $ \fp -> do
+    forM_ (Set.toList $ tempDirCleanup td) $ \fp -> do
         putLog $ printf "Removing '%s'" (dir </> fp)
         ignoreError (removeFile $ dir </> fp)
     putLog $ printf "Removing '%s'" dir
     ignoreError (removeDirectory dir)
 
-addCleanup :: FilePath -> IO ()
+addCleanup :: FilePath -> IO Bool
 addCleanup fp = do
     td <- readIORef tdRef
-    writeIORef tdRef td { tempDirCleanup = fp:tempDirCleanup td }
+    if fp `Set.member` tempDirCleanup td then
+        return False
+        else writeIORef tdRef td { tempDirCleanup = fp `Set.insert` tempDirCleanup td } >> return True
 
 wrapMain :: IO () -> IO ()
-wrapMain main = E.catch (main >> cleanUp) $ \e -> case fromException e of
-    Just code -> cleanUp >>  exitWith code
-    Nothing -> do
+wrapMain main = E.catch (main >> cleanUp) f where
+    f (fromException -> Just code) = cleanUp >> exitWith code
+    f (fromException -> Just UserInterrupt) = cleanUp >> throwIO UserInterrupt
+    f e = do
         td <- readIORef tdRef
         case tempDirPath td of
             Just td -> hPutStrLn stderr $ printf "Exiting abnormally. Work directory is '%s'" td
@@ -92,10 +103,10 @@ ignoreError action = Prelude.catch action (\_ -> return ())
 {-# NOINLINE tdRef #-}
 tdRef :: IORef TempDir
 tdRef = unsafePerformIO $ newIORef TempDir {
-    tempDirClean = True,
-    tempDirDump = False,
-    tempDirPath = Nothing,
-    tempDirCleanup = []
+    tempDirClean   = True,
+    tempDirDump    = False,
+    tempDirPath    = Nothing,
+    tempDirCleanup = Set.empty
     }
 
 foreign import ccall unsafe "stdlib.h mkdtemp"
