@@ -892,7 +892,6 @@ rawExtTypeMap = Map.fromList [
 
 typeTable :: Map.Map Name ExtType
 typeTable = Map.fromList [
-    (tc_Char,"wchar_t"),
     (tc_Char_,"wchar_t"),
     (tc_Int, "int"),
     (tc_Int8, "int8_t"),
@@ -925,7 +924,6 @@ typeTable = Map.fromList [
     (tc_CLong, "long"),
 
     (tc_CSChar, "signed char"),
-
     (tc_CUChar, "unsigned char"),
     (tc_CUShort, "unsigned short"),
     (tc_CUInt, "unsigned int"),
@@ -935,6 +933,7 @@ typeTable = Map.fromList [
     (tc_CWchar, "wchar_t"),
     (tc_CWint, "wint_t"),
     (tc_CTime, "time_t"),
+    (tc_CClock, "clock_t"),
     (tc_CSize, "size_t"),
     (tc_Unit,  "void"),
     (tc_State_,  "void")

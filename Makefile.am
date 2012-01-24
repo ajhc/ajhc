@@ -217,7 +217,7 @@ CLEANFILES= $(JHC_LIBS) $(JHC_EXT_LIBS)
 
 LIB_OPTIONS=$(RTSOPTS) $(JHC_TEST)  -L- -L.
 
-jhc-prim-1.0.hl: lib/jhc-prim/jhc-prim.yaml lib/jhc-prim/Jhc/Prim/Prim.hs lib/jhc-prim/Jhc/Prim/IO.hs lib/jhc-prim/Jhc/Prim/Words.hs lib/jhc-prim/Jhc/Prim/Bits.hs
+jhc-prim-1.0.hl: lib/jhc-prim/jhc-prim.yaml
 	./jhc $(LIB_OPTIONS) --build-hl $< -o $@
 jhc-1.0.hl: lib/jhc/jhc.yaml jhc-prim-1.0.hl
 	./jhc $(LIB_OPTIONS) --build-hl $< -o $@
@@ -308,19 +308,18 @@ haskell98-1.0.hl: lib/haskell98/haskell98.yaml lib/haskell98/System.hs lib/haske
     lib/haskell98/CPUTime.hs lib/haskell98/Ratio.hs lib/haskell98/Monad.hs lib/haskell98/Directory.hs \
     lib/haskell98/IO.hs lib/haskell98/Ix.hs lib/haskell98/Char.hs lib/haskell98/Maybe.hs \
     base-1.0.hl jhc-1.0.hl
-jhc-1.0.hl: lib/jhc/jhc.yaml lib/jhc/Jhc/Prim.hs lib/jhc/Jhc/IO.hs lib/jhc/Jhc/Int.hs \
-    lib/jhc/Jhc/Inst/Enum.hs lib/jhc/Data/Int.hs lib/jhc/Prelude/IO.hs lib/jhc/Jhc/Order.hs \
-    lib/jhc/System/C/Stdio.hs lib/jhc/Jhc/JumpPoint.hs lib/jhc/Data/Word.hs lib/jhc/Foreign/C/String.hs \
-    lib/jhc/Jhc/Show.hs lib/jhc/Jhc/Handle.hs lib/jhc/Jhc/Addr.hs lib/jhc/Numeric.hs \
-    lib/jhc/Jhc/Float.hs lib/jhc/Jhc/Inst/Storable.hs lib/jhc/Foreign/C/Types.hs lib/jhc/Data/Ratio.hs \
-    lib/jhc/Jhc/Hole.hs lib/jhc/Data/Char.hs lib/jhc/Jhc/List.hs lib/jhc/Foreign/Marshal/Utils.hs \
-    lib/jhc/Jhc/Basics.hs lib/jhc/System/Mem.hs lib/jhc/Prelude.hs lib/jhc/Jhc/Num.hs \
-    lib/jhc/Jhc/Text/Read.hs lib/jhc/Foreign/C/Error.hs lib/jhc/Foreign/Storable.hs lib/jhc/Foreign/Ptr.hs \
-    lib/jhc/Jhc/Inst/Order.hs lib/jhc/Jhc/Enum.hs lib/jhc/Jhc/Tuples.hs lib/jhc/Jhc/String.hs \
-    lib/jhc/Prelude/Float.hs lib/jhc/Jhc/Inst/PrimEnum.hs lib/jhc/Jhc/Inst/Show.hs lib/jhc/Jhc/Array.hs \
-    lib/jhc/Prelude/Text.hs lib/jhc/Foreign/Marshal/Alloc.hs lib/jhc/Foreign/Marshal/Array.hs \
-    lib/jhc/Jhc/Options.hs lib/jhc/Prelude/CType.hs lib/jhc/Jhc/Monad.hs lib/jhc/System/IO/Unsafe.hs \
-    lib/jhc/System/Mem/StableName.hs lib/jhc/Jhc/Inst/Read.hs lib/jhc/Jhc/Maybe.hs
+jhc-1.0.hl: lib/jhc/jhc.yaml lib/jhc/Jhc/Prim.hs lib/jhc/Jhc/IO.hs lib/jhc/Jhc/Int.hs lib/jhc/Jhc/Inst/Enum.hs \
+    lib/jhc/Data/Int.hs lib/jhc/Prelude/IO.hs lib/jhc/Jhc/Order.hs lib/jhc/System/C/Stdio.hs lib/jhc/Data/Word.hs \
+    lib/jhc/Foreign/C/String.hs lib/jhc/Jhc/Show.hs lib/jhc/Jhc/Handle.hs lib/jhc/Jhc/Addr.hs lib/jhc/Numeric.hs \
+    lib/jhc/Jhc/Float.hs lib/jhc/Jhc/Inst/Storable.hs lib/jhc/Jhc/Inst/Num.hs lib/jhc/Foreign/C/Types.hs lib/jhc/Data/Ratio.hs \
+    lib/jhc/Data/Char.hs lib/jhc/Jhc/List.hs lib/jhc/Jhc/Type/Float.hs lib/jhc/Foreign/Marshal/Utils.hs lib/jhc/Jhc/Basics.hs \
+    lib/jhc/System/Mem.hs lib/jhc/Jhc/Type/Basic.hs lib/jhc/Prelude.hs lib/jhc/Jhc/Num.hs lib/jhc/Jhc/Text/Read.hs \
+    lib/jhc/Jhc/Type/Ptr.hs lib/jhc/Foreign/C/Error.hs lib/jhc/Foreign/Storable.hs lib/jhc/Foreign/Ptr.hs lib/jhc/Jhc/Inst/Order.hs \
+    lib/jhc/Jhc/Enum.hs lib/jhc/Jhc/Type/Handle.hs lib/jhc/Jhc/Tuples.hs lib/jhc/Jhc/String.hs lib/jhc/Prelude/Float.hs \
+    lib/jhc/Jhc/Type/C.hs lib/jhc/Jhc/Inst/PrimEnum.hs lib/jhc/Jhc/Inst/Show.hs lib/jhc/Jhc/Array.hs lib/jhc/Prelude/Text.hs \
+    lib/jhc/Foreign/Marshal/Alloc.hs lib/jhc/Foreign/Marshal/Array.hs lib/jhc/Jhc/Options.hs lib/jhc/Prelude/CType.hs lib/jhc/Jhc/Monad.hs \
+    lib/jhc/System/IO/Unsafe.hs lib/jhc/System/Mem/StableName.hs lib/jhc/Jhc/Inst/Read.hs lib/jhc/Jhc/Maybe.hs jhc-prim-1.0.hl
+jhc-prim-1.0.hl: lib/jhc-prim/jhc-prim.yaml lib/jhc-prim/Jhc/Prim/IO.hs lib/jhc-prim/Jhc/Prim/Prim.hs lib/jhc-prim/Jhc/Prim/Wrapper.hs lib/jhc-prim/Jhc/Prim/Bits.hs
 
 containers-0.3.0.0.hl: lib/ext/containers.cabal base-1.0.hl applicative-1.0.hl jhc-1.0.hl lib/ext/containers.patch
 	perl utils/build_extlibs.prl $<

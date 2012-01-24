@@ -22,14 +22,6 @@ data Float80_  :: #
 data Float128_ :: #
 data FloatMax_ :: #
 
-data BitsShort_ :: #
-data BitsInt_   :: #
-data BitsLong_  :: #
-data BitsLLong_ :: #
-
-data BitsSize_  :: #
-data BitsWchar_ :: #
-
 -- data Complex_ :: # -> #
 
 -- these newtypes exist to modify the

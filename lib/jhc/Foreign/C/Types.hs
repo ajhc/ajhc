@@ -6,21 +6,4 @@ module Foreign.C.Types (
     CFpos,  CJmpBuf
   ) where
 
-import Data.Word
 import Jhc.Type.C
-
-data CChar
-data CSChar
-data CUChar
-
-data CInt
-data CUInt
-
-data CPtrdiff
-data CSize
-data CSigAtomic
-data CClock
-data CTime
-data CFloat
-data CDouble
-data CLDouble

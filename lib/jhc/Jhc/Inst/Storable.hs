@@ -37,16 +37,10 @@ INST_STORABLE_XXX(WordMax,BitsMax_,bits<max>)
 INST_STORABLE_XXX(IntPtr,BitsPtr_,bits<ptr>)
 INST_STORABLE_XXX(WordPtr,BitsPtr_,bits<ptr>)
 
---type BitsWchar_ = Bits32_
---type BitsSize_ = BitsPtr_
---type BitsInt_ = Bits32_
-
 INST_STORABLE_XXX(CChar,Bits8_,bits8)
 INST_STORABLE_XXX(CSChar,Bits8_,bits8)
 INST_STORABLE_XXX(CUChar,Bits8_,bits8)
-INST_STORABLE_XXX(CInt,BitsInt_,bits<int>)
-INST_STORABLE_XXX(CUInt,BitsInt_,bits<int>)
---XINST_STORABLE_XXX(CWchar,BitsWchar_,bits<wchar_t>)
+INST_STORABLE_XXX(CInt,Bits32_,bits<int>)
+INST_STORABLE_XXX(CUInt,Bits32_,bits<int>)
 INST_STORABLE_XXX(CWchar,Bits32_,bits<wchar_t>)
---XINST_STORABLE_XXX(CWchar,BitsWchar_,bits32)
-INST_STORABLE_XXX(CSize,BitsSize_,bits<size_t>)
+INST_STORABLE_XXX(CSize,BitsPtr_,bits<size_t>)

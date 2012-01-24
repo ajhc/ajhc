@@ -89,30 +89,22 @@ module Foreign.C.Error (
 ) where
 
 
-import Foreign.Storable
-import Foreign.Ptr
-import Foreign.C.Types
 import Foreign.C.String
-import Jhc.Order
-import Jhc.Num
+import Foreign.C.Types
+import Foreign.Ptr
+import Foreign.Storable
 import Jhc.Basics
-import Jhc.Monad
 import Jhc.Basics
 import Jhc.IO
 import Jhc.Maybe
-
+import Jhc.Monad
+import Jhc.Num
+import Jhc.Order
+import Jhc.Type.C
 import System.IO.Unsafe		( unsafePerformIO )
 
 
 
--- "errno" type
--- ------------
-
--- | Haskell representation for @errno@ values.
--- The implementation is deliberately exposed, to allow users to add
--- their own definitions of 'Errno' values.
-
-newtype Errno = Errno CInt
 
 instance Eq Errno where
   errno1@(Errno no1) == errno2@(Errno no2)
