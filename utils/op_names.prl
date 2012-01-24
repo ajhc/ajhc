@@ -11,14 +11,14 @@ my %stuff;
 
 
 my @ds;
-open PR, "<src/data/primitives.txt";
-while(<PR>) {
-    chomp;
-    next unless /\S/;
-    next if /^\s*#/;
-    my @a = split /\s*,\s*/;
-    push @ds, \@a;
-}
+#open PR, "<src/data/primitives.txt";
+#while(<PR>) {
+#    chomp;
+#    next unless /\S/;
+#    next if /^\s*#/;
+#    my @a = split /\s*,\s*/;
+#    push @ds, \@a;
+#}
 
 
 print "{- WARNING! Do not edit!!!\n";

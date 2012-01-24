@@ -33,7 +33,7 @@ augment g xs = g (:) xs
 		       augment g (build h) = build (\c n -> g c (h c n)) #-}
 {-# RULES "augment/nil"   forall (g::forall b. (a->b->b) -> b -> b) .  augment g [] = build g #-}
 
-{-# RULES "foldr/unpackString"  forall k z (addr::Addr__) . foldr k z (unpackString addr) = unpackStringFoldr addr k z  #-}
+{-# RULES "foldr/unpackString"  forall k z (addr::BitsPtr_) . foldr k z (unpackString addr) = unpackStringFoldr addr k z  #-}
 
 -- a few pre-fusioned routines
 

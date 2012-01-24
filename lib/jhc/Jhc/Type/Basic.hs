@@ -1,6 +1,21 @@
-module Jhc.Type.Basic where
+module Jhc.Type.Basic(module Jhc.Type.Basic, module Jhc.Type.Word)  where
 
 import Jhc.Prim.Prim
-import Jhc.Prim
+import Jhc.Prim.Bits
+import Jhc.Type.Word
+
+type String = [Char]
 
 data Maybe a  =  Nothing | Just a
+
+data Either a b = Left a | Right b
+
+data Char = Char Char_
+data Integer = Integer BitsMax_
+
+--type Bool__ = Bits16_
+type Bool__ = Bool_
+type Int__  = Bits32_
+type Char__ = Bits32_
+type Enum__ = Bits16_
+type Addr__ = Addr_

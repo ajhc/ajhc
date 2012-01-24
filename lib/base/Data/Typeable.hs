@@ -1,15 +1,14 @@
 {-# OPTIONS_JHC -fffi -funboxed-values  #-}
 module Data.Typeable(TypeRep(),Typeable(..),Typeable1(..),Typeable2(..)) where
 
-
 import Jhc.Prim
 import Jhc.String
 
+type String_ = BitsPtr_
 
-data TypeRep = TypeRep Addr__ [TypeRep]
+data TypeRep = TypeRep String_ [TypeRep]
 
-
-showsAddr__ :: Addr__ -> [Char] -> [Char]
+showsAddr__ :: String_ -> [Char] -> [Char]
 showsAddr__ a xs = unpackStringFoldr a (:) xs
 
 instance Show TypeRep where
@@ -19,12 +18,10 @@ instance Show TypeRep where
         spacesep [x] = x
         spacesep (x:xs) = x . showChar ' ' . spacesep xs
 
-
 instance Eq TypeRep where
     TypeRep a xs == TypeRep b ys = case c_strcmp (Addr_ a) (Addr_ b) of
         0 -> xs == ys
         _ -> False
-
 
 foreign import ccall "strcmp" c_strcmp :: Addr_ -> Addr_ -> Int
 
@@ -39,7 +36,6 @@ foreign import primitive ptypeOf6 :: t a b c d e f -> TypeRep
 foreign import primitive ptypeOf7 :: t a b c d e f g -> TypeRep
 foreign import primitive typeRepEq :: TypeRep -> TypeRep -> Bool
 -}
-
 
 class Typeable a where
     typeOf :: a -> TypeRep
@@ -153,11 +149,9 @@ typeOfDefault x = typeOf1 x `mkAppTy` typeOf (argType x)
    argType :: t a -> a
    argType =  undefined
 
-
 -- | For defining a 'Typeable1' instance from any 'Typeable2' instance.
 typeOf1Default :: (Typeable2 t, Typeable a) => t a b -> TypeRep
 typeOf1Default x = typeOf2 x `mkAppTy` typeOf (argType x)
  where
    argType :: t a b -> a
    argType =  undefined
-

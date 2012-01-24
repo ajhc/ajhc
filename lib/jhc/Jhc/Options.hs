@@ -27,7 +27,7 @@ isBigEndian,isLittleEndian :: Bool
 isLittleEndian = not isBigEndian
 
 foreign import primitive "box" boxTarget :: Enum__ -> Target
-foreign import primitive "box" boxBool   :: Enum__ -> Bool
+foreign import primitive "box" boxBool   :: Bool_ -> Bool
 
 target      = boxTarget (options_target      ())
 isWindows   = boxBool   (options_isWindows   ())

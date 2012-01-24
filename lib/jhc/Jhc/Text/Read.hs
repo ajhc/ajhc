@@ -2,9 +2,11 @@
 module Jhc.Text.Read where
 
 import Jhc.Basics
-import Jhc.Order
 import Jhc.Int
 import Jhc.List
+import Jhc.Num
+import Jhc.Order
+import Jhc.Type.Basic
 import Prelude.CType
 
 type  ReadS a  = String -> [(a,String)]
@@ -119,3 +121,28 @@ lexDigits        =  nonnull isDigit
 
 nonnull          :: (Char -> Bool) -> ReadS String
 nonnull p s      =  [(cs,t) | (cs@(_:_),t) <- [span p s]]
+
+instance (Read a,Read b) => Read (Either a b) where
+    readsPrec d input =
+	      readParen (d > 9)
+	      (\ inp ->
+	       [((Left aa) , rest) | ("Left" , inp) <- lex inp ,
+		(aa , rest) <- readsPrec 10 inp])
+	      input
+	      ++
+	      readParen (d > 9)
+	      (\ inp ->
+	       [((Right aa) , rest) | ("Right" , inp) <- lex inp ,
+		(aa , rest) <- readsPrec 10 inp])
+	      input
+
+instance (Read a) => Read (Maybe a) where
+    readsPrec d input =
+	      (\ inp -> [((Nothing) , rest) | ("Nothing" , rest) <- lex inp])
+	      input
+	      ++
+	      readParen (d > 9)
+	      (\ inp ->
+	       [((Just aa) , rest) | ("Just" , inp) <- lex inp ,
+		(aa , rest) <- readsPrec 10 inp])
+	      input

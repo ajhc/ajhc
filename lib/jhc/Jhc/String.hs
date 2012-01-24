@@ -8,9 +8,11 @@ module Jhc.String(
     unpackString
     )where
 
-import Jhc.Prim
+import Jhc.Type.Basic
 import Jhc.Prim.Prim
 import Jhc.Prim.Bits
+
+type Addr__ = BitsPtr_
 
 {-# VCONSTRUCTOR unpackString #-}
 {-# NOINLINE unpackString #-}

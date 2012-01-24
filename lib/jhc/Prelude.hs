@@ -33,6 +33,7 @@ module Prelude(
     break,
     (!!),
     Maybe(Just,Nothing),
+    Either(Left,Right),
     maybe,
     sequence,
     sequence_,
@@ -60,7 +61,6 @@ module Prelude(
     module Prelude.Text
     ) where
 
-import Data.Int(Int())
 import Jhc.Basics
 import Jhc.Float
 
@@ -80,6 +80,8 @@ import Jhc.Num
 import Jhc.Order
 import Jhc.Show
 import Jhc.Tuples
+import Jhc.Type.Basic
+import Jhc.Type.Word(Int)
 import Prelude.Float
 import Prelude.IO
 import Prelude.Text
@@ -130,9 +132,6 @@ _ ^ _            = error "Prelude.^: negative exponent"
 
 (^^)             :: (Fractional a, Integral b) => a -> b -> a
 x ^^ n           =  if n >= 0 then x^n else recip (x^(-n))
-
-data Either a b = Left a | Right b
-    deriving (Eq, Ord, Read, Show)
 
 either :: (a -> c) -> (b -> c) -> Either a b -> c
 either f g (Left x)  =  f x

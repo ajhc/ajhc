@@ -1,13 +1,9 @@
 {-# OPTIONS_JHC -fno-prelude -fffi #-}
-module Jhc.Basics(module Jhc.Basics, module Jhc.Prim, module Jhc.Prim.Prim) where
+module Jhc.Basics(module Jhc.Basics, module Jhc.Prim.Prim, module Jhc.Type.Basic, IO()) where
 
-import Jhc.Int
-import Jhc.Prim
+import Jhc.Type.Basic
 import Jhc.Prim.Prim
-
-data Integer
-
-type String = [Char]
+import Jhc.Prim.IO
 
 ------------------------
 -- the basic combinators
@@ -125,16 +121,16 @@ foldr k z (x:xs) = k x (foldr k z xs)
 
 foreign import primitive "error.Prelude.undefined" undefined :: a
 
+unsafeChr :: Int -> Char
+unsafeChr = chr
+
+{-
 ord :: Char -> Int
 ord (Char (Char_ c)) = boxInt c
 
 chr :: Int -> Char
 chr i = Char (Char_ (unboxInt i))
 
-unsafeChr :: Int -> Char
-unsafeChr = chr
-
-{-
 foreign import primitive "ULte" bits32ULte  :: Bits32_ -> Bits32_ -> Bool__
 foreign import primitive "error.Prelude.chr: value out of range" chr_error :: a
 
@@ -147,3 +143,6 @@ chr i = case unboxInt i of
 unsafeChr :: Int -> Char
 unsafeChr i = Char (unboxInt i)
 -}
+
+foreign import primitive "B2B" ord :: Char -> Int
+foreign import primitive "B2B" chr :: Int -> Char

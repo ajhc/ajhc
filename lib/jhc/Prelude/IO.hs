@@ -31,6 +31,7 @@ import Jhc.Order
 import Jhc.Show
 import Jhc.Type.C
 import System.C.Stdio
+import Jhc.Prim.Wrapper
 
 -- IO operations exported by the prelude
 
@@ -67,7 +68,7 @@ getContents = unsafeInterleaveIO getContents' where
 
 readFile :: FilePath -> IO String
 readFile fn = do
-    file <- withCString fn $ \fnc -> c_fopen fnc (Ptr "r"#)
+    file <- withCString fn $ \fnc -> c_fopen fnc (Ptr (Addr_ "r"#))
     if  (file == nullPtr) then (fail $ "Could not open file:" ++ fn) else do
         let gc = do
                 ch <- c_fgetwc file
@@ -104,10 +105,10 @@ writeFile' fn s mode = do
         return ()
 
 writeFile  :: FilePath -> String -> IO ()
-writeFile fn s = writeFile' fn s "w"#
+writeFile fn s = writeFile' fn s (Addr_ "w"#)
 
 appendFile  :: FilePath -> String -> IO ()
-appendFile fn s = writeFile' fn s "a"#
+appendFile fn s = writeFile' fn s (Addr_ "a"#)
 
 
 

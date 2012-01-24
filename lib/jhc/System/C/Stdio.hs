@@ -1,10 +1,9 @@
 {-# OPTIONS_JHC -fno-prelude -fffi #-}
 module System.C.Stdio where
 
-import Data.Int
-import Foreign.C.Types
-import Foreign.Ptr
 import Jhc.Basics
+import Jhc.Type.C
+import Jhc.Type.Ptr
 
 type FILE = Ptr CFile
 

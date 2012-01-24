@@ -1,18 +1,18 @@
 {-# LANGUAGE UnboxedTuples, ForeignFunctionInterface, NoImplicitPrelude #-}
-module Jhc.Prim(module Jhc.Prim.Bits, module Jhc.Prim, module Jhc.Prim.Prim, module Jhc.Prim.IO) where
+module Jhc.Prim(module Jhc.Prim.Bits, module Jhc.Prim, module Jhc.Prim.Prim, module Jhc.Prim.IO, module Jhc.Prim.Type.Basic, module Jhc.Prim.Type.Word) where
 
 import Jhc.Prim.Bits
 import Jhc.String
 import Jhc.Prim.IO
+import Jhc.Type.Word
 
-data Int
-data Char = Char Char_
+--data Int
+--data Char = Char Char_
 
-type Bool__ = Bits16_ -- Change to Bits1_ when the time comes
-type Int__  = Bits32_
-type Char__ = Bits32_
-type Enum__ = Bits16_
-type Addr__ = BitsPtr_
+--type Bool__ = Bits16_ -- Change to Bits1_ when the time comes
+--type Int__  = Bits32_
+--type Char__ = Bits32_
+--type Enum__ = Bits16_
 
 -- | when no exception wrapper is wanted
 runNoWrapper :: IO a -> World__ -> World__

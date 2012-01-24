@@ -24,11 +24,10 @@ instance Eq a => Eq (Maybe a) where
     Just x == Just y = x == y
     _ == _ = False
 
-instance Show a => Show (Maybe a) where
-    showsPrec d (Just m) = showParen (d > app_prec) $
-             showString "Just " . showsPrec (app_prec+1) m
-          where app_prec = 10
-    showsPrec _ Nothing = showString "Nothing"
+instance (Show a) => Show (Maybe a) where
+    showsPrec d (Nothing) = showString "Nothing"
+    showsPrec d (Just aa) = showParen (d >= 10)
+	      (showString "Just" . showChar ' ' . showsPrec 10 aa)
 
 instance Ord a => Ord (Maybe a) where
     Just x `compare` Just y = x `compare` y
@@ -40,3 +39,22 @@ maybe :: b -> (a -> b) -> Maybe a -> b
 maybe n f m = case m of
     Just x -> f x
     Nothing -> n
+
+
+-- either instances
+instance (Eq a,Eq b) => Eq (Either a b) where
+    (Left aa) == (Left aa') = aa == aa'
+    (Right aa) == (Right aa') = aa == aa'
+    _ == _ = False
+
+instance (Ord a,Ord b) => Ord (Either a b) where
+    compare (Left aa) (Left aa') = compare aa aa'
+    compare (Left aa) (Right aa') = LT
+    compare (Right aa) (Left aa') = GT
+    compare (Right aa) (Right aa') = compare aa aa'
+
+instance (Show a,Show b) => Show (Either a b) where
+    showsPrec d (Left aa) = showParen (d >= 10)
+	      (showString "Left" . showChar ' ' . showsPrec 10 aa)
+    showsPrec d (Right aa) = showParen (d >= 10)
+	      (showString "Right" . showChar ' ' . showsPrec 10 aa)

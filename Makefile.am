@@ -4,7 +4,7 @@ bin_PROGRAMS = jhc
 
 jhc_SOURCES = src/Main.hs $(HSFILES) $(BUILT_SOURCES) $(HSBOOT) $(DRIFTFILES)
 
-BUILT_SOURCES= src/PrimitiveOperators.hs src/RtsFiles.hs src/RawFiles.hs src/FrontEnd/HsParser.hs src/FlagDump.hs \
+BUILT_SOURCES= src/RtsFiles.hs src/RawFiles.hs src/FrontEnd/HsParser.hs src/FlagDump.hs \
 	       src/FlagOpts.hs src/Name/Prim.hs src/Info/Properties.hs $(DRIFTFILES)
 
 MY_CINCLUDES= -I$(srcdir)/src/data -I$(srcdir)/src/StringTable -I$(srcdir)/src/cbits -I$(builddir)/src/cbits
@@ -27,7 +27,7 @@ HSFILES=src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/
        	src/Grin/NodeAnalyze.hs src/Grin/Noodle.hs src/Grin/Optimize.hs src/Grin/Show.hs src/Grin/Val.hs \
 	src/Grin/Whiz.hs src/Ho/Binary.hs src/Ho/Collected.hs src/Ho/Library.hs src/Info/Binary.hs src/Info/Info.hs src/Info/Properties.hs \
 	src/Info/Types.hs src/Interactive.hs src/Main.hs src/Name/Binary.hs src/Name/Id.hs src/Name/Name.hs src/Name/Names.hs \
-	src/Name/Prim.hs src/PackedString.hs src/PrimitiveOperators.hs src/Ho/ReadSource.hs \
+	src/Name/Prim.hs src/PackedString.hs src/Ho/ReadSource.hs \
 	src/RawFiles.hs src/RtsFiles.hs src/Stats.hs src/Support/CanType.hs src/Support/CFF.hs src/Support/Compat.hs \
 	src/Support/FreeVars.hs src/Support/MapBinaryInstance.hs src/Support/MD5.hs src/Support/Tickle.hs src/Support/Transform.hs \
 	src/Support/Tuple.hs src/Support/Unparse.hs src/Util/BitSet.hs src/Util/ContextMonad.hs src/Util/FilterInput.hs \
@@ -147,10 +147,7 @@ HSBOOT= src/DataConstructors.hs-boot src/FrontEnd/Tc/Class.hs-boot src/Grin/Grin
 src/Info/Properties.hs: src/data/props.txt utils/gen_props.prl
 	perl $(srcdir)/utils/gen_props.prl $< > $@ || rm -f $@
 
-src/PrimitiveOperators.hs: utils/op_process.prl src/data/primitives.txt src/data/PrimitiveOperators-in.hs
-	perl $< > $@ || rm -f $@
-
-src/Name/Prim.hs: utils/op_names.prl src/data/primitives.txt src/data/names.txt
+src/Name/Prim.hs: utils/op_names.prl src/data/names.txt
 	perl $< > $@ || rm -f $@
 
 src/RawFiles.hs: utils/op_raw.prl $(RAWFILES)

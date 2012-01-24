@@ -47,7 +47,6 @@ import Name.Names
 import Name.VConsts
 import Options
 import PackedString
-import PrimitiveOperators
 import StringTable.Atom
 import Support.CanType
 import Support.FreeVars
@@ -60,6 +59,10 @@ import qualified FrontEnd.Tc.Type as Type
 import qualified Info.Info as Info
 
 ump sl e = EError (show sl ++ ": Unmatched pattern") e
+
+r_bits32       = ELit litCons { litName = rt_bits32, litType = eHash }
+r_bits_max_    = ELit litCons { litName = rt_bits_max_, litType = eHash }
+r_bits_ptr_    = ELit litCons { litName = rt_bits_ptr_, litType = eHash }
 
 createIf e a b = do
     [tv] <- newVars [Unknown]

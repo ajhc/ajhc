@@ -1,5 +1,4 @@
 {-# OPTIONS_JHC -fno-prelude -fffi -fm4 #-}
-
 module Jhc.Float(
     Float(..),
     Double(..),
@@ -135,7 +134,6 @@ rationalToDouble :: Rational -> Double
 rationalToDouble (x:%y) = fromInteger x `divideDouble` fromInteger y
 
 foreign import primitive "FDiv" divideDouble ::  Double -> Double -> Double
-foreign import primitive "box" boxBool :: Bool__ -> Bool
 
 m4_define(NUMINSTANCE,
 instance Num $1 where
@@ -191,21 +189,21 @@ foreign import primitive "FAdd" fplus$1  :: $1 -> $1 -> $1
 foreign import primitive "FSub" fminus$1 :: $1 -> $1 -> $1
 
 instance Eq $1 where
-    $1 x == $1 y = boxBool (x `eq$2` y)
-    $1 x /= $1 y = boxBool (x `neq$2` y)
+    $1 x == $1 y = (x `eq$2` y)
+    $1 x /= $1 y = (x `neq$2` y)
 
 instance Ord $1 where
-    $1 x < $1 y = boxBool (flt$2 x y)
-    $1 x > $1 y = boxBool (fgt$2 x y)
-    $1 x <= $1 y = boxBool (flte$2 x y)
-    $1 x >= $1 y = boxBool (fgte$2 x y)
+    $1 x < $1 y = (flt$2 x y)
+    $1 x > $1 y = (fgt$2 x y)
+    $1 x <= $1 y = (flte$2 x y)
+    $1 x >= $1 y = (fgte$2 x y)
 
-foreign import primitive "FEq" eq$2   :: $2 -> $2 -> Bool__
-foreign import primitive "FNEq" neq$2 :: $2 -> $2 -> Bool__
-foreign import primitive "FLt" flt$2  :: $2 -> $2 -> Bool__
-foreign import primitive "FLte" flte$2 :: $2 -> $2 -> Bool__
-foreign import primitive "FGt" fgt$2 :: $2 -> $2 -> Bool__
-foreign import primitive "FGte" fgte$2 :: $2 -> $2 -> Bool__
+foreign import primitive "FEq" eq$2   :: $2 -> $2 -> Bool
+foreign import primitive "FNEq" neq$2 :: $2 -> $2 -> Bool
+foreign import primitive "FLt" flt$2  :: $2 -> $2 -> Bool
+foreign import primitive "FLte" flte$2 :: $2 -> $2 -> Bool
+foreign import primitive "FGt" fgt$2 :: $2 -> $2 -> Bool
+foreign import primitive "FGte" fgte$2 :: $2 -> $2 -> Bool
 
 )
 

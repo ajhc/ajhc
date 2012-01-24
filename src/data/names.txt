@@ -1,12 +1,13 @@
 TypeConstructor:tc:
 
 IOErrorType  Jhc.Type.Handle.IOErrorType
-IOMode  Jhc.Type.Handle.IOMode
+IOMode       Jhc.Type.Handle.IOMode
+
 Arrow      Jhc.Prim.Prim.->
 Ref__      Data.IORef.Ref__
 MutArray__ Jhc.Array.MutArray__
 List       Jhc.Prim.Prim.[]
-Char       Jhc.Prim.Char
+Char       Jhc.Type.Basic.Char
 IO         Jhc.Prim.IO.IO
 ACIO       Jhc.Prim.IO.ACIO
 State_     Jhc.Prim.IO.State_
@@ -43,23 +44,23 @@ CTime     Jhc.Type.C.CTime
 CSize     Jhc.Type.C.CSize
 CClock    Jhc.Type.C.CClock
 
-#Int       Jhc.Prim.Int
-#Integer   Jhc.Basics.Integer
-#
-#Int8      Data.Int.Int8
-#Int16     Data.Int.Int16
-#Int32     Data.Int.Int32
-#Int64     Data.Int.Int64
-#IntMax    Data.Int.IntMax
-#IntPtr    Data.Int.IntPtr
-#
-#Word       Jhc.Prim.Word
-#Word8      Data.Word.Word8
-#Word16     Data.Word.Word16
-#Word32     Data.Word.Word32
-#Word64     Data.Word.Word64
-#WordMax    Data.Word.WordMax
-#WordPtr    Data.Word.WordPtr
+Integer   Jhc.Type.Basic.Integer
+
+Int       Jhc.Type.Word.Int
+Int8      Jhc.Type.Word.Int8
+Int16     Jhc.Type.Word.Int16
+Int32     Jhc.Type.Word.Int32
+Int64     Jhc.Type.Word.Int64
+IntMax    Jhc.Type.Word.IntMax
+IntPtr    Jhc.Type.Word.IntPtr
+
+Word       Jhc.Type.Word.Word
+Word8      Jhc.Type.Word.Word8
+Word16     Jhc.Type.Word.Word16
+Word32     Jhc.Type.Word.Word32
+Word64     Jhc.Type.Word.Word64
+WordMax    Jhc.Type.Word.WordMax
+WordPtr    Jhc.Type.Word.WordPtr
 
 Bits1      Jhc.Prim.Bits.Bits1_
 Bits8      Jhc.Prim.Bits.Bits8_
@@ -88,12 +89,15 @@ Char_      Jhc.Prim.Bits.Char_
 
 DataConstructor:dc:
 
-Ratio      Jhc.Type.Float.:%
+Boolzh     Jhc.Prim.Prim.Bool#
+Char       Jhc.Type.Basic.Char
 Cons       Jhc.Prim.Prim.:
 EmptyList  Jhc.Prim.Prim.[]
+Int        Jhc.Type.Word.Int
+Integer    Jhc.Type.Basic.Integer
+Ratio      Jhc.Type.Float.:%
 Unit       Jhc.Prim.Prim.()
-Boolzh     Jhc.Prim.Prim.Bool#
-Char       Jhc.Prim.Char
+Word       Jhc.Type.Word.Word
 
 ClassName:class:
 Eq              Jhc.Order.Eq

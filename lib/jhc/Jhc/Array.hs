@@ -10,13 +10,13 @@ import Jhc.Int
 data MutArray__ :: * -> #
 data Array__ :: * -> #
 
-foreign import primitive newMutArray__      :: Int__ -> a -> UIO (MutArray__ a)
-foreign import primitive newBlankMutArray__ :: Int__ -> UIO (MutArray__ a)
-foreign import primitive copyArray__        :: Int__ -> Int__ -> Int__ -> Array__ a -> MutArray__ a -> UIO_
-foreign import primitive copyMutArray__     :: Int__ -> Int__ -> Int__ -> MutArray__ a -> MutArray__ a -> UIO_
-foreign import primitive readArray__        :: MutArray__ a -> Int__ -> UIO a
-foreign import primitive writeArray__       :: MutArray__ a -> Int__ -> a -> UIO_
-foreign import primitive indexArray__       :: Array__ a -> Int__ -> (# a #)
+foreign import primitive newMutArray__      :: Int_ -> a -> UIO (MutArray__ a)
+foreign import primitive newBlankMutArray__ :: Int_ -> UIO (MutArray__ a)
+foreign import primitive copyArray__        :: Int_ -> Int_ -> Int_ -> Array__ a -> MutArray__ a -> UIO_
+foreign import primitive copyMutArray__     :: Int_ -> Int_ -> Int_ -> MutArray__ a -> MutArray__ a -> UIO_
+foreign import primitive readArray__        :: MutArray__ a -> Int_ -> UIO a
+foreign import primitive writeArray__       :: MutArray__ a -> Int_ -> a -> UIO_
+foreign import primitive indexArray__       :: Array__ a -> Int_ -> (# a #)
 
 -- these basically cast from a mutable to an immutable array and back again
 foreign import primitive unsafeFreezeArray__ :: MutArray__ a -> UIO (Array__ a)

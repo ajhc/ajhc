@@ -71,7 +71,6 @@ import Name.Id
 import Name.Name as Name
 import Name.Names
 import Name.VConsts
-import PrimitiveOperators
 import Support.CanType
 import Support.FreeVars
 import Support.MapBinaryInstance
@@ -275,6 +274,8 @@ primitiveConstructor name = emptyConstructor {
     conChildren = DataPrimitive
     }
 
+primitiveTable = []
+{-
 primitiveTable = concatMap f allCTypes  where
     f (dc,tc,rt) = [typeCons,dataCons] where
         dataCons = emptyConstructor {
@@ -292,6 +293,7 @@ primitiveTable = concatMap f allCTypes  where
             conChildren = DataNormal [dc]
            }
         tipe = ELit (litCons { litName = tc, litArgs = [], litType = eStar })
+        -}
 
 typesCompatable :: forall m . Monad m => DataTable -> E -> E -> m ()
 typesCompatable dataTable a b = f etherealIds a b where

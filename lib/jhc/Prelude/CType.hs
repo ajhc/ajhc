@@ -9,8 +9,6 @@ module Prelude.CType (
 import Jhc.Inst.Order
 import Jhc.Basics
 import Jhc.Order
-import Jhc.Num
-import Data.Word
 import Jhc.List
 import Jhc.IO
 
@@ -47,23 +45,27 @@ isAlphaNum c             =  isAlpha c || isDigit c
 digitToInt :: Char -> Int
 digitToInt c
   | isDigit c            =  ord c - ord '0'
-  | c >= 'a' && c <= 'f' =  ord c - (ord 'a' + 10)
-  | c >= 'A' && c <= 'F' =  ord c - (ord 'A' + 10)
+  | c >= 'a' && c <= 'f' =  ord c - (ord 'a' + Int 10#)
+  | c >= 'A' && c <= 'F' =  ord c - (ord 'A' + Int 10#)
   | otherwise            =  error "Char.digitToInt: not a digit"
 
 intToDigit :: Int -> Char
-intToDigit i = f (fromIntegral i :: Word) where
-    f w | w < 10 = chr (ord '0' + i)
-        | w < 16 = chr ((ord 'a' - 10) + i)
+intToDigit i = f (int2word i) where
+    f w | w < (Word 10#) = chr (ord '0' + i)
+        | w < (Word 16#) = chr ((ord 'a' - Int 10#) + i)
         | otherwise = error "Char.intToDigit: not a digit"
+
+foreign import primitive "U2U" int2word :: Int -> Word
+foreign import primitive "Add" (+) :: Int -> Int -> Int
+foreign import primitive "Sub" (-) :: Int -> Int -> Int
 
 -- Case-changing operations
 toUpper :: Char -> Char
-toUpper c | isLower c = chr $ ord c - 32
+toUpper c | isLower c = chr $ ord c - (Int 32#)
           | otherwise = c
 
 toLower :: Char -> Char
-toLower c | isUpper c = chr $ ord c + 32
+toLower c | isUpper c = chr $ ord c + (Int 32#)
           | otherwise = c
 
 elem    :: Char -> [Char] -> Bool

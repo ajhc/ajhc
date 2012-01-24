@@ -5,6 +5,7 @@ import Jhc.Basics
 import Jhc.IO
 import Jhc.Order
 import Jhc.Prim.Bits
+import Jhc.Type.Basic
 
 m4_include(Jhc/Order.m4)
 

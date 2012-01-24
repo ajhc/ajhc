@@ -112,7 +112,8 @@ openBinaryFile fp m = do
     h <- openFile fp m
     return h { handleBinary = True }
 
-toStr ReadMode = "r"#
-toStr WriteMode = "w"#
-toStr AppendMode = "a"#
-toStr ReadWriteMode = "r+"#
+toStr x = Addr_ (case x of
+    ReadMode -> "r"#
+    WriteMode -> "w"#
+    AppendMode -> "a"#
+    ReadWriteMode -> "r+"#)

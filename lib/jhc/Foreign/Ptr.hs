@@ -41,10 +41,10 @@ castFunPtr :: FunPtr a -> FunPtr b
 castFunPtr (FunPtr x) = FunPtr x
 
 castFunPtrToPtr :: FunPtr a -> Ptr b
-castFunPtrToPtr (FunPtr x) = Ptr x
+castFunPtrToPtr (FunPtr (FunAddr_ x)) = Ptr (Addr_ x)
 
 castPtrToFunPtr :: Ptr a -> FunPtr b
-castPtrToFunPtr (Ptr x) = FunPtr x
+castPtrToFunPtr (Ptr (Addr_ x)) = FunPtr (FunAddr_ x)
 
 freeHaskellFunPtr :: FunPtr a -> IO ()
 freeHaskellFunPtr _ = error "freeHaskellFunPtr"
@@ -58,5 +58,5 @@ ptrToWordPtr (Ptr w) = boxWordPtr w
 wordPtrToPtr :: WordPtr -> Ptr a
 wordPtrToPtr w = Ptr (unboxWordPtr w)
 
-foreign import primitive "box" boxWordPtr :: BitsPtr_ -> WordPtr
-foreign import primitive "unbox" unboxWordPtr :: WordPtr -> BitsPtr_
+foreign import primitive "box" boxWordPtr :: Addr_ -> WordPtr
+foreign import primitive "unbox" unboxWordPtr :: WordPtr -> Addr_

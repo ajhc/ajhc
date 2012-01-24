@@ -2,16 +2,16 @@ m4_divert(-1)
 m4_dnl simple macros for defining instances for classes in Jhc.Order
 
 m4_define(BOXBOOL,{{ONCE({{
-foreign import primitive "box" boxBool :: Bool__ -> Bool
+foreign import primitive "box" boxBool :: Bool_ -> Bool
 }})}})
 
 m4_define(INST_EQ,{{
 instance Eq $1 where
-    $2 x == $2 y = boxBool (equals$3 x y)
-    $2 x /= $2 y = boxBool (nequals$3 x y)
+    $2 x == $2 y =  (equals$3 x y)
+    $2 x /= $2 y =  (nequals$3 x y)
 ONCE({{
-foreign import primitive "Eq" equals$3 :: $3 -> $3 -> Bool__
-foreign import primitive "NEq" nequals$3 :: $3 -> $3 -> Bool__
+foreign import primitive "Eq" equals$3 :: $3 -> $3 -> Bool
+foreign import primitive "NEq" nequals$3 :: $3 -> $3 -> Bool
 }})
 BOXBOOL()
 }})
@@ -20,15 +20,15 @@ BOXBOOL()
 
 m4_define(INST_ORDER,{{
 instance Ord $1 where
-    $2 x < $2 y = boxBool (lt$4$3 x y)
-    $2 x > $2 y = boxBool (gt$4$3 x y)
-    $2 x <= $2 y = boxBool (lte$4$3 x y)
-    $2 x >= $2 y = boxBool (gte$4$3 x y)
+    $2 x < $2 y =  (lt$4$3 x y)
+    $2 x > $2 y =  (gt$4$3 x y)
+    $2 x <= $2 y =  (lte$4$3 x y)
+    $2 x >= $2 y =  (gte$4$3 x y)
 ONCE({{
-foreign import primitive "$4Lt" lt$4$3   :: $3 -> $3 -> Bool__
-foreign import primitive "$4Lte" lte$4$3 :: $3 -> $3 -> Bool__
-foreign import primitive "$4Gt" gt$4$3   :: $3 -> $3 -> Bool__
-foreign import primitive "$4Gte" gte$4$3 :: $3 -> $3 -> Bool__
+foreign import primitive "$4Lt" lt$4$3   :: $3 -> $3 -> Bool
+foreign import primitive "$4Lte" lte$4$3 :: $3 -> $3 -> Bool
+foreign import primitive "$4Gt" gt$4$3   :: $3 -> $3 -> Bool
+foreign import primitive "$4Gte" gte$4$3 :: $3 -> $3 -> Bool
 }})
 BOXBOOL()
 }})

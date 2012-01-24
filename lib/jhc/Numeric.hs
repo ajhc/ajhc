@@ -357,5 +357,3 @@ readFloat r    = [(fromRational ((n%1)*10^^(k-d)),t) | (n,d,s) <- readFix r,
                  readExp' ('-':s) = [(-k,t) | (k,t) <- readDec s]
                  readExp' ('+':s) = readDec s
                  readExp' s       = readDec s
-
-

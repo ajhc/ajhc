@@ -1,9 +1,9 @@
 {-# OPTIONS_JHC -fno-prelude -fffi #-}
 
 -- just a few basic operations on integers to jumpstart things
-module Jhc.Int(Int(),Int__(),increment,decrement,plus,minus,times,divide,modulus,zero,one,boxInt,unboxInt) where
+module Jhc.Int(Int(),Int_(),increment,decrement,plus,minus,times,divide,modulus,zero,one,boxInt,unboxInt) where
 
-import Jhc.Prim(Int(),Int__())
+import Jhc.Type.Word(Int(),Int_())
 
 foreign import primitive increment :: Int -> Int
 foreign import primitive decrement :: Int -> Int
@@ -15,5 +15,5 @@ foreign import primitive "Mod" modulus   :: Int -> Int -> Int
 foreign import primitive zero      :: Int
 foreign import primitive one       :: Int
 
-foreign import primitive "box" boxInt :: Int__ -> Int
-foreign import primitive "unbox" unboxInt :: Int -> Int__
+foreign import primitive "box" boxInt :: Int_ -> Int
+foreign import primitive "unbox" unboxInt :: Int -> Int_

@@ -168,7 +168,7 @@ processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o i
     primopt op [a,b] t | Just cop <- readM op = mdo
         (pa,(ta,_sta)) <- extractPrimitive dataTable a
         (pb,(tb,_stb)) <- extractPrimitive dataTable b
-        (bp,(tr,str)) <- boxPrimitive dataTable
+        (bp,(tr,str))  <- boxPrimitive dataTable
                 (EPrim (APrim Op { primCOp = Op.BinOp cop (stot cop 1 ta) (stot cop 2 tb), primRetTy = (stot cop 0 tr) } mempty) [pa, pb] str) t
         return bp
     primopt op [a] t | Just cop <- readM op = mdo

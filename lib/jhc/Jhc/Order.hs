@@ -14,6 +14,7 @@ module Jhc.Order(
 import Jhc.Basics
 import Jhc.Prim.Bits
 import Jhc.Prim.Prim
+import Jhc.Type.Basic
 
 m4_include(Jhc/Order.m4)
 
