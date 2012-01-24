@@ -16,22 +16,20 @@ module Foreign.Marshal.Alloc (
   finalizerFree -- :: FinalizerPtr a
 ) where
 
-import Foreign.Ptr
-import Foreign.Storable
-import Prelude.IO
 import Foreign.C.Types
 import Foreign.Marshal.Utils
-import Jhc.Prim
+import Foreign.Ptr
+import Foreign.Storable
+import Jhc.Addr
 import Jhc.Basics
-import Jhc.Monad
-import Jhc.Order
 import Jhc.IO
 import Jhc.Int(unboxInt)
-import Jhc.Addr
+import Jhc.Monad
 import Jhc.Num
+import Jhc.Order
+import Jhc.Prim
+import Prelude.IO
 import qualified Jhc.Options as JO
-
-
 
 -- TODO handle exceptions
 allocaBytes' :: Int -> (Ptr a -> IO b) -> IO b
@@ -64,7 +62,6 @@ malloc  = doMalloc undefined
 doMalloc       :: Storable b => b -> IO (Ptr b)
 doMalloc dummy  = mallocBytes (sizeOf dummy)
 
-
 -- |@'alloca' f@ executes the computation @f@, passing as argument
 -- a pointer to a temporarily allocated block of memory sufficient to
 -- hold values of type @a@.
@@ -77,9 +74,14 @@ alloca fn  = etaIO $ doAlloca undefined fn where
     doAlloca       :: Storable a' => a' -> (Ptr a' -> IO b') -> IO b'
     doAlloca dummy fn = allocaBytes (sizeOf dummy) fn
 
+{-# INLINE failWhenNULL #-}
 failWhenNULL :: String -> IO (Ptr a) -> IO (Ptr a)
 failWhenNULL name f = do
    addr <- f
+   failWhenNULL' name addr
+
+failWhenNULL' :: String -> Ptr a -> IO (Ptr a)
+failWhenNULL' name addr = do
    if addr == nullPtr
       then ioError (userError (name++": out of memory"))
       else return addr
@@ -92,8 +94,7 @@ failWhenNULL name f = do
 -- no longer required.
 --
 mallocBytes      :: Int -> IO (Ptr a)
-mallocBytes size  = failWhenNULL "malloc" (_malloc (fromIntegral size))
-
+mallocBytes size  = _malloc (fromIntegral size) >>= failWhenNULL' "malloc"
 
 -- |Resize a memory area that was allocated with 'malloc' or 'mallocBytes'
 -- to the size needed to store values of type @b@.  The returned pointer
@@ -111,7 +112,7 @@ doRealloc           :: Storable b' => b' -> Ptr a' -> IO (Ptr b')
 doRealloc dummy ptr  = let
                          size = fromIntegral (sizeOf dummy)
                        in
-                       failWhenNULL "realloc" (_realloc ptr size)
+                       (_realloc ptr size) >>= failWhenNULL' "realloc"
 
 -- |Resize a memory area that was allocated with 'malloc' or 'mallocBytes'
 -- to the given size.  The returned pointer may refer to an entirely
@@ -129,7 +130,7 @@ reallocBytes          :: Ptr a -> Int -> IO (Ptr a)
 reallocBytes ptr i | ptr `seq` i `seq` False = undefined
 reallocBytes ptr 0     = do free ptr; return nullPtr
 reallocBytes ptr size  =
-  failWhenNULL "realloc" (_realloc ptr (fromIntegral size))
+  _realloc ptr (fromIntegral size) >>= failWhenNULL' "realloc"
 
 foreign import ccall "stdlib.h malloc" _malloc :: CSize -> IO (Ptr a)
 foreign import ccall "stdlib.h free" free :: Ptr a -> IO ()
