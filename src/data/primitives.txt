@@ -21,12 +21,12 @@ Data.Word.WordPtr, bits<ptr>
 Foreign.C.Types.CChar, bits8
 Foreign.C.Types.CSChar, bits8
 Foreign.C.Types.CUChar, bits8
-Foreign.C.Types.CShort, bits<short>
+#Foreign.C.Types.CShort, bits<short>
 Foreign.C.Types.CInt, bits<int>
 Foreign.C.Types.CUInt, bits<int>
-Foreign.C.Types.CULong, bits<ptr>
+#Foreign.C.Types.CULong, bits<ptr>
 Foreign.C.Types.CSize, bits<size_t>
-Foreign.C.Types.CWchar, bits<wchar_t>
-Foreign.C.Types.CWint, bits<wchar_t>
+#Foreign.C.Types.CWchar, bits<wchar_t>
+#Foreign.C.Types.CWint, bits<wchar_t>
 Foreign.C.Types.CTime, bits<time_t>
 

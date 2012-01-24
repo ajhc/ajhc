@@ -54,6 +54,8 @@ Exposed-Modules:
         - Jhc.Type.Basic
         - Jhc.Type.Handle
         - Jhc.Type.Ptr
+        - Jhc.Type.C
+        - Jhc.Type.Float
 
 #        - Jhc.Hole
 #        - Jhc.JumpPoint

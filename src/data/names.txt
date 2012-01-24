@@ -15,17 +15,29 @@ Array__    Jhc.Array.Array__
 Bool       Jhc.Prim.Prim.Bool
 Ordering   Jhc.Prim.Prim.Ordering
 Bool_      Jhc.Prim.Bits.Bool_
-Ptr        Jhc.Addr.Ptr
-FunPtr     Jhc.Addr.FunPtr
-Ratio      Jhc.Num.Ratio
 Unit       Jhc.Prim.Prim.()
-Float      Jhc.Float.Float
-Double     Jhc.Float.Double
-CLong      Foreign.C.Types.CLong
+
+# Jhc.Type
+Ratio      Jhc.Type.Float.Ratio
+Float      Jhc.Type.Float.Float
+Double     Jhc.Type.Float.Double
+Ptr        Jhc.Type.Ptr.Ptr
+FunPtr     Jhc.Type.Ptr.FunPtr
+
+# Jhc.Type.C
+CLong      Jhc.Type.C.CLong
+CULong     Jhc.Type.C.CULong
+CLLong     Jhc.Type.C.CLLong
+CULLong    Jhc.Type.C.CULLong
+CShort     Jhc.Type.C.CShort
+CUShort    Jhc.Type.C.CUShort
+CWchar     Jhc.Type.C.CWchar
+CWint      Jhc.Type.C.CWint
+
 CSChar     Foreign.C.Types.CSChar
 CUChar     Foreign.C.Types.CUChar
-CUShort    Foreign.C.Types.CUShort
-CULong     Foreign.C.Types.CULong
+
+
 #Int       Jhc.Prim.Int
 #Integer   Jhc.Basics.Integer
 #
@@ -71,7 +83,7 @@ Char_      Jhc.Prim.Bits.Char_
 
 DataConstructor:dc:
 
-Rational   Jhc.Num.:%
+Ratio      Jhc.Type.Float.:%
 Cons       Jhc.Prim.Prim.:
 EmptyList  Jhc.Prim.Prim.[]
 Unit       Jhc.Prim.Prim.()

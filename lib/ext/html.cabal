@@ -5,7 +5,6 @@ license-file:	LICENSE
 maintainer:	libraries@haskell.org
 synopsis:	HTML combinator library
 category:       Web
-build-depends:  base>=2.0
 description:
 	This package contains a combinator library for constructing
         HTML documents.

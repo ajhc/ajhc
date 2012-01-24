@@ -1,27 +1,26 @@
-{-# OPTIONS_JHC -fno-prelude #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-module Foreign.C.Types where
+-- Haskell 2010 compliant
+module Foreign.C.Types (
+    CChar,  CSChar,  CUChar,  CShort,  CUShort,  CInt,  CUInt,  CLong,  CULong,
+    CPtrdiff,  CSize,  CWchar,  CSigAtomic,  CLLong,  CULLong,  CIntPtr,
+    CUIntPtr,  CIntMax,  CUIntMax,  CClock,  CTime,  CFloat,  CDouble,  CFile,
+    CFpos,  CJmpBuf
+  ) where
+
+import Data.Word
+import Jhc.Type.C
 
 data CChar
 data CSChar
 data CUChar
-data CShort
-data CUShort
+
 data CInt
 data CUInt
-data CLong
-data CULong
+
 data CPtrdiff
 data CSize
-data CWchar
 data CSigAtomic
-data CLLong
-data CULLong
 data CClock
 data CTime
 data CFloat
 data CDouble
 data CLDouble
-data CJmpBuf
-data CFpos
-data CWint

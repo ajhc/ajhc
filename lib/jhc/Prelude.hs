@@ -60,10 +60,9 @@ module Prelude(
     module Prelude.Text
     ) where
 
-
+import Data.Int(Int())
 import Jhc.Basics
 import Jhc.Float
-import Data.Int(Int())
 
 import Jhc.Inst.Enum
 import Jhc.Inst.Order
@@ -75,18 +74,16 @@ import Data.Ratio
 import Jhc.Enum
 import Jhc.IO
 import Jhc.List
+import Jhc.Maybe
 import Jhc.Monad
 import Jhc.Num
 import Jhc.Order
 import Jhc.Show
-import Jhc.Maybe
 import Jhc.Tuples
 import Prelude.Float
 import Prelude.IO
 import Prelude.Text
 import qualified Data.Char as Char(isSpace,ord,chr)
-
-
 
 -- infixr 9  .
 --infixr 8  ^, ^^, **
@@ -101,12 +98,7 @@ infixr 8  ^, ^^
 --infixr 1  =<<
 -- infixr 0  $, $!, `seq`
 
-
-
 -- Numeric functions
-
-
-
 
 {-# SPECIALIZE gcd :: Int -> Int -> Int #-}
 {-# SPECIALIZE gcd :: Integer -> Integer -> Integer #-}
@@ -116,14 +108,12 @@ gcd x y          =  gcd' (abs x) (abs y)
                     where gcd' x 0  =  x
                           gcd' x y  =  gcd' y (x `rem` y)
 
-
 {-# SPECIALIZE lcm :: Int -> Int -> Int #-}
 {-# SPECIALIZE lcm :: Integer -> Integer -> Integer #-}
 lcm              :: (Integral a) => a -> a -> a
 lcm _ 0          =  0
 lcm 0 _          =  0
 lcm x y          =  abs ((x `quot` (gcd x y)) * y)
-
 
 {-# SPECIALIZE (^) :: Int -> Int -> Int #-}
 {-# SPECIALIZE (^) :: Integer -> Int -> Integer #-}
@@ -138,17 +128,8 @@ x ^ n | n > 0    =  f x (n-1) x
                                           | otherwise = f x (n-1) (x*y)
 _ ^ _            = error "Prelude.^: negative exponent"
 
-
 (^^)             :: (Fractional a, Integral b) => a -> b -> a
 x ^^ n           =  if n >= 0 then x^n else recip (x^(-n))
-
-
-
-
-
-
-
-
 
 data Either a b = Left a | Right b
     deriving (Eq, Ord, Read, Show)
@@ -157,18 +138,10 @@ either :: (a -> c) -> (b -> c) -> Either a b -> c
 either f g (Left x)  =  f x
 either f g (Right y) =  g y
 
-
-
 until            :: (a -> Bool) -> (a -> a) -> a -> a
 until p f x
      | p x       =  x
      | otherwise =  until p f (f x)
-
-
-
-
-
-
 
 -- foldl, applied to a binary operator, a starting value (typically the
 -- left-identity of the operator), and a list, reduces the list using
@@ -182,13 +155,6 @@ until p f x
 -- scanl1 is similar, again without the starting element:
 --      scanl1 f [x1, x2, ...] == [x1, x1 `f` x2, ...]
 
-
-
-
-
-
-
-
 -- replicate n x is a list of length n with x the value of every element
 
 replicate        :: Int -> a -> [a]
@@ -200,7 +166,6 @@ replicate n x    = f n where
 -- the infinite repetition of the original list.  It is the identity
 -- on infinite lists.
 
-
 cycle            :: [a] -> [a]
 cycle []         =  error "Prelude.cycle: empty list"
 cycle xs         =  xs' where xs' = xs ++ xs'
@@ -210,21 +175,17 @@ cycle xs         =  xs' where xs' = xs ++ xs'
 -- after the first n elements, or [] if n > length xs.  splitAt n xs
 -- is equivalent to (take n xs, drop n xs).
 
-
 take :: Int -> [a] -> [a]
 take n xs = f n xs where
     f n _      | n <= 0 =  []
     f _ []              =  []
     f n (x:xs)          =  x : f (n-1) xs
 
-
 drop :: Int -> [a] -> [a]
 drop n xs = f n xs where
     f n xs | n <= 0 =  xs
     f _ [] = []
     f n (_:xs) = f (n-1) xs
-
-
 
 splitAt                  :: Int -> [a] -> ([a],[a])
 --splitAt n xs             =  (take n xs, drop n xs)
@@ -243,7 +204,6 @@ splitAt n ls = splitAt' n ls where
 -- unlines joins lines with terminating newlines, and unwords joins
 -- words with separating spaces.
 
-
 lines            :: String -> [String]
 lines ""         =  []
 lines s          =  let (l, s') = break (== '\n') s
@@ -251,25 +211,21 @@ lines s          =  let (l, s') = break (== '\n') s
                                 []      -> []
                                 (_:s'') -> lines s''
 
-
 words            :: String -> [String]
 words s          =  case dropWhile Char.isSpace s of
                       "" -> []
                       s' -> w : words s''
                             where (w, s'') = break Char.isSpace s'
 
-
 unlines          :: [String] -> String
 unlines [] = []
 unlines (l:ls) = l ++ '\n' : unlines ls
 --unlines          =  concatMap (++ "\n")
 
-
 unwords          :: [String] -> String
 unwords []		=  ""
 unwords [w]		= w
 unwords (w:ws)		= w ++ ' ' : unwords ws
-
 
 -- lookup key assocs looks up a key in an association list.
 
@@ -316,29 +272,22 @@ maximum xs       =  foldl1 max xs
 minimum []       =  error "Prelude.minimum: empty list"
 minimum xs       =  foldl1 min xs
 
-
 zip3             :: [a] -> [b] -> [c] -> [(a,b,c)]
 zip3             =  zipWith3 (\a b c -> (a,b,c))
-
-
 
 zipWith3         :: (a->b->c->d) -> [a]->[b]->[c]->[d]
 zipWith3 z (a:as) (b:bs) (c:cs)
                  =  z a b c : zipWith3 z as bs cs
 zipWith3 _ _ _ _ =  []
 
-
 -- unzip transforms a list of pairs into a pair of lists.
-
 
 unzip            :: [(a,b)] -> ([a],[b])
 unzip            =  foldr (\(a,b) ~(as,bs) -> (a:as,b:bs)) ([],[])
 
-
 unzip3           :: [(a,b,c)] -> ([a],[b],[c])
 unzip3           =  foldr (\(a,b,c) ~(as,bs,cs) -> (a:as,b:bs,c:cs))
                           ([],[],[])
-
 
 {-# RULES "drop/0"        forall . drop 0 = \xs -> xs #-}
 {-# RULES "drop/1"        forall x xs . drop 1 (x:xs) = xs #-}
@@ -384,6 +333,5 @@ unzip3           =  foldr (\(a,b,c) ~(as,bs,cs) -> (a:as,b:bs,c:cs))
 -- {-# RULES "foldr/sequence" forall k z xs . foldr k z (sequence xs) = foldr (\x y -> do rx <- x; ry <- y; return (k rx ry)) (return z) xs #-}
 -- {-# RULES "foldr/mapM" forall k z f xs . foldr k z (mapM f xs) = foldr (\x y -> do rx <- f x; ry <- y; return (k rx ry)) (return z) xs   #-}
 {-# RULES "take/repeat"   forall n x . take n (repeat x) = replicate n x #-}
-
 
 default(Int,Double)

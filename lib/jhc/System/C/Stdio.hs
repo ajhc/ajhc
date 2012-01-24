@@ -5,7 +5,6 @@ import Data.Int
 import Foreign.C.Types
 import Foreign.Ptr
 import Jhc.Basics
-import Jhc.Type.Handle
 
 type FILE = Ptr CFile
 

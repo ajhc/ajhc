@@ -39,17 +39,17 @@ module System.IO(
     hReady,
     hSetBuffering,
     hGetBuffering
-
     ) where
 
-import Jhc.IO
-import Jhc.Handle
-import Foreign.Ptr
-import System.C.Stdio
-import Foreign.Storable
-import Foreign.C.Types
 import Data.Char(ord)
 import Data.Int
+--import Foreign.C.Types
+import Jhc.Type.C
+import Foreign.Ptr
+import Foreign.Storable
+import Jhc.Handle
+import Jhc.IO
+import System.C.Stdio
 import System.IO.Error
 
 data BufferMode = NoBuffering | LineBuffering | BlockBuffering (Maybe Int)

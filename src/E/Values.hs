@@ -75,7 +75,7 @@ instance ToE Char where
     typeE _ = tChar
 
 instance ToE Rational where
-    toE rat = ELit (litCons { litName = dc_Rational, litArgs = [toE (numerator rat), toE (denominator rat)], litType = tRational })
+    toE rat = ELit (litCons { litName = dc_Ratio, litArgs = [toE (numerator rat), toE (denominator rat)], litType = tRational })
     typeE _ = tRational
 
 instance ToE Integer where

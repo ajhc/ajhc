@@ -20,11 +20,9 @@ import Jhc.Int
 import Jhc.Num
 import Jhc.Order
 import Jhc.Prim.Bits
+import Jhc.Type.Float
 
 infixr 8  **
-
-data Float = Float Float32_
-data Double = Double Float64_
 
 foreign import primitive "F2F" floatToDouble :: Float -> Double
 foreign import primitive "F2F" doubleToFloat :: Double -> Float

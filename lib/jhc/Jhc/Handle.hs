@@ -48,7 +48,8 @@ instance Show Handle where
 
 stdin, stdout, stderr :: Handle
 
-make_builtin mode name std = Handle { handleName = "(" ++ name ++ ")", handleFile = std, handleIOMode = mode, handleBinary = False, handleIsPipe = False }
+{-# INLINE make_builtin #-}
+make_builtin mode name std = Handle { handleName = name, handleFile = std, handleIOMode = mode, handleBinary = False, handleIsPipe = False }
 
 stdin = make_builtin ReadMode "stdin" c_stdin
 stdout = make_builtin WriteMode "stdout" c_stdout

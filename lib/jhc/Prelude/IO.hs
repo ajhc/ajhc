@@ -20,9 +20,8 @@ module Prelude.IO(
     userError
     ) where
 
-import System.C.Stdio
+--import Foreign.C.Types
 import Foreign.C.String
-import Foreign.C.Types
 import Foreign.Ptr
 import Jhc.Addr
 import Jhc.Basics
@@ -30,6 +29,8 @@ import Jhc.IO
 import Jhc.Monad
 import Jhc.Order
 import Jhc.Show
+import Jhc.Type.C
+import System.C.Stdio
 
 -- IO operations exported by the prelude
 

@@ -4,8 +4,7 @@ import Jhc.Prim
 import Jhc.Basics
 import Jhc.Type.Ptr
 import Jhc.Type.Basic
-
-data CFile
+import Jhc.Type.C
 
 data IOMode = ReadMode | WriteMode | AppendMode | ReadWriteMode
 

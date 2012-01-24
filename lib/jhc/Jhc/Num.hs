@@ -1,5 +1,5 @@
 {-# OPTIONS_JHC -fno-prelude #-}
-module Jhc.Num where
+module Jhc.Num(module Jhc.Num, Ratio(..)) where
 
 import Jhc.Basics
 import Jhc.Order
@@ -7,12 +7,11 @@ import Jhc.Show
 import Jhc.IO(error)
 import Jhc.Enum
 import Jhc.Float
+import Jhc.Type.Float
 
-infixl 7 :%
 infixl 7  *  , /, `quot`, `rem`, `div`, `mod`
 infixl 6  +, -
 
-data  Ratio a  = !a :% !a
 type  Rational = Ratio Integer
 
 numerator, denominator  :: Ratio a -> a
