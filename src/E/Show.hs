@@ -19,6 +19,7 @@ import Support.FreeVars
 import Support.Unparse
 import Util.SetLike
 import Util.VarName
+import qualified Data.Map as Map
 import qualified Doc.Chars as UC
 import qualified FlagDump as FD
 
@@ -52,42 +53,6 @@ enumList = [
     (toName TypeConstructor ("Jhc.Order","Ordering#"),["LT#","EQ#","GT#"])
     ]
 
-{-
-instance PPrint (SEM Doc) a => PPrint (SEM Doc) (Lit a E)  where
-    pprintAssoc a i lit = f lit where
-        f (LitInt i (ELit LitCons { litName = n })) | Just l <- lookup n enumList, i >= 0 && fromIntegral i < length l = text $ l !! (fromIntegral i)
-        f (LitInt i _) = text $ show i
-        f LitCons { litName = s, litArgs = es } | Just n <- fromTupname s , n == length es = do
-            es' <- mapM pprint es
-            return $ tupled es'
-        f LitCons { litName = s, litArgs = es } | Just n <- fromUnboxedNameTuple s, n == length es = do
-            es' <- mapM pprint es
-            return $ encloseSep (text "(# ") (text " #)") (text ", ") es'
-        f LitCons { litName = n, litArgs = [a,b] } | dc_Cons == n  = do
-            a' <- showBind a
-            b' <- showBind b
-            return $ a' `cons` b'
-        f LitCons { litName = n, litArgs = [e] } | tc_List == n = do
-            e <- pprint e
-            return $ (char '[' <> e <> char ']')
-        f LitCons { litName = n, litArgs = [] } | dc_EmptyList == n = return $ text "[]"
-        f LitCons { litName = n, litArgs = [v] }
-            | n == dc_Integer = go "Integer#"
-            | n == dc_Int     = go "Int#"
-            | n == dc_Char    = go "Char#"
-          where go n = do
-                    se <- pprintAssoc AssocNone 10 v
-                    return $ atom (text n) `app` se
-        f LitCons { litName = s, litArgs = es, litType = t, litAliasFor = Just af } | dump FD.EAlias = do
-            es' <- mapM showBind es
-            se <- showE af
-            return $ foldl appCon (atom (tshow s <> char '@' <> parens (unparse se))) es' -- `inhabit` prettye t
-        f LitCons { litName = s, litArgs = es, litType = t } = do
-            es' <- mapM showBind es
-            return $ foldl appCon (atom (tshow s)) es' -- `inhabit` prettye t
-        cons = bop (R,5) (text ":")
-        -}
-
 showLit ::
     (a -> SEM (Unparse Doc))   -- ^ routine for showing the contents of constructor literals
     -> Lit a E                 -- ^ the literal to show
@@ -117,18 +82,22 @@ showLit showBind l = do
         f LitCons { litName = ((tc_Addr_ ==) -> True), litType = ((eHash ==) -> True) } = return $ atom $ text "Addr_"
         f LitCons { litName = ((tc_FunAddr_ ==) -> True), litType = ((eHash ==) -> True) } = return $ atom $ text "FunAddr_"
         f LitCons { litName = ((tc_Char_ ==) -> True), litType = ((eHash ==) -> True) } = return $ atom $ text "Char_"
-        f LitCons { litName = n, litArgs = [v] }
-            | n == dc_Integer = go "Integer#"
-            | n == dc_Int     = go "Int#"
-            | n == dc_Char    = go "Char#"
-          where go n = do
-                    se <- showBind v
-                    return $ atom (text n) `app` se
-        f LitCons { litName = s, litArgs = es, litType = t, litAliasFor = Just af } | dump FD.EAlias = do
+--        f LitCons { litName = n, litArgs = [v] }
+--        f LitCons { litName = n, litArgs = [v] }
+--            | n == dc_Integer = go "Integer#"
+--            | n == dc_Int     = go "Int#"
+--            | n == dc_Char    = go "Char#"
+--          where go n = do
+--                    se <- showBind v
+--                    return $ atom (text n) `app` se
+        f LitCons { litName = s, litArgs = es, litType = t,
+		    litAliasFor = Just af } | dump FD.EAlias = do
+	    s <- return $ fromMaybe s (Map.lookup s shortName)
             es' <- mapM showBind es
             se <- showE af
             return $ foldl appCon (atom (tshow s <> char '@' <> parens (unparse se))) es' -- `inhabit` prettye t
         f LitCons { litName = s, litArgs = es, litType = t } = do
+	    s <- return $ fromMaybe s (Map.lookup s shortName)
             es' <- mapM showBind es
             return $ foldl appCon (atom (tshow s)) es' -- `inhabit` prettye t
         cons = bop (R,5) (text ":")
@@ -136,12 +105,6 @@ showLit showBind l = do
 
 app = bop (L,100) (text " ")
 appCon = bop (L,99) (text " ")
-
---class EPrint a where
---    eprint :: a -> SEM Doc
---    eprintAssoc :: Assoc -> a -> Int -> SEM Doc
---    eprintAssoc _ _ a = eprint a
---    eprint a = eprintAssoc AssocNone (-1) a
 
 showI i = do
     n <- SEM $ maybeLookupName i
@@ -184,22 +147,28 @@ collectAbstractions e0 = go e0 [] where
     go  e           xs = done e xs
     done e xs = (reverse xs, e)
 
+short_names = [
+      tc_Bool,     tc_Char,    tc_IO,      tc_ACIO,    tc_State_,  tc_RealWorld,
+      tc_Ordering, tc_Bool_,   tc_Ratio,   tc_Float,   tc_Double,  tc_Ptr,
+      tc_FunPtr,   tc_CInt,    tc_CUInt,   tc_CLong,   tc_CULong,  tc_CLLong,
+      tc_CULLong,  tc_CShort,  tc_CUShort, tc_CWchar,  tc_CWint,   tc_CChar,
+      tc_CSChar,   tc_CUChar,  tc_CInt,    tc_CUInt,   tc_CTime,   tc_CSize,
+      tc_CClock,   tc_Integer, tc_Int,     tc_Int8,    tc_Int16,   tc_Int32,
+      tc_Int64,    tc_IntMax,  tc_IntPtr,  tc_Word,    tc_Word8,   tc_Word16,
+      tc_Word32,   tc_Word64,  tc_WordMax, tc_WordPtr, tc_Addr_,   tc_FunAddr_,
+      tc_Char_,    dc_Boolzh,  dc_Char,    dc_Int,     dc_Integer, dc_Word ]
+
+shortName = Map.fromList [ (x, toUnqualified x) | x <- short_names]
+
 showE :: E -> SEM (Unparse Doc)
 showE e = do
     let f e | Just s <- E.E.toString e = return $ atom $ (text $ show s)
         f e | Just xs <- eToList e = do
             xs <- mapM (fmap unparse . showE) xs
             return $ atom $ list xs
-        f e | e == tBool     = return $ atom $ text "Bool"
-        f e | e == tBoolzh   = return $ atom $ text "Bool_"
-        f e | e == tChar     = return $ atom $ text "Char"
-        f e | e == tInt      = return $ atom $ text "Int"
-        f e | e == tInteger  = return $ atom $ text "Integer"
         f e | e == tRational = return $ atom $ text "Rational"
         f e | e == tString   = return $ atom $ text "String"
         f e | e == tUnit     = return $ atom $ text "()"
-        f e | e == vFalse    = return $ atom $ text "False"
-        f e | e == vTrue     = return $ atom $ text "True"
         f e | e == tWorld__  = return $ atom $ text "RealWorld_"
         f e | e == vUnit     = return $ atom $ text "()"
         f (EAp a b) = liftM2 app (showE a) (showE b)
