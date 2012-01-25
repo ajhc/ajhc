@@ -55,7 +55,7 @@ GHCOPTS= $(HSOPTS) -XBangPatterns -O @GHCFLAGS@ $(GHCDEBUGOPTS) $(GHCINC) $(PACK
 
 JHC_LIBS = jhc-1.0.hl base-1.0.hl haskell98-1.0.hl applicative-1.0.hl flat-foreign-1.0.hl jhc-prim-1.0.hl
 
-EXTRA_DIST = src/data src/rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
+EXTRA_DIST = src/data rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
              lib/jhc lib/base lib/haskell98 lib/flat-foreign $(JHC_LIBS) $(JHC_EXT_LIBS) \
 	     src/StringTable/StringTable_cbits.c src/StringTable/StringTable_cbits.h src/cbits/md5sum.c jhc.1 \
 	     src/StringTable/Atom.hsc jhc.spec \
@@ -97,9 +97,9 @@ UTILS = utils/op_process.prl utils/opt_sets.prl utils/gen_props.prl utils/op_nam
 RAWFILES = src/data/ViaGhc.hs ChangeLog \
 	   src/data/shortchange.txt src/data/prelude.m4 src/data/targets.ini
 
-RTSFILES = src/data/HsFFI.h src/rts/wsize.h src/rts/jhc_rts_header.h src/rts/jhc_jgc.h \
-	   src/rts/debug.c src/rts/jhc_rts_alloc.c src/rts/jhc_rts.c src/rts/profile.c src/rts/jhc_rts2.c src/rts/bitarray.h \
-	   src/rts/slub.c src/rts/jhc_jgc.c  src/rts/lib_cbits.c
+RTSFILES = src/data/HsFFI.h rts/wsize.h rts/jhc_rts_header.h rts/jhc_jgc.h \
+	   rts/debug.c rts/jhc_rts_alloc.c rts/jhc_rts.c rts/profile.c rts/jhc_rts2.c rts/bitarray.h \
+	   rts/slub.c rts/jhc_jgc.c  rts/lib_cbits.c
 
 DRIFTFILES = drift_processed/C/FFI.hs drift_processed/C/FromGrin2.hs drift_processed/Cmm/Op.hs drift_processed/C/Prims.hs drift_processed/DataConstructors.hs \
    drift_processed/DerivingDrift/StandardRules.hs drift_processed/E/CPR.hs drift_processed/E/Demand.hs drift_processed/E/LambdaLift.hs \
@@ -178,8 +178,8 @@ bin-dist: jhc
 	gzip -f -- $(BINDISTDIR).tar
 	rm -rf -- $(BINDISTDIR)
 
-.INTERMEDIATE: deps.txt
-.DELETE_ON_ERROR: deps.txt depend.make ChangeLog data/shortchange.txt
+.INTERMEDIATE: deps.txt jhc_man.mkd  options.mkd
+.DELETE_ON_ERROR: deps.txt depend.make ChangeLog data/shortchange.txt manual.mkd jhc_man.mkd options.mkd
 
 deps.txt:
 	$(MAKE) $(AM_MAKEFLAGS) $(BUILT_SOURCES)
@@ -255,7 +255,7 @@ manual: manual.mkd
 
 
 jhc_man.mkd: utils/stitch.prl docs/man_header.mkd $(JHC_MANUAL_FILES)
-	perl utils/stitch.prl -h docs/man_header.mkd -c Using,Options > jhc_man.mkd
+	perl utils/stitch.prl -h docs/man_header.mkd -c Using,Options $(JHC_MANUAL_FILES) > jhc_man.mkd
 
 man: jhc_man.mkd
 	pandoc jhc_man.mkd -s -f markdown -t man -s  -o jhc.1
@@ -352,5 +352,5 @@ JHC_EXT_LIBS = containers-0.3.0.0.hl Diff-0.1.2.hl html-1.0.1.2.hl HUnit-1.2.2.1
     xhtml-3000.2.0.1.hl transformers-0.2.1.0.hl filepath-1.2.0.0.hl deepseq-1.1.0.2.hl
 
 JHC_MANUAL_FILES = options.mkd docs/make.mkd docs/dependency_format.mkd docs/pragmas.mkd docs/differences.mkd \
-	docs/unboxed.mkd src/rts/jhc_rts2.c src/FlagOpts.mkd src/FlagDump.mkd src/E/PrimOpt.hs \
+	docs/unboxed.mkd rts/jhc_rts2.c src/FlagOpts.mkd src/FlagDump.mkd src/E/PrimOpt.hs \
 	drift_processed/E/TypeCheck.hs drift_processed/Options.hs

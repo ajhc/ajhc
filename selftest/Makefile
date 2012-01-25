@@ -1,6 +1,6 @@
 INC= -i -i../drift_processed -i../src
 GHCOPTS= -fallow-overlapping-instances -fallow-undecidable-instances -fglasgow-exts \
-	 -XBangPatterns $(INC) \
+	 -XBangPatterns $(INC) -XTypeFamilies \
 	 -O -package QuickCheck -ignore-package lang  -optc-std=c99 -optc-g
 
 HC= ghc
