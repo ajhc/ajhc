@@ -76,13 +76,6 @@ Float64    Jhc.Prim.Bits.Float64_
 Float80    Jhc.Prim.Bits.Float80_
 Float128   Jhc.Prim.Bits.Float128_
 
-BitsShort  Jhc.Prim.Bits.BitsShort_
-BitsInt    Jhc.Prim.Bits.BitsInt_
-BitsLong   Jhc.Prim.Bits.BitsLong_
-BitsLLong  Jhc.Prim.Bits.BitsLLong_
-BitsSize   Jhc.Prim.Bits.BitsSize_
-BitsWchar  Jhc.Prim.Bits.BitsWchar_
-
 Addr_      Jhc.Prim.Bits.Addr_
 FunAddr_   Jhc.Prim.Bits.FunAddr_
 Char_      Jhc.Prim.Bits.Char_
@@ -129,14 +122,8 @@ float32       fbits32
 float64       fbits64
 float80       fbits80
 float128      fbits128
-bits_short_   bits<short>
-bits_int_     bits<int>
-bits_long_    bits<long>
-bits_wchar_t_ bits<wchar_t>
 bits_max_     bits<max>
 bits_ptr_     bits<ptr>
-bits_size_t_  bits<size_t>
-bits_time_t_  bits<time_t>
 
 Val:v:
 
