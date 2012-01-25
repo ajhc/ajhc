@@ -1,7 +1,7 @@
 module FrontEnd.Tc.Module (tiModules,TiData(..)) where
 
-import Data.Char
 import Control.Monad.Writer
+import Data.Char
 import Text.PrettyPrint.HughesPJ as PPrint
 import qualified Data.Foldable as T
 import qualified Data.Map as Map

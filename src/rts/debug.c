@@ -22,7 +22,6 @@ static Pvoid_t mem_annotate = NULL;
 #define gc_alloc(gc,sc,c,nptrs) \
     gc_alloc_annot(gc,sc,c,nptrs,(__FILE__ ":" STR(__LINE__)))
 
-
 A_UNUSED static void *
 gc_alloc_annot(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs, char *str)
 {
@@ -40,6 +39,5 @@ gc_lookup(void *ptr)
         JLG(pval,mem_annotate,(Word_t)ptr & ~(Word_t)3);
         return pval ? (char *)*pval : "(none)";
 }
-
 
 #endif

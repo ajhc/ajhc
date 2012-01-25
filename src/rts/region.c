@@ -4,7 +4,6 @@
 #undef _JHC_GC_CONTEXT
 #define _JHC_GC_CONTEXT 1
 
-
 typedef unsigned jhc_gc_context_t;
 
 #include <sys/queue.h>
@@ -13,7 +12,6 @@ static inline void jhc_malloc_init(void) { return; }
 
 // Region chunk size
 #define JHC_MEM_CHUNK_SIZE (1 << 12)
-
 
 struct region {
         SLIST_HEAD(,region_page) pages;
@@ -25,12 +23,10 @@ struct region_page {
         uintptr_t data[];
 };
 
-
 #define JHC_REGION_STACK_SIZE  1024
 static struct region region_stack[JHC_REGION_STACK_SIZE];
 
 SLIST_HEAD(,region_page) free_pages;
-
 
 static struct region_page *
 new_region_page(unsigned current_region) {
@@ -79,8 +75,6 @@ new_region(unsigned current_region) {
         }
 }
 
-
-
 static inline void * A_MALLOC
 jhc_malloc_region(unsigned current_region, struct region *r, size_t n) {
         n = ALIGN(sizeof(void *),n);
@@ -93,14 +87,9 @@ jhc_malloc_region(unsigned current_region, struct region *r, size_t n) {
                 rp = SLIST_FIRST(&r->pages);
         }
 
-
         void *ret = (void *)rp + r->offset;
         r->offset += n;
         return ret;
 }
-
-
-
-
 
 #endif

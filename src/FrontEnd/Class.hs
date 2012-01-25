@@ -295,7 +295,6 @@ hsInstDeclToInst kt (HsNewTypeDecl _sloc _cntxt tyConName argNames _condecls der
    --newInstances = makeDeriveInstances newContext convertedType derives
    newInstances = mempty
 
-
 -- the types will only ever be constructors or vars
 
 convType :: [(HsType, Kind)] -> Type
@@ -456,7 +455,6 @@ newMethodSig' kt methodName newCntxt qt' instanceType  = newQualType where
     ct n | n == classArg = instanceType
     ct n =  n
     -}
-
 
 -- collect assumptions of all class methods
 

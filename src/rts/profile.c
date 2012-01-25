@@ -20,7 +20,6 @@ struct profile_stack {
 struct profile_stack gc_alloc_time;
 struct profile_stack gc_gc_time;
 
-
 void
 profile_push(struct profile_stack *ps)
 {
@@ -35,7 +34,6 @@ profile_pop(struct profile_stack *ps)
     ps->tm_total.tms_utime += tm.tms_utime - ps->tm_pushed.tms_utime;
     ps->tm_total.tms_stime += tm.tms_stime - ps->tm_pushed.tms_stime;
 }
-
 
 #else
 

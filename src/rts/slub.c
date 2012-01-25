@@ -25,10 +25,8 @@ struct {								\
 #define	SLIST_FOREACH(var, head, field)					\
 	for((var) = (head)->slh_first; (var); (var) = (var)->field.sle_next)
 
-
 #define BLOCK_SIZE     (1UL << 12)
 #define MEGABLOCK_SIZE (1UL << 20)
-
 
 #define S_BLOCK(val) (struct s_block *)((uintptr_t)(val) & ~ (BLOCK_SIZE - 1))
 
@@ -69,7 +67,6 @@ struct s_cache {
         unsigned short num_entries;
         struct s_arena *arena;
 };
-
 
 /* This finds a bit that isn't set, sets it, then returns its index.  It
  * assumes that a bit is available to be found, otherwise it goes into an
@@ -291,7 +288,6 @@ new_cache(struct s_arena *arena, unsigned short size, unsigned short num_ptrs)
         return sc;
 }
 
-
 // clear all used bits, must be followed by a marking phase.
 static void
 clear_used_bits(struct s_arena *arena)
@@ -404,7 +400,6 @@ stress_test(int n) {
         }
 }
 
-
 int
 main(int argc, char *argv[])
 {
@@ -428,7 +423,6 @@ main(int argc, char *argv[])
 
         print_cache(sc1);
         print_cache(sc2);
-
 
         return 0;
 }

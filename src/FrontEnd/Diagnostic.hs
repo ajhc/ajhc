@@ -23,10 +23,10 @@ module FrontEnd.Diagnostic (
        TypeError (..),
        ) where
 
-import List  (find)
-import Maybe (isJust)
-import FrontEnd.SrcLoc
+import Data.List as List(find)
+import Data.Maybe (isJust)
 import Data.Monoid
+import FrontEnd.SrcLoc
 
 --------------------------------------------------------------------------------
 
@@ -34,7 +34,6 @@ data TypeError
         = Unification String
         | BogusError
         | Failure String
-
 
 typeError :: Monad m => TypeError -> [Diagnostic] -> m a
 typeError err ds
@@ -48,7 +47,6 @@ typeError err ds
            Unification s -> ("type unification error", s)
            BogusError    -> ("bogus reason", "bogus reason")
            Failure s ->  ("failure", s)
-
 
 data Diagnostic = Msg (Maybe SrcLoc) String
    deriving Show
@@ -76,9 +74,6 @@ locSimple loc desc = withASrcLoc loc (simpleMsg desc)
 locMsg :: SrcLoc -> Description -> String -> Diagnostic
 locMsg loc desc val = locSimple loc (desc ++ "\n   " ++ val)
 
-
-
-
 {- take a diagnostic stack and a 'maxContext' and display the
    most recent maxContext number of lines from the stack -}
 dumpDiagnostic :: Int -> [Diagnostic] -> String
@@ -97,7 +92,6 @@ dumpDiagnostic maxContext diagnostics
                 Just (Msg (Just (SrcLoc fn line col)) _)
                     -> "on line " ++ show line ++ " in " ++ fn
                 _ -> "no line information"
-
 
 {- display an entire stack of diagnostics (it displays the top of
    the stack first, so most calls will have to reverse the stack
@@ -122,11 +116,9 @@ showDiagnostics diags
               Just srcloc -> "\t\t{- on line " ++ show (srcLine srcloc) ++ " -}"  -- discreetly display line nums
               _ -> ""
 
-
 srcLine :: SrcLoc -> Int
 srcLine = srcLocLine
 
 withASrcLoc :: SrcLoc -> Diagnostic -> Diagnostic
 withASrcLoc loc x | loc == mempty = x
 withASrcLoc loc (Msg _ description) = Msg (Just loc) description
-

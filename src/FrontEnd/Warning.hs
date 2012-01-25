@@ -11,23 +11,21 @@ module FrontEnd.Warning(
     printIOErrors
     ) where
 
-import List
-import GenUtil
-import Options
-import Control.Monad.Writer
-import System.IO.Unsafe
-import Data.IORef
 import Control.Monad.Identity
+import Control.Monad.Writer
+import Data.IORef
 import FrontEnd.SrcLoc
+import GenUtil
+import List
+import Options
+import System.IO.Unsafe
 
 {-# NOINLINE ioWarnings #-}
 ioWarnings :: IORef [Warning]
 ioWarnings = unsafePerformIO $ newIORef []
 
-
 data Warning = Warning { warnSrcLoc :: !SrcLoc, warnType :: String, warnMessage :: String }
     deriving(Eq,Ord)
-
 
 class Monad m => MonadWarn m where
     addWarning :: Warning -> m ()
@@ -71,7 +69,6 @@ printIOErrors = do
 
 processErrors :: [Warning] -> IO ()
 processErrors ws = processErrors' True ws >> return ()
-
 
 processErrors' :: Bool -> [Warning] -> IO Bool
 processErrors' doDie ws = mapM_ s ws' >> when (die && doDie) exitFailure >> return die where
@@ -122,5 +119,3 @@ _warnings = [
     ("unused-imports", "warn about unnecessary imports"),
     ("unused-matches", "warn about variables in patterns that aren't used")
     ]
-
-

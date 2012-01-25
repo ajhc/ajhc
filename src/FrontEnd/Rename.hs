@@ -6,18 +6,17 @@ module FrontEnd.Rename(
     renameStatement
     ) where
 
-import Char
+import Data.Char
+import Control.Applicative
 import Control.Monad.RWS
 import Control.Monad.Writer
-import Control.Applicative
 import List hiding(union)
-import Maybe
-import qualified Data.Map as Map
-import qualified Data.Set as Set
-import qualified Data.Sequence as Seq
+import Data.Maybe
 import qualified Data.Foldable as Seq
+import qualified Data.Map as Map
+import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
 
-import Util.SetLike
 import Doc.DocLike(tupled)
 import FrontEnd.Desugar (doToExp,listCompToExp)
 import FrontEnd.HsSyn
@@ -31,6 +30,7 @@ import Options
 import Support.FreeVars
 import Util.Gen
 import Util.Inst()
+import Util.SetLike
 import qualified FrontEnd.HsErrors as HsErrors
 import qualified Name.VConsts as V
 
@@ -457,7 +457,6 @@ instance Rename HsMatch where
         hsRhs' <- rename hsRhs
         return (HsMatch srcLoc hsName' hsPats' hsRhs' {-where-} hsDecls')
 
-
 instance Rename HsPat where
     rename (HsPVar hsName) = HsPVar `fmap` renameValName hsName
     rename (HsPInfixApp hsPat1 hsName hsPat2) = HsPInfixApp <$> rename hsPat1 <*> renameValName hsName <*> rename hsPat2
@@ -488,14 +487,12 @@ buildRecPat (FieldMap amp fls) n us = case mlookup (toName DataConstructor n) am
         rs <- mapM g [0 .. t - 1 ]
         return $ HsPApp n rs
 
-
 instance Rename HsPatField where
     rename (HsPFieldPat hsName hsPat) = do
         --gt <- gets globalSubTable      -- field names are not shadowed by local definitions.
         hsName' <- renameName (toName FieldLabel hsName) --renameHsName hsName gt
         hsPat' <- rename hsPat
         return (HsPFieldPat hsName' hsPat')
-
 
 instance Rename HsRhs where
     rename (HsUnGuardedRhs hsExp) = HsUnGuardedRhs <$> rename hsExp
@@ -508,7 +505,6 @@ instance Rename HsGuardedRhs where
         hsExp2' <- rename hsExp2
         return (HsGuardedRhs srcLoc hsExp1' hsExp2')
 
-
 f_fromRational = HsVar $ nameName (toUnqualified v_fromRational)
 
 newVar = do
@@ -517,7 +513,6 @@ newVar = do
     --let hsName'' = (Qual mod (HsIdent $ show unique {- ++ fromHsName hsName' -} ++ "_var@"))
     let hsName'' = toName Val (mod,show unique ++ "_var@")
     return hsName''
-
 
 instance Rename HsExp where
     rename (HsVar hsName) = HsVar <$> renameValName hsName
@@ -582,7 +577,6 @@ failRename s = do
     sl <- getSrcLoc
     fail (show sl ++ ": " ++ s)
 
-
 buildRecConstr ::  FieldMap -> HsName -> [HsFieldUpdate] -> RM HsExp
 buildRecConstr (FieldMap amp fls) n us = do
     undef <- createError HsErrorUninitializedField "Uninitialized Field"
@@ -620,7 +614,6 @@ buildRecUpdate (FieldMap amp fls) n us = do
         pe <- createError HsErrorRecordUpdate "Record Update Error"
         return $ HsCase n (as ++ [HsAlt sl HsPWildCard (HsUnGuardedRhs pe) []])
 
-
 instance Rename HsAlt where
     rename (HsAlt srcLoc hsPat hsGuardedAlts {-where-} hsDecls) = withSrcLoc srcLoc $ do
         updateWithN Val hsPat $ do
@@ -630,7 +623,6 @@ instance Rename HsAlt where
         mapM_ HsErrors.hsDeclLocal hsDecls'
         hsGuardedAlts' <- rename hsGuardedAlts
         return (HsAlt srcLoc hsPat' hsGuardedAlts' hsDecls')
-
 
 renameHsStmts :: [HsStmt] -> RM a  -> RM ([HsStmt],a)
 renameHsStmts ss fe = f ss [] where
@@ -673,7 +665,6 @@ renameValName hsName = renameName (fromValishHsName hsName)
 
 renameTypeName :: HsName -> RM HsName
 renameTypeName hsName = renameName (fromTypishHsName hsName)
-
 
 -- This looks up a replacement name in the subtable.
 -- Regardless of whether the name is found, if it's not qualified

@@ -30,13 +30,13 @@ module FrontEnd.ParseMonad(
 import qualified Data.Set as Set
 
 import Control.Monad
-import Data.Monoid
 import Data.Functor
+import Data.Monoid
 import FrontEnd.SrcLoc
 import FrontEnd.Warning
 import Options
-import qualified FlagOpts as FO
 import qualified Control.Applicative as A
+import qualified FlagOpts as FO
 
 -- | The result of a parse.
 data ParseResult a
@@ -60,7 +60,6 @@ data ParseState = ParseState {
     psInDo :: !Bool,
     psForceClose :: !Bool
     } deriving(Show)
-
 
 instance Functor ParseResult where
     fmap f (ParseOk x) = ParseOk (f x)
@@ -117,7 +116,6 @@ parseModeOptions options = defaultParseMode {
     }
 
 -- | Monad for parsing
-
 
 newtype P a = P { runP ::
 		        String		-- input string
@@ -238,7 +236,6 @@ getInput = Lex $ \cont -> P $ \r -> runP (cont r) r
 discard :: Int -> Lex r ()
 discard n = Lex $ \cont -> P $ \r x -> runP (cont ()) (drop n r) (x+n)
 
-
 setSrcLoc :: SrcLoc -> Lex a ()
 setSrcLoc srcloc = Lex $ \cont -> P $ \r x l _ -> runP (cont ()) r x l srcloc
 
@@ -324,8 +321,6 @@ popContextL fn = Lex $ \cont -> P $ \r x y loc stk -> case psLexContext stk of
 		(_:ctxt) -> runP (cont ()) r x y loc stk { psLexContext = ctxt }
 		[]       -> error ("Internal error: empty context in " ++ fn)
 
-
-
 {-
 -- ---------------------------------------------------------------------------
 -- Construct a parse error
@@ -358,6 +353,5 @@ srcParseFail = P $ \buf _ _ last_loc _ _ ->
 --  loc <- getSrcLoc
 --  i@(end,_) <- getInput
 --  failLocMsgP loc end str
-
 
 -}

@@ -55,7 +55,6 @@ import IO(hFlush, stdout, Handle, hPutStr)
 import Monad
 import qualified Data.Set as Set
 
-
 -- | Fixable class, must satisfy the following rules
 --
 -- isBottom bottom == True
@@ -84,7 +83,6 @@ data Fixer  = Fixer {
     todo :: {-# UNPACK #-} !(IORef (Set.Set MkFixable))
     }
 
-
 newFixer :: MonadIO m => m Fixer
 newFixer = liftIO $ do
     v <- newIORef []
@@ -111,7 +109,6 @@ instance Fixable a => Show (Value a) where
     showsPrec _ (UnionValue a b) = showString "<<" . shows a . shows b . showString ">>"
     showsPrec _ (IOValue _) = showString "<<IO>>"
     showsPrec _ (IV a) = showString "<<" . shows (hashUnique $ ident a) . showString ">>"
-
 
 data RvValue a = RvValue {
     ident :: {-# UNPACK #-} !Unique,
@@ -149,7 +146,6 @@ newValue fixer@Fixer { vars = vars } v = liftIO $ do
     modifyIORef vars (MkFixable rv:)
     propagateValue v rv
     return value
-
 
 addAction :: Fixable a => Value a -> (a -> IO ())  -> IO ()
 addAction (ConstValue n) act = act n
@@ -198,7 +194,6 @@ propagateValue p v = do
     if isBottom p then return () else do
     (modifyIORef (todo $ fixer v) (Set.insert $ MkFixable v))
     modifyIORef (pending v) (lub p)
-
 
 -- | read result, calculating fixpoint if needed
 readValue :: (Fixable a,MonadIO m) => Value a -> m a
@@ -262,8 +257,6 @@ findFixpoint msh@(~(Just (mstring,_))) Fixer { vars = vars, todo = todo } = lift
     mFlush
     f (Set.toList to) (-1::Int) (0::Int)
 
-
-
 -- some useful instances
 
 instance Ord n => Fixable (Set.Set n)  where
@@ -271,7 +264,6 @@ instance Ord n => Fixable (Set.Set n)  where
     isBottom = Set.null
     lub a b = Set.union a b
     minus a b = a Set.\\ b
-
 
 instance Fixable Bool where
     bottom = False
@@ -296,7 +288,6 @@ instance (Fixable a,Fixable b) => Fixable (a,b) where
     lub (x,y) (x',y') = (lub x x', lub y y')
     minus (x,y) (x',y') = (minus x x', minus y y')
 
-
 -- the maybe instance creates a new bottom of nothing. note that (Just bottom) is a distinct point.
 instance Fixable a => Fixable (Maybe a) where
     bottom = Nothing
@@ -308,4 +299,3 @@ instance Fixable a => Fixable (Maybe a) where
     minus (Just a) (Just b) = Just (minus a b)
     minus (Just a) Nothing = Just a
     minus Nothing _ = Nothing
-

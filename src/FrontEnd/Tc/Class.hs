@@ -24,15 +24,13 @@ import Doc.PPrint
 import FrontEnd.Class
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
-import Name.Names
+import FrontEnd.Warning
 import Name.Name
+import Name.Names
 import Options
 import Support.CanType
-import FrontEnd.Warning
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
-
-
 
 generalize :: [Pred] -> Rho -> Tc Sigma
 generalize ps r = do
@@ -91,14 +89,12 @@ reducePred h p@(IsIn c t)
     | otherwise = fail "reducePred"
  where poss = map (byInst p) (instsOf h c)
 
-
 simplify :: ClassHierarchy -> [Pred] -> [Pred]
 simplify h ps = loop [] ps where
     loop rs []     = rs
     loop rs (p:ps)
         | entails h (rs ++ ps) p = loop rs ps
         | otherwise = loop (p:rs) ps
-
 
 -- | returns true when set of predicates implies some other predicate is satisfied.
 entails :: ClassHierarchy -> [Pred] -> Pred -> Bool
@@ -128,7 +124,6 @@ supersOf :: ClassHierarchy -> Class -> [Class]
 supersOf ch c = asksClassRecord ch c classSupers
 instsOf :: ClassHierarchy -> Class -> [Inst]
 instsOf ch c = asksClassRecord ch c classInsts
-
 
 match :: Monad m => Type -> Type -> m [(Tyvar,Type)]
 match x y = do match' x y
@@ -168,7 +163,7 @@ withDefaults :: Monad m
              => ClassHierarchy
              -> Set.Set MetaVar -- ^ Variables to be considered known
              -> [Pred]          -- ^ Predicates to consider
-             -> m [(MetaVar, [Pred], Type)] 
+             -> m [(MetaVar, [Pred], Type)]
              -- ^ List of (defaulted meta var, predicates involving it, type defaulted to)
 withDefaults h vs ps
   | any null tss = fail $ "withDefaults.ambiguity: " ++ (pprint ps)  ++ pprint (Set.toList vs) -- ++ show ps
@@ -199,7 +194,6 @@ ambig h vs ps
   = [ (v, qs, defs h v qs) |
          v <- Set.toList (freeMetaVarsPreds ps `Set.difference` vs),
          let qs = [ p | p<-ps, v `Set.member` freeMetaVarsPred p ] ]
-
 
 assertEntailment :: Preds -> Preds -> Tc ()
 assertEntailment qs ps = do
@@ -232,7 +226,6 @@ defs h v qs = [ t | all ((TMetaVar v)==) ts,
                   and [ entails h [] (IsIn c t) | c <- cs ]]
  where cs = [ c | (IsIn c t) <- qs ]
        ts = [ t | (IsIn c t) <- qs ]
-
 
 -- FIXME use @default@ declarations!
 defaults    :: [Type]

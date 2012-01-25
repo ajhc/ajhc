@@ -144,8 +144,6 @@ redirection to a whnf value.
 #define FETCH_MEM_TAG(x)  (DNODEP(x)->what)
 #define SET_MEM_TAG(x,v)  (DNODEP(x)->what = (what_t)RAW_SET_16(v))
 
-
-
 #define BLACK_HOLE TO_FPTR(0xDEADBEE0)
 
 struct sptr {};
@@ -158,7 +156,6 @@ typedef struct sptr * sptr_t;
 typedef struct sptr * wptr_t;
 typedef struct fptr * fptr_t;
 typedef uintptr_t     what_t;
-
 
 typedef struct node {
         fptr_t head;
@@ -179,7 +176,6 @@ dnode_t *_dummy3;
 sptr_t *_dummy4;
 fptr_t *_dummy5;
 wptr_t *_dummy6;
-
 
 static bool A_UNUSED
 jhc_valid_whnf(wptr_t s)
@@ -203,14 +199,12 @@ jhc_valid_lazy(sptr_t s)
                 return jhc_valid_whnf((wptr_t)ds->head);
 }
 
-
 #else
 
 #define jhc_valid_whnf(x) true
 #define jhc_valid_lazy(x) true
 
 #endif
-
 
 #if _JHC_GC == _JHC_GC_JGC
 typedef wptr_t (*eval_fn)(gc_t gc,node_t *node) A_STD;
@@ -284,7 +278,6 @@ eval(sptr_t s)
         assert(jhc_valid_whnf((wptr_t)s));
         return (wptr_t)s;
 }
-
 
 static void A_STD A_UNUSED A_HOT
 update(void * thunk, wptr_t new)

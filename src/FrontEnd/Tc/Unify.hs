@@ -13,16 +13,13 @@ import qualified Data.Set as Set
 import Doc.DocLike
 import Doc.PPrint
 import FrontEnd.Tc.Class
+import FrontEnd.Tc.Kind
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
-import FrontEnd.Tc.Kind
 import Options
 import Support.CanType
 import Support.FreeVars
 import qualified FlagDump as FD
-
-
-
 
 pretty vv = prettyPrintType vv
 ppretty vv = parens (pretty vv)
@@ -85,9 +82,7 @@ subsumes s1 s2 = do
         withMetaVars mv [getType s1, getType s2] (\ [a,b] -> TArrow a b) $ \ [a,b] -> do
         subsumes t (a `fn` b)
 
-
     sub t1@TArrow {} t2@TAp {} = boxyMatch t1 t2 >> return ctId
-
 
     -- ASSOC
     sub s1@TAssoc {} s2 = do
@@ -105,7 +100,6 @@ subsumes s1 s2 = do
     -- MONO
     sub a b | isTau a && isTau b = unify a b >> return ctId
 
-
     sub a b = fail $ "subsumes failure: " <> ppretty a <+> ppretty b
 
 -- might as well return flattened type
@@ -120,8 +114,6 @@ printRule :: String -> Tc ()
 printRule s
     | dump FD.BoxySteps = liftIO $ putStrLn s
     | otherwise = return ()
-
-
 
 boxyMatch :: Sigma' -> Sigma' -> Tc ()
 boxyMatch s1 s2 = do
@@ -161,7 +153,6 @@ boxyMatch s1 s2 = do
         boxyMatch s2 s4
         return False
 
-
     bm t@(TArrow s1 s2) (TAp (TAp arr a1) a2) = do
         printRule "AF2-arrow"
         tArrow `boxyMatch` arr
@@ -186,7 +177,6 @@ boxyMatch s1 s2 = do
             sequence_ [ boxyMatch a t | t <- ts | a <- xxs ]
         return False
 
-
     -- CEQ2
 
     bm a b | (TCon ca,as) <- fromTAp a, (TCon cb,bs) <- fromTAp b = case ca == cb of
@@ -195,9 +185,6 @@ boxyMatch s1 s2 = do
             printRule $ "CEQ2: " ++ pprint ca
             sequence_ [boxyMatch x y | x <- as | y <- bs] >> return False
         _ -> unificationError a b
-
-
-
 
     -- SEQ1
     bm a@(TForAll vs (ps :=> tbody)) (TMetaVar mv) = do
@@ -215,7 +202,6 @@ boxyMatch s1 s2 = do
         boxyMatch r1 r2
         assertEquivalant ps1 ps2
         return False
-
 
     bm (TAp a b) (TAp c d) = do
         printRule "APP"
@@ -254,7 +240,6 @@ boxyMatch s1 s2 = do
         | isTau a && isTau b = printRule "MEQ2" >> unify a b >> return False
     bm _ _ = return True
 
-
 solveConstraints :: [Constraint] -> Tc ()
 solveConstraints cs = mapM_ f cs where
     f Equality { constraintSrcLoc = _sl, constraintType1 = t1, constraintType2 = t2 } = {- withSrcLoc sl $ -} boxyMatch t1 t2
@@ -265,7 +250,6 @@ listenSolvePreds tc = do
     ((),(ps',cs')) <- listenCPreds (solveConstraints cs)
     ch <- getClassHierarchy
     return (x,simplify ch (ps ++ ps') ++ [ IsEq a b | Equality _ a b <- cs' ])
-
 
 var_meets_var :: MetaVar -> MetaVar -> Tc ()
 var_meets_var tv1 tv2 = do
@@ -295,8 +279,6 @@ var_meets_var tv1 tv2 = do
             zonkKind k tv1
             return ()
 
-
-
 unify      :: Tau -> Tau -> Tc ()
 unify t1 t2 = do
     t1' <- evalType t1
@@ -323,13 +305,6 @@ mgu TForAll {} _ = error "attempt to unify TForall"
 mgu _ TForAll {} = error "attempt to unify TForall"
 mgu t1 t2  = unificationError t1 t2
 
-
-
 -- This is used in pattern matching because it might be polymorphic, but also needs to match exactly
 --subsumesPattern a b | isTau b = a `boxyMatch` b
 --subsumes
-
-
-
-
-

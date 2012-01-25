@@ -22,10 +22,10 @@ import Data.Binary
 import Data.Monoid
 import qualified Data.Map as Map
 
-import Util.HasSize
 import FrontEnd.HsSyn
-import Support.MapBinaryInstance
 import Name.Name
+import Support.MapBinaryInstance
+import Util.HasSize
 
 ----------------------------------------------------------------------------
 

@@ -20,10 +20,10 @@ module FrontEnd.KindInfer (
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.Writer
+import Data.Binary
 import Data.Generics(Typeable, everything, mkQ, Data)
 import Data.IORef
 import Data.List
-import Data.Binary
 import System.IO.Unsafe
 import Util.Inst()
 import qualified Data.Map as Map

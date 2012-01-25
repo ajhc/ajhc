@@ -23,15 +23,15 @@ module FrontEnd.HsPretty (PPLayout(..),PPHsMode(..),
 import Char
 import qualified Text.PrettyPrint.HughesPJ as P
 
+import Doc.DocLike(TextLike(..),DocLike(..))
 import Doc.PPrint(pprint)
 import FlagDump as FD
+import FrontEnd.HsSyn
 import FrontEnd.Rename(unRename)
 import FrontEnd.SrcLoc(Located(..))
-import FrontEnd.HsSyn
-import Name.Names
 import Name.Name
+import Name.Names
 import Options
-import Doc.DocLike(TextLike(..),DocLike(..))
 import qualified Doc.DocLike as DL
 import qualified Doc.PPrint as P
 
@@ -103,7 +103,6 @@ type Doc = DocM PPHsMode P.Doc
 
 -- The pretty printing combinators
 
-
 nest :: Int -> Doc -> Doc
 nest i m = m >>= return . P.nest i
 
@@ -116,8 +115,6 @@ instance DL.TextLike Doc where
     text = return . P.text
     char = return . P.char
 
-
-
 int :: Int -> Doc
 int = return . P.int
 
@@ -129,7 +126,6 @@ float = return . P.float
 
 double :: Double -> Doc
 double = return . P.double
-
 
 -- Simple Combining Forms
 
@@ -147,7 +143,6 @@ semi = return P.semi
 comma = return P.comma
 equals = return P.equals
 
-
 -- Combinators
 --
 instance DocLike Doc where
@@ -161,10 +156,8 @@ instance DocLike Doc where
 ($$) :: Doc -> Doc -> Doc
 aM $$ bM = do{a<-aM;b<-bM;return (a P.$$ b)}
 
-
 fsep :: [Doc] -> Doc
 fsep dl = sequence dl >>= return . P.fsep
-
 
 -- Yuk, had to cut-n-paste this one from Pretty.hs
 punctuate :: Doc -> [Doc] -> [Doc]
@@ -174,15 +167,12 @@ punctuate p (d:ds) = go d ds
                      go d [] = [d]
                      go d (e:es) = (d <> p) : go e es
 
-
-
 -- this is the equivalent of runM now.
 renderWithMode :: PPHsMode -> Doc -> String
 renderWithMode ppMode d = P.render . unDocM d $ ppMode
 
 render :: Doc -> String
 render = renderWithMode defaultMode
-
 
 -------------------------  Pretty-Print a Module --------------------
 ppHsModule :: HsModule -> Doc
@@ -332,7 +322,6 @@ ppHsDecl (HsInfixDecl pos assoc prec nameList) =
 	    ppAssoc HsAssocRight = text "infixr"
 ppHsDecl (HsPragmaProps _ w ns) = text "{-# " <> text w <+> mySep (punctuate comma . map ppHsNameParen $ ns) <+> text "#-}"
 ppHsDecl _ = error "ppHsDecl: unknown construct"
-
 
 ppMatch (HsMatch pos f ps rhs whereDecls)
    =   myFsep (ppHsQNameParen f : map ppHsPat ps ++ [ppHsRhs rhs])
@@ -620,7 +609,6 @@ isSymbolName :: HsName -> Bool
 isSymbolName x | (_,_,c:_) <- nameParts (unRename x), isAlpha c || c `elem` "'_" = False
 isSymbolName _ = True
 
-
 ppHsContext :: HsContext -> Doc
 ppHsContext []      = empty
 ppHsContext context = parenList (map ppHsAsst context)
@@ -702,7 +690,6 @@ layoutChoice a b dl = do e <- getPPEnv
                          if layout e == PPOffsideRule ||
                             layout e == PPSemiColon
                           then a dl else b dl
-
 
 instance P.PPrint P.Doc HsDecl where
     pprint d = unDocM (ppHsDecl d) defaultMode

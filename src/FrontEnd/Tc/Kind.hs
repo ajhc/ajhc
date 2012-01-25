@@ -13,9 +13,9 @@ module FrontEnd.Tc.Kind(
     unfoldKind
     ) where
 
-import Data.Monoid
 import Control.Monad
 import Data.IORef
+import Data.Monoid
 
 import Data.Binary
 import Doc.DocLike
@@ -79,7 +79,6 @@ KBase kb    `isSubsumedBy` KBase kb'    = isSubsumedBy2 kb kb'
 Kfun  k1 k2 `isSubsumedBy` Kfun k1' k2' = isSubsumedBy k1 k1' && isSubsumedBy k2 k2'
 _           `isSubsumedBy` _            = False
 
-
 kindCombine :: Monad m => Kind -> Kind -> m Kind
 kindCombine x y = g x y where
     f x y | x == y = return x
@@ -142,7 +141,6 @@ instance Show Kind where
 instance Show Kindvar where
     showsPrec n k = pprintPrec n k
 
-
 instance Show KBase where
     showsPrec _ Star    = showString "*"
     showsPrec _ KUTuple = showString "(#)"
@@ -159,8 +157,6 @@ instance DocLike d => PPrint d Kind where
    pprintAssoc _ _ (KVar kindVar)   = pprint kindVar
    pprintAssoc a n (Kfun k1 k2) = pprintBinary AssocRight 5 a n k1 (text "->") k2 -- checkAssoc AssocRight 5 a n $ pprintPrec 5 k1 <+> text "->" <+> pprintAssoc AssocRight 5 k2
 
-
-
 instance DocLike d =>  PPrint d Kindvar where
    pprint Kindvar { kvarUniq = s } = text $ 'k':show s
 
@@ -169,4 +165,3 @@ instance DocLike d =>  PPrint d Kindvar where
 unfoldKind :: Kind -> [Kind]
 unfoldKind (Kfun k1 k2) = k1 : unfoldKind k2
 unfoldKind v = [v]
-

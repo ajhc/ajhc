@@ -32,7 +32,6 @@ import Util.Progress
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 
-
 listenPreds = listenSolvePreds
 
 type Expl = (Sigma, HsDecl)
@@ -128,7 +127,6 @@ newHsVar ns = do
     nn <- newUniq
     return $ toName Val (ns ++ "@",show nn)
 
-
 isTypePlaceholder :: HsName -> Bool
 isTypePlaceholder (getModule -> Just (Module m)) = m `elem` ["Wild@","As@"]
 isTypePlaceholder _ = False
@@ -158,7 +156,6 @@ tiExpr (HsCase e alts) typ = withContext (simpleMsg $ "in the case expression\n 
     alts' <- mapM (tcAlt scrutinee typ) alts
     wrapInAsPatEnv (HsCase e' alts') typ
 
-
 tiExpr (HsCon conName) typ = do
     sc <- lookupName (toName DataConstructor conName)
     sc `subsumes` typ
@@ -171,7 +168,6 @@ tiExpr (HsLit l@(HsIntPrim _)) typ = do
         TCon (Tycon n kh) | kh == kindHash -> return ()
         _ -> ty `boxyMatch` (TCon (Tycon tc_Bits32 kindHash))
     wrapInAsPatEnv (HsLit l) ty
-
 
 tiExpr (HsLit l@(HsInt _)) typ = do
     t <- tiLit l
@@ -244,7 +240,6 @@ tiExpr expr@(HsNegApp e) typ = withContext (makeMsg "in the negative expression"
         addPreds [IsIn class_Num typ]
         return (HsNegApp e)
 
-
 -- ABS1
 tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lambda expression\n   \\" ++ show (pprint ps:: P.Doc) ++ " -> ...") $ do
     let lam (p:ps) e (TMetaVar mv) rs = do -- ABS2
@@ -274,7 +269,6 @@ tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lam
             doCoerce (ctAbs ts) e
     lam ps e typ []
 
-
 tiExpr (HsIf e e1 e2) typ = withContext (simpleMsg $ "in the if expression\n   if " ++ show e ++ "...") $ do
     e <- tcExpr e tBool
     e1 <- tcExpr e1 typ
@@ -289,7 +283,6 @@ tiExpr tuple@(HsTuple exps@(_:_)) typ = withContext (makeMsg "in the tuple" $ re
 tiExpr tuple@(HsUnboxedTuple exps) typ = withContext (makeMsg "in the unboxed tuple" $ render $ ppHsExp tuple) $ do
     (_,exps') <- tcApps (HsCon (nameName $ unboxedNameTuple DataConstructor (length exps))) exps typ
     return (HsUnboxedTuple exps')
-
 
 -- special case for the empty list
 tiExpr (HsList []) (TAp c v) | c == tList = do
@@ -332,8 +325,6 @@ tiExpr expr@(HsLet decls e) typ = withContext (makeMsg "in the let binding" $ re
             return (HsLet rs e')
     f bgs []
 
-
-
 tiExpr e typ = fail $ "tiExpr: not implemented for: " ++ show (e,typ)
 
 tcWheres :: [HsDecl] -> Tc ([HsDecl],TypeEnv)
@@ -349,7 +340,6 @@ tcWheres decls = do
 -----------------------------------------------------------------------------
 
 -- type check implicitly typed bindings
-
 
 tcAlt ::  Sigma -> Sigma -> HsAlt -> Tc HsAlt
 
@@ -443,7 +433,6 @@ tiPat (HsPBangPat (Located l p)) typ = do
     tiPat (HsPBangPat (Located l (HsPAsPat (nameName v) p))) typ
 tiPat (HsPParen p) typ = tiPat p typ
 
-
 -- TODO check that constructors are saturated
 tiPat (HsPApp conName pats) typ = do
     s <- lookupName (toName DataConstructor conName)
@@ -464,7 +453,6 @@ tiPat (HsPApp conName pats) typ = do
     --s `subsumes` (foldr fn typ bs)
     --pats' <- sequence [ tcPat a r | r <- bs | a <- pats ]
     --return (HsPApp conName (fsts pats'), mconcat (snds pats'))
-
 
 tiPat pl@(HsPList []) (TAp t v) | t == tList = do
     unBox v
@@ -496,7 +484,6 @@ tiPat HsPWildCard typ = do
     addToCollectedEnv (Map.singleton n typ')
     return (HsPVar (nameName n), Map.singleton n typ')
 
-
 tiPat (HsPAsPat i pat) typ = do
     (pat',env) <- tcPat pat typ
     addToCollectedEnv (Map.singleton (toName Val i) typ)
@@ -512,7 +499,6 @@ tiPat (HsPTypeSig _ pat qt)  typ = do
     s `boxyMatch` typ
     p <- tcPat pat typ
     return p
-
 
 tiPat p _ = error $ "tiPat: " ++ show p
 
@@ -626,7 +612,6 @@ tcPragmaDecl (HsPragmaRules rs) = do
     rs' <- mapM tcRule rs
     return [HsPragmaRules rs']
 
-
 -- foreign decls are accumulated by tiExpl
 tcPragmaDecl fd@(HsForeignDecl _ _ n qt) = do
     kt <- getKindEnv
@@ -699,7 +684,6 @@ tcDecl decl@(HsPatBind sloc (HsPVar v) rhs wheres) typ = withContext (declDiagno
         HsGuardedRhss as -> do
             gas <- mapM (tcGuardedRhs typ) as
             return (HsPatBind sloc (HsPVar v) (HsGuardedRhss gas) wheres', Map.singleton (toName Val v) typ)
-
 
 tcDecl decl@(HsFunBind matches) typ = withContext (declDiagnostic decl) $ do
     typ <- evalType typ
@@ -809,14 +793,11 @@ tiLit (HsFrac _) = do
 tiLit (HsStringPrim _)  = return (TCon (Tycon tc_BitsPtr kindHash))
 tiLit (HsString _)  = return tString
 
-
-
 --tiProgram = undefined
 
 ------------------------------------------
 -- Binding analysis and program generation
 ------------------------------------------
-
 
 -- create a Program structure from a list of decls and
 -- type sigs. Type sigs are associated with corresponding
@@ -841,7 +822,6 @@ getBindGroups ns fn fd = map f $ stronglyConnComp [ (n, fn n, fd n) | n <- ns] w
 -- | make a program from a set of binding groups
 makeProgram :: TypeEnv -> [[HsDecl]] -> [BindGroup]
 makeProgram sigEnv groups = map (makeBindGroup sigEnv ) groups
-
 
 -- | reunite decls with their signatures, if ever they had one
 

@@ -43,12 +43,12 @@ import qualified Data.Set as S
 
 import Doc.DocLike
 import Doc.PPrint
-import Name.Name
+import FrontEnd.Representation
 import FrontEnd.SrcLoc
 import FrontEnd.Tc.Kind
+import Name.Name
 import Name.Names
 import Name.VConsts
-import FrontEnd.Representation
 import Support.CanType
 import Support.FreeVars
 import Support.Tickle
@@ -115,7 +115,6 @@ isBoxy :: Type -> Bool
 isBoxy (TMetaVar MetaVar { metaType = t }) | t > Tau = True
 isBoxy t = getAny $ tickleCollect (Any . isBoxy) t
 
-
 isRho' :: Type -> Bool
 isRho' TForAll {} = False
 isRho' _ = True
@@ -123,10 +122,8 @@ isRho' _ = True
 isRho :: Type -> Bool
 isRho r = isRho' r && not (isBoxy r)
 
-
 isBoxyMetaVar :: MetaVar -> Bool
 isBoxyMetaVar MetaVar { metaType = t } = t > Tau
-
 
 extractTyVar ::  Monad m => Type -> m Tyvar
 extractTyVar (TVar tv) = return tv
@@ -140,8 +137,6 @@ extractBox :: Monad m => Type -> m MetaVar
 extractBox (TMetaVar mv) | metaType mv > Tau  = return mv
 extractBox t = fail $ "not a metaTyVar:" ++ show t
 
-
-
 newtype UnVarOpt = UnVarOpt {
     failEmptyMetaVar :: Bool
     }
@@ -149,8 +144,6 @@ newtype UnVarOpt = UnVarOpt {
 {-# SPECIALIZE flattenType :: MonadIO m => Type -> m Type #-}
 flattenType :: (MonadIO m, UnVar t) => t -> m t
 flattenType t = liftIO $ unVar' t
-
-
 
 class UnVar t where
     unVar' ::   t -> IO t
@@ -196,7 +189,6 @@ followTaus tv@(TMetaVar mv@MetaVar {metaRef = r }) | not (isBoxyMetaVar mv) = li
             return t'
 followTaus tv = return tv
 
-
 findType :: MonadIO m => Type -> m Type
 findType tv@(TMetaVar MetaVar {metaRef = r }) = liftIO $ do
     rt <- readIORef r
@@ -208,7 +200,6 @@ findType tv@(TMetaVar MetaVar {metaRef = r }) = liftIO $ do
             return t'
 findType tv = return tv
 
-
 readMetaVar :: MonadIO m => MetaVar -> m (Maybe Type)
 readMetaVar MetaVar { metaRef = r }  = liftIO $ do
     rt <- readIORef r
@@ -218,7 +209,6 @@ readMetaVar MetaVar { metaRef = r }  = liftIO $ do
             t' <- findType t
             writeIORef r (Just t')
             return (Just t')
-
 
 {-
 freeMetaVars :: Type -> S.Set MetaVar
@@ -251,7 +241,6 @@ freeMetaVars t = f t where
     f2 (IsIn c t) = f t
     f2 (IsEq t1 t2) = f t1 `S.union` f t2
 
-
 instance FreeVars Type [Tyvar] where
     freeVars (TVar u)      = [u]
     freeVars (TForAll vs qt) = freeVars qt Data.List.\\ vs
@@ -271,7 +260,6 @@ instance FreeVars Type b =>  FreeVars Pred b where
     freeVars (IsIn _c t)  = freeVars t
     freeVars (IsEq t1 t2)  = freeVars (t1,t2)
 
-
 instance Tickleable Type Pred where
     tickleM f (IsIn c t) = liftM (IsIn c) (f t)
     tickleM f (IsEq t1 t2) = liftM2 IsEq (f t1) (f t2)
@@ -288,8 +276,6 @@ instance Tickleable Type Type where
         liftM (TExists ta . (ps :=>)) (f t)
     tickleM _ t = return t
 
-
-
 data Rule = RuleSpec {
     ruleUniq :: (Module,Int),
     ruleName :: Name,
@@ -301,7 +287,6 @@ data Rule = RuleSpec {
     ruleFreeTVars :: [(Name,Kind)]
     }
 
-
 -- CTFun f => \g . \y -> f (g y)
 data CoerceTerm = CTId | CTAp [Type] | CTAbs [Tyvar] | CTFun CoerceTerm | CTCompose CoerceTerm CoerceTerm
 
@@ -311,7 +296,6 @@ instance Show CoerceTerm where
     showsPrec n (CTAbs ts) = ptrans (n > 10) parens $ char '\\' <+> hsep (map pprint ts)
     showsPrec n (CTFun ct) = ptrans (n > 10) parens $ text "->" <+> showsPrec 11 ct
     showsPrec n (CTCompose ct1 ct2) = ptrans (n > 10) parens $ (showsPrec 11 ct1) <+> char '.' <+> (showsPrec 11 ct2)
-
 
 -- | Apply the function if the 'Bool' is 'True'.
 ptrans :: Bool -> (a -> a) -> (a -> a)
@@ -348,13 +332,8 @@ composeCoerce x CTId = x
 --    f _ _ = CTCompose (CTAbs ts) (CTAp ts')
 composeCoerce x y = CTCompose x y
 
-
 instance UnVar Type => UnVar CoerceTerm where
     unVar' (CTAp ts) = CTAp `liftM` unVar' ts
     unVar' (CTFun ct) = CTFun `liftM` unVar' ct
     unVar' (CTCompose c1 c2) = liftM2 CTCompose (unVar' c1) (unVar' c2)
     unVar' x = return x
-
-
-
-

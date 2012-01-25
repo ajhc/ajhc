@@ -16,20 +16,14 @@
 
 -------------------------------------------------------------------------------}
 
-
 module FrontEnd.DependAnalysis (getBindGroups,  debugBindGroups) where
 
-import List (nub)
 import Data.Graph(stronglyConnComp, SCC(..))
+import Data.List (nub)
 
-
---------------------------------------------------------------------------------
-
---
 -- Given a list of nodes, a function to convert nodes to a unique name, a function
 -- to convert nodes to a list of names on which the node is dependendant, bindgroups
 -- will return a list of bind groups generater from the list of nodes given.
---
 getBindGroups :: Ord name =>
                  [node]           ->    -- List of nodes
                  (node -> name)   ->    -- Function to convert nodes to a unique name
@@ -71,7 +65,6 @@ buildNameEdges (n:ns) getName getDeps
 	= map mapFunc (getDeps n) ++ (buildNameEdges ns getName getDeps)
 	where
 	mapFunc = ( \ s -> (getName n, s) )
-
 
 --
 -- Create a list of groups from a list of names.
@@ -138,7 +131,6 @@ showBindGroups :: [[node]]        ->     -- List of nodes
 showBindGroups ns getAlias
 	= showBindGroups_ ns getAlias 0
 
-
 --
 -- Recursive function which does the work of showBindGroups.
 --
@@ -174,7 +166,6 @@ debugBindGroups :: (Eq name) =>
 debugBindGroups ns getAlias getName getDeps
 	= debugBindGroups_ ns getAlias getName getDeps 0 []
 
-
 --
 -- Recursive function which does the work of showBindGroups.
 --
@@ -195,7 +186,6 @@ debugBindGroups_ (n:ns) getAlias getName getDeps groupNum history
 	where
 	bgString = showBindGroup (expandBindGroup n getAlias getDeps newHistory)
 	newHistory = history ++ [(groupNum, [ getName x | x <- n ])]
-
 
 --
 -- Expand bindgroups, generating dependancie and error information.
@@ -243,7 +233,6 @@ listToString [l] lFunc
 listToString (l:ls) lFunc
 	= (lFunc l) ++ ", " ++ listToString ls lFunc
 
-
 --
 -- Given a list of names and the history of visited names, this function
 -- generates a list of bindgroups that are depended upon as well as returning
@@ -286,5 +275,3 @@ searchHistory name ((bgnum, bgnames):history)
 wrapString :: String -> String -> String
 wrapString rep "" = "[" ++ rep ++ "]"
 wrapString _   s  = "[" ++ s ++ "]"
-
---------------------------------------------------------------------------------

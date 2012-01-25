@@ -1,4 +1,3 @@
-
 module FrontEnd.TypeSynonyms (
     removeSynonymsFromType,
     declsToTypeSynonyms,
@@ -14,7 +13,6 @@ import Data.List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Support.FreeVars
 import Doc.DocLike
 import FrontEnd.HsSyn
 import FrontEnd.SrcLoc
@@ -22,11 +20,11 @@ import FrontEnd.Syn.Traverse
 import FrontEnd.Warning
 import GenUtil
 import Name.Name
+import Support.FreeVars
 import Support.MapBinaryInstance
 import Util.HasSize
 import Util.UniqueMonad
 import qualified Util.Graph as G
-
 
 newtype TypeSynonyms = TypeSynonyms (Map.Map Name ([HsName], HsType, SrcLoc))
     deriving(Monoid,HasSize)
@@ -86,7 +84,6 @@ quantifyHsType inscope t
     fv (HsTyExists vs qt) = tell $ snub (execWriter (fv $ hsQualTypeType qt)) \\ map hsTyVarBindName vs
     fv x = traverseHsType (\x -> fv x >> return x) x >> return ()
 
-
 evalTypeSyms :: MonadWarn m => TypeSynonyms -> HsType -> m HsType
 evalTypeSyms (TypeSynonyms tmap) t = execUniqT 1 (eval [] t) where
     eval stack x@(HsTyCon n) | Just (args, t, sl) <- Map.lookup (toName TypeConstructor n) tmap = do
@@ -132,5 +129,3 @@ evalTypeSyms (TypeSynonyms tmap) t = execUniqT 1 (eval [] t) where
         ps' <- mapM f ps -- = [ case Map.lookup n sm of Just (HsTyVar n') -> (c,n') ; _ -> (c,n) | (c,n) <- ps ]
 
         return qt { hsQualTypeType = t', hsQualTypeContext = ps' }
-
-

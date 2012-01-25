@@ -2,16 +2,15 @@ module FrontEnd.TypeSyns( expandTypeSyns, expandTypeSynsStmt ) where
 
 import Control.Monad.State
 import Control.Monad.Writer
-import qualified Data.Traversable as T
 import List
+import qualified Data.Traversable as T
 
-import Name.Name
-import FrontEnd.SrcLoc hiding(srcLoc)
 import FrontEnd.HsSyn
+import FrontEnd.SrcLoc hiding(srcLoc)
+import FrontEnd.Syn.Traverse
 import FrontEnd.TypeSynonyms
 import FrontEnd.Warning
-import FrontEnd.Syn.Traverse
-
+import Name.Name
 
 type SubTable = ()
 
@@ -34,7 +33,6 @@ instance MonadSrcLoc ScopeSM where
     getSrcLoc = gets srcLoc
 instance MonadSetSrcLoc ScopeSM where
     withSrcLoc sl a = modify (\s -> s { srcLoc = sl `mappend` srcLoc s}) >> a
-
 
 expandTypeSyns :: MonadWarn m => TypeSynonyms -> HsModule -> m HsModule
 expandTypeSyns syns m = ans where
@@ -64,27 +62,21 @@ expandTypeSynsStmt syns mod m = ans where
         mapM_ addWarning (errors fs)
         return rm
 
-
 -- This is Bryn's modification to make the code a bit easier to understand for
 -- functions like renameHsNames, renameHsFileUpdates
 mapRename :: (a -> SubTable -> ScopeSM a) -> [a] -> SubTable -> ScopeSM [a]
 mapRename renameIndividual individuals subTable
     = mapM (`renameIndividual` subTable) individuals
 
-
-
 renameDecls :: HsModule -> ScopeSM HsModule
 renameDecls tidy = do
         decls' <- renameHsDecls (hsModuleDecls tidy) undefined
         return tidy { hsModuleDecls = decls' }
 
-
-
 renameHsDecls :: [HsDecl] -> SubTable -> ScopeSM ([HsDecl])
 renameHsDecls decls subtable = do
     ans <- mapRename renameHsDecl (expandTypeSigs decls) subtable
     return ans
-
 
 expandTypeSigs :: [HsDecl] -> [HsDecl]
 expandTypeSigs ds =  (concatMap f ds) where
@@ -157,14 +149,11 @@ renameHsDecl prules@HsPragmaSpecialize { hsDeclSrcLoc = srcLoc, hsDeclName = n, 
     return prules {  hsDeclType = t }
 renameHsDecl otherHsDecl _ = return otherHsDecl
 
-
 renameHsRule prules@HsRule { hsRuleSrcLoc = srcLoc, hsRuleFreeVars = fvs, hsRuleLeftExpr = e1, hsRuleRightExpr = e2 } subTable = withSrcLoc srcLoc $ do
     fvs' <- sequence [ T.mapM (`renameHsType` subTable) t  >>= return . (,) n | (n,t) <- fvs]
     e1' <- renameHsExp e1 subTable
     e2' <- renameHsExp e2 subTable
     return prules {  hsRuleFreeVars = fvs', hsRuleLeftExpr = e1', hsRuleRightExpr = e2' }
-
-
 
 renameHsQualType :: HsQualType -> SubTable -> ScopeSM (HsQualType)
 renameHsQualType (HsQualType hsContext hsType) subTable = do
@@ -264,7 +253,6 @@ renameHsMatch (HsMatch srcLoc hsName hsPats hsRhs {-where-} hsDecls) subTable = 
     hsRhs' <- renameHsRhs hsRhs subTable''
     return (HsMatch srcLoc hsName' hsPats' hsRhs' {-where-} hsDecls')
 
-
 renameHsPats :: [HsPat] -> SubTable -> ScopeSM ([HsPat])
 renameHsPats = mapRename renameHsPat
 
@@ -282,7 +270,6 @@ renameHsRhs (HsUnGuardedRhs hsExp) subTable = do
 renameHsRhs (HsGuardedRhss hsGuardedRhss) subTable = do
       hsGuardedRhss' <- renameHsGuardedRhsList hsGuardedRhss subTable
       return (HsGuardedRhss hsGuardedRhss')
-
 
 renameHsExp :: HsExp -> SubTable -> ScopeSM HsExp
 renameHsExp (HsLambda srcLoc hsPats hsExp) subTable = withSrcLoc srcLoc $ do
@@ -332,7 +319,6 @@ renameHsAlt (HsAlt srcLoc hsPat hsGuardedAlts {-where-} hsDecls) subTable = with
     hsGuardedAlts' <- renameHsRhs hsGuardedAlts subTable''
     return (HsAlt srcLoc hsPat' hsGuardedAlts' hsDecls')
 
-
 renameHsGuardedRhsList :: [HsGuardedRhs] -> SubTable -> ScopeSM [HsGuardedRhs]
 renameHsGuardedRhsList = mapRename renameHsGuardedRhs
 
@@ -370,7 +356,6 @@ renameHsStmt (HsLetStmt hsDecls) subTable = do
       hsDecls' <- renameHsDecls hsDecls subTable
       return (HsLetStmt hsDecls')
 
-
 renameHsFieldUpdates :: [HsFieldUpdate] -> SubTable -> ScopeSM ([HsFieldUpdate])
 renameHsFieldUpdates = mapRename renameHsFieldUpdate
 
@@ -387,7 +372,6 @@ renameHsFieldUpdate (HsFieldUpdate hsName hsExp) subTable = do
     hsExp' <- renameHsExp hsExp subTable
     return (HsFieldUpdate hsName' hsExp')
 
-
 renameHsNames :: [HsName] -> SubTable -> ScopeSM ([HsName])
 renameHsNames ns _ = return ns
 
@@ -396,8 +380,6 @@ renameHsNames ns _ = return ns
 -- it will be qualified with the current module's prefix.
 renameHsName :: HsName -> SubTable -> ScopeSM (HsName)
 renameHsName hsName _ = return hsName
-
-
 
 renameTypeHsName hsName subTable  =  return hsName
 
@@ -448,10 +430,8 @@ clobberHsNames [] subTable
 clobberHsName :: HsName -> SubTable -> ScopeSM (SubTable)
 clobberHsName hsName subTable = return subTable
 
-
 --------------------------------------------------------
 ----This section of code updates the current SubTable to reflect the present scope
-
 
 updateSubTableWithHsDecls :: SubTable -> [HsDecl] ->  ScopeSM (SubTable)
 updateSubTableWithHsDecls subTable []  = return subTable
@@ -482,7 +462,6 @@ updateSubTableWithHsStmt subTable hsStmt = do
 -- the following updateSubTableWith* functions do not need to alter the identTable aswell
 --
 
-
 -- takes an HsQualType (a type signature) and adds the names of its variables
 -- to the current subTable
 
@@ -491,8 +470,6 @@ updateSubTableWithHsQualType subTable hsQualType = do
       let hsNames = nub $ getHsNamesFromHsQualType hsQualType
       subTable' <- clobberHsNames hsNames subTable
       return (subTable')
-
-
 
 getHsNamesAndASrcLocsFromHsDecl :: HsDecl -> [(HsName, SrcLoc)]
 getHsNamesAndASrcLocsFromHsDecl (HsPatBind srcLoc (HsPVar hsName) _ _) = [(hsName, srcLoc)]
@@ -513,17 +490,13 @@ getHsNamesAndASrcLocsFromHsMatch :: HsMatch -> [(HsName, SrcLoc)]
 getHsNamesAndASrcLocsFromHsMatch (HsMatch srcLoc hsName _ _ _)
   = [(hsName, srcLoc)]
 
-
-
 getHsNamesAndASrcLocsFromHsStmt :: HsStmt -> [(HsName, SrcLoc)]
 getHsNamesAndASrcLocsFromHsStmt (HsGenerator srcLoc hsPat _hsExp) = zip (getNamesFromHsPat hsPat) (repeat srcLoc)
 getHsNamesAndASrcLocsFromHsStmt (HsQualifier _hsExp) = []
 getHsNamesAndASrcLocsFromHsStmt (HsLetStmt hsDecls) = concat $ map getHsNamesAndASrcLocsFromHsDecl hsDecls
 
-
 -- the getNew... functions are used only inside class declarations to avoid _re_ renaming things
 -- that should be left as is.
-
 
 getHsNamesFromHsQualType :: HsQualType -> [HsName]
 getHsNamesFromHsQualType (HsQualType _hsContext hsType) = getHsNamesFromHsType hsType
@@ -539,7 +512,3 @@ getHsNamesFromHsType (HsTyExists vs qt) = getHsNamesFromHsQualType qt List.\\ ma
 getHsNamesFromHsType (HsTyCon _hsName) = [] -- don't rename the Constructors
 getHsNamesFromHsType ty = execWriter $ traverseHsType_ f ty where
     f t = tell $ getHsNamesFromHsType t
-
-
-
-

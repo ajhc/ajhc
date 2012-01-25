@@ -55,7 +55,6 @@
 #endif
 #endif
 
-
 #ifdef TEST_WSIZE
 #include <stdio.h>
 int

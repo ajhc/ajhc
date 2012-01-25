@@ -1,14 +1,13 @@
 module FrontEnd.SrcLoc where
 
-import Control.Monad.Writer
-import Control.Monad.Identity
 import Control.Applicative
-import Data.Traversable
+import Control.Monad.Identity
+import Control.Monad.Writer
 import Data.Foldable
+import Data.Traversable
 
-import Data.Generics
 import Data.Binary
-
+import Data.Generics
 
 data SrcLoc = SrcLoc { srcLocFileName :: String, srcLocLine :: {-# UNPACK #-} !Int, srcLocColumn :: {-# UNPACK #-}  !Int}
     deriving(Data,Typeable,Eq,Ord)
@@ -67,9 +66,7 @@ instance Foldable Located where
 instance Traversable Located where
     traverse f (Located l x) = Located l <$> f x
 
-
 located ss x = Located (srcSpan ss) x
-
 
 -----------------------
 -- srcloc monad classes
@@ -80,7 +77,6 @@ class Monad m => MonadSrcLoc m where
     getSrcSpan :: m SrcSpan
     getSrcSpan = getSrcLoc >>= return . srcSpan
     getSrcLoc = getSrcSpan >>= return . srcLoc
-
 
 class MonadSrcLoc m => MonadSetSrcLoc m where
     withSrcLoc :: SrcLoc -> m a -> m a
@@ -114,4 +110,3 @@ instance Show SrcSpan where
     show SrcSpan { srcSpanBegin =  sl1, srcSpanEnd = sl2 }
       | sl1 == sl2 = show sl1
       | otherwise = show sl1 ++ "-" ++ show sl2
-

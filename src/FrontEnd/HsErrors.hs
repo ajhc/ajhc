@@ -1,24 +1,19 @@
--- |
--- Routines to check for several error and warning conditions which can be locally determined from syntax.
---
-
+-- Routines to check for several error and warning conditions which can be
+-- locally determined from syntax.
 module FrontEnd.HsErrors(
     hsType,
     hsDeclTopLevel,
     hsDeclLocal
     ) where
 
+import Control.Monad
 import FrontEnd.Class
+import FrontEnd.HsSyn
 import FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse
-import FrontEnd.HsSyn
-import Monad
+import FrontEnd.Warning
 import Name.Name
 import Name.Names
-import FrontEnd.Warning
-
-
-
 
 hsType :: (MonadSrcLoc m, MonadWarn m) => HsType -> m ()
 hsType x@HsTyForall {} = do
@@ -31,11 +26,8 @@ hsType x = traverseHsType (\x -> hsType x >> return x) x >> return ()
 
 hsQualType x  = hsType (hsQualTypeType x)
 
-
 data Context = InClass [HsType] | InInstance [HsType] | TopLevel | Local
     deriving(Eq)
-
-
 
 instance Show Context where
     show InClass {} = "in a class declaration"
@@ -43,12 +35,9 @@ instance Show Context where
     show TopLevel = "at the top level"
     show Local = "in local declaration block"
 
-
 hsDeclTopLevel,hsDeclLocal :: MonadWarn m => HsDecl -> m ()
 hsDeclTopLevel = hsDecl TopLevel
 hsDeclLocal = hsDecl Local
-
-
 
 hsDecl :: MonadWarn m => Context -> HsDecl -> m ()
 hsDecl cntx decl = f cntx decl where
@@ -83,13 +72,11 @@ hsDecl cntx decl = f cntx decl where
 fetchQtArgs sl HsQualType { hsQualTypeType = t } | (HsTyCon {},args@(_:_)) <- fromHsTypeApp t = return args
 fetchQtArgs sl _ = warn sl "invalid-decl" "invalid head in class or instance decl" >> return []
 
-
 checkDeriving _ _ xs | all (`elem` derivableClasses) xs = return ()
 checkDeriving sl True _ = warn sl "h98-newtypederiv" "arbitrary newtype derivations are a non-haskell98 feature"
 checkDeriving sl False xs
   = let nonDerivable = filter (`notElem` derivableClasses) xs
     in warn sl "unknown-deriving" ("attempt to derive from a non-derivable class: " ++ unwords (map show nonDerivable))
-
 
 fromHsTypeApp t = f t [] where
     f (HsTyApp a b) rs = f a (b:rs)

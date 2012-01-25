@@ -13,12 +13,10 @@ import Data.Typeable
 import Fixer.Fixer
 import qualified Data.Map as Map
 
-
 -- maps b's to values of a's, creating them as needed.
 
 data Supply b a = Supply Fixer {-# UNPACK #-} !(IORef (Map.Map b (Value a)))
     deriving(Typeable)
-
 
 newSupply :: MonadIO m => Fixer -> m (Supply b a)
 newSupply fixer = liftIO $ do
@@ -49,4 +47,3 @@ readSValue :: (MonadIO m, Ord b, Fixable a) => Supply b a -> b -> m a
 readSValue s b = do
     v <- supplyValue s b
     readValue v
-

@@ -34,18 +34,18 @@ module FrontEnd.ParseUtils (
         , doForeignEq
  ) where
 
-import Data.Maybe
 import Char
+import Data.Maybe
 import Data.Monoid
 import Ratio
 import qualified Data.Traversable as T
 
 import C.FFI
-import Name.Name
-import Name.Names
+import FrontEnd.HsSyn
 import FrontEnd.ParseMonad
 import FrontEnd.SrcLoc
-import FrontEnd.HsSyn
+import Name.Name
+import Name.Names
 
 type HsQName = HsName
 
@@ -104,7 +104,6 @@ checkDataHeader (HsQualType cs t) = do
 	(c,ts) <- checkSimple "data/newtype" t []
 	return (cs,c,ts)
 
-
 checkSimple :: String -> HsType -> [HsName] -> P ((HsName,[HsName]))
 checkSimple kw (HsTyApp l (HsTyVar a)) xs = checkSimple kw l (a:xs)
 checkSimple _kw (HsTyCon t)   xs = return (t,xs)
@@ -129,7 +128,6 @@ checkInsts _ _ = fail "Illegal instance declaration"
 
 checkPattern :: HsExp -> P HsPat
 checkPattern e = checkPat e []
-
 
 checkPat :: HsExp -> [HsPat] -> P HsPat
 checkPat (HsCon c) args = return (HsPApp c args)
@@ -376,7 +374,6 @@ fixupHsDecls [] = []
 -- get the variable name bound by a match
 matchName (HsMatch _sloc name _pats _rhs _whereDecls) = name
 
-
 -- True if the decl is a HsFunBind and binds the same name as the
 -- first argument, False otherwise
 sameFun :: HsName -> HsDecl -> Bool
@@ -408,7 +405,6 @@ doForeign srcLoc names ms qt = ans where
         g s _  ("stdcall":rs) = g s StdCall rs
         g s c  [] = (s,c)
         g _ _ rs = error $ "FrontEnd.ParseUtils: unknown foreign flags " ++ show rs
-
 
 doForeignEq :: Monad m => SrcLoc -> [HsName] -> Maybe (String,HsName) -> HsQualType -> HsExp -> m HsDecl
 doForeignEq srcLoc names ms qt e = undefined
@@ -471,5 +467,3 @@ readRational xs = (readInteger (i++m))%1 * 10^^(case e of {[] -> 0;  ('+':e2) ->
   where (i,r1) = span isDigit xs
         (m,r2) = span isDigit (dropWhile (=='.') r1)
         e      = dropWhile (=='e') r2
-
-

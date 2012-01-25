@@ -69,7 +69,6 @@ static char initial_chunk[JHC_MEM_CHUNK_SIZE];
 static void *jhc_current_chunk = initial_chunk;
 static unsigned mem_chunks,mem_offset;
 
-
 static void jhc_alloc_init(void) {}
 static void jhc_alloc_fini(void) {}
 
@@ -101,7 +100,6 @@ jhc_malloc_basic(size_t n) {
         return ret;
 }
 
-
 #if _JHC_DEBUG
 
 #define jhc_malloc(n) jhc_malloc_debug(n,__LINE__,0)
@@ -130,7 +128,6 @@ jhc_malloc_atomic(size_t n) {
         alloc_count(n,1);
         return jhc_malloc_basic(n);
 }
-
 
 #endif
 

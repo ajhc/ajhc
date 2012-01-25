@@ -22,7 +22,6 @@ import Doc.DocLike
 import Fixer.Fixer
 import GenUtil
 
-
 -- | General data type for finding the fixpoint of a general tree-like structure.
 
 data VMap p n = VMap {
@@ -75,7 +74,6 @@ vmapMember :: Ord n => n -> VMap p n -> Bool
 vmapMember n VMap { vmapNodes = Left _ } = True
 vmapMember n VMap { vmapNodes = Right set } = n `Set.member` set
 
-
 pruneVMap :: (Ord n,Ord p,Show n,Show p) => VMap p n -> VMap p n
 pruneVMap vmap = f (7::Int) vmap where
     f 0 _ = emptyVMap { vmapNodes = Left DepthExceeded }
@@ -114,4 +112,3 @@ instance (Show p,Show n,Ord p,Ord n) => Fixable (VMap p n) where
 instance (Show p,Show n,Ord p,Ord n) => Monoid (VMap p n) where
     mempty = bottom
     mappend = lub
-

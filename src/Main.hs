@@ -36,10 +36,10 @@ main = wrapMain $ do
         (argstring,_) <- getArgString
         return (argstring ++ "\n" ++ versionSimple)
     case optMode o of
-        BuildHl hl      -> darg >> buildLibrary processInitialHo processDecls hl
-        ListLibraries   -> listLibraries
-        ShowHo ho       -> dumpHoFile ho
-        Preprocess      -> forM_ (optArgs o) $ \fn -> do
+        BuildHl hl    -> darg >> buildLibrary processInitialHo processDecls hl
+        ListLibraries -> listLibraries
+        ShowHo ho     -> dumpHoFile ho
+        Preprocess    -> forM_ (optArgs o) $ \fn -> do
             lbs <- LBS.readFile fn
             res <- preprocessHs options fn lbs
             LBS.putStr res
@@ -55,10 +55,12 @@ processFiles cs = f cs (optMainFunc options) where
         m <- getModule (parseName Val m)
         g [Left m]
     f cs _ = g (map fileOrModule cs)
-    g fs = processCollectedHo . snd =<< parseFiles options [outputName] [] fs processInitialHo processDecls
+    g fs = processCollectedHo . snd =<< parseFiles options [outputName] []
+	    fs processInitialHo processDecls
     fileOrModule f = case reverse f of
         ('s':'h':'.':_)     -> Right f
         ('s':'h':'l':'.':_) -> Right f
+        ('c':'s':'h':'.':_) -> Right f
         _                   -> Left $ Module f
 
 processCollectedHo cho = do
@@ -84,15 +86,15 @@ processCollectedHo cho = do
             }
     -- dump final version of various requested things
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
-    wdump FD.DatatableBuiltin $ putErrLn (render $ showDataTable samplePrimitiveDataTable)
-    dumpRules (Rules $ fromList [ (combIdent x,combRules x) | x <- combinators, not $ null (combRules x) ])
+    wdump FD.DatatableBuiltin $
+	putErrLn (render $ showDataTable samplePrimitiveDataTable)
+    dumpRules (Rules $ fromList
+	[(combIdent x,combRules x) | x <- combinators, not $ null (combRules x)])
 
     -- enter interactive mode
     int <- Interactive.isInteractive
     if int then Interactive.interact cho else do
         prog <- compileWholeProgram prog
         compileToGrin prog
-
--- | this is called on parsed, typechecked haskell code to convert it to the internal representation
 
 progressM c  = wdump FD.Progress $ (c >>= putErrLn) >> hFlush stderr

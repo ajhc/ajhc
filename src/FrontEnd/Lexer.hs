@@ -19,15 +19,14 @@
 
 module FrontEnd.Lexer (Token(..), lexer) where
 
-
 import Data.Char hiding(isSymbol)
 import Data.Ratio
 import qualified Data.Char
 import qualified Data.Map as Map
 
 import FrontEnd.ParseMonad
-import FrontEnd.Warning
 import FrontEnd.SrcLoc
+import FrontEnd.Warning
 
 data Token
         = VarId String
@@ -288,7 +287,6 @@ setFilePos line column ms = do
     case ms of
         Just fn -> setSrcLoc sl' { srcLocFileName = fn }
         Nothing -> setSrcLoc sl'
-
 
 lexNestedComment :: Bool -> Lex a Bool
 lexNestedComment bol = do

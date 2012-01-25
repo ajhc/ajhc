@@ -17,11 +17,11 @@ import Control.Monad.Identity
 import Control.Monad.Writer
 import qualified Data.Map as Map
 
+import FrontEnd.HsSyn
 import FrontEnd.KindInfer
+import FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse
 import FrontEnd.Tc.Type
-import FrontEnd.SrcLoc
-import FrontEnd.HsSyn
 import Name.Name
 
 newtype SC a = SC (Writer [HsDecl] a)
@@ -36,7 +36,6 @@ addSigs ds = SC $ tell ds
 instance MonadSrcLoc SC where
 instance MonadSetSrcLoc SC where
     withSrcLoc _ a = a
-
 
 collectSigEnv :: KindEnv -> HsStmt -> SigEnv
 collectSigEnv kindInfo stmt = sigEnv where
@@ -119,4 +118,3 @@ listSigsToSigEnv kt sigs
 aHsTypeSigToAssumps :: KindEnv -> HsDecl -> [(Name,Type)]
 aHsTypeSigToAssumps kt sig@(~(HsTypeSig _ names qualType)) = [ (toName Val n,typ) | n <- names] where
     Identity typ = hsQualTypeToSigma kt qualType
-

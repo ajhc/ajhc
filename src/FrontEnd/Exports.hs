@@ -5,9 +5,8 @@ module FrontEnd.Exports(determineExports,ModInfo(..),modInfoHsModule_s) where
 
 import Control.Monad.Identity
 import Data.Monoid
-import List
-import Maybe
-import Prelude
+import Data.List
+import Data.Maybe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 

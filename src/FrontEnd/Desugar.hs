@@ -10,10 +10,10 @@ module FrontEnd.Desugar (doToExp, listCompToExp, desugarHsModule, desugarHsStmt)
 import Control.Monad.State
 
 import FrontEnd.HsSyn
+import FrontEnd.SrcLoc
+import FrontEnd.Syn.Traverse
 import Name.Name
 import Name.Names
-import FrontEnd.Syn.Traverse
-import FrontEnd.SrcLoc
 
 type PatState = Int
 
@@ -28,13 +28,9 @@ instance MonadSrcLoc PatSM where
 instance MonadSetSrcLoc PatSM where
     withSrcLoc _ a = a
 
-
 -- a new (unique) name introduced in pattern selector functions
 newPatVarName :: HsName
 newPatVarName = nameName $ toName Val "patvar@0"
-
-
-
 
 {-
  this function replaces all constructor-pattern bindings in a module with
@@ -72,7 +68,6 @@ desugarDecl pb@(HsPatBind sloc (HsPVar n) rhs wheres) = do
     newWheres <- mapM desugarDecl wheres
     return [HsPatBind sloc (HsPVar n) newRhs (concat newWheres)]
 
-
 desugarDecl pb@(HsPatBind sloc pat rhs wheres) = do
     rhs <- desugarRhs rhs
     unique <- getUnique
@@ -92,12 +87,10 @@ desugarDecl (HsInstDecl sloc qualtype decls) = do
     newDecls <- mapM desugarDecl decls
     return [HsInstDecl sloc qualtype (concat newDecls)]
 
-
 -- XXX we currently discard instance specializations
 desugarDecl HsPragmaSpecialize { hsDeclName = n } | n == u_instance = return []
 
 desugarDecl anyOtherDecl = return [anyOtherDecl]
-
 
 desugarMatch :: (HsMatch) -> PatSM (HsMatch)
 desugarMatch (HsMatch sloc funName pats rhs wheres) = do
@@ -121,7 +114,6 @@ getPatSelFuns sloc pat = [(varName, HsParen (HsLambda sloc [HsPVar newPatVarName
     kase p =  HsCase (HsVar newPatVarName) [a1, a2 ] where
        a1 =  HsAlt sloc p (HsUnGuardedRhs (HsVar newPatVarName)) []
        a2 =  HsAlt sloc HsPWildCard (HsUnGuardedRhs (HsApp (HsVar (toName Val "error")) (HsLit $ HsString $ show sloc ++ " failed pattern match"))) []
-
 
 -- replaces all occurrences of a name with a new variable
 -- and every other name with underscore
@@ -208,8 +200,6 @@ desugarStmt (HsLetStmt decls) = do
         newDecls <- mapM desugarDecl decls
         return (HsLetStmt $ concat newDecls)
 
-
-
 doToExp :: Monad m
     => m HsName    -- ^ name generator
     -> HsName      -- ^ bind (>>=) to use
@@ -238,7 +228,6 @@ doToExp newName f_bind f_bind_ f_fail ss = hsParen `liftM` f ss where
     f (HsLetStmt decls:ss) = do
         ss <- f ss
         return $ HsLet decls ss
-
 
 hsApp e es = hsParen $ foldl HsApp (hsParen e) (map hsParen es)
 hsIf e a b = hsParen $ HsIf e a b
@@ -292,7 +281,6 @@ listCompToExp newName exp ss = hsParen `liftM` f ss where
 -- simple, a wildcard or variable
 -- failable is a subset of refutable
 
-
 isFailablePat p | isStrictPat p = f (openPat p) where
     f (HsPTuple ps) = any isFailablePat ps
     f (HsPUnboxedTuple ps) = any isFailablePat ps
@@ -305,7 +293,6 @@ isSimplePat p = f (openPat p) where
     f HsPWildCard = True
     f _ = False
 
-
 isLazyPat pat = not (isStrictPat pat)
 isStrictPat p = f (openPat p) where
     f HsPVar {} = False
@@ -313,13 +300,9 @@ isStrictPat p = f (openPat p) where
     f (HsPIrrPat p) = False -- isStrictPat p  -- TODO irrefutable patterns
     f _ = True
 
-
 openPat (HsPParen p) = openPat p
 openPat (HsPNeg p) = openPat p
 openPat (HsPAsPat _ p) = openPat p
 openPat (HsPTypeSig _ p _) = openPat p
 openPat (HsPInfixApp a n b) = HsPApp n [a,b]
 openPat p = p
-
-
-

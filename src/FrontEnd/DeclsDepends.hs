@@ -14,12 +14,12 @@ module FrontEnd.DeclsDepends (getDeclDeps, debugDeclBindGroups) where
 
 import Control.Monad.Writer
 
-import FrontEnd.HsSyn
 import FrontEnd.DependAnalysis(debugBindGroups)
-import FrontEnd.Utils(getDeclName)
+import FrontEnd.HsSyn
 import FrontEnd.Rename(unRename)
-import Name.Name
 import FrontEnd.Syn.Traverse
+import FrontEnd.Utils(getDeclName)
+import Name.Name
 
 --------------------------------------------------------------------------------
 
@@ -33,14 +33,12 @@ debugDeclBindGroups groups
 
 -- HsDecl getDeps function
 
-
 getDeclDeps :: HsDecl -> [HsName]
 
 getDeclDeps (HsPatBind _pat _ rhs wheres) = getRhsDeps rhs ++ foldr (++) [] (map getLocalDeclDeps wheres)
 getDeclDeps (HsActionDecl _ _ e) = getExpDeps e
 getDeclDeps (HsFunBind matches) = foldr (++) [] (map getMatchDeps matches)
 getDeclDeps _ = []
-
 
 getMatchDeps :: HsMatch -> [HsName]
 getMatchDeps (HsMatch _sloc _name _pats rhs wheres) = getRhsDeps rhs ++ foldr (++) [] (map getLocalDeclDeps wheres)
@@ -64,8 +62,6 @@ getRhsDeps (HsGuardedRhss rhss) = foldr (++) [] (map getGuardedRhsDeps rhss)
 getGuardedRhsDeps :: HsGuardedRhs -> [HsName]
 getGuardedRhsDeps (HsGuardedRhs _sloc guardExp rhsExp)
    = getExpDeps guardExp ++ getExpDeps rhsExp
-
-
 
 getExpDeps :: HsExp -> [HsName]
 getExpDeps e = execWriter (expDeps e)

@@ -3,7 +3,7 @@ module FrontEnd.FrontEnd(
     Tc.TiData(..)
     ) where
 
-import Monad
+import Control.Monad
 import qualified Data.Map as Map
 
 import Doc.DocLike

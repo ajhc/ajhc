@@ -185,7 +185,6 @@ runTc tcInfo  (Tc tim) = do
 instance OptionMonad Tc where
     getOptions = asks tcOptions
 
-
 -- | given a diagnostic and a computation to take place inside the TI-monad,
 --   run the computation but during it have the diagnostic at the top of the
 --   stack
@@ -196,7 +195,6 @@ withContext diagnostic comp = do
 
 addRule :: Rule -> Tc ()
 addRule r = tell mempty { checkedRules = Seq.singleton r }
-
 
 getErrorContext :: Tc [Diagnostic]
 getErrorContext = asks tcDiagnostics
@@ -212,7 +210,6 @@ getSigEnv = asks (tcInfoSigEnv . tcInfo)
 
 getModName :: Tc String
 getModName = asks ( tcInfoModName . tcInfo)
-
 
 askCurrentEnv = do
     env1 <- asks tcConcreteEnv
@@ -433,12 +430,10 @@ evalTAssoc ta@TAssoc { typeCon = Tycon { tyconName = n1 }, typeClassArgs = ~[car
         _ -> return ta { typeClassArgs = [carg'] }
 evalTAssoc t = return t
 
-
 evalArrowApp (TAp (TAp (TCon tcon) ta) tb)
     | tyconName tcon == tc_Arrow = return (TArrow ta tb)
 
 evalArrowApp t = return t
-
 
 -- Bind mv to type, first filling in any boxes in type with tau vars
 varBind :: MetaVar -> Type -> Tc ()
@@ -461,7 +456,6 @@ varBind u t
                 --when (dump FD.BoxySteps) $ putStrLn $ "varBind: " ++ pprint u <+> text ":=" <+> prettyPrintType t
                 writeIORef r (Just tt)
 
-
 zonkKind :: Kind -> MetaVar -> Tc MetaVar
 zonkKind nk mv = do
     fk <- kindCombine nk (metaKind mv)
@@ -470,9 +464,6 @@ zonkKind nk mv = do
         let nmv = mv { metaKind = fk, metaRef = nref }
         liftIO $ modifyIORef (metaRef mv) (\Nothing -> Just $ TMetaVar nmv)
         return nmv
-
-
-
 
 zonkBox :: MetaVar -> Tc Type
 zonkBox mv | isBoxyMetaVar mv = findType (TMetaVar mv)
@@ -513,7 +504,6 @@ instance Monad Tc where
 instance MonadWarn Tc where
 --    addWarning w = liftIO $ processErrors [w]
     addWarning w = tell mempty { tcWarnings = Seq.singleton w }
-
 
 instance MonadSrcLoc Tc where
     getSrcLoc = do

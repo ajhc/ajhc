@@ -12,7 +12,6 @@ A_UNUSED static char *jhc_options_os = "(unknown os)";
 A_UNUSED static char *jhc_options_arch = "(unknown arch)";
 #endif
 
-
 static void A_NORETURN A_UNUSED A_COLD
 jhc_exit(int n) {
         fflush(stdout);
@@ -111,4 +110,3 @@ main(int argc, char *argv[])
         return 0;
 }
 #endif
-

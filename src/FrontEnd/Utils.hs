@@ -1,4 +1,3 @@
-
 module FrontEnd.Utils where
 
 import Char
@@ -9,11 +8,6 @@ import Doc.DocLike
 import Doc.PPrint
 import FrontEnd.HsSyn
 import Name.Name
-
-
-
---------------------------------------------------------------------------------
-
 
 maybeGetDeclName :: Monad m => HsDecl -> m Name
 maybeGetDeclName (HsPatBind sloc (HsPVar name) rhs wheres) = return (toName Val name)
@@ -37,8 +31,6 @@ maybeGetDeclName d = fail  $ "getDeclName: could not find name for a decl: " ++ 
 getDeclName :: HsDecl -> Name
 getDeclName d =  runIdentity $ maybeGetDeclName d
 
-
-
 -- | Convert name to what it was before renaming.
 
 hsNameToOrig :: HsName -> HsName
@@ -46,8 +38,6 @@ hsNameToOrig n = hsNameIdent_u (hsIdentString_u dn) n where
     dn xs = case dropWhile isDigit xs of
         ('_':xs) -> xs
         _ -> error $ "hsNameToOrig: " ++ show n
-
-
 
 pprintEnvMap :: (PPrint d k, PPrint d a) => Map.Map k a -> d
 pprintEnvMap m = vcat [ pprint x <+> text "::" <+> pprint y | (x,y) <- Map.toList m ]

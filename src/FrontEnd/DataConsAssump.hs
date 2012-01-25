@@ -30,18 +30,15 @@ module FrontEnd.DataConsAssump (dataConsEnv) where
 import Control.Monad.Identity
 import qualified Data.Map as Map
 
+import FrontEnd.HsSyn
 import FrontEnd.KindInfer
 import FrontEnd.Tc.Type
-import FrontEnd.HsSyn
 import Name.Name
 import Support.FreeVars
-
---------------------------------------------------------------------------------
 
 dataConsEnv :: Module -> KindEnv -> [HsDecl] -> Map.Map Name Sigma
 dataConsEnv modName kt decls
    = Map.unions $ map (dataDeclEnv modName kt) decls
-
 
 -- we should only apply this function to data decls and newtype decls
 -- howver the fall through case is just there for completeness
@@ -78,7 +75,6 @@ dataDeclEnv modName kt (HsNewTypeDecl _sloc context typeName args condecl _)
 dataDeclEnv _modName _kt _anyOtherDecl
    = Map.empty
 
-
 hsContextToPreds :: KindEnv -> HsContext -> [Pred]
 hsContextToPreds kt assts = map (hsAsstToPred kt) assts
 
@@ -99,4 +95,3 @@ conDeclType modName kt preds tResult rd@HsRecDecl { hsConDeclName = conName }
 bangTypeToType :: KindEnv -> HsBangType -> Type
 bangTypeToType kt (HsBangedTy t) = runIdentity $ hsTypeToType kt t
 bangTypeToType kt (HsUnBangedTy t) = runIdentity $ hsTypeToType kt t
-
