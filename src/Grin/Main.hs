@@ -84,7 +84,7 @@ compileGrinToC grin = do
     cf <- case (optOutName options,optMode options) of
             (Just fn,StopC) -> return fn
             _ | dump FD.C -> return (fn ++ "_code.c")
-              | otherwise -> fileInTempDir (fn ++ "_code.c") (\_ -> return ())
+              | otherwise -> fileInTempDir ("main_code.c") (\_ -> return ())
     (argstring,sversion) <- getArgString
     (cc,args) <- fetchCompilerFlags
     let comm = shellQuote $ [cc] ++ ["-o", fn, cf] ++ args ++ (map ("-l" ++) rls)

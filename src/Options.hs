@@ -43,6 +43,7 @@ import qualified Data.Set as S
 
 import RawFiles(targets_ini)
 import Support.IniParse
+import Support.TempDir
 import Util.ExitCodes
 import Util.Gen
 import Util.YAML
@@ -167,6 +168,7 @@ data Opt = Opt {
     optIncs        ::  [String],
     optDefs        ::  [String],
     optExtensions  ::  [String],
+    optWorkDir     ::  Maybe FilePath,
     optAnnotate    ::  Maybe FilePath,
     optDeps        ::  Maybe FilePath,
     optHoDir       ::  Maybe FilePath,
@@ -206,6 +208,7 @@ emptyOpt = Opt {
     optStmts       = [],
     optFOpts       = ["default"],
     optCCargs      = [],
+    optWorkDir     = Nothing,
     optHoDir       = Nothing,
     optHoCache     = Nothing,
     optArgs        = [],
@@ -227,47 +230,48 @@ idu d ds = ds ++ [d]
 
 theoptions :: [OptDescr (Opt -> Opt)]
 theoptions =
-    [ Option ['V'] ["version"]   (NoArg  (optMode_s Version))          "print version info and exit"
-    , Option []    ["version-context"] (NoArg  (optMode_s VersionCtx)) "print version context info and exit"
-    , Option []    ["help"]      (NoArg  (optMode_s ShowHelp))         "print help information and exit"
-    , Option []    ["info"]    (NoArg  (optMode_s ShowConfig))         "show compiler configuration information and exit"
-    , Option ['v'] ["verbose"]   (NoArg  (optVerbose_u (+1)))          "chatty output on stderr"
-    , Option ['z'] []            (NoArg  (optStatLevel_u (+1)))        "Increase verbosity of statistics"
-    , Option ['d'] []            (ReqArg (\d -> optDump_u (d:)) "[no-]flag")  "dump specified data during compilation"
-    , Option ['f'] []            (ReqArg (\d -> optFOpts_u (d:)) "[no-]flag") "set or clear compilation options"
-    , Option ['X'] []            (ReqArg (\d -> optExtensions_u (d:)) "ExtensionName") "enable the given language extension"
-    , Option ['o'] ["output"]    (ReqArg (optOutName_s . Just) "FILE")        "output to FILE"
-    , Option ['i'] ["include"]   (ReqArg (optIncdirs_u . idu) "DIR")   "where to look for source files"
-    , Option ['I'] []            (ReqArg (optIncs_u . idu) "DIR")       "add to preprocessor include path"
-    , Option ['D'] []            (ReqArg (\d -> optDefs_u (d:)) "NAME=VALUE") "add new definitions to set in preprocessor"
-    , Option []    ["optc"]      (ReqArg (optCCargs_u . idu) "option") "extra options to pass to c compiler"
-    , Option ['c'] []            (NoArg  (optMode_s CompileHo))        "just compile the modules, caching the results."
-    , Option ['C'] []            (NoArg  (optMode_s StopC))            "compile to C code"
-    , Option ['E'] []            (NoArg  (optMode_s Preprocess))       "preprocess the input and print result to stdout"
-    , Option ['k'] ["keepgoing"] (NoArg  (optKeepGoing_s True))        "keep going on errors"
-    , Option []    ["cross"]     (NoArg  (optCross_s True))            "enable cross-compilation, choose target with the -m flag"
-    , Option []    ["stop"]      (ReqArg (optMode_s . stop) "parse/typecheck/c")  "stop after the given pass, parse/typecheck/c"
-    , Option []    ["width"]     (ReqArg (optColumns_s . read) "COLUMNS") "width of screen for debugging output"
-    , Option []    ["main"]      (ReqArg (optMainFunc_s . Just . (,) False) "Main.main")  "main entry point"
-    , Option ['m'] ["arch"]      (ReqArg (optArch_u . idu ) "arch")      "target architecture options"
-    , Option []    ["entry"]     (ReqArg (optMainFunc_s . Just . (,) True)  "<expr>")  "main entry point, showable expression"
---    , Option ['e'] []            (ReqArg (\d -> optStmts_u (d:)) "<statement>")  "run given statement as if on jhci prompt"
-    , Option []    ["show-ho"]   (ReqArg  (optMode_s . ShowHo) "file.ho") "Show ho file"
-    , Option []    ["noauto"]    (NoArg  (optNoAuto_s True))           "Don't automatically load base and haskell98 packages"
-    , Option ['p'] []            (ReqArg (\d -> optHls_u (++ [d])) "file.hl") "Load given haskell library .hl file"
-    , Option ['L'] []            (ReqArg (optHlPath_u . idu) "path")   "Look for haskell libraries in the given directory"
-    , Option []    ["build-hl"]  (ReqArg (optMode_s . BuildHl) "desc.yaml") "Build hakell library from given library description file"
-    , Option []    ["annotate-source"]  (ReqArg (optAnnotate_s . Just) "<dir>") "Write preprocessed and annotated source code to the directory specified"
-    , Option []    ["deps"]      (ReqArg (optDeps_s . Just) "<file.yaml>") "Write dependency information to file specified"
-    , Option []    ["interactive"] (NoArg  (optMode_s Interactive))    "run interactivly (for debugging only)"
-    , Option []    ["ignore-ho"]   (NoArg  (optIgnoreHo_s True))       "Ignore existing haskell object files"
-    , Option []    ["nowrite-ho"]  (NoArg  (optNoWriteHo_s True))      "Do not write new haskell object files"
-    , Option []    ["no-ho"]       (NoArg  (optNoWriteHo_s True . optIgnoreHo_s True)) "same as --ignore-ho and --nowrite-ho"
-    , Option []    ["ho-cache"]    (ReqArg (optHoCache_s . Just ) "JHC_CACHE")  "Use a global cache located in the directory passed as an argument."
-    , Option []    ["ho-dir"]      (ReqArg (optHoDir_s . Just ) "<dir>")    "Where to place and look for ho files"
-    , Option []    ["stale"]       (ReqArg (optStale_u . idu) "Module")     "Treat these modules as stale, even if a ho file is present"
-    , Option []    ["list-libraries"] (NoArg  (optMode_s ListLibraries)) "List of installed libraries"
-    , Option []    ["print-hsc-options"] (NoArg (optMode_s PrintHscOptions)) "print options to pass to hsc2hs"
+    [ Option ['V'] ["version"]         (NoArg  (optMode_s Version))          "print version info and exit"
+    , Option []    ["version-context"] (NoArg  (optMode_s VersionCtx))       "print version context info and exit"
+    , Option []    ["help"]            (NoArg  (optMode_s ShowHelp))         "print help information and exit"
+    , Option []    ["info"]            (NoArg  (optMode_s ShowConfig))       "show compiler configuration information and exit"
+    , Option ['v'] ["verbose"]         (NoArg  (optVerbose_u (+1)))          "chatty output on stderr"
+    , Option ['z'] []                  (NoArg  (optStatLevel_u (+1)))        "Increase verbosity of statistics"
+    , Option ['d'] []                  (ReqArg (optDump_u . (:))        "[no-]flag")  "dump specified data during compilation"
+    , Option ['f'] []                  (ReqArg (optFOpts_u . (:))       "[no-]flag") "set or clear compilation options"
+    , Option ['X'] []                  (ReqArg (optExtensions_u . (:))  "ExtensionName") "enable the given language extension"
+    , Option ['o'] ["output"]          (ReqArg (optOutName_s . Just) "FILE") "output to FILE"
+    , Option ['i'] ["include"]         (ReqArg (optIncdirs_u . idu) "DIR")   "where to look for source files"
+    , Option ['I'] []                  (ReqArg (optIncs_u . idu) "DIR")       "add to preprocessor include path"
+    , Option ['D'] []                  (ReqArg (optDefs_u . (:)) "NAME=VALUE") "add new definitions to set in preprocessor"
+    , Option []    ["optc"]            (ReqArg (optCCargs_u . idu) "option") "extra options to pass to c compiler"
+    , Option ['c'] []                  (NoArg  (optMode_s CompileHo))        "just compile the modules, caching the results."
+    , Option ['C'] []                  (NoArg  (optMode_s StopC))            "compile to C code"
+    , Option ['E'] []                  (NoArg  (optMode_s Preprocess))       "preprocess the input and print result to stdout"
+    , Option ['k'] ["keepgoing"]       (NoArg  (optKeepGoing_s True))        "keep going on errors"
+    , Option []    ["cross"]           (NoArg  (optCross_s True))            "enable cross-compilation, choose target with the -m flag"
+    , Option []    ["stop"]            (ReqArg (optMode_s . stop) "parse/typecheck/c")  "stop after the given pass, parse/typecheck/c"
+    , Option []    ["width"]           (ReqArg (optColumns_s . read) "COLUMNS") "width of screen for debugging output"
+    , Option []    ["main"]            (ReqArg (optMainFunc_s . Just . (,) False) "Main.main")  "main entry point"
+    , Option ['m'] ["arch"]            (ReqArg (optArch_u . idu ) "arch")      "target architecture options"
+    , Option []    ["entry"]           (ReqArg (optMainFunc_s . Just . (,) True)  "<expr>")  "main entry point, showable expression"
+    --    , Option ['e'] []            (ReqArg (\d -> optStmts_u ( d:)) "<statement>")  "run given statement as if on jhci prompt"
+    , Option []    ["show-ho"]         (ReqArg (optMode_s . ShowHo) "file.ho") "Show ho file"
+    , Option []    ["noauto"]          (NoArg  (optNoAuto_s True))           "Don't automatically load base and haskell98 packages"
+    , Option ['p'] []                  (ReqArg (optHls_u . (:)) "package")   "Load given haskell library package"
+    , Option ['L'] []                  (ReqArg (optHlPath_u . idu) "path")   "Look for haskell libraries in the given directory"
+    , Option []    ["build-hl"]        (ReqArg (optMode_s . BuildHl) "desc.yaml") "Build hakell library from given library description file"
+    , Option []    ["annotate-source"] (ReqArg (optAnnotate_s . Just) "<dir>") "Write preprocessed and annotated source code to the directory specified"
+    , Option []    ["deps"]            (ReqArg (optDeps_s . Just) "<file.yaml>") "Write dependency information to file specified"
+    , Option []    ["interactive"]     (NoArg  (optMode_s Interactive))      "run interactivly                                                             ( for debugging only)"
+    , Option []    ["ignore-ho"]       (NoArg  (optIgnoreHo_s True))         "Ignore existing haskell object files"
+    , Option []    ["nowrite-ho"]      (NoArg  (optNoWriteHo_s True))        "Do not write new haskell object files"
+    , Option []    ["no-ho"]           (NoArg  (optNoWriteHo_s True . optIgnoreHo_s True)) "same as --ignore-ho and --nowrite-ho"
+    , Option []    ["ho-cache"]        (ReqArg (optHoCache_s . Just ) "JHC_CACHE")  "Use a global cache located in the directory passed as an argument."
+    , Option []    ["ho-dir"]          (ReqArg (optHoDir_s . Just ) "<dir>")    "Where to place and look for ho files"
+    , Option []    ["stale"]           (ReqArg (optStale_u . idu) "Module")     "Treat these modules as stale, even if a ho file is present"
+    , Option []    ["list-libraries"]  (NoArg  (optMode_s ListLibraries))    "List of installed libraries"
+    , Option []    ["tdir"]            (ReqArg (optWorkDir_s . Just) "dir/") "specify the directory where all intermediate files/dumps will be placed."
+--    , Option []    ["print-hsc-options"] (NoArg (optMode_s PrintHscOptions)) "print options to pass to hsc2hs"
     ]
 
 stop "parse" = StopParse

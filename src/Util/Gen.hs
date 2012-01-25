@@ -44,4 +44,5 @@ shortenPath x@('/':_) = do
     return $ fromJust $ f (return cd) `mplus` f pwd `mplus` liftM ("~/" ++) (f h) `mplus` return x
 shortenPath x = return x
 
-
+maybeDo :: Monad m => Maybe (m a) -> (m ())
+maybeDo x = maybe (return ()) (>> return ()) x

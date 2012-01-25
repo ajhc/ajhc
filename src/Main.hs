@@ -30,6 +30,8 @@ main = wrapMain $ do
     hSetEncoding stdout utf8
     hSetEncoding stderr utf8
     o <- processOptions
+    -- set temporary directory
+    maybeDo $ do x <- optWorkDir o; return $ setTempDir x
     let darg = progressM $ do
         (argstring,_) <- getArgString
         return (argstring ++ "\n" ++ versionSimple)
