@@ -176,15 +176,15 @@ instance Binary DataTable where
     get = fmap DataTable getMap
 
 emptyConstructor = Constructor {
-                conName = error "emptyConstructor.conName",
-                conType = Unknown,
-                conOrigSlots = [],
-                conExpr = Unknown,
-                conInhabits = error "emptyConstructor.conInhabits",
-                conAlias = NotAlias,
-                conVirtual = Nothing,
-                conChildren = DataNone
-                }
+    conName      = error "emptyConstructor.conName",
+    conType      = Unknown,
+    conOrigSlots = [],
+    conExpr      = Unknown,
+    conInhabits  = error "emptyConstructor.conInhabits",
+    conAlias     = NotAlias,
+    conVirtual   = Nothing,
+    conChildren  = DataNone
+    }
 
 instance HasSize DataTable where
     size (DataTable d) = Map.size d
@@ -208,36 +208,40 @@ getConstructor n (DataTable map) = case Map.lookup n map of
 
 -- | return the single constructor of product types
 getProduct :: Monad m => DataTable -> E -> m Constructor
-getProduct dataTable e | (ELit LitCons { litName = cn }) <- followAliases dataTable e, Just c <- getConstructor cn dataTable = f c where
-    f c | DataNormal [x] <- conChildren c = getConstructor x dataTable
-        | otherwise = fail "Not Product type"
+getProduct dataTable e | (ELit LitCons { litName = cn }) <-
+    followAliases dataTable e, Just c <- getConstructor cn dataTable = f c where
+        f c | DataNormal [x] <- conChildren c = getConstructor x dataTable
+            | otherwise = fail "Not Product type"
 getProduct _ _ = fail "Not Product type"
 
 tunboxedtuple :: Int -> (Constructor,Constructor)
 tunboxedtuple n = (typeCons,dataCons) where
-        dataCons = emptyConstructor {
-            conName = dc,
-            conType = dtipe,
-            conOrigSlots = map (SlotNormal . EVar) typeVars,
-            conExpr =  foldr ($) (ELit litCons { litName = dc, litArgs = map EVar vars, litType = ftipe }) (map ELam vars),
-            conInhabits = tc
-           }
-        typeCons = emptyConstructor {
-            conName = tc,
-            conType = foldr EPi eHash (replicate n tvr { tvrType = eStar }),
-            conOrigSlots = replicate n (SlotNormal eStar),
-            conExpr = tipe,
-            conInhabits = s_Hash,
-            conChildren = DataNormal [dc]
-           }
-
-        dc = unboxedNameTuple DataConstructor n
-        tc = unboxedNameTuple TypeConstructor n
-        tipe = foldr ELam ftipe typeVars
-        typeVars = take n [ tvr { tvrType = eStar, tvrIdent = v } | v <- anonymousIds ]
-        vars =  [ tvr { tvrType = EVar t, tvrIdent = v } | v <- map anonymous [ n + 8, n + 9 ..] | t <- typeVars ]
-        ftipe = ELit (litCons { litName = tc, litArgs = map EVar typeVars, litType = eHash })
-        dtipe = foldr EPi (foldr EPi ftipe [ v { tvrIdent = emptyId } | v <- vars]) typeVars
+    dataCons = emptyConstructor {
+        conName      = dc,
+        conType      = dtipe,
+        conOrigSlots = map (SlotNormal . EVar) typeVars,
+        conExpr      = foldr ($) (ELit litCons
+                { litName = dc
+                , litArgs = map EVar vars
+                , litType = ftipe
+                }) (map ELam vars),
+        conInhabits  = tc
+        }
+    typeCons = emptyConstructor {
+        conName      = tc,
+        conType      = foldr EPi eHash (replicate n tvr { tvrType = eStar }),
+        conOrigSlots = replicate n (SlotNormal eStar),
+        conExpr      = tipe,
+        conInhabits  = s_Hash,
+        conChildren  = DataNormal [dc]
+        }
+    dc = unboxedNameTuple DataConstructor n
+    tc = unboxedNameTuple TypeConstructor n
+    tipe = foldr ELam ftipe typeVars
+    typeVars = take n [ tvr { tvrType = eStar, tvrIdent = v } | v <- anonymousIds ]
+    vars =  [ tvr { tvrType = EVar t, tvrIdent = v } | v <- map anonymous [ n + 8, n + 9 ..] | t <- typeVars ]
+    ftipe = ELit (litCons { litName = tc, litArgs = map EVar typeVars, litType = eHash })
+    dtipe = foldr EPi (foldr EPi ftipe [ v { tvrIdent = emptyId } | v <- vars]) typeVars
 
 -- | conjured data types, these data types are created as needed and can be of any type, their
 -- actual type is encoded in their names.
@@ -251,11 +255,14 @@ tunboxedtuple n = (typeCons,dataCons) where
 -- the final stages of compilation before core mangling so that optimizations
 -- that were previously blocked by type variables can be carried out.
 
-tAbsurd k = ELit (litCons { litName = nameConjured modAbsurd k, litArgs = [], litType = k })
-mktBox  k = ELit (litCons { litName = nameConjured modBox k, litArgs = [], litType = k, litAliasFor = af }) where
-    af = case k of
-        EPi TVr { tvrType = t1 } t2 -> Just (ELam tvr { tvrType = t1 } (mktBox t2))
-        _ -> Nothing
+tAbsurd k = ELit (litCons {
+    litName = nameConjured modAbsurd k, litArgs = [], litType = k })
+mktBox  k = ELit (litCons {
+    litName = nameConjured modBox k, litArgs = [],
+    litType = k, litAliasFor = af }) where
+        af = case k of
+            EPi TVr { tvrType = t1 } t2 -> Just (ELam tvr { tvrType = t1 } (mktBox t2))
+            _ -> Nothing
 
 tarrow = emptyConstructor {
             conName = tc_Arrow,
@@ -397,14 +404,15 @@ lookupExtTypeInfo dataTable oe = f oe where
             ExtTypeBoxed b t _ -> ExtTypeBoxed b t et
             ExtTypeVoid -> ExtTypeVoid
     f e = g e
+    -- if we are a raw type, we can be foreigned
+    g (ELit LitCons { litName = c })
+        | Just et <- Map.lookup c rawExtTypeMap = return (ExtTypeRaw et)
     -- if we are a single constructor data type with a single foreignable unboxed
     -- slot, we are foreiginable
     g (ELit LitCons { litName = c, litAliasFor = Nothing })
         | Just Constructor { conChildren = DataNormal [cn] }  <- getConstructor c dataTable,
           Just Constructor { conOrigSlots = [SlotNormal st] } <- getConstructor cn dataTable,
           Just (ExtTypeRaw et) <- lookupExtTypeInfo dataTable st = return $ ExtTypeBoxed cn st et
-    -- if we are a raw type, we can be foreigned
-    g (ELit LitCons { litName = c, litAliasFor = Nothing }) | Just et <- Map.lookup c rawExtTypeMap = return (ExtTypeRaw et)
     g e | Just e' <- followAlias dataTable e = f e'
         | otherwise = fail $ "lookupExtTypeInfo: " ++ show (oe,e)
 
@@ -749,22 +757,15 @@ slotTypesHs _ n e = error $ "slotTypes: error in " ++ show n ++ ": " ++ show e
 
 {-# NOINLINE showDataTable #-}
 showDataTable (DataTable mp) = vcat xs where
-    c  const = vcat [t,e,cs,al,vt,ih,ch] where
-        t  = text "::" <+> ePretty conType
-        e  = text "=" <+> ePretty conExpr
-        cs = text "slots:" <+> tupled (map ePretty (conSlots const))
-        al = text "alias:" <+> tshow conAlias
-        vt = text "virtual:" <+> tshow conVirtual
+    c con = vcat [t,e,cs,al,vt,ih,ch] where
+        t  = text "::"        <+> ePretty conType
+        e  = text "="         <+> ePretty conExpr
+        cs = text "slots:"    <+> tupled (map ePretty (conSlots con))
+        al = text "alias:"    <+> tshow conAlias
+        vt = text "virtual:"  <+> tshow conVirtual
         ih = text "inhabits:" <+> tshow conInhabits
         ch = text "children:" <+> tshow conChildren
-        Constructor {
-            conType = conType,
-            conExpr = conExpr,
-            conAlias = conAlias,
-            conVirtual = conVirtual,
-            conInhabits = conInhabits,
-            conChildren = conChildren
-            } = const
+        Constructor { .. } = con
     xs = [text x <+> hang 0 (c y) | (x,y) <- ds ]
     ds = sortBy (\(x,_) (y,_) -> compare x y) [(show x,y)  | (x,y) <-  Map.toList mp]
 
@@ -843,17 +844,17 @@ instance DataTableMonad Identity
 
 primitiveAliases :: Map.Map Name Name
 primitiveAliases = Map.fromList [
-    (tc_Bits1, rt_bool),
-    (tc_Bits8, rt_bits8),
-    (tc_Bits16, rt_bits16),
-    (tc_Bits32, rt_bits32),
-    (tc_Bits64, rt_bits64),
-    (tc_Bits128, rt_bits128),
-    (tc_BitsPtr, rt_bits_ptr_),
-    (tc_BitsMax, rt_bits_max_),
-    (tc_Float32, rt_float32),
-    (tc_Float64, rt_float64),
-    (tc_Float80, rt_float80),
+    (tc_Bits1,    rt_bool),
+    (tc_Bits8,    rt_bits8),
+    (tc_Bits16,   rt_bits16),
+    (tc_Bits32,   rt_bits32),
+    (tc_Bits64,   rt_bits64),
+    (tc_Bits128,  rt_bits128),
+    (tc_BitsPtr,  rt_bits_ptr_),
+    (tc_BitsMax,  rt_bits_max_),
+    (tc_Float32,  rt_float32),
+    (tc_Float64,  rt_float64),
+    (tc_Float80,  rt_float80),
     (tc_Float128, rt_float128)
     ]
 
@@ -862,18 +863,18 @@ primitiveAliases = Map.fromList [
 
 rawExtTypeMap :: Map.Map Name ExtType
 rawExtTypeMap = Map.fromList [
-    (rt_bool,  "bool"),
-    (rt_bits8,  "uint8_t"),
-    (rt_bits16, "uint16_t"),
-    (rt_bits32, "uint32_t"),
-    (rt_bits64, "uint64_t"),
-    (rt_bits128,"uint128_t"),
+    (rt_bool,      "bool"),
+    (rt_bits8,     "uint8_t"),
+    (rt_bits16,    "uint16_t"),
+    (rt_bits32,    "uint32_t"),
+    (rt_bits64,    "uint64_t"),
+    (rt_bits128,   "uint128_t"),
     (rt_bits_ptr_, "uintptr_t" ),
     (rt_bits_max_, "uintmax_t"),
-    (rt_float32, "float"),
-    (rt_float64, "double"),
-    (rt_float80, "long double"),
-    (rt_float128, "__float128")
+    (rt_float32,   "float"),
+    (rt_float64,   "double"),
+    (rt_float80,   "long double"),
+    (rt_float128,  "__float128")
     ]
 
 -- which C types these convert to in FFI specifications for
@@ -884,46 +885,50 @@ rawExtTypeMap = Map.fromList [
 
 typeTable :: Map.Map Name ExtType
 typeTable = Map.fromList [
-    (tc_Char_,"wchar_t"),
-    (tc_Int, "int"),
-    (tc_Int8, "int8_t"),
-    (tc_Int16, "int16_t"),
-    (tc_Int32, "int32_t"),
-    (tc_Int64, "int64_t"),
-    (tc_IntMax, "intmax_t"),
-    (tc_IntPtr, "intptr_t"),
-    (tc_Word, "unsigned"),
-    (tc_Word8, "uint8_t"),
-    (tc_Word16, "uint16_t"),
-    (tc_Word32, "uint32_t"),
-    (tc_Word64, "uint64_t"),
-    (tc_WordMax, "uintmax_t"),
-    (tc_WordPtr, "uintptr_t"),
-    (tc_Float, "float"),
-    (tc_Double, "double"),
-    (tc_Ptr, "HsPtr"),
-    (tc_FunPtr, "HsFunPtr"),
+    (tc_Int,      "int"),
+    (tc_Int8,     "int8_t"),
+    (tc_Int16,    "int16_t"),
+    (tc_Int32,    "int32_t"),
+    (tc_Int64,    "int64_t"),
+    (tc_IntMax,   "intmax_t"),
+    (tc_IntPtr,   "intptr_t"),
+    (tc_Word,     "unsigned"),
+    (tc_Word8,    "uint8_t"),
+    (tc_Word16,   "uint16_t"),
+    (tc_Word32,   "uint32_t"),
+    (tc_Word64,   "uint64_t"),
+    (tc_WordMax,  "uintmax_t"),
+    (tc_WordPtr,  "uintptr_t"),
+    (tc_Float,    "float"),
+    (tc_Double,   "double"),
+    (tc_Ptr,      "HsPtr"),
+    (tc_FunPtr,   "HsFunPtr"),
 
-    (tc_Addr_, "HsPtr"),
+    (tc_Addr_,    "HsPtr"),
     (tc_FunAddr_, "HsFunPtr"),
+    (tc_Char_,    "wchar_t"),
+    (tc_Bool_,    "bool"),
+    (tc_Bool,     "HsBool"),
 
-    (tc_CChar, "char"),
-    (tc_CShort, "short"),
-    (tc_CInt, "int"),
-    (tc_CLong, "long"),
+    (tc_CChar,    "char"),
+    (tc_CShort,   "short"),
+    (tc_CInt,     "int"),
+    (tc_CLong,    "long"),
+    (tc_CLLong,   "long long"),
 
-    (tc_CSChar, "signed char"),
-    (tc_CUChar, "unsigned char"),
-    (tc_CUShort, "unsigned short"),
-    (tc_CUInt, "unsigned int"),
-    (tc_CULong, "unsigned long"),
-    (tc_Bool, "HsBool"),
+    (tc_CSChar,   "signed char"),
+    (tc_CUChar,   "unsigned char"),
+    (tc_CUShort,  "unsigned short"),
+    (tc_CUInt,    "unsigned int"),
+    (tc_CULong,   "unsigned long"),
+    (tc_CULLong,  "unsigned long long"),
 
-    (tc_CWchar, "wchar_t"),
-    (tc_CWint, "wint_t"),
-    (tc_CTime, "time_t"),
-    (tc_CClock, "clock_t"),
-    (tc_CSize, "size_t"),
-    (tc_Unit,  "void"),
-    (tc_State_,  "void")
+
+    (tc_CWchar,   "wchar_t"),
+    (tc_CWint,    "wint_t"),
+    (tc_CTime,    "time_t"),
+    (tc_CClock,   "clock_t"),
+    (tc_CSize,    "size_t"),
+    (tc_Unit,     "void"),
+    (tc_State_,   "void")
     ]
