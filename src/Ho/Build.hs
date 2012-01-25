@@ -55,7 +55,6 @@ import Ho.Type
 import Name.Name
 import Options
 import PackedString(PackedString,packString,unpackPS)
-import Support.Yaml
 import Util.FilterInput
 import Util.Gen
 import Util.SetLike
