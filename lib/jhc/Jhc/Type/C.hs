@@ -13,27 +13,30 @@ newtype Errno = Errno CInt
 newtype CChar    = CChar Int8
 newtype CSChar   = CSChar Int8
 newtype CUChar   = CUChar Word8
-newtype CInt     = CInt Int
-newtype CUInt    = CUInt Word
-newtype CLLong   = CLLong IntMax
-newtype CULLong  = CULLong WordMax
-newtype CLong    = CLong IntPtr
-newtype CULong   = CULong WordPtr
 newtype CShort   = CShort Int16
 newtype CUShort  = CUShort Word16
-newtype CWchar   = CWchar Word32
-newtype CWint    = CWint Int32
+newtype CInt     = CInt Int
+newtype CUInt    = CUInt Word
+newtype CLong    = CLong IntPtr
+newtype CULong   = CULong WordPtr
+newtype CLLong   = CLLong IntMax
+newtype CULLong  = CULLong WordMax
+
 newtype CIntMax  = CIntMax IntMax
 newtype CUIntMax = CUIntMax WordMax
 newtype CIntPtr  = CIntPtr IntPtr
 newtype CUIntPtr = CUIntPtr WordPtr
+
 newtype CFloat   = CFloat Float
 newtype CDouble  = CDouble Double
 newtype CLDouble = CLDouble Double
-newtype CSize    = CSize WordPtr
-newtype CPtrdiff = CPtrdiff IntPtr
-newtype CTime    = CTime IntMax
+
+newtype CWchar   = CWchar Word32
+newtype CWint    = CWint Int32
 newtype CClock   = CClock IntMax
+newtype CPtrdiff = CPtrdiff IntPtr
+newtype CSize    = CSize WordPtr
+newtype CTime    = CTime IntMax
 
 data CFile
 data CJmpBuf
