@@ -24,6 +24,7 @@ import Data.Data
 import Data.Monoid
 import Foreign
 import Foreign.C
+import GHC.Exts
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.UTF8 as BS(fromString,toString)
@@ -32,8 +33,6 @@ import qualified Data.ByteString.Unsafe as BS
 import Util.GMap
 import Util.SetLike
 import Util.HasSize
-
-
 
 newtype Atom = Atom (#type atom_t)
     deriving(Typeable,Eq,Data,Ord)
@@ -56,18 +55,19 @@ class HasHash a where
     hash32 :: a -> Word32
 
 instance HasHash Atom where
-    hash32 a = let (x,y) = fromAtom a :: CStringLen in unsafePerformIO $ hash2 0 x (fromIntegral y)
+    hash32 a = let (x,y) = fromAtom a :: CStringLen in 
+        unsafePerformIO $ hash2 0 x (fromIntegral y)
 
 instance HasHash BS.ByteString where
     hash32 bs = unsafePerformIO $ do
         BS.unsafeUseAsCStringLen bs $ \ (x,y) -> hash2 0 x (fromIntegral y)
 
 instance HasHash String where
-    hash32 s = unsafePerformIO $ withCStringLen s $ \ (x,y) -> hash2 0 x (fromIntegral y)
+    hash32 s = unsafePerformIO $ withCStringLen s $ 
+        \ (x,y) -> hash2 0 x (fromIntegral y)
 
 instance FromAtom (String -> String) where
     fromAtom x = shows (fromAtom x :: String)
-
 
 instance ToAtom Atom where
     toAtom x = x
@@ -84,8 +84,6 @@ instance ToAtom CStringLen where
             then fail "StringTable: atom is too big"
             else stAdd cs (fromIntegral len)
 
-
-
 instance ToAtom CString where
     toAtomIO cs = do
         len <- BS.c_strlen cs
@@ -101,7 +99,8 @@ instance ToAtom BS.ByteString where
     toAtomIO bs = BS.unsafeUseAsCStringLen bs toAtomIO
 
 instance FromAtom CStringLen where
-    fromAtom a@(Atom v) = (stPtr a,fromIntegral $ (v `shiftR` (#const ATOM_LEN_SHIFT)) .&. (#const ATOM_LEN_MASK))
+    fromAtom a@(Atom v) = (stPtr a,fromIntegral $ 
+        (v `shiftR` (#const ATOM_LEN_SHIFT)) .&. (#const ATOM_LEN_MASK))
 
 instance FromAtom Word where
     fromAtom (Atom i) = fromIntegral i
@@ -118,6 +117,9 @@ instance Monoid Atom where
     mempty = toAtom BS.empty
     mappend x y = unsafePerformIO $ atomAppend x y
 
+instance IsString Atom where
+    fromString = toAtom
+
 instance Show Atom where
     showsPrec _ atom = (fromAtom atom ++)
 
@@ -125,7 +127,8 @@ instance Read Atom where
     readsPrec _ s = [ (toAtom s,"") ]
 
 intToAtom :: Monad m => Int -> m Atom
-intToAtom i = if isValidAtom i then return (Atom $ fromIntegral i) else fail $ "intToAtom: " ++ show i
+intToAtom i = if isValidAtom i then return (Atom $ fromIntegral i) else 
+    fail $ "intToAtom: " ++ show i
 
 isValidAtom :: Int -> Bool
 isValidAtom i = odd i
@@ -148,11 +151,9 @@ foreign import ccall unsafe hash2  :: Word32 -> CString -> CInt -> IO Word32
 atomCompare a b = if c == 0 then EQ else if c > 0 then GT else LT where
     c = c_atomCompare a b
 
-
 instance Intjection Atom where
     toIntjection i = Atom (fromIntegral i)
     fromIntjection (Atom i) = fromIntegral i
-
 
 newtype instance GSet Atom = GSetAtom (IntjectionSet Atom)
     deriving(Monoid,IsEmpty,HasSize,Collection,Unionize,SetLike,Eq,Ord,Show)
@@ -161,7 +162,6 @@ newtype instance GMap Atom v = GMapAtom (IntjectionMap Atom v)
 
 instance Functor (GMap Atom) where
     fmap f (GMapAtom (IntjectionMap mp)) = GMapAtom (IntjectionMap (fmap f mp))
-
 
 instance Binary Atom where
     get = do
