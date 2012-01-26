@@ -88,7 +88,7 @@ data BinOp
     | FLte
     -- whether two values can be compared at all.
     | FOrdered
-    deriving(Eq,Show,Ord,Read)
+    deriving(Eq,Show,Ord,Read,Enum,Bounded)
     {-! derive: Binary !-}
 
 data UnOp
@@ -109,7 +109,7 @@ data UnOp
     | Log
     | Exp
     | Sqrt
-    deriving(Eq,Show,Ord,Read)
+    deriving(Eq,Show,Ord,Read,Enum,Bounded)
     {-! derive: Binary !-}
 
 -- conversion ops
@@ -126,7 +126,7 @@ data ConvOp
     | I2I         -- ^ perform a 'Lobits' or a 'Sx' depending on the sizes of the arguments
     | U2U         -- ^ perform a 'Lobits' or a 'Zx' depending on the sizes of the arguments
     | B2B         -- ^ a nop, useful for coercing hints (bits 2 bits)
-    deriving(Eq,Show,Ord,Read)
+    deriving(Eq,Show,Ord,Read,Enum,Bounded)
     {-! derive: Binary !-}
 
 data ValOp
@@ -135,7 +135,7 @@ data ValOp
     | NInf
     | PZero
     | NZero
-    deriving(Eq,Show,Ord,Read)
+    deriving(Eq,Show,Ord,Read,Bounded)
     {-! derive: Binary !-}
 
 data ArchBits = BitsMax | BitsPtr | BitsUnknown

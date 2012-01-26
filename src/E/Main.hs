@@ -32,6 +32,7 @@ import E.WorkerWrapper
 import FrontEnd.HsSyn
 import FrontEnd.KindInfer
 import FrontEnd.Tc.Module
+import FrontEnd.Warning
 import Grin.Show(render)
 import Ho.Build
 import Ho.Collected
@@ -294,6 +295,8 @@ processDecls cho ho' tiData = do
     putProgressLn ">"
     wdump FD.Stats $
         Stats.printLStat (optStatLevel options) "MainPass Stats" (progStats prog)
+
+    processIOErrors
 
     lintCheckProgram (putErrLn "After the workwrap/CPR") prog
 

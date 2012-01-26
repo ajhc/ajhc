@@ -207,6 +207,8 @@ processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o i
         ans = ELit litCons { litName = cna, litArgs = [ee], litType = orig_t }
     primopt pn [] t | Just c <- getPrefix "options_" pn      = return (EPrim (APrim (CConst ("JHC_" ++ c) "int") mempty) [] t)
     primopt pn [a,w] t | Just c <- getPrefix "peek." pn      >>= Op.readTy = return (EPrim (APrim (Peek c) mempty) [w,a] t)
+    --primopt pn [a,w] t | Just c <- getPrefix "peek." pn >>= Op.readTy =
+    --    boxResult dataTable t $ \_ pt -> (EPrim (APrim (Peek c) mempty) [w,a] pt)
     primopt pn [a,v,w] t | Just c <- getPrefix "poke." pn    >>= Op.readTy = return (EPrim (APrim (Poke c) mempty) [w,a,v] t)
     primopt pn [v] t | Just c <- getPrefix "sizeOf." pn      >>= Op.readTy = return (EPrim (APrim (PrimTypeInfo c Op.bits32 PrimSizeOf) mempty) [] t)
     primopt pn [v] t | Just c <- getPrefix "alignmentOf." pn >>= Op.readTy = return (EPrim (APrim (PrimTypeInfo c Op.bits32 PrimAlignmentOf) mempty) [] t)
@@ -220,3 +222,9 @@ processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o i
     primopt pn [] _ | Just c <-  getPrefix "error." pn = return (EError c orig_t)
     primopt _ _ _ = fail "not a primopt we care about"
 processPrimPrim _ e = e
+
+type T = E
+boxResult :: DataTable -> T -> (ExtType -> T -> E) -> Maybe E
+boxResult dataTable t fn = mdo
+        (res,(ta,sta)) <- boxPrimitive dataTable (fn ta sta) t
+	return res

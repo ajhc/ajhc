@@ -14,18 +14,22 @@ module FrontEnd.Warning(
 import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.IORef
-import FrontEnd.SrcLoc
-import GenUtil
-import List
-import Options
+import Data.List
 import System.IO.Unsafe
+
+import FrontEnd.SrcLoc
+import Options
+import Util.Gen
 
 {-# NOINLINE ioWarnings #-}
 ioWarnings :: IORef [Warning]
 ioWarnings = unsafePerformIO $ newIORef []
 
-data Warning = Warning { warnSrcLoc :: !SrcLoc, warnType :: String, warnMessage :: String }
-    deriving(Eq,Ord)
+data Warning = Warning {
+    warnSrcLoc :: !SrcLoc,
+    warnType :: String,
+    warnMessage :: String
+    } deriving(Eq,Ord)
 
 class Monad m => MonadWarn m where
     addWarning :: Warning -> m ()
@@ -45,7 +49,8 @@ addWarn t m = do
     warn sl t m
 
 addDiag s = warn bogusASrcLoc "diagnostic" s
-warn s t m = addWarning (Warning { warnSrcLoc = s, warnType = t, warnMessage = m })
+warn s t m = addWarning Warning
+    { warnSrcLoc = s, warnType = t, warnMessage = m }
 err t m = warn bogusASrcLoc t m
 warnF fn t m  = warn bogusASrcLoc { srcLocFileName = fn } t m
 
@@ -73,12 +78,20 @@ processErrors ws = processErrors' True ws >> return ()
 processErrors' :: Bool -> [Warning] -> IO Bool
 processErrors' doDie ws = mapM_ s ws' >> when (die && doDie) exitFailure >> return die where
     ws' = filter ((`notElem` ignore) . warnType ) $ snub ws
-    s Warning { warnSrcLoc = sl, warnType = t, warnMessage = m } | sl == bogusASrcLoc = putErrLn $ msg t m
-    s Warning { warnSrcLoc = SrcLoc { srcLocFileName = fn, srcLocLine = -1 }, warnType = t ,warnMessage = m } =
-        putErrLn (fn ++ ": "  ++ msg t m)
-    s Warning { warnSrcLoc = SrcLoc { srcLocFileName = fn, srcLocLine = l }, warnType = t ,warnMessage = m } =
-        putErrLn (fn ++ ":" ++ pad 3 (show l) ++  " - "  ++ msg t m)
+    s Warning { warnSrcLoc = sl, warnType = t, warnMessage = m }
+        | sl == bogusASrcLoc = putErrLn $ msg t m
+    s Warning { warnSrcLoc = SrcLoc { srcLocFileName = fn, srcLocLine = -1 },
+                warnType = t ,warnMessage = m } = putErrLn (fn ++ ": "  ++ msg t m)
+    s Warning { warnSrcLoc = SrcLoc { srcLocFileName = fn, srcLocLine = l },
+                warnType = t ,warnMessage = m } = putErrLn (fn ++ ":" ++ pad 3 (show l) ++  " - "  ++ msg t m)
     die = (not $ null $ intersect (map warnType ws') fatal) && not (optKeepGoing options)
+
+--data WarnType
+--    = UndefinedName Name
+--    | AmbiguousName Name
+--    | MultiplyDefined Name
+--    | UnknownImport Module
+--    | ParseError
 
 fatal = [
     "undefined-name",
@@ -90,14 +103,17 @@ fatal = [
     "missing-dep",
     "invalid-decl",
     "invalid-assoc",
+    "invalid-primitive",
     "type-synonym-recursive",
     "type-synonym-partialap" ]
 
 ignore = ["h98-emptydata"]
 
 instance Show Warning where
-    show  Warning { warnSrcLoc = sl, warnType = t, warnMessage = m } | sl == bogusASrcLoc =  msg t m
-    show  Warning { warnSrcLoc = SrcLoc { srcLocFileName = fn, srcLocLine = l }, warnType = t ,warnMessage = m } =
+    show  Warning { warnSrcLoc = sl, warnType = t, warnMessage = m }
+        | sl == bogusASrcLoc =  msg t m
+    show  Warning { warnSrcLoc = SrcLoc { srcLocFileName = fn, srcLocLine = l },
+                                          warnType = t ,warnMessage = m } =
          (fn ++ ":" ++ pad 3 (show l) ++  " - "  ++ msg t m)
 msg "diagnostic" m = "Diagnostic: " ++ m
 msg t m = (if t `elem` fatal then "Error: " else "Warning: ") ++ m

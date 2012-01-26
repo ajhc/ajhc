@@ -23,6 +23,7 @@ import Doc.PPrint
 import E.E
 import E.Eta
 import E.Eval(eval)
+import E.PrimDecode
 import E.LetFloat(atomizeAp)
 import E.PrimOpt
 import E.Rules
@@ -291,9 +292,11 @@ convertRules mod tiData classHierarchy assumps dataTable hsDecls = ans where
         let e2 = atomizeAp mempty False dataTable e2'
         return (hsRuleIsMeta pr,hsRuleString pr,( snds (cs' ++ ts) ),eval $ smt $ sma e1,e2)
 
-convertE :: Monad m => TiData -> ClassHierarchy -> Map.Map Name Type -> DataTable -> SrcLoc -> HsExp -> m E
+convertE :: MonadWarn m => TiData -> ClassHierarchy -> Map.Map Name Type 
+    -> DataTable -> SrcLoc -> HsExp -> m E
 convertE tiData classHierarchy assumps dataTable srcLoc exp = do
-    [(_,_,e)] <- convertDecls tiData mempty classHierarchy assumps dataTable [HsPatBind srcLoc (HsPVar v_silly) (HsUnGuardedRhs exp) []]
+    [(_,_,e)] <- convertDecls tiData mempty classHierarchy assumps dataTable 
+        [HsPatBind srcLoc (HsPVar v_silly) (HsUnGuardedRhs exp) []]
     return e
 
 v_silly = toName Val ("Jhc@","silly")
@@ -343,8 +346,14 @@ applyCoersion ct e = etaReduce `liftM` f ct e where
         return (eLam y fgy)
 
 {-# NOINLINE convertDecls #-}
-convertDecls :: Monad m => TiData -> IdMap Properties -> ClassHierarchy -> Map.Map Name Type -> DataTable -> [HsDecl] -> m [(Name,TVr,E)]
-convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $ evalRWST ans ceEnv 2 where
+convertDecls :: MonadWarn m => TiData -> IdMap Properties 
+    -> ClassHierarchy -> Map.Map Name Type -> DataTable 
+    -> [HsDecl] -> m [(Name,TVr,E)]
+convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
+    res = do
+        (a,ws) <- evalRWST ans ceEnv 2
+        mapM_ addWarning ws
+        return a
     ceEnv = CeEnv {
         ceCoerce = tiCoerce tiData,
         ceAssumps = assumps,
@@ -438,14 +447,18 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
                                           (eJustIO (EVar tvrWorld2) (EVar rtVar))
 
     cDecl :: Monad m => HsDecl -> Ce m [(Name,TVr,E)]
-    cDecl (HsForeignDecl _ (FfiSpec (Import cn req) _ Primitive) n _) = do
+    cDecl (HsForeignDecl sLoc (FfiSpec (Import cn req) _ Primitive) n _) = do
         let name      = toName Name.Val n
         (var,ty,lamt) <- convertValue name
         let (ts,rt)   = argTypes' ty
-            prim      = APrim (PrimPrim $ toAtom cn) req
+--            prim      = APrim (PrimPrim $ toAtom cn) req
         es <- newVars [ t |  t <- ts, not (sortKindLike t) ]
-        let result    = foldr ($) (processPrimPrim dataTable $ EPrim prim [ EVar e | e <- es, not (tvrType e == tUnit)] rt) (map ELam es)
-        return [(name,setProperty prop_INLINE var,lamt result)]
+        --let result    = foldr ($) (processPrimPrim dataTable $ EPrim prim [ EVar e | e <- es, not (tvrType e == tUnit)] rt) (map ELam es)
+        --result <- return (processPrimPrim dataTable $ EPrim prim [ EVar e | e <- es, not (tvrType e == tUnit)] rt)
+        result <- processPrim dataTable sLoc (toAtom cn) 
+            [ EVar e | e <- es, not (tvrType e == tUnit)] rt req
+        return [(name,setProperty prop_INLINE var,
+                 lamt $ foldr ($) result (map ELam es))]
     cDecl (HsForeignDecl _ (FfiSpec (ImportAddr rcn req) _ _) n _) = do
         let name       = toName Name.Val n
         (var,ty,lamt)  <- convertValue name
