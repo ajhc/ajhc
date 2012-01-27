@@ -53,7 +53,7 @@ newGraph ns a b = snd $ newGraph' ns a b
 newGraphReachable :: Ord k => [n] -> (n -> k) -> (n -> [k]) -> ([k] -> [n],Graph n)
 newGraphReachable ns fn fd = (rable,ng) where
     (vmap,ng) = newGraph' ns fn fd
-    rable ks = Util.Graph.reachable ng [ v | Just v <- map (flip Map.lookup vmap) ks ] 
+    rable ks = Util.Graph.reachable ng [ v | Just v <- map (flip Map.lookup vmap) ks ]
 
 reachableFrom :: Ord k => (n -> k) -> (n -> [k]) -> [n] -> [k] -> [n]
 reachableFrom fn fd ns  = fst $ newGraphReachable ns fn fd

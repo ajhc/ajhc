@@ -22,7 +22,7 @@ module List (
     take, drop, splitAt, takeWhile, dropWhile, span, break,
     lines, words, unlines, unwords, reverse, and, or,
     any, all, elem, notElem, lookup,
-    sum, product, maximum, minimum, concatMap, 
+    sum, product, maximum, minimum, concatMap,
     zip, zip3, zipWith, zipWith3, unzip, unzip3
   ) where
 

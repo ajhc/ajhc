@@ -2,7 +2,7 @@ module DerivingDrift.DataP where
 
 import FrontEnd.HsSyn
 
-data Statement = DataStmt | NewTypeStmt 
+data Statement = DataStmt | NewTypeStmt
     deriving (Eq,Show)
 
 data Data = D {

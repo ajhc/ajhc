@@ -292,10 +292,10 @@ convertRules mod tiData classHierarchy assumps dataTable hsDecls = ans where
         let e2 = atomizeAp mempty False dataTable e2'
         return (hsRuleIsMeta pr,hsRuleString pr,( snds (cs' ++ ts) ),eval $ smt $ sma e1,e2)
 
-convertE :: MonadWarn m => TiData -> ClassHierarchy -> Map.Map Name Type 
+convertE :: MonadWarn m => TiData -> ClassHierarchy -> Map.Map Name Type
     -> DataTable -> SrcLoc -> HsExp -> m E
 convertE tiData classHierarchy assumps dataTable srcLoc exp = do
-    [(_,_,e)] <- convertDecls tiData mempty classHierarchy assumps dataTable 
+    [(_,_,e)] <- convertDecls tiData mempty classHierarchy assumps dataTable
         [HsPatBind srcLoc (HsPVar v_silly) (HsUnGuardedRhs exp) []]
     return e
 
@@ -346,8 +346,8 @@ applyCoersion ct e = etaReduce `liftM` f ct e where
         return (eLam y fgy)
 
 {-# NOINLINE convertDecls #-}
-convertDecls :: MonadWarn m => TiData -> IdMap Properties 
-    -> ClassHierarchy -> Map.Map Name Type -> DataTable 
+convertDecls :: MonadWarn m => TiData -> IdMap Properties
+    -> ClassHierarchy -> Map.Map Name Type -> DataTable
     -> [HsDecl] -> m [(Name,TVr,E)]
 convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
     res = do
@@ -455,7 +455,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
         es <- newVars [ t |  t <- ts, not (sortKindLike t) ]
         --let result    = foldr ($) (processPrimPrim dataTable $ EPrim prim [ EVar e | e <- es, not (tvrType e == tUnit)] rt) (map ELam es)
         --result <- return (processPrimPrim dataTable $ EPrim prim [ EVar e | e <- es, not (tvrType e == tUnit)] rt)
-        result <- processPrim dataTable sLoc (toAtom cn) 
+        result <- processPrim dataTable sLoc (toAtom cn)
             [ EVar e | e <- es, not (tvrType e == tUnit)] rt req
         return [(name,setProperty prop_INLINE var,
                  lamt $ foldr ($) result (map ELam es))]

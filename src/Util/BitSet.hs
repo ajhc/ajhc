@@ -21,14 +21,14 @@ instance Monoid BitSet where
     mempty = BitSet 0
     mappend (BitSet a) (BitSet b) = BitSet (a .|. b)
     mconcat ss = foldl' mappend mempty ss
-    
+
 instance Unionize BitSet where
     BitSet a `difference` BitSet b = BitSet (a .&. complement b)
     BitSet a `intersection` BitSet b = BitSet (a .&. b)
 
 type instance  Elem BitSet = Int
 
-instance Collection BitSet where 
+instance Collection BitSet where
 --    type Elem BitSet = Int
     singleton i = BitSet (bit i)
     fromList ts = BitSet (foldl' setBit 0 ts)
@@ -47,7 +47,7 @@ instance SetLike BitSet where
         f w n r = if even w || not (fn n) then f w1 n1 r else f w1 n1 (setBit r n) where
             !n1 = n + 1
             !w1 = w `shiftR` 1
-    
+
 
 instance IsEmpty BitSet where
     isEmpty (BitSet n) = n == 0
@@ -95,7 +95,7 @@ newtype EnumBitSet a = EBS BitSet
     deriving(Monoid,Unionize,HasSize,Eq,Ord,IsEmpty)
 
 type instance Elem (EnumBitSet a) = a
-instance Enum a => Collection (EnumBitSet a) where 
+instance Enum a => Collection (EnumBitSet a) where
     singleton i = EBS $ singleton (fromEnum i)
     fromList ts = EBS $ fromList (map fromEnum ts)
     toList (EBS w) = map toEnum $ toList w
@@ -106,7 +106,7 @@ instance Enum a => SetLike (EnumBitSet a) where
     member (fromEnum -> i) (EBS v) = member i v
     insert (fromEnum -> i) (EBS v) = EBS $ insert i v
     sfilter f (EBS v) = EBS $ sfilter (f . toEnum) v
-    
+
 
 {-
 instance Enum a => BuildSet a (EnumBitSet a) where

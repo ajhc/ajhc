@@ -223,7 +223,7 @@ stdSplit std@(StdGen s1 s2)
 --  #else
 -- stdSplit :: StdGen -> (StdGen, StdGen)
 -- stdSplit std@(StdGen s1 _) = (std, unsafePerformIO (mkStdRNG (fromInt s1)))
---  #endif	
+--  #endif
 
 
 --ptr_a = unsafePerformIO $ malloc

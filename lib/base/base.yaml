@@ -3,7 +3,7 @@ Version: 1.0
 Hs-Source-Dir: .
 Extensions: ForeignFunctionInterface
 Options: [ -pjhc, --noauto ]
-Exposed-Modules: 
+Exposed-Modules:
         - Control.Exception
         - Control.Monad
         - Data.Array

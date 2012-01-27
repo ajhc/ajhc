@@ -9,7 +9,7 @@ diff -ru containers-0.3.0.0/Data/Sequence.hs containers-0.3.0.0-new/Data/Sequenc
 -g i x is = if p x then i:is else is
 +    g i x is = if p x then i:is else is
  #endif
- 
+
  {-# INLINE findIndicesR #-}
 @@ -1513,7 +1513,7 @@
  				foldlWithIndex g n xs)
@@ -18,5 +18,5 @@ diff -ru containers-0.3.0.0/Data/Sequence.hs containers-0.3.0.0-new/Data/Sequenc
 -g is i x = if p x then i:is else is
 +    g is i x = if p x then i:is else is
  #endif
- 
+
  ------------------------------------------------------------------------

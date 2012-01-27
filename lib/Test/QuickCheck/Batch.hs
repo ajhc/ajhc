@@ -165,7 +165,7 @@ run a TestOptions { no_of_tests = n, length_of_tests = len, debug_tests = debug 
              -- inside "r" might be _|_, but anyway....
 	     r <- theTest
 	     -- Now, we turn off the watcher.
-	     -- Ignored if the watcher is already dead,	
+	     -- Ignored if the watcher is already dead,
 	     -- (unless some unlucky thread picks up the same name)
 	     killThread watcher
 	     return r)

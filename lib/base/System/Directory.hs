@@ -41,7 +41,7 @@ foreign import ccall unsafe rename :: CString -> CString -> IO Int
 
 
 createDirectory  :: FilePath -> IO ()
-createDirectory fp = throwErrnoIfMinus1_ fp $ withCString fp $ \cs -> mkdir cs (-1) 
+createDirectory fp = throwErrnoIfMinus1_ fp $ withCString fp $ \cs -> mkdir cs (-1)
 
 
 removeDirectory  :: FilePath -> IO ()

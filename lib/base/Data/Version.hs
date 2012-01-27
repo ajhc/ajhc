@@ -79,7 +79,7 @@ data Version =
   deriving ( Read,Show )
 
 instance Eq Version where
-  v1 == v2  =  versionBranch v1 == versionBranch v2 
+  v1 == v2  =  versionBranch v1 == versionBranch v2
                 && sort (versionTags v1) == sort (versionTags v2)
                 -- tags may be in any order
 
@@ -90,10 +90,10 @@ instance Ord Version where
 -- A concrete representation of 'Version'
 
 -- | Provides one possible concrete representation for 'Version'.  For
--- a version with 'versionBranch' @= [1,2,3]@ and 'versionTags' 
+-- a version with 'versionBranch' @= [1,2,3]@ and 'versionTags'
 -- @= [\"tag1\",\"tag2\"]@, the output will be @1.2.3-tag1-tag2@.
 --
 showVersion :: Version -> String
 showVersion (Version branch tags)
-  = concat (intersperse "." (map show branch)) ++ 
+  = concat (intersperse "." (map show branch)) ++
      concatMap ('-':) tags

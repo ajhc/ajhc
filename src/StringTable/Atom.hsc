@@ -55,7 +55,7 @@ class HasHash a where
     hash32 :: a -> Word32
 
 instance HasHash Atom where
-    hash32 a = let (x,y) = fromAtom a :: CStringLen in 
+    hash32 a = let (x,y) = fromAtom a :: CStringLen in
         unsafePerformIO $ hash2 0 x (fromIntegral y)
 
 instance HasHash BS.ByteString where
@@ -63,7 +63,7 @@ instance HasHash BS.ByteString where
         BS.unsafeUseAsCStringLen bs $ \ (x,y) -> hash2 0 x (fromIntegral y)
 
 instance HasHash String where
-    hash32 s = unsafePerformIO $ withCStringLen s $ 
+    hash32 s = unsafePerformIO $ withCStringLen s $
         \ (x,y) -> hash2 0 x (fromIntegral y)
 
 instance FromAtom (String -> String) where
@@ -99,7 +99,7 @@ instance ToAtom BS.ByteString where
     toAtomIO bs = BS.unsafeUseAsCStringLen bs toAtomIO
 
 instance FromAtom CStringLen where
-    fromAtom a@(Atom v) = (stPtr a,fromIntegral $ 
+    fromAtom a@(Atom v) = (stPtr a,fromIntegral $
         (v `shiftR` (#const ATOM_LEN_SHIFT)) .&. (#const ATOM_LEN_MASK))
 
 instance FromAtom Word where
@@ -127,7 +127,7 @@ instance Read Atom where
     readsPrec _ s = [ (toAtom s,"") ]
 
 intToAtom :: Monad m => Int -> m Atom
-intToAtom i = if isValidAtom i then return (Atom $ fromIntegral i) else 
+intToAtom i = if isValidAtom i then return (Atom $ fromIntegral i) else
     fail $ "intToAtom: " ++ show i
 
 isValidAtom :: Int -> Bool
