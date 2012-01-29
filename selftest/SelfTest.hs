@@ -63,6 +63,9 @@ testAtom = do
 --strings = [ "foo", "foobar", "baz", "", "bob"]
 strings =  ["h","n\206^um\198(","\186","yOw\246$\187x#",";\221x<n","\201\209\236\213J\244\233","\189eW\176v\175\209"]
 
+appendPS :: PackedString -> PackedString
+appendPS = mconcat
+
 testPackedString = do
     putStrLn "Testing PackedString"
     let prop_psid xs = unpackPS (packString xs) == (xs::String)
@@ -78,14 +81,14 @@ testPackedString = do
     print $ map packString strings
     print $ sort $ map packString strings
     print $ sort strings
-    pshash "Hello"
-    pshash "Foo"
-    pshash "Bar"
-    pshash "Baz"
-    pshash ""
-    pshash "\2321\3221x.y\3421\2222"
+ --   pshash "Hello"
+--    pshash "Foo"
+--    pshash "Bar"
+--    pshash "Baz"
+--    pshash ""
+--    pshash "\2321\3221x.y\3421\2222"
 
-pshash xs = putStrLn $ xs ++ ": " ++ show (hashPS (packString xs ))
+--pshash xs = putStrLn $ xs ++ ": " ++ show (hashPS (packString xs ))
 
 testName = do
     let nn x = (not (null x)) && ';' `notElem` x
