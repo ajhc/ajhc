@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Grin.FromE(compile) where
 
 import Control.Monad.Reader
@@ -31,7 +32,7 @@ import Name.Id
 import Name.Name
 import Name.Names
 import Options
-import Stats(mtick)
+import Stats(mtick')
 import StringTable.Atom
 import Support.CanType
 import Support.FreeVars
@@ -151,7 +152,7 @@ compile prog@Program { progDataTable = dataTable } = do
     funcBaps <- liftIO $ newIORef []
     counter <- liftIO $ newIORef 100000  -- TODO real number
     let (cc,reqcc,rcafs) = constantCaf prog
-        funcMain = toAtom "b_main"
+        funcMain = "b_main" :: Atom
     wdump FD.Progress $ do
         putErrLn $ "Updatable CAFS:" <+> tshow (length rcafs)
         putErrLn $ "Constant CAFS: " <+> tshow (length cc)
@@ -335,13 +336,13 @@ evalVar fty tvr  = do
     em <- asks evaledMap
     case mlookup (tvrIdent tvr) em of
         Just v -> do
-            mtick "Grin.FromE.strict-evaled"
+            mtick' "Grin.FromE.strict-evaled"
             return (Return [v])
 --        Nothing | not isFGrin, Just CaseDefault <- Info.lookup (tvrInfo tvr) -> do
 --            mtick "Grin.FromE.strict-casedefault"
 --            return (Fetch (toVal tvr))
         Nothing | getProperty prop_WHNF tvr -> do
-            mtick "Grin.FromE.strict-propevaled"
+            mtick' "Grin.FromE.strict-propevaled"
             return (BaseOp Promote [toVal tvr])
         Nothing -> return $ gEval (toVal tvr)
 
@@ -364,7 +365,7 @@ compile' cenv (tvr,as,e) = ans where
     ce (EVar tvr) | isUnboxed (getType tvr) = do
         return (Return $ keepIts [toVal tvr])
     ce (EVar tvr) | not $ isLifted (EVar tvr)  = do
-        mtick "Grin.FromE.strict-unlifted"
+        mtick' "Grin.FromE.strict-unlifted"
         return (Return $ keepIts [toVal tvr])
         --return (Fetch (toVal tvr))
     ce e | (EVar tvr,as) <- fromAp e = do
@@ -386,7 +387,7 @@ compile' cenv (tvr,as,e) = ans where
                         let pt = partialTag v (length as' - length as)
                         return $ dstore (NodeC pt (keepIts as))
                 Nothing | not (isLifted $ EVar tvr) -> do
-                    mtick "Grin.FromE.app-unlifted"
+                    mtick' "Grin.FromE.app-unlifted"
                     app fty (Return [toVal tvr]) as
                 Nothing -> do
                     case as of
@@ -400,16 +401,7 @@ compile' cenv (tvr,as,e) = ans where
     ce e | Just [z@NodeC {}] <- con e = return (dstore z)
     ce e | Just z <- con e = return (Return z)
 
-    ce (EPrim ap@(APrim (PrimPrim prim) _) as _) = f (fromAtom prim) as where
-
---        pconst s = Prim (APrim CConst { primConst = s, primRetType = "int" } mempty) [] [tEnumzh]
-        -- options
-
---        f "options_target" [] = do return $ Return [Lit 0 tEnumzh]
---        f "options_isWindows" [] = do return $ pconst "JHC_isWindows"
---        f "options_isPosix" [] = do return $ pconst "JHC_isPosix"
---        f "options_isBigEndian" [] = do return $ pconst "JHC_isBigEndian"
-
+    ce (EPrim ap@(APrim (PrimPrim prim) _) as _) = f prim as where
         -- artificial dependencies
         f "newWorld__" [_] = do
             return $ Return []
@@ -562,7 +554,7 @@ compile' cenv (tvr,as,e) = ans where
 
     app' e [] = return $ Return [e]
     app' e as = do
-        mtick "Grin.FromE.lazy-app-bap"
+        mtick' "Grin.FromE.lazy-app-bap"
         V vn <- newVar
         let t  = toAtom $ "Bap_" ++ show (length as) ++ "_" ++ funcName ++ "_" ++ show vn
             tl = toAtom $ "bap_" ++ show (length as) ++ "_" ++  funcName ++ "_" ++ show vn
@@ -626,7 +618,7 @@ compile' cenv (tvr,as,e) = ans where
         f [] x = x
         f (Left te@(_,ELam {}):ds) x = f (Right [te]:ds) x
         f (Left (t,e):ds) x | not (isLifted (EVar t)) = do
-            mtick "Grin.FromE.let-unlifted"
+            mtick' "Grin.FromE.let-unlifted"
             e <- ce e
             z <- newNodeVar
             v <- localEvaled [t] z $ f ds x

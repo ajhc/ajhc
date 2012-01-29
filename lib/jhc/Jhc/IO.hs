@@ -78,9 +78,10 @@ userError x = IOError User x Nothing Nothing
 errorContinuation :: IO a -> IO a
 errorContinuation x = catch x showError
 
-ioError    ::  IOError -> IO a
-ioError e  = case Jhc.Options.target of
-    Jhc.Options.GhcHs -> IO $ \w -> raiseIO__ e w
+ioError :: IOError -> IO a
+ioError e = case Jhc.Options.target of
+    Jhc.Options.GhcHs -> IO $
+        \w -> (case raiseIO__ e w of w' -> (# w', raiseError #))
     _ -> showError e
 
 catch :: IO a -> (IOError -> IO a) -> IO a
@@ -143,10 +144,6 @@ error s = unsafePerformIO' $
     putErrLn s         `thenIO_`
     exitFailure
 
--- | no the implicit unsafeCoerce__ here!
-foreign import primitive catch__ :: (World__ -> (# World__,a #)) -> (b -> World__ -> (# World__,a #)) -> World__ -> (# World__,a #)
-foreign import primitive raiseIO__ :: a -> World__ -> (# World__,b #)
-
 putErrLn :: [Char] -> IO ()
 putErrLn [] = putChar '\n'
 putErrLn (c:cs) = putChar c `thenIO_` putErrLn cs
@@ -155,3 +152,4 @@ putChar c = c_putwchar (charToInt c)
 
 foreign import primitive "U2U" charToInt :: Char -> Int
 foreign import ccall "stdio.h jhc_utf8_putchar" c_putwchar :: Int -> IO ()
+foreign import primitive "error.raiseIO__" raiseError :: a
