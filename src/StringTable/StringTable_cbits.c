@@ -7,7 +7,6 @@
 #define NDEBUG 1
 #include <assert.h>
 
-
 #define USE_THREADS 0
 
 #if USE_THREADS
@@ -37,8 +36,6 @@ static void print_quoted(FILE *file,unsigned char *s,int len);
 #define NUM_CHUNKS 256
 #define CHUNK_SIZE 16384
 
-
-
 #define ATOM_LEN(c)     (((atom_t)(c) >> ATOM_LEN_SHIFT) & ATOM_LEN_MASK)
 #define CHUNK_INDEX(c)  (((atom_t)(c) >> 9)&0xFF)
 #define CHUNK_OFFSET(c) (((atom_t)(c) >> 17) & 0x3FFF)
@@ -50,8 +47,6 @@ static void print_quoted(FILE *file,unsigned char *s,int len);
 #define ATOM_VALID(a) (a)
 
 // ((a) & VALID_BITMASK)
-
-
 
 static unsigned char first_chunk[CHUNK_SIZE];
 static unsigned char *stringtable_chunks[NUM_CHUNKS] = { first_chunk };
@@ -174,7 +169,6 @@ dump_table(void) {
         }
 }
 
-
 static void
 grow_table(void) {
  //   fprintf(stderr,"grow_table[[[\n");
@@ -190,10 +184,11 @@ grow_table(void) {
 //    fprintf(stderr,"]]]\n");
 }
 
+uint32_t hashlittle(const void *key, size_t length, uint32_t initval);
 #if KEEP_HASH
 #define FHASH(x,i) ((x).hashes[i])
 #else
-#define FHASH(x,i) (hash2(i,ATOM_PTR((x).atom),ATOM_LEN((x).atom)))
+#define FHASH(x,i) (hashlittle(ATOM_PTR((x).atom),ATOM_LEN((x).atom),i))
 #endif
 
 static void
@@ -230,8 +225,6 @@ hash_insert(struct hentry x) {
         return hash_insert(x);
 }
 
-
-
 static void
 print_quoted(FILE *file,unsigned char *s,int len)
 {
@@ -249,7 +242,6 @@ print_quoted(FILE *file,unsigned char *s,int len)
         }
 }
 
-
 atom_t
 stringtable_lookup(unsigned char *cs, int len)
 {
@@ -264,7 +256,7 @@ stringtable_lookup(unsigned char *cs, int len)
         assert(len < MAX_ENTRY_SIZE);
         hash_t h[CUCKOO_HASHES];
         for(uint32_t i = 0; i < CUCKOO_HASHES; i++) {
-                h[i] = hash2(i,cs,len);
+                h[i] = hashlittle(cs,len,i);
                 //int e = HASH_INDEX(i,h[i]);
                 for(int j = 0; j < CUCKOO_BUCKETS; j++) {
                         //struct hentry *b = &htable[(e + i) & HASHJMASK ];
@@ -294,8 +286,6 @@ stringtable_lookup(unsigned char *cs, int len)
         return na;
 }
 
-
-
 int
 lexigraphic_compare(atom_t x, atom_t y)
 {
@@ -303,7 +293,6 @@ lexigraphic_compare(atom_t x, atom_t y)
     int yl = ATOM_LEN(y);
     return memcmp(ATOM_PTR(x),ATOM_PTR(y),xl < yl ? xl : yl) || xl - yl;
 }
-
 
 atom_t
 atom_append(atom_t x,atom_t y)
@@ -376,9 +365,6 @@ stringtable_stats(void)
 
 }
 
-
-
-
 static void
 dieif(bool w,char *str)
 {
@@ -389,8 +375,7 @@ dieif(bool w,char *str)
 }
 
 // hash functions
-
-
+/*
 uint32_t
 hash2(uint32_t salt, unsigned char *key, int key_len)
 {
@@ -406,7 +391,6 @@ hash2(uint32_t salt, unsigned char *key, int key_len)
         return hash;
 }
 
-/*
 int
 main(int argc, char *argv[])
 {

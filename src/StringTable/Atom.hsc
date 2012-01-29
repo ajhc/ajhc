@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fffi -XTypeSynonymInstances -XDeriveDataTypeable  #-}
+{-# OPTIONS_GHC -XForeignFunctionInterface -XTypeSynonymInstances -XDeriveDataTypeable  #-}
 module StringTable.Atom(
     Atom(),
     ToAtom(..),
@@ -146,7 +146,10 @@ foreign import ccall unsafe "dump_table" dumpTable :: IO ()
 foreign import ccall unsafe "atom_append" atomAppend :: Atom -> Atom -> IO Atom
 foreign import ccall unsafe "lexigraphic_compare" c_atomCompare :: Atom -> Atom -> CInt
 foreign import ccall unsafe "dump_to_file" dumpToFile :: IO ()
-foreign import ccall unsafe hash2  :: Word32 -> CString -> CInt -> IO Word32
+foreign import ccall unsafe hashlittle  :: CString -> CSize -> Word32 -> IO Word32
+
+hash2 :: Word32 -> CString -> Int -> IO Word32
+hash2 init str size = hashlittle str (fromIntegral size) init
 
 atomCompare a b = if c == 0 then EQ else if c > 0 then GT else LT where
     c = c_atomCompare a b

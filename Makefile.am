@@ -58,7 +58,7 @@ JHC_LIBS = jhc-1.0.hl base-1.0.hl haskell98-1.0.hl applicative-1.0.hl flat-forei
 EXTRA_DIST = src/data rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
              lib/jhc lib/base lib/haskell98 lib/flat-foreign $(JHC_LIBS) $(JHC_EXT_LIBS) \
 	     src/StringTable/StringTable_cbits.c src/StringTable/StringTable_cbits.h src/cbits/md5sum.c jhc.1 \
-	     src/StringTable/Atom.hsc jhc.spec \
+	     src/StringTable/Atom.hsc jhc.spec src/cbits/lookup3.c \
 	     manual.html lib/applicative examples/HelloWorld.hs examples/Calendar.hs \
 	     src/FlagOpts.flags src/FlagDump.flags lib/ext
 
@@ -113,7 +113,7 @@ drift_processed/%: src/%
 	mkdir -p `echo $@ | sed -e 's@/[^/]*$$@@'`
 	DrIFT $< -o $@
 
-CFILES = src/StringTable/StringTable_cbits.o src/cbits/md5sum.o
+CFILES = src/StringTable/StringTable_cbits.o src/cbits/md5sum.o src/cbits/lookup3.o
 
 %.o : %.c
 	mkdir -p `echo $@ | sed -e 's@/[^/]*$$@@'`

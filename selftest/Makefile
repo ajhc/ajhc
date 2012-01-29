@@ -1,6 +1,6 @@
 INC= -i -i../drift_processed -i../src
 GHCOPTS= -fallow-overlapping-instances -fallow-undecidable-instances -fglasgow-exts \
-	 -XBangPatterns $(INC) -XTypeFamilies \
+	 -XBangPatterns $(INC) -XTypeFamilies -XViewPatterns -XRecordWildCards \
 	 -O -package QuickCheck -ignore-package lang  -optc-std=c99 -optc-g
 
 HC= ghc
@@ -13,7 +13,7 @@ UnionSolve: UnionSolve.hs ../src/Util/UnionSolve.hs
 TempDir: TempDir.hs ../src/Support/TempDir.hs
 
 %: %.hs
-	$(HC) $(GHCOPTS) --make $< -o $@  -I../src/cbits ../src/cbits/md5sum.c ../src/StringTable/StringTable_cbits.c
+	$(HC) $(GHCOPTS) --make $< -o $@  -I../src/cbits ../src/cbits/md5sum.c ../src/StringTable/StringTable_cbits.c ../src/cbits/lookup3.c
 
 clean:
 	rm -f -- md5 sha1 TestParse cff SelfTest
