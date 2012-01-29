@@ -67,12 +67,3 @@ toUpper c | isLower c = chr $ ord c - (Int 32#)
 toLower :: Char -> Char
 toLower c | isUpper c = chr $ ord c + (Int 32#)
           | otherwise = c
-
-elem    :: Char -> [Char] -> Bool
-elem _ []	= False
-elem x (y:ys)
-    | x == y = True
-    | otherwise = f y ys where
-        f y _ | x == y = True
-        f _ (y:ys) = f y ys
-        f _ [] = False

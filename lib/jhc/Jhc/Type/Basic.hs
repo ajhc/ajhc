@@ -18,4 +18,4 @@ type Bool__ = Bool_
 type Int__  = Bits32_
 type Char__ = Bits32_
 type Enum__ = Bits16_
-type Addr__ = Addr_
+type Addr__ = BitsPtr_

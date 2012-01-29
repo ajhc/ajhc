@@ -73,17 +73,16 @@ addTopLevels  hsmod action = do
                 = let nn = hsName in (nn,nn):r
             | nameName tc_Arrow == hsName, toModule "Jhc.Prim.Prim" == mod
                 = let nn = hsName in (nn,nn):r
- --           | otherwise = error $ "strong bad: " ++ show hsName
             | otherwise = let nn = toUnqualified hsName in (nn,hsName):(hsName,hsName):r
         f r z = let nn = qualifyName mod z in (z,nn):(nn,nn):r
         z ns = mapM mult (filter (\x -> length x > 1) $ groupBy (\a b -> fst a == fst b) (sort ns))
         mult xs@(~((n,sl):_)) = warn sl "multiply-defined" (show n ++ " is defined multiple times: " ++ show xs)
     z cdefs
---    let cn k (Right x) (Right y) | x /= y = Left $ ambig k [x,y]
---        cn _ _ x@Left {} = x
---        cn _ x _ = x
-    withSubTable (fromList nmap) action
-    --local ( \e -> e { envNameMap = Map.unionWithKey cn (Map.map Right (fromList nmap)) (envNameMap e) }) action
+    let amb k x y | x == y = x
+        amb k (Right n1) (Right n2) = Left (ambig k [n1,n2])
+        amb _ _ l  = l
+        
+    local ( \e -> e { envNameMap = Map.unionWithKey amb (Map.map Right $ Map.fromList nmap) (envNameMap e) }) action
 
 createSelectors sloc ds = mapM g ns where
     ds' :: [(HsName,[(HsName,HsBangType)])]

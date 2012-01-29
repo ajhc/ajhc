@@ -37,7 +37,6 @@ import Jhc.Prim.Wrapper
 
 type FilePath = String
 
-
 {-# RULES "putStr/++"      forall xs ys . putStr (xs ++ ys) = putStr xs >> putStr ys #-}
 
 putStr     :: String -> IO ()
@@ -49,7 +48,6 @@ putStrLn s =  do putStr s
 
 print      :: Show a => a -> IO ()
 print x    =  putStrLn (show x)
-
 
 getLine    :: IO String
 getLine    =  do c <- getChar
@@ -65,7 +63,6 @@ getContents = unsafeInterleaveIO getContents' where
             xs <- unsafeInterleaveIO getContents'
             return (unsafeChr ch:xs)
 
-
 readFile :: FilePath -> IO String
 readFile fn = do
     file <- withCString fn $ \fnc -> c_fopen fnc (Ptr (Addr_ "r"#))
@@ -76,7 +73,6 @@ readFile fn = do
                         xs <- unsafeInterleaveIO gc
                         return (unsafeChr ch:xs)
         unsafeInterleaveIO gc
-
 
 -- | The 'interact' function takes a function of type @String->String@
 -- as its argument.  The entire input from the standard input device is
@@ -96,7 +92,7 @@ interact f  =  do hSetBuffering stdin  NoBuffering
 
 -}
 
-writeFile'  :: FilePath -> String -> Addr__ -> IO ()
+writeFile'  :: FilePath -> String -> Addr_ -> IO ()
 writeFile' fn s mode = do
     file <- withCString fn $ \fnc -> c_fopen fnc (Ptr mode)
     if  (file == nullPtr) then (fail $ "Could not open file: " ++ fn) else do
@@ -109,8 +105,6 @@ writeFile fn s = writeFile' fn s (Addr_ "w"#)
 
 appendFile  :: FilePath -> String -> IO ()
 appendFile fn s = writeFile' fn s (Addr_ "a"#)
-
-
 
 putChar :: Char -> IO ()
 putChar c = c_putwchar (ord c)

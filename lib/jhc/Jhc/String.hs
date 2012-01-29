@@ -12,8 +12,6 @@ import Jhc.Type.Basic
 import Jhc.Prim.Prim
 import Jhc.Prim.Bits
 
-type Addr__ = BitsPtr_
-
 {-# VCONSTRUCTOR unpackString #-}
 {-# NOINLINE unpackString #-}
 unpackString :: Addr__ -> [Char]

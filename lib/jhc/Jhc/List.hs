@@ -5,15 +5,12 @@ import Jhc.Basics
 import Jhc.IO(error)
 import Jhc.Int
 import Jhc.Order
-
 import Jhc.String
-
 
 -- | our fusion routines
 
 build :: (forall b . (a -> b -> b) -> b -> b) -> [a]
 build g = g (:) []
-
 
 augment :: forall a. (forall b. (a->b->b) -> b -> b) -> [a] -> [a]
 augment g xs = g (:) xs
@@ -82,9 +79,7 @@ or (False:xs) = or xs
 
 {-# RULES "any/build"     forall p (g::forall b.(a->b->b)->b->b) .  any p (build g) = g ((||) . p) False #-}
 
-
 {-# RULES "all/build"     forall p (g::forall b.(a->b->b)->b->b) .  all p (build g) = g ((&&) . p) True #-}
-
 
 any, all         :: (a -> Bool) -> [a] -> Bool
 any p xs = f xs where
@@ -107,12 +102,10 @@ filter p (x:xs) | p x       = x : filter p xs
 
 infix  4  `elem`, `notElem`
 
-
 -- the implementation looks a little funny, but the reason for the
 -- inner loop is so that both the == function and the unboxing of the
 -- argument may occur right away outside the inner loop when the list isn't
 -- empty.
-
 
 elem, notElem    :: (Eq a) => a -> [a] -> Bool
 elem _ []	= False
@@ -168,11 +161,9 @@ head             :: [a] -> a
 head (x:_)       =  x
 head []          =  error "Prelude.head: empty list"
 
-
 tail             :: [a] -> [a]
 tail (_:xs)      =  xs
 tail []          =  error "Prelude.tail: empty list"
-
 
 last             :: [a] -> a
 last []          =  error "Prelude.last: empty list"
@@ -180,13 +171,11 @@ last (x:xs)      = last' x xs where
     last' x []     = x
     last' _ (y:ys) = last' y xs
 
-
 init             :: [a] -> [a]
 init []          =  error "Prelude.init: empty list"
 init (x:xs)      =  init' x xs where
     init' _ [] = []
     init' y (z:zs) = y:init' z zs
-
 
 {-# RULES "head/iterate"  forall f x . head (iterate f x) = x #-}
 {-# RULES "head/repeat"   forall x . head (repeat x) = x #-}
@@ -194,13 +183,9 @@ init (x:xs)      =  init' x xs where
 {-# RULES "tail/iterate"  forall f x . tail (iterate f x) = iterate f (f x) #-}
 {-# RULES "iterate/id" forall . iterate id = repeat #-}
 
-
-
 foldl1           :: (a -> a -> a) -> [a] -> a
 foldl1 f (x:xs)  =  foldl f x xs
 foldl1 _ []      =  error "Prelude.foldl1: empty list"
-
-
 
 scanl1           :: (a -> a -> a) -> [a] -> [a]
 scanl1 f (x:xs)  =  scanl f x xs
@@ -214,7 +199,6 @@ foldr1 _ []      =  error "Prelude.foldr1: empty list"
 scanr             :: (a -> b -> b) -> b -> [a] -> [b]
 scanr f q0 []     =  [q0]
 scanr f q0 (x:xs) =  f x q : qs where qs@(q:_) = scanr f q0 xs
-
 
 scanr1          :: (a -> a -> a) -> [a] -> [a]
 scanr1 f []     =  []
@@ -240,7 +224,6 @@ filter p xs = build (\c n -> foldr (filterFB c p) n xs)
 filterFB c p x r | p x       = x `c` r
 		 | otherwise = r
 
-
 {- NOINLINE iterateFB #-}
 iterate f x = build (\c _n -> iterateFB c f x)
 iterateFB c f x = x `c` iterateFB c f (f x)
@@ -248,12 +231,10 @@ iterateFB c f x = x `c` iterateFB c f (f x)
 head (x:xs) = x
 head [] = badHead
 
-
 map f xs =  build (\c n -> foldr (mapFB c f) n xs)
 {- NOINLINE mapFB #-}
 mapFB ::  (elt -> lst -> lst) -> (a -> elt) -> a -> lst -> lst
 mapFB c f x ys = c (f x) ys
-
 
 badHead = error "Prelude.head: empty list"
 
@@ -264,10 +245,7 @@ badHead = error "Prelude.head: empty list"
 --repeat x = build (\c _n -> repeatFB c x)
 --repeatFB c x = xs where xs = x `c` xs
 
-
 {-
-
-
 
 {-# RULES forall xs n (g :: forall b . (a -> b -> b) -> b -> b) . build g !! n  = bangBang g n  #-}
 
@@ -296,8 +274,6 @@ bangFB _x xs m = xs $! (m - 1)
 {-# INLINE iterateFB #-}
 {-# INLINE (!!) #-}
 
-
-
 {-# RULES
 "take"	   [~1] forall n xs . take n xs = case n of I# n# -> build (\c nil -> foldr (takeFB c nil) (takeConst nil) xs n#)
 "takeList"  [1] forall n xs . foldr (takeFB (:) []) (takeConst []) xs n = takeUInt n xs
@@ -320,13 +296,11 @@ takeFB c n x xs m | m <=# 0#  = n
 -- returns the remaining suffix.  span p xs is equivalent to
 -- (takeWhile p xs, dropWhile p xs), while break p uses the negation of p.
 
-
 takeWhile               :: (a -> Bool) -> [a] -> [a]
 takeWhile p []          =  []
 takeWhile p (x:xs)
             | p x       =  x : takeWhile p xs
             | otherwise =  []
-
 
 dropWhile               :: (a -> Bool) -> [a] -> [a]
 dropWhile p []          =  []
