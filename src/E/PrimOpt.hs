@@ -2,23 +2,17 @@
 module E.PrimOpt(performPrimOpt) where
 
 import Control.Monad.Fix()
-import Data.Maybe
-import Text.Printf
 
 import C.Prims
-import Cmm.Op(readTy,Ty)
 import Cmm.OpEval
 import Data.Monoid
-import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
 import E.E
 import E.Values
-import GenUtil
 import Stats
 import StringTable.Atom
 import Support.CanType
-import Support.FreeVars
 import qualified Cmm.Op as Op
 
 {-@Extensions

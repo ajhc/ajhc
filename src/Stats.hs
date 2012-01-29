@@ -23,6 +23,7 @@ module Stats(
     StatT,
     StatM,
     mtick,
+    mtick',
     mticks,
     runStatT,
     runStatIO,
@@ -145,6 +146,7 @@ runStatM (StatM a s) = (a,s)
 {-# INLINE mtick  #-}
 {-# INLINE mticks #-}
 mtick k = mticks 1 k
+mtick' k = mticks' 1 k
 mticks 0 _ = return ()
 mticks n k = let k' = toAtom k in k' `seq` n `seq` mticks' n k'
 

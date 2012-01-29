@@ -30,7 +30,7 @@ instance MonadSetSrcLoc PatSM where
 
 -- a new (unique) name introduced in pattern selector functions
 newPatVarName :: HsName
-newPatVarName = nameName $ toName Val "patvar@0"
+newPatVarName = nameName $ toName Val ("patvar@0"::String)
 
 {-
  this function replaces all constructor-pattern bindings in a module with
@@ -113,7 +113,7 @@ getPatSelFuns :: SrcLoc -> HsPat -> [(HsName, (HsExp))]
 getPatSelFuns sloc pat = [(varName, HsParen (HsLambda sloc [HsPVar newPatVarName] (kase (replaceVarNamesInPat varName pat)))) | varName <- getNamesFromHsPat pat] where
     kase p =  HsCase (HsVar newPatVarName) [a1, a2 ] where
        a1 =  HsAlt sloc p (HsUnGuardedRhs (HsVar newPatVarName)) []
-       a2 =  HsAlt sloc HsPWildCard (HsUnGuardedRhs (HsApp (HsVar (toName Val "error")) (HsLit $ HsString $ show sloc ++ " failed pattern match"))) []
+       a2 =  HsAlt sloc HsPWildCard (HsUnGuardedRhs (HsApp (HsVar (toName Val ("error"::String))) (HsLit $ HsString $ show sloc ++ " failed pattern match"))) []
 
 -- replaces all occurrences of a name with a new variable
 -- and every other name with underscore

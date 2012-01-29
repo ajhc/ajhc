@@ -56,6 +56,7 @@ plainPrimMap = Map.fromList
     , "dependingOn" ==> star +> starHash +> star
     , "newWorld__" ==> star +> state
     , "unsafeCoerce" ==> star +> star
+    , "options_target" ==> hash
     , "zero" ==> starHash
     , "one" ==> starHash
     , "box" ==> hash +> star

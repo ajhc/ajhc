@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 -- | All hardcoded names in the compiler should go in here
 -- the convention is
 -- v_foo for values
@@ -40,18 +41,18 @@ fromUnboxedNameTuple n = case show n of
     _ -> fail $ "Not unboxed tuple: " ++ show n
 
 instance FromTupname Name where
-    fromTupname name | m == "Jhc.Prim.Prim" = fromTupname (nn::String) where
+    fromTupname name | m == Module "Jhc.Prim.Prim" = fromTupname (nn::String) where
         (_,(m,nn)) = fromName name
     fromTupname _ = fail "not a tuple"
 
-s_Star = toName SortName ("Jhc@","*")
-s_Hash = toName SortName ("Jhc@","#")
-s_Bang = toName SortName ("Jhc@","!")
-s_Quest = toName SortName ("Jhc@","?")
-s_QuestQuest = toName SortName ("Jhc@","??")
-s_StarBang = toName SortName ("Jhc@","*!")
+s_Star = toName SortName (Module "Jhc@","*"::String)
+s_Hash = toName SortName (Module "Jhc@","#"::String)
+s_Bang = toName SortName (Module "Jhc@","!"::String)
+s_Quest = toName SortName (Module "Jhc@","?"::String)
+s_QuestQuest = toName SortName (Module "Jhc@","??"::String)
+s_StarBang = toName SortName (Module "Jhc@","*!"::String)
 
-u_instance = toName UnknownType ("Jhc@","instance")
+u_instance = toName UnknownType (Module "Jhc@","instance"::String)
 
 sFuncNames = FuncNames {
     func_equals = v_equals,

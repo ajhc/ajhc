@@ -41,10 +41,15 @@ instance Ord ModInfo where
 
 modInfoModImports m =  mp  [ i | i <- hsModuleImports (modInfoHsModule m)] where
     mp xs
-        | any ((== Module "Prelude") . hsImportDeclModule) xs = xs
+        | any ((== toModule "Prelude") . hsImportDeclModule) xs = xs
         | FO.Prelude `Set.member` (optFOptsSet $ modInfoOptions m) = (prelude:xs)
         | otherwise = xs
-    prelude = HsImportDecl { hsImportDeclSrcLoc = bogusASrcLoc, hsImportDeclModule = Module "Prelude", hsImportDeclSpec = Nothing, hsImportDeclAs = Nothing, hsImportDeclQualified = False }
+    prelude = HsImportDecl {
+        hsImportDeclSrcLoc = bogusASrcLoc,
+        hsImportDeclModule = toModule "Prelude",
+        hsImportDeclSpec = Nothing,
+        hsImportDeclAs = Nothing,
+        hsImportDeclQualified = False }
 
 --doExports :: [(Module,[Name])] -> [[ModInfo]] -> [[ModInfo]] -> IO [[ModInfo]]
 

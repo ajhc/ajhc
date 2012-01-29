@@ -23,9 +23,8 @@ import Doc.PPrint
 import E.E
 import E.Eta
 import E.Eval(eval)
-import E.PrimDecode
 import E.LetFloat(atomizeAp)
-import E.PrimOpt
+import E.PrimDecode
 import E.Rules
 import E.Show(render)
 import E.Subst
@@ -194,7 +193,7 @@ createInstanceRules dataTable classHierarchy funcs = return $ fromRules ans wher
         defaultName = defaultInstanceName methodName
 
         as = [ rule  t | Inst { instHead = _ :=> IsIn _ t }  <- snub (classInsts classRecord) ]
-        rule t = makeRule ("Rule.{" ++ show name ++ "}") (Module (show name),0) RuleSpecialization ruleFvs methodVar (vp:map EVar args) (removeNewtypes dataTable body)  where
+        rule t = makeRule ("Rule.{" ++ show name ++ "}") (toModule (show name),0) RuleSpecialization ruleFvs methodVar (vp:map EVar args) (removeNewtypes dataTable body)  where
             ruleFvs = [ t | ~(EVar t) <- vs] ++ args
             (vp,vs) = valToPat' (removeNewtypes dataTable $ tipe t)
             name = instanceName methodName (getTypeCons t)
@@ -1011,10 +1010,10 @@ makeSpec dataTable (t,e) T.RuleSpec { T.ruleType = rt, T.ruleUniq = (Module m,ui
     as <- specializeE (getType t) nt
     let ntvr = tvr { tvrIdent = toId newName, tvrType = getType nbody, tvrInfo = setProperties (prop_SPECIALIZATION:sspec) mempty }
         Just nn = fromId (tvrIdent t)
-        (ntype,Just m,q) = nameParts nn
-        newName = toName ntype (Just $ "Spec@." ++ m ++ "." ++ show ui,'f':m ++ "." ++ q)
+        (ntype,Just (show -> m),q) = nameParts nn
+        newName = toName ntype (Just $ toModule ("Spec@." ++ m ++ "." ++ show ui),'f':m ++ "." ++ q)
         sspec = if ss then [prop_SUPERSPECIALIZE] else []
-        ar = makeRule ("Specialize.{" ++ show newName) (Module m,ui) RuleSpecialization bvars t as (foldl eAp (EVar ntvr) (map EVar bvars))
+        ar = makeRule ("Specialize.{" ++ show newName) (toModule m,ui) RuleSpecialization bvars t as (foldl eAp (EVar ntvr) (map EVar bvars))
         bvars = nub $ freeVars as
         nbody = foldr ELam (foldl EAp e as) bvars
     return ((ntvr,nbody),ar)

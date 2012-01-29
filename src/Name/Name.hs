@@ -1,27 +1,30 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Name.Name(
-    NameType(..),
+    Module(..),
     Name,
-    nameName,
-    nameType,
-    getModule,
-    getIdent,
-    toUnqualified,
-    qualifyName,
+    NameType(..),
     ToName(..),
+    ffiExportName,
+    fromModule,
     fromTypishHsName,
     fromValishHsName,
-    parseName,
-    ffiExportName,
+    getIdent,
+    getModule,
     isConstructorLike,
-    Module(..),
-    fromModule,
     isTypeNamespace,
     isValNamespace,
     mainModule,
-    primModule,
-    nameParts,
+    preludeModule,
     mapName,
-    setModule
+    nameName,
+    nameParts,
+    nameType,
+    parseName,
+    primModule,
+    qualifyName,
+    setModule,
+    toModule,
+    toUnqualified
     ) where
 
 import Data.Char
@@ -81,9 +84,11 @@ fromValishHsName name
     where (x:_) = (hsIdentString . hsNameIdent  $ name)
     -}
 
-createName _ "" i = error $ "createName: empty module "  ++ i
-createName _ m "" = error $ "createName: empty ident "   ++ m
-createName t m i = Name $  toAtom $ (chr $  ord '1' + fromEnum t):m ++ ";" ++ i
+createName :: NameType -> Module -> String -> Name
+createName _ (Module "") i = error $ "createName: empty module " ++ i
+createName _ m "" = error $ "createName: empty ident " ++ show m
+createName t m i = Name $ toAtom $ (chr $ ord '1' + fromEnum t):show m ++ ";" ++ i
+
 createUName :: NameType -> String -> Name
 createUName _ "" = error $ "createUName: empty ident"
 createUName t i =  Name $ toAtom $ (chr $ fromEnum t + ord '1'):";" ++ i
@@ -92,36 +97,29 @@ class ToName a where
     toName :: NameType -> a -> Name
     fromName :: Name -> (NameType, a)
 
---instance ToName HsName where
---    toName nt n = m where
---        i = hsIdentString $ hsNameIdent n
---        m | Qual (Module m) _ <- n = createName nt m i
---          | otherwise = createUName nt i
---    fromName n = (nameType n, nameName n)
-
 instance ToName (String,String) where
-    toName nt (m,i) = createName nt m i
+    toName nt (m,i) = createName nt (Module $ toAtom m) i
     fromName n = case nameParts n of
-            (nt,Just m,i) -> (nt,(m,i))
+            (nt,Just (Module m),i) -> (nt,(show m,i))
             (nt,Nothing,i) -> (nt,("",i))
 
 instance ToName (Module,String) where
-    toName nt (Module m,i) = createName nt m i
+    toName nt (m,i) = createName nt m i
     fromName n = case nameParts n of
-            (nt,Just m,i) -> (nt,(Module m,i))
+            (nt,Just m,i) -> (nt,(m,i))
             (nt,Nothing,i) -> (nt,(Module "",i))
 
-instance ToName (Maybe String,String) where
+--instance ToName (Maybe String,String) where
+--    toName nt (Just m,i) = createName nt m i
+--    toName nt (Nothing,i) = createUName nt i
+--    fromName n = case nameParts n of
+--        (nt,a,b) -> (nt,(a,b))
+
+instance ToName (Maybe Module,String) where
     toName nt (Just m,i) = createName nt m i
     toName nt (Nothing,i) = createUName nt i
     fromName n = case nameParts n of
         (nt,a,b) -> (nt,(a,b))
-
-instance ToName (Maybe Module,String) where
-    toName nt (Just (Module m),i) = createName nt m i
-    toName nt (Nothing,i) = createUName nt i
-    fromName n = case nameParts n of
-        (nt,a,b) -> (nt,(fmap Module a,b))
 
 instance ToName Name where
     toName nt i = toName nt (x,y) where
@@ -132,12 +130,12 @@ instance ToName String where
     toName nt i = createUName nt i
     fromName n = (nameType n, mi ) where
         mi = case snd $ fromName n of
-            (Just m,i) -> m ++ "." ++ i
+            (Just (Module m),i) -> show m ++ "." ++ i
             (Nothing,i) -> i
 
 getModule :: Monad m => Name -> m Module
 getModule n = case nameParts n of
-    (_,Just m,_)  -> return (Module m)
+    (_,Just m,_) -> return m
     _ -> fail "Name is unqualified."
 
 getIdent :: Name -> String
@@ -147,7 +145,7 @@ getIdent n = case nameParts n of
 toUnqualified :: Name -> Name
 toUnqualified n = case nameParts n of
     (_,Nothing,_) -> n
-    (t,Just _,i) -> toName t (Nothing :: Maybe String,i)
+    (t,Just _,i) -> toName t (Nothing :: Maybe Module,i)
 
 qualifyName :: Module -> Name -> Name
 qualifyName m n = case nameParts n of
@@ -174,35 +172,42 @@ nameName n = n
 --    f xs | (a,_:b) <- span (/= ';') xs  = Qual (Module a) (HsIdent b)
 --    f _ = error $ "invalid Name: " ++ (show $ (fromAtom a :: String))
 
-nameParts :: Name -> (NameType,Maybe String,String)
+nameParts :: Name -> (NameType,Maybe Module,String)
 nameParts n@(Name a) = f $ tail (fromAtom a) where
     f (';':xs) = (nameType n,Nothing,xs)
-    f xs = (nameType n,Just a,b) where
+    f xs = (nameType n,Just $ Module (toAtom a),b) where
         (a,_:b) = span (/= ';') xs
 
 instance Show Name where
     showsPrec _ n = case nameParts n of
-        (_,Just a,b) -> showString a . showChar '.' . showString b
+        (_,Just a,b) -> shows a . showChar '.' . showString b
         (_,Nothing,b) -> showString b
 
 instance DocLike d => PPrint d Name  where
     pprint n = text (show n)
 
-mapName :: (String -> String,String -> String) -> Name -> Name
+mapName :: (Module -> Module,String -> String) -> Name -> Name
 mapName (f,g) n = case nameParts n of
     (nt,Nothing,i) -> toName nt (g i)
-    (nt,Just m,i) -> toName nt (Just (f m :: String),g i)
+    (nt,Just m,i) -> toName nt (Just (f m :: Module),g i)
 
 mainModule = Module "Main@"
 primModule = Module "Prim@"
+preludeModule = Module "Prelude"
+
+toModule :: String -> Module
+toModule s = Module $ toAtom s
 
 ffiExportName :: FfiExport -> Name
-ffiExportName (FfiExport cn _ cc _ _) = toName Val ("FE@", show cc ++ "." ++ cn)
+ffiExportName (FfiExport cn _ cc _ _) = toName Val (Module "FE@", show cc ++ "." ++ cn)
 
-newtype Module = Module String
-  deriving(Eq,Data,Typeable,Ord,ToAtom,FromAtom)
+newtype Module = Module Atom
+  deriving(Eq,Data,Typeable,ToAtom,FromAtom)
+
+instance Ord Module where
+    compare x y = show x `compare` show y
 
 instance Show Module where
-    showsPrec _ (Module n) = showString n
+    showsPrec _ (Module n) = shows n
 
-fromModule (Module s) = s
+fromModule (Module s) = fromAtom s

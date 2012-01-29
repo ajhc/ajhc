@@ -617,10 +617,10 @@ compileCompNode ifunc func ksm cn = do
     f cn
 
 --hsModuleRequires x = snub (Module "Jhc.Prim":ans) where
-hsModuleRequires x = snub (Module "Jhc.Prim.Prim":ans) where
+hsModuleRequires x = snub (toModule "Jhc.Prim.Prim":ans) where
 --hsModuleRequires x = snub ans where
     noPrelude = FO.Prelude `Set.notMember` optFOptsSet (hsModuleOpt x)
-    ans = (if noPrelude then id else  (Module "Prelude":)) [  hsImportDeclModule y | y <- hsModuleImports x]
+    ans = (if noPrelude then id else (preludeModule:)) [  hsImportDeclModule y | y <- hsModuleImports x]
 
 searchPaths :: Opt -> String -> [(String,String)]
 searchPaths modOpt m = ans where
@@ -726,8 +726,8 @@ buildLibrary ifunc func = ans where
                 dd x = FP.takeDirectory fp FP.</> x
         when verbose $
             print (flags,optFOptsSet modOpts)
-        let hmods = map Module $ snub $ mfield "hidden-modules"
-            emods = map Module $ snub $ mfield "exposed-modules"
+        let hmods = map toModule $ snub $ mfield "hidden-modules"
+            emods = map toModule $ snub $ mfield "exposed-modules"
         return (Map.toList dsing,name,vers,hmods,emods, modOpts)
 
 ------------------------------------

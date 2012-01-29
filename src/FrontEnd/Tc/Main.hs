@@ -128,7 +128,7 @@ newHsVar ns = do
     return $ toName Val (ns ++ "@",show nn)
 
 isTypePlaceholder :: HsName -> Bool
-isTypePlaceholder (getModule -> Just (Module m)) = m `elem` ["Wild@","As@"]
+isTypePlaceholder (getModule -> Just m) = m `elem` [toModule "Wild@",toModule "As@"]
 isTypePlaceholder _ = False
 
 tiExpr,tcExpr ::  HsExp -> Type ->  Tc HsExp

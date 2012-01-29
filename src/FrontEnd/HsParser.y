@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -w #-} {- -*- Haskell -*- -}
+{-# OPTIONS_GHC -w -XNoOverloadedStrings #-} {- -*- Haskell -*- -}
 -- -----------------------------------------------------------------------------
 -- $Id: HsParser.ly,v 1.4 2001/11/25 08:52:13 bjpop Exp $
 
@@ -1033,8 +1033,8 @@ layout_on  :: { () }  :   {% getSrcLoc `thenP` \sl ->
 -- Miscellaneous (mostly renamings)
 
 modid :: { Module }
-      : CONID                 { Module $1 }
-      | QCONID                { Module (fst $1 ++ "." ++ snd $1) }
+      : CONID                 { toModule $1 }
+      | QCONID                { toModule (fst $1 ++ "." ++ snd $1) }
 
 tyconorcls :: { HsName }
       : conid                 { $1 }
@@ -1074,10 +1074,10 @@ pling_name	      = toName UnknownType  "!"
 star_name	      = toName UnknownType  "*"
 hash_name	      = toName UnknownType  "#"
 dot_name	      = toName UnknownType  "."
-prelude_mod	      = Module "Prelude"
-main_mod	      = Module "Main"
+prelude_mod	      = toModule "Prelude"
+main_mod	      = toModule "Main"
 
-tuple_con_name i      = toName DataConstructor ("Jhc.Prim.Prim","("++replicate i ','++")")
+tuple_con_name i      = toName DataConstructor (toModule "Jhc.Prim.Prim","("++replicate i ','++")")
 
 unit_con	      = HsCon { {-hsExpSrcSpan = bogusSrcSpan,-} hsExpName = dc_Unit }
 tuple_con i	      = HsCon { {-hsExpSrcSpan = bogusSrcSpan,-} hsExpName = (tuple_con_name i) }
@@ -1090,5 +1090,5 @@ tuple_tycon_name i    = tuple_con_name i
 
 list_tycon	      = HsTyCon list_tycon_name
 
-toUnqualName n = toName UnknownType (Nothing :: Maybe String,n)
+toUnqualName n = toName UnknownType (Nothing :: Maybe Module,n)
 }

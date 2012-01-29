@@ -35,12 +35,13 @@ import qualified FrontEnd.HsErrors as HsErrors
 import qualified Name.VConsts as V
 
 data FieldMap = FieldMap
-    (Map.Map Name Int)             -- a map of data constructors to their arities
-    (Map.Map Name [(Name,Int)])    -- a map of field labels to ...
+    !(Map.Map Name Int)          -- a map of data constructors to their arities
+    !(Map.Map Name [(Name,Int)]) -- a map of field labels to ...
 
 instance Monoid FieldMap where
     mempty = FieldMap mempty mempty
-    mappend (FieldMap a b) (FieldMap c d) = FieldMap (a `mappend` c) (b `mappend` d)
+    mappend (FieldMap a b) (FieldMap c d) =
+        FieldMap (a `mappend` c) (b `mappend` d)
 
 type SubTable = Map.Map HsName HsName
 
@@ -68,9 +69,9 @@ addTopLevels  hsmod action = do
     let cdefs = map (\ (x,y,_) -> (x,y)) $ fst $ collectDefsHsModule hsmod
         nmap = foldl f [] (fsts cdefs)
         f r hsName@(getModule -> Just _)
-            | Just _ <- V.fromTupname hsName, Module "Jhc.Prim.Prim" <- mod
+            | Just _ <- V.fromTupname hsName, toModule "Jhc.Prim.Prim" == mod
                 = let nn = hsName in (nn,nn):r
-            | nameName tc_Arrow == hsName, Module "Jhc.Prim.Prim" == mod
+            | nameName tc_Arrow == hsName, toModule "Jhc.Prim.Prim" == mod
                 = let nn = hsName in (nn,nn):r
  --           | otherwise = error $ "strong bad: " ++ show hsName
             | otherwise = let nn = toUnqualified hsName in (nn,hsName):(hsName,hsName):r
@@ -673,7 +674,7 @@ renameName :: Name -> RM Name
 -- a few hard coded cases
 renameName hsName
     | hsName `elem` [tc_Arrow,dc_Unit,tc_Unit] = return hsName
-    | (nt,Just ('@':m),i) <- nameParts hsName = return $ toName nt (Module m, i)
+    | (nt,Just m,i) <- nameParts hsName, '@':_ <- show m = return $ toName nt (m, i)
     | Just _ <- V.fromTupname hsName = return hsName
 renameName hsName = do
     subTable <- asks envNameMap

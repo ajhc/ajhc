@@ -53,7 +53,7 @@ processFiles cs = f cs (optMainFunc options) where
     f [] Nothing  = do
         int <- Interactive.isInteractive
         when (not int) $ putErrDie "jhc: no input files"
-        g [Left (Module "Prelude")]
+        g [Left preludeModule]
     f [] (Just (b,m)) = do
         m <- getModule (parseName Val m)
         g [Left m]
@@ -64,7 +64,7 @@ processFiles cs = f cs (optMainFunc options) where
         ('s':'h':'.':_)     -> Right f
         ('s':'h':'l':'.':_) -> Right f
         ('c':'s':'h':'.':_) -> Right f
-        _                   -> Left $ Module f
+        _                   -> Left $ toModule f
 
 processCollectedHo cho = do
     if optMode options == CompileHo then return () else do

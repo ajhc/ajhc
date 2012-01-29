@@ -179,7 +179,7 @@ instance Binary Tyvar where
         return (Tyvar aa ab)
 
 instance DocLike d => PPrint d Module where
-   pprint (Module s) = text s
+   pprint (Module s) = tshow s
 
 withNewNames ts action = subVarName $ do
     ts' <- mapM newTyvarName ts

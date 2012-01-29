@@ -70,7 +70,7 @@ data InteractiveState = IS {
 isInitial = IS {
     stateHo = mempty,
     stateInteract = emptyInteract,
-    stateModule = Module "Main",
+    stateModule = mainModule,
     stateImports = [],
     stateOptions = options
     }
@@ -141,7 +141,7 @@ interact cho = mre where
     ptype k | Just r <- Map.lookup k (hoAssumps hoE) = show (pprint r:: PP.Doc)
     ptype x | nameType x == ClassName = hsep (map kindShow $ kindOfClass x (hoKinds hoE))
     ptype x = "UNKNOWN: " ++ show (nameType x,x)
-    isStart =  isInitial { stateHo = hoE, stateImports = runIdentity $ calcImports hoE False (Module "Prelude") }
+    isStart =  isInitial { stateHo = hoE, stateImports = runIdentity $ calcImports hoE False preludeModule }
     do_expr :: Interact -> String -> IO Interact
     do_expr act s = case parseStmt (s ++ "\n") of
         Left m -> putStrLn m >> return act

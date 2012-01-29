@@ -50,7 +50,12 @@ PACKAGES= -package fgl -package regex-compat -package random -package array -pac
 	  -package unix -package haskell98 -package utf8-string -package zlib -package HsSyck \
 	  -package filepath -package process
 
-GHCLANG= -XTypeFamilies -XViewPatterns -XUndecidableInstances -XOverlappingInstances -XRecordWildCards -XRecursiveDo -XTupleSections -XParallelListComp -XGeneralizedNewtypeDeriving -XScopedTypeVariables -XFlexibleInstances -XTypeSynonymInstances -XMultiParamTypeClasses -XDeriveDataTypeable -fglasgow-exts -XNoMonoLocalBinds
+GHCLANG= -XTypeFamilies -XViewPatterns -XUndecidableInstances -XOverlappingInstances \
+	-XRecordWildCards -XRecursiveDo -XTupleSections -XParallelListComp \
+	-XGeneralizedNewtypeDeriving -XScopedTypeVariables -XFlexibleInstances \
+	-XTypeSynonymInstances -XMultiParamTypeClasses -XDeriveDataTypeable \
+	-fglasgow-exts -XNoMonoLocalBinds
+
 GHCOPTS= $(HSOPTS) -XBangPatterns -O @GHCFLAGS@ $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 
 JHC_LIBS = jhc-1.0.hl base-1.0.hl haskell98-1.0.hl applicative-1.0.hl flat-foreign-1.0.hl jhc-prim-1.0.hl
@@ -252,7 +257,6 @@ manual.mkd: utils/stitch.prl $(JHC_MANUAL_FILES)
 
 manual: manual.mkd
 	pandoc $< --toc -s -f markdown -t html -s -c manual.css -o $@.html
-
 
 jhc_man.mkd: utils/stitch.prl docs/man_header.mkd $(JHC_MANUAL_FILES)
 	perl utils/stitch.prl -h docs/man_header.mkd -c Using,Options $(JHC_MANUAL_FILES) > jhc_man.mkd

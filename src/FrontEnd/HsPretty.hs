@@ -187,7 +187,7 @@ ppHsDecls ds = vcat $ map ppHsDecl ds
 ppHsModuleHeader :: Module -> Maybe [HsExportSpec] ->  Doc
 ppHsModuleHeader (Module modName) mbExportList = mySep [
 		 text "module",
-		 text modName,
+		 text $ show modName,
 		 maybePP (parenList . map ppHsExportSpec) mbExportList,
 		 text "where"]
 
@@ -197,13 +197,13 @@ ppHsExportSpec (HsEAbs name)                     = ppHsQName name
 ppHsExportSpec (HsEThingAll name)                = ppHsQName name <> text"(..)"
 ppHsExportSpec (HsEThingWith name nameList)      = ppHsQName name <>
                                                    (parenList . map ppHsQNameParen $ nameList)
-ppHsExportSpec (HsEModuleContents (Module name)) = text "module" <+> text name
+ppHsExportSpec (HsEModuleContents (show -> name)) = text "module" <+> text name
 
-ppHsImportDecl (HsImportDecl pos (Module mod) bool mbName mbSpecs) =
+ppHsImportDecl (HsImportDecl pos (show -> mod) bool mbName mbSpecs) =
 	   mySep [text "import",
 		 if bool then text "qualified" else empty,
 		 text mod,
-		 maybePP (\(Module n) -> text "as" <+> text n) mbName,
+		 maybePP (\(show -> n) -> text "as" <+> text n) mbName,
 		 maybePP exports mbSpecs]
            where
 	   exports (b,specList)

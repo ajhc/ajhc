@@ -10,10 +10,7 @@ import Doc.DocLike
 import FrontEnd.Exports
 import FrontEnd.HsSyn
 import FrontEnd.Rename
-import FrontEnd.SrcLoc
-import FrontEnd.Warning
 import Ho.Type
-import Name.Name
 import Options
 import qualified FlagDump as FD
 import qualified FrontEnd.Tc.Module as Tc
