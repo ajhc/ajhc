@@ -39,10 +39,10 @@ data DotNetPrim = DotNetField | DotNetCtor | DotNetMethod
 
 data Prim =
     PrimPrim Atom          -- Special primitive implemented in the compiler somehow.
-    | CConst { primConst :: String, primRetType :: ExtType }  -- C code which evaluates to a constant
+    | CConst { primConst :: !PackedString }  -- C code which evaluates to a constant
     | Func {
         funcIOLike :: {-# UNPACK #-} !Bool,
-        funcName :: PackedString,
+        funcName :: !PackedString,
         primArgTypes :: [ExtType],
         primRetType :: ExtType
         }   -- function call with C calling convention
@@ -51,7 +51,7 @@ data Prim =
         primArgTypes :: [ExtType],
         primRetType :: ExtType
         } -- indirect function call with C calling convention
-    | AddrOf PackedString          -- address of linker name
+    | AddrOf !PackedString          -- address of linker name
     | Peek { primArgTy :: Op.Ty }  -- read value from memory
     | Poke { primArgTy :: Op.Ty }  -- write value to memory
     | PrimTypeInfo {
@@ -59,13 +59,13 @@ data Prim =
         primRetTy :: Op.Ty,
         primTypeInfo :: {-# UNPACK #-} !PrimTypeInfo
         }
-    | PrimString PackedString                                 -- address of a raw string. encoded in utf8.
+    | PrimString !PackedString                                 -- address of a raw string. encoded in utf8.
     | PrimDotNet {
         primStatic :: {-# UNPACK #-} !Bool,
-        primDotNet :: DotNetPrim,
+        primDotNet :: !DotNetPrim,
         primIOLike :: {-# UNPACK #-} !Bool,
-        primAssembly :: PackedString,
-        primDotNetName :: PackedString
+        primAssembly :: !PackedString,
+        primDotNetName :: !PackedString
         }
     | Op {
         primCOp :: Op.Op Op.Ty,
@@ -147,7 +147,7 @@ instance PPrint d Prim  => PPrint d APrim where
 
 instance DocLike d => PPrint d Prim where
     pprint (PrimPrim t) = text (fromAtom t)
-    pprint (CConst s t) = parens (text t) <> parens (text s)
+    pprint (CConst s) = parens (text $ unpackPS s)
     pprint (Func _ s xs r) = parens (text r) <> text (unpackPS s) <> tupled (map text xs)
     pprint (IFunc _ xs r) = parens (text r) <> parens (char '*') <> tupled (map text xs)
     pprint (AddrOf s) = char '&' <> text (unpackPS s)

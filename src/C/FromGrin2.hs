@@ -636,7 +636,7 @@ convertConst v = return (f v) where
     f (Lit i (TyPrim (Op.TyBits _ Op.HintFloat))) = return (constant $ floating (realToFrac i))
     f (Lit i _) = return (constant $ number (fromIntegral i))
     f (ValPrim (APrim p _) [] ty) = case p of
-        CConst s _ -> return $ expressionRaw s
+        CConst s -> return $ expressionRaw $ unpackPS s
         AddrOf t -> do rt <- convertType ty; return . cast rt $ expressionRaw ('&':unpackPS t)
         PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimSizeOf } -> return $ expressionRaw ("sizeof(" ++ tyToC Op.HintUnsigned arg ++ ")")
         PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimMinBound } -> return $ expressionRaw ("prim_minbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
@@ -660,8 +660,8 @@ convertConst v = return (f v) where
 
 --convertPrim p vs = return (mempty,err $ show p)
 convertPrim p vs ty
-    | APrim (CConst s _) _ <- p = do
-        return $ expressionRaw s
+    | APrim (CConst s) _ <- p = do
+        return $ expressionRaw $ unpackPS s
     | APrim Op {} _ <- p = do
         let [rt] = ty
         convertVal (ValPrim (p) vs rt)

@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fffi #-}
+{-# OPTIONS_JHC -fffi -funboxed-values #-}
 module System.IO.Binary(readBinaryFile,putWord8,getWord8) where
 
 import Data.Word
@@ -12,7 +12,7 @@ import Foreign.C.Error
 
 readBinaryFile :: FilePath -> IO [Word8]
 readBinaryFile fn = do
-    file <- withCString fn $ \fnc -> c_fopen fnc read_str
+    file <- withCString fn $ \fnc -> c_fopen fnc "rb"#
     if  (file == nullPtr) then getErrno >>= \errno -> (ioError $ errnoToIOError "readBinaryFile" errno Nothing (Just fn)) else do
         let gc = do
                 ch <- c_getc file
@@ -24,10 +24,10 @@ readBinaryFile fn = do
         unsafeInterleaveIO gc
 
 foreign import primitive "Lobits" cintToWord8 :: CInt -> Word8
-foreign import primitive "const.\"rb\"" read_str :: Ptr CChar
+--foreign import primitive "const.\"rb\"" read_str :: Ptr CChar
 
 foreign import ccall "stdio.h getc_unlocked" c_getc :: Ptr () -> IO CInt
-foreign import ccall "stdio.h fopen" c_fopen :: CString -> CString -> IO (Ptr ())
+foreign import ccall "stdio.h fopen" c_fopen :: CString -> BitsPtr_ -> IO (Ptr ())
 foreign import ccall "stdio.h fclose" c_fclose :: Ptr () -> IO CInt
 
 -- Int translates to CInt in the calling conventions so this is safe.

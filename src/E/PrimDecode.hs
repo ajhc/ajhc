@@ -6,95 +6,78 @@ import Text.Printf
 
 import C.Prims
 import Cmm.Op(readTy,Ty)
+import Data.Maybe
+import Data.Monoid(Monoid(..))
 import DataConstructors
 import E.E
 import E.Values
 import FrontEnd.SrcLoc
 import FrontEnd.Tc.Kind
 import FrontEnd.Warning
+import Name.Name
+import Name.Names
+import PackedString
 import StringTable.Atom
 import Support.CanType
+import Support.FreeVars
+import Util.Gen
 import qualified Cmm.Op as Op
 import qualified Data.Map as Map
 
-{-
--- type to describe type patterns, used for error checking types.
-data Var t = Var !Int t
-data Quant = Forall | Exists
-data Ty t
-    = Quant Quant [Var t] t
-    | Kind KBase
-    | V (Var t)
-    | t :-> t
-    | Or [t]
-    | t :*> t
-    | C Name
-    | A (Ty t) [Ty t]
-
-match :: Fix Ty ->
-
---    a :*> b = a :*> (a :-> b) | b
-
--- describes a pattern the type of a prim must match
-data TSpec
-    = K KBase
-    | TSpec :-> TSpec
-    | TSpec :*> TSpec  -- repeated
-    | UIO_
-    | UIO TSpec
-    | TA [TSpec]
--}
-
-data Typ = [KBase] :-> KBase
+data Typ = [BType] :-> BType
     deriving (Show)
 
---data BType
---    = BVar !Int KBase
---    | BCon Name (Maybe [BType])
+data BType
+    = BKind KBase
+    | BTup [BType]
+    | BState
 
-star = [] :-> Star
-hash = [] :-> KHash
-starHash = [] :-> KQuestQuest
-world = hash
+instance Show BType where
+    showsPrec n (BKind k) = showsPrec n k
+    showsPrec _ BState = showString "State#"
+    showsPrec n (BTup ts) = showsPrec n ts
+
+star = [] :-> BKind Star
+hash = [] :-> BKind KHash
+starHash = [] :-> BKind KQuestQuest
+state = [] :-> BState
+utup ~([] :-> t1) ~([] :-> t2) = [] :-> BTup [t1,t2]
 
 infixr 3 +>
-[] :-> k +> ks :-> rt = (k:ks) :-> rt
+(+>) :: Typ -> Typ -> Typ
+~([] :-> k) +> ks :-> rt = (k:ks) :-> rt
 
 infix 1 ==>
 a ==> b = (a,b)
 --plainPrimMap, rawArgPrimMap, prefixPrimMap :: Map.Map Atom Typ
-plainPrimMap, fullPlainPrimMap :: Map.Map Atom Typ
+plainPrimMap :: Map.Map Atom Typ
 plainPrimMap = Map.fromList
     [ "seq" ==> star +> starHash +> starHash
     , "dependingOn" ==> star +> starHash +> star
-    , "newWorld__" ==> star +> world
-    , "zero" ==> star
-    , "one" ==> star
+    , "newWorld__" ==> star +> state
+    , "unsafeCoerce" ==> star +> star
+    , "zero" ==> starHash
+    , "one" ==> starHash
     , "box" ==> hash +> star
     , "unbox" ==> star +> hash
-    , "increment" ==> starHash +> starHash
-    , "decrement" ==> starHash +> starHash
-    , "fincrement" ==> starHash +> starHash
-    , "fdecrement" ==> starHash +> starHash
     , "constPeekByte" ==> hash +> hash
     , "exitFailure__" ==> hash +> hash
-    ]
+    ] `Map.union` fmap (const (starHash +> starHash)) incDec
+      `Map.union` fmap (const star) primBoundMap
+
+primBoundMap = Map.fromList [("maxBound",PrimMaxBound),
+                             ("minBound",PrimMinBound),
+                             ("umaxBound",PrimUMaxBound)]
+incDec = Map.fromList [("increment",Op.Add),("decrement",Op.Sub),
+                       ("fincrement",Op.FAdd),("fdecrement",Op.FSub)]
+
 ashow op = toAtom (show op)
-fullPlainPrimMap = Map.union plainPrimMap . Map.fromList
-    $ [ (ashow op ==> starHash +> starHash +> starHash)
+binOpMap = Map.fromList [ ashow op ==> (op, starHash +> starHash +> starHash)
         | op :: Op.BinOp <- [minBound .. maxBound] ]
-    ++ [ (ashow op ==> starHash +> starHash)
-        | op :: Op.UnOp <- [minBound .. maxBound] ]
-    ++ [ (ashow op ==> starHash +> starHash)
-        | op :: Op.ConvOp <- [minBound .. maxBound] ]
---rawArgPrimMap =
---    [ "peek." ==> starHash :-> UIO starHash
---    , "poke." ==> starHash :-> UIO starHash
---    ]
---prefixPrimMap = rawArgPrimMap ++
---    [ "const." ==> TA [star,hash :-> hash]
---    , "error." ==> star
---    ]
+unOpMap = Map.fromList [ ashow op ==> (op,starHash +> starHash)
+    | op :: Op.UnOp <- [minBound .. maxBound] ]
+convOpMap = Map.fromList [ ashow op ==> (op,starHash +> starHash)
+    | op :: Op.ConvOp <- [minBound .. maxBound] ]
 
 -- | A safe version of 'zipWith'.
 pairWith  :: (a -> b -> c)
@@ -104,6 +87,8 @@ pairWith f xs ys = g xs ys [] where
     g (x:xs) (y:ys) rs = g xs ys (f x y:rs)
     g _ _ _ = Nothing
 
+ePrim prim as t = EPrim (APrim prim mempty) as t
+
 processPrim :: MonadWarn m
     => DataTable
     -> SrcLoc     -- ^ location of declaration
@@ -112,97 +97,116 @@ processPrim :: MonadWarn m
     -> E          -- ^ return type
     -> Requires   -- ^ c requires
     -> m E        -- ^ result
-processPrim dT srcLoc pName args rType req = ans where
-    ans = case Map.lookup pName fullPlainPrimMap of
-        Just typ -> checkType typ (return passThrough)
-        Nothing -> prefixOp
-    checkType (tas :-> trt) onFail =
-        case pairWith match tas (map (getType . getType) args) of
-            Just cs | and cs, match trt (getType rType) -> looksGood
+processPrim dataTable srcLoc pName args rType req = ans where
+    passThrough = EPrim (APrim (PrimPrim pName) req) args rType
+    ans = checkOp binOpMap doBinOp $ checkOp unOpMap (doUnOp Op.UnOp) $
+        checkOp convOpMap (doUnOp Op.ConvOp) primCheckOther
+    checkOp table yesMatch noMatch = case Map.lookup pName table of
+        Just (op,ty) -> checkType ty (return passThrough) (yesMatch op)
+        Nothing -> noMatch
+    primCheckOther = case Map.lookup pName plainPrimMap of
+        Just ty -> checkType ty (return passThrough) (primOther pName args)
+        Nothing -> primPrefix (show pName) args
+      where primOther "box" [a] = return ans where
+                Just (ExtTypeBoxed cna _ _) = lookupExtTypeInfo dataTable rType
+                ans = ELit litCons { litName = cna, litArgs = [a], litType = rType }
+            primOther "unbox" [a] = return ans where
+                (vara:_) = newIds (freeVars (a,rType))
+                ans = unbox dataTable a vara $ \tvra -> EVar tvra
+            primOther "seq" [a,b] = return $ prim_seq a b
+            primOther "exitFailure__" [_] = return $ EError "" rType
+            primOther "options_target" _ = return (ELit (LitInt 0 rType))
+            primOther "constPeekByte" [a] = return $ ePrim (Peek Op.bits8) [a] rType
+            primOther op [a] | Just x <- Map.lookup op incDec = do
+                (pa,(ta,sta)) <- extractPrimitive dataTable a
+                Just ret <- return $ boxResult dataTable rType $ \tr str ->
+                    ePrim (Op (Op.BinOp x (stringToOpTy ta) (stringToOpTy ta)) tr)
+                        [pa, ELit (LitInt 1 sta)] str
+                return ret
+            primOther op [] | Just x <- Map.lookup op primBoundMap = do
+                Just res <- return $ boxResult dataTable rType $ \tr str ->
+                    ePrim (PrimTypeInfo tr tr x) [] str
+                return res
+            primOther op [] | Just x <- lookup op ["zero" ==> 0,"one" ==> 1] = do
+                Just res <- return $ boxResult dataTable rType $ \tr str ->
+                    ELit (LitInt x str)
+                return res
+            -- since the primitive was found in the plainPrimMap file and
+            -- typechecked we pass it through unchanged.
+            primOther _ _ = return passThrough
+    preType n s = getPrefix n s >>= Op.readTy
+    checkType' ty os = checkType ty (return passThrough) os
+    primPrefix (preType "peek." -> Just c) ~[a,w] = checkType'
+        (hash +> state +> utup state hash) $ return
+            (ePrim (Peek c) [w,a] rType)
+    primPrefix (preType "poke." -> Just c) ~[a,v,w] = checkType'
+        (hash +> hash +> state +> state) $ return
+           (ePrim (Poke c) [w,a,v] rType)
+    primPrefix (preType "sizeOf." -> Just c) _ = primInfo c Op.bits32 PrimSizeOf
+    primPrefix (preType "alignmentOf." -> Just c) _ = primInfo c Op.bits32 PrimAlignmentOf
+    primPrefix (preType "maxBound." -> Just c) _ = primInfo c c PrimMaxBound
+    primPrefix (preType "minBound." -> Just c) _ = primInfo c c PrimMinBound
+    primPrefix (preType "umaxBound." -> Just c) _ = primInfo c c PrimUMaxBound
+    primPrefix (getPrefix "options_" -> Just c) _ =
+        return (ePrim (CConst (packString $ "JHC_" ++ c)) [] rType)
+    primPrefix (getPrefix "const." -> Just c) _ = checkType' star $ do
+        Just ret <- return $ boxResult dataTable rType $ \tr str ->
+            ePrim (CConst $ packString c) [] rType
+        return ret
+    primPrefix (getPrefix "error." -> Just c) _ = return (EError c rType)
+    primPrefix _ _ = primUnknown
+    primInfo c cr wh = checkType' (hash +> hash) $ return
+       (ePrim (PrimTypeInfo c cr wh) [] rType)
+    primUnknown = do
+        warn srcLoc "primitive-unxnown" $
+                    printf "Unknown primitive '%s'" (fromAtom pName :: String)
+        return passThrough
+    doBinOp op = do
+        let [a,b] = args
+        (pa,(ta,_)) <- extractPrimitive dataTable a
+        (pb,(tb,_)) <- extractPrimitive dataTable b
+        Just res <- return $ boxResult dataTable rType $ \tr str ->
+                 ePrim Op { primCOp = Op.BinOp op (stot op 1 ta) (stot op 2 tb), primRetTy = tr } [pa, pb] str
+        return res
+    doUnOp bOp op = do
+        let [a] = args
+        (pa,(ta,_)) <- extractPrimitive dataTable a
+        Just res <- return $ boxResult dataTable rType $ \tr str ->
+                 ePrim Op { primCOp = bOp op (stot op 1 ta), primRetTy = tr } [pa] str
+        return res
+
+    checkType (tas :-> trt) onFail onPass =
+        case pairWith match tas (map getType args) of
+            Just cs | and cs, match trt rType -> onPass
             _ -> do
                 warn srcLoc "primitive-badtype" $
                     printf "Primitive type mismatch. expected '%s' but found '%s -> %s'"
                         (show (tas :-> trt)) (show $ map (getType . getType) args) (show $ getType rType)
                 onFail
-    prefixOp = return passThrough
-    looksGood = return passThrough
-    passThrough = EPrim (APrim (PrimPrim pName) req) args rType
 
-    match k e = f k where
-        f Star = e == eStar
-        f KHash = e == eHash
-        f KQuestQuest = e == eStar || e == eHash
-        f _  = False
+match k e = g k where
+    t = getType e
+    g BState = isState_ e
+    g (BTup ks) = case e of
+        ELit (LitCons { litName = n, litArgs = as }) ->
+            n == unboxedNameTuple TypeConstructor (length as) && matches ks as
+        _ -> False
+    g (BKind k) = f k
+    -- check the kind
+    f Star = t == eStar
+    f KHash = t == eHash
+    f KQuestQuest = t == eStar || t == eHash
+    f _  = False
 
-{-
-processPrimPrim :: DataTable -> E -> E
-processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o id (primopt (fromAtom s) es (followAliases dataTable orig_t)) where
-    primBoundMap = [("maxBound",PrimMaxBound), ("minBound",PrimMinBound), ("umaxBound",PrimUMaxBound)]
-    primopt "seq" [x,y] _  = return $ prim_seq x y
-    primopt "exitFailure__" [w] rt  = return $ EError "" rt
-    primopt op [a,b] t | Just cop <- readM op = mdo
-        (pa,(ta,_sta)) <- extractPrimitive dataTable a
-        (pb,(tb,_stb)) <- extractPrimitive dataTable b
-        (bp,(tr,str))  <- boxPrimitive dataTable
-                (EPrim (APrim Op { primCOp = Op.BinOp cop (stot cop 1 ta) (stot cop 2 tb), primRetTy = (stot cop 0 tr) } mempty) [pa, pb] str) t
-        return bp
-    primopt op [a] t | Just cop <- readM op = mdo
-        (pa,(ta,_sta)) <- extractPrimitive dataTable a
-        (bp,(tr,str)) <- boxPrimitive dataTable
-                (EPrim (APrim Op { primCOp = Op.UnOp cop (stringToOpTy ta), primRetTy = (stringToOpTy tr) } mempty) [pa] str) t
-        return bp
-    primopt op [a] t | Just cop <- readM op = mdo
-        (pa,(ta,_sta)) <- extractPrimitive dataTable a
-        (bp,(tr,str)) <- boxPrimitive dataTable
-                (EPrim (APrim Op { primCOp = Op.ConvOp cop (stringToOpTy ta), primRetTy = (stringToOpTy tr) } mempty) [pa] str) t
-        return bp
-    primopt "constPeekByte" [a] t = return (EPrim (APrim (Peek Op.bits8) mempty) [a] t)
-    primopt "box" [a] t = return ans where
-        (ExtTypeBoxed cna _ _) = fromMaybe (error $ "lookupExtTypeInfo(box): " ++ show t) $ lookupExtTypeInfo dataTable t
-        ans = ELit litCons { litName = cna, litArgs = [a], litType = orig_t }
-    primopt "unbox" [a] t = return ans where
-        (vara:_) = newIds (freeVars (a,t,orig_t))
-        ans = unbox dataTable a vara $ \tvra -> EVar tvra
-    primopt op [a] t | Just o <- lookup op unop = do
-        (pa,(ta,sta)) <- extractPrimitive dataTable a
-        let tvra = tVr vn sta; (vn:_) = newIds (freeVars (a,t))
-        (bp,(tr,str)) <- boxPrimitive dataTable (EVar tvra) t
-        let res = EPrim (APrim (Op (Op.BinOp o (stringToOpTy ta) (stringToOpTy ta)) (stringToOpTy tr)) mempty) [pa, ELit (LitInt 1 sta)] str
-        return $ eStrictLet tvra res bp
-        where unop = [("increment",Op.Add),("decrement",Op.Sub),("fincrement",Op.FAdd),("fdecrement",Op.FSub)]
-    primopt n [] t | Just num <- lookup n vs = mdo
-        (res,(_,sta)) <- boxPrimitive dataTable (ELit (LitInt num sta)) t; return res
-        where vs = [("zero",0),("one",1)]
-    primopt "options_target" [] t     = return (ELit (LitInt 0 t))
-    primopt pn@(flip lookup primBoundMap -> Just c) [] t  = return $ ans where
-        Just tt = Op.readTy $ show rtn
-        (ExtTypeBoxed cna rt _) = fromMaybe (error $ "lookupExtTypeInfo(box): " ++ show t) $ lookupExtTypeInfo dataTable t
-        ELit LitCons { litName = rtn } = rt
-        ee = (EPrim (APrim (PrimTypeInfo tt tt c) mempty) [] rt)
-        ans = ELit litCons { litName = cna, litArgs = [ee], litType = orig_t }
-    primopt pn [] t | Just c <- getPrefix "options_" pn      = return (EPrim (APrim (CConst ("JHC_" ++ c) "int") mempty) [] t)
-    primopt pn [a,w] t | Just c <- getPrefix "peek." pn      >>= Op.readTy = return (EPrim (APrim (Peek c) mempty) [w,a] t)
-    --primopt pn [a,w] t | Just c <- getPrefix "peek." pn >>= Op.readTy =
-    --    boxResult dataTable t $ \_ pt -> (EPrim (APrim (Peek c) mempty) [w,a] pt)
-    primopt pn [a,v,w] t | Just c <- getPrefix "poke." pn    >>= Op.readTy = return (EPrim (APrim (Poke c) mempty) [w,a,v] t)
-    primopt pn [v] t | Just c <- getPrefix "sizeOf." pn      >>= Op.readTy = return (EPrim (APrim (PrimTypeInfo c Op.bits32 PrimSizeOf) mempty) [] t)
-    primopt pn [v] t | Just c <- getPrefix "alignmentOf." pn >>= Op.readTy = return (EPrim (APrim (PrimTypeInfo c Op.bits32 PrimAlignmentOf) mempty) [] t)
-    primopt pn [v] t | Just c <- getPrefix "maxBound." pn    >>= Op.readTy = return (EPrim (APrim (PrimTypeInfo c c PrimMaxBound) mempty) [] t)
-    primopt pn [v] t | Just c <- getPrefix "minBound." pn    >>= Op.readTy = return (EPrim (APrim (PrimTypeInfo c c PrimMinBound) mempty) [] t)
-    primopt pn [v] t | Just c <- getPrefix "umaxBound." pn   >>= Op.readTy = return (EPrim (APrim (PrimTypeInfo c c PrimUMaxBound) mempty) [] t)
-    primopt pn [] t | Just c <-  getPrefix "const.M_PI" pn = mdo
-        (res,(_ta,sta)) <- boxPrimitive dataTable (ELit (LitInt (realToFrac (pi :: Double)) sta)) t; return res
-    primopt pn [] t | Just c <-  getPrefix "const." pn = mdo
-        (res,(ta,sta)) <- boxPrimitive dataTable (EPrim (APrim (CConst c ta) mempty) [] sta) t; return res
-    primopt pn [] _ | Just c <-  getPrefix "error." pn = return (EError c orig_t)
-    primopt _ _ _ = fail "not a primopt we care about"
-processPrimPrim _ e = e
+matches ks es = maybe False and $ pairWith match ks es
 
 type T = E
-boxResult :: DataTable -> T -> (ExtType -> T -> E) -> Maybe E
+
+boxResult :: DataTable -> T -> (Ty -> T -> E) -> Maybe E
 boxResult dataTable t fn = mdo
-        (res,(ta,sta)) <- boxPrimitive dataTable (fn ta sta) t
+        (res,(ta,sta)) <- boxPrimitive dataTable (fn (stringToOpTy ta) sta) t
 	return res
+
 stringToOpTy :: String -> Ty
 stringToOpTy s = case readTy s of
     Just t -> t
@@ -215,4 +219,9 @@ stringToOpTy' x s = case readTy s of
 
 stot :: Show a => a -> Int -> String -> Ty
 stot op n s = stringToOpTy' (show op ++ show n) s
--}
+
+unbox :: DataTable -> E -> Id -> (TVr -> E) -> E
+unbox dataTable e vn wtd = eCase e  [Alt (litCons { litName = cna, litArgs = [tvra], litType = te }) (wtd tvra)] Unknown where
+    te = getType e
+    tvra = tVr vn sta
+    (ExtTypeBoxed cna sta _) = fromMaybe (error $ "lookupExtTypeInfo(unbox): " ++ show te) $ lookupExtTypeInfo dataTable te

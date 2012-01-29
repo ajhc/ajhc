@@ -451,10 +451,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
         let name      = toName Name.Val n
         (var,ty,lamt) <- convertValue name
         let (ts,rt)   = argTypes' ty
---            prim      = APrim (PrimPrim $ toAtom cn) req
         es <- newVars [ t |  t <- ts, not (sortKindLike t) ]
-        --let result    = foldr ($) (processPrimPrim dataTable $ EPrim prim [ EVar e | e <- es, not (tvrType e == tUnit)] rt) (map ELam es)
-        --result <- return (processPrimPrim dataTable $ EPrim prim [ EVar e | e <- es, not (tvrType e == tUnit)] rt)
         result <- processPrim dataTable sLoc (toAtom cn)
             [ EVar e | e <- es, not (tvrType e == tUnit)] rt req
         return [(name,setProperty prop_INLINE var,
