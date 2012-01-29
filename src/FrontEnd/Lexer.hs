@@ -19,10 +19,12 @@
 
 module FrontEnd.Lexer (Token(..), lexer) where
 
+import Control.Monad
 import Data.Char hiding(isSymbol)
 import Data.Ratio
 import qualified Data.Char
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 import FrontEnd.ParseMonad
 import FrontEnd.SrcLoc
@@ -251,7 +253,8 @@ lexWhiteSpace bol = do
         '{':'-':'#':s
             | pname `Map.member` pragmas -> return bol
             | otherwise -> do
-                addWarn "unknown-pragma" $ "The pragma '" ++ pname ++ "' is unknown"
+                when (pname `Set.notMember` pragmas_ignored) $
+                    addWarn "unknown-pragma" $ "The pragma '" ++ pname ++ "' is unknown"
                 discard 2
                 bol <- lexNestedComment bol
                 lexWhiteSpace bol
@@ -689,6 +692,8 @@ pragmas_parsed = [
 pragmas_all = pragmas_parsed ++ [ (xs,PragmaStart x) | xs@(~(x:_)) <- pragmas_std ]
 
 pragmas = Map.fromList $ [ (y,Left x) | xs@(x:_)  <- pragmas_raw, y <- xs] ++  [ (y,Right w) | (xs@(~(x:_)),w)  <- pragmas_all , y <- xs]
+
+pragmas_ignored = Set.fromList ["LANGUAGE", "OPTIONS_GHC", "UNPACK"]
 
 normPragma :: String -> Either String Token
 normPragma s | ~(Just v) <- Map.lookup s pragmas  = v
