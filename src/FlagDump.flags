@@ -69,6 +69,8 @@ grin-final final grin before conversion to C
 !Backend code
 c don't delete C source file after compilation
 
+!Internal
+atom dump atom table on exit
 
 !General
 @verbose     progress

@@ -6,6 +6,7 @@ module Support.TempDir(
     fileInTempDir,
     cleanTempDir,
     setTempDir,
+    addAtExit,
     wrapMain
    ) where
 
@@ -27,6 +28,7 @@ data TempDir = TempDir {
     tempDirClean   :: Bool,  -- ^ whether to delete the directory afterwords.
     tempDirDump    :: Bool,
     tempDirPath    :: Maybe String,
+    tempDirAtExit  :: [IO ()],
     tempDirCleanup :: Set.Set FilePath
     }
 
@@ -58,6 +60,11 @@ getTempDir = do
             putLog $ printf "Created work directory '%s'" fp
             writeIORef tdRef td { tempDirPath = Just fp }
             return fp
+
+addAtExit :: IO () -> IO ()
+addAtExit action = do
+    td <- readIORef tdRef
+    writeIORef tdRef td { tempDirAtExit = action:tempDirAtExit td }
 
 createTempFile :: FilePath -> IO (FilePath, Handle)
 createTempFile fp = do
@@ -98,6 +105,7 @@ fileInTempDir (FP.normalise -> fp) action = do
 cleanUp :: IO ()
 cleanUp = do
     td <- readIORef tdRef
+    sequence_ (tempDirAtExit td)
     if not (tempDirClean td) ||
         isNothing (tempDirPath td) then return () else do
     dir <- getTempDir
@@ -140,6 +148,7 @@ tdRef = unsafePerformIO $ newIORef TempDir {
     tempDirClean   = True,
     tempDirDump    = False,
     tempDirPath    = Nothing,
+    tempDirAtExit  = [],
     tempDirCleanup = Set.empty
     }
 

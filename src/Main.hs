@@ -19,6 +19,7 @@ import Ho.Collected
 import Ho.Library
 import Name.Name
 import Options
+import StringTable.Atom
 import Support.TempDir
 import Util.Gen
 import Util.SetLike as S
@@ -30,6 +31,8 @@ main = wrapMain $ do
     hSetEncoding stdout utf8
     hSetEncoding stderr utf8
     o <- processOptions
+    when (dump FD.Atom) $
+        addAtExit dumpStringTableStats
     -- set temporary directory
     maybeDo $ do x <- optWorkDir o; return $ setTempDir x
     let darg = progressM $ do
