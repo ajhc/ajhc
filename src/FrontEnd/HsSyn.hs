@@ -309,8 +309,6 @@ instance HasLocation HsTyVarBind where
     srcLoc = hsTyVarBindSrcLoc
 
 type HsContext = [HsAsst]
---type HsAsst    = (HsName,[HsType])	-- for multi-parameter type classes
---type HsAsst    = (HsName,HsName)	-- clobber
 
 data HsAsst = HsAsst HsName [HsName] | HsAsstEq HsType HsType
   deriving(Data,Typeable,Eq,Ord, Show)
@@ -371,9 +369,9 @@ data HsExp
 	| HsEnumFromThenTo HsExp HsExp HsExp
 	| HsListComp HsExp [HsStmt]
 	| HsExpTypeSig SrcLoc HsExp HsQualType
-	| HsAsPat { hsExpName :: HsName, hsExpExp :: HsExp }  -- pattern only
+	| HsAsPat { hsExpName :: HsName, hsExpExp :: HsExp }
         | HsError { hsExpSrcLoc :: SrcLoc, hsExpErrorType :: HsErrorType, hsExpString :: String }
-	| HsWildCard SrcLoc			-- ditto
+	| HsWildCard SrcLoc
 	| HsIrrPat { hsExpLExp :: LHsExp }
 	| HsBangPat { hsExpLExp :: LHsExp }
         | HsLocatedExp LHsExp

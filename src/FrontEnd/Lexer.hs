@@ -29,106 +29,100 @@ import qualified Data.Set as Set
 import FrontEnd.ParseMonad
 import FrontEnd.SrcLoc
 import FrontEnd.Warning
+import Name.Name
+import Util.SetLike
 
 data Token
-        = VarId String
-        | QVarId (String,String)
-	| ConId String
-        | QConId (String,String)
-        | VarSym String
-        | ConSym String
-        | QVarSym (String,String)
-        | QConSym (String,String)
-	| IntTok  Integer
-	| UIntTok Integer
-	| FloatTok Rational
-	| Character Char
-	| UCharacter Char
-        | StringTok String
-        | UStringTok String
-        | PragmaOptions [String]
-        | PragmaInline String          -- also for NOINLINE
-        | PragmaRules Bool
-        | PragmaSpecialize Bool
-        | PragmaStart String
-        | PragmaEnd
-
+    = VarId      !Name
+    | QVarId     !Name
+    | ConId      !Name
+    | QConId     !Name
+    | VarSym     !Name
+    | ConSym     !Name
+    | QVarSym    !Name
+    | QConSym    !Name
+    | IntTok     !Integer
+    | UIntTok    !Integer
+    | FloatTok   !Rational
+    | Character  !Char
+    | UCharacter !Char
+    | StringTok  String
+    | UStringTok String
+    | PragmaOptions [String]
+    | PragmaInline String
+    | PragmaRules !Bool
+    | PragmaSpecialize !Bool
+    | PragmaStart String
+    | PragmaEnd
 -- Symbols
-
-	| LeftParen
-	| RightParen
-	| LeftUParen
-	| RightUParen
-	| SemiColon
-        | LeftCurly
-        | RightCurly
-        | VRightCurly			-- a virtual close brace
-        | LeftSquare
-        | RightSquare
-	| Comma
-        | Underscore
-        | BackQuote
-
+    | LeftParen
+    | RightParen
+    | LeftUParen
+    | RightUParen
+    | SemiColon
+    | LeftCurly
+    | RightCurly
+    | VRightCurly -- a virtual close brace
+    | LeftSquare
+    | RightSquare
+    | Comma
+    | Underscore
+    | BackQuote
 -- Reserved operators
-
-	| DotDot
-	| Colon
-	| DoubleColon
-	| Equals
-	| Backslash
-	| Bar
-	| LeftArrow
-	| RightArrow
-	| At
-	| Tilde
-	| DoubleArrow
-	| Minus
-        | Quest
-	| QuestQuest
-	| StarBang
-	| Exclamation
-	| Star
-	| Hash
-	| Dot
-
+    | DotDot
+    | Colon
+    | DoubleColon
+    | Equals
+    | Backslash
+    | Bar
+    | LeftArrow
+    | RightArrow
+    | At
+    | Tilde
+    | DoubleArrow
+    | Minus
+    | Quest
+    | QuestQuest
+    | StarBang
+    | Exclamation
+    | Star
+    | Hash
+    | Dot
 -- Reserved Ids
+    | KW_As
+    | KW_Case
+    | KW_Class
+    | KW_Alias
+    | KW_Data
+    | KW_Default
+    | KW_Deriving
+    | KW_Do
+    | KW_Else
+    | KW_Hiding
+    | KW_If
+    | KW_Import
+    | KW_In
+    | KW_Infix
+    | KW_InfixL
+    | KW_InfixR
+    | KW_Instance
+    | KW_Let
+    | KW_Module
+    | KW_NewType
+    | KW_Of
+    | KW_Then
+    | KW_Type
+    | KW_Where
+    | KW_Qualified
+    | KW_Foreign
+    | KW_Forall
+    | KW_Exists
+    | KW_Kind
+    | KW_Closed
+    | EOF
 
-	| KW_As
-	| KW_Case
-	| KW_Class
-        | KW_Alias
-	| KW_Data
-	| KW_Default
-	| KW_Deriving
-	| KW_Do
-	| KW_Else
-        | KW_Hiding
-	| KW_If
-	| KW_Import
-	| KW_In
-	| KW_Infix
-	| KW_InfixL
-	| KW_InfixR
-	| KW_Instance
-	| KW_Let
-	| KW_Module
-	| KW_NewType
-	| KW_Of
-	| KW_Then
-	| KW_Type
-	| KW_Where
-	| KW_Qualified
-	| KW_Foreign
-	| KW_Forall
-        | KW_Exists
-        | KW_Kind
-        | KW_Closed
-
-        | EOF
-        deriving (Eq,Show)
-
-reserved_ops :: [(String,Token)]
-reserved_ops = [
+reserved_ops :: Map.Map Name Token
+reserved_ops = procMap [
  ( "..", DotDot ),
  -- ( ":",  Colon ),
  ( "::", DoubleColon ),
@@ -147,8 +141,8 @@ reserved_ops = [
  ( [chr 0x21d2], DoubleArrow )  -- ⇒
  ]
 
-special_varops :: [(String,Token)]
-special_varops = [
+special_varops :: Map.Map Name Token
+special_varops = procMap [
  ( "-",  Minus ),	--ToDo: shouldn't be here
  ( "?",  Quest ),     --ditto
  ( "??", QuestQuest ),--ditto
@@ -160,8 +154,12 @@ special_varops = [
  ( "#",  Hash )		--ditto
  ]
 
-reserved_ids :: [(String,Token)]
-reserved_ids = [
+procMap :: [(String,Token)] -> Map.Map Name Token
+procMap xs = fromList $ map f xs where
+    f (x,y) = (toUnqualName x,y)
+
+reserved_ids :: Map.Map Name Token
+reserved_ids = procMap [
  ( "_",         Underscore ),
  ( "case",      KW_Case ),
  ( "class",     KW_Class ),
@@ -192,8 +190,8 @@ reserved_ids = [
  ( "where", 	KW_Where )
  ]
 
-special_varids :: [(String,Token)]
-special_varids = [
+special_varids :: Map.Map Name Token
+special_varids = procMap [
  ( "as", 	KW_As ),
  ( "kind", 	KW_Kind ),
  ( "closed", 	KW_Closed ),
@@ -380,8 +378,8 @@ lexToken = do
 	    | isUpper c -> lexConIdOrQual ""
 
 	    | isLower c || c == '_' || generalCategory c == OtherLetter -> do
-		ident <- lexWhile isIdent
-		case lookup ident (reserved_ids ++ special_varids) of
+		(toUnqualName -> ident) <- lexWhile isIdent
+		case Map.lookup ident (reserved_ids `Map.union` special_varids) of
                         Just KW_Foreign
                             | doFFI -> return KW_Foreign
                             | otherwise -> return $ VarId ident
@@ -391,11 +389,12 @@ lexToken = do
 
 	    | isSymbol c -> do
 		sym <- lexWhile isSymbol
-		return $ case lookup sym (reserved_ops ++ special_varops) of
+                let nsym = toUnqualName sym
+		return $ case Map.lookup nsym (reserved_ops `Map.union` special_varops) of
 			Just t  -> t
 			Nothing -> case c of
-			    ':' -> ConSym sym
-			    _   -> VarSym sym
+			    ':' -> ConSym nsym
+			    _   -> VarSym nsym
 
 	    | otherwise -> do
 		discard 1
@@ -478,8 +477,8 @@ lexDecimalOrFloat = do
 lexConIdOrQual :: String -> Lex a Token
 lexConIdOrQual qual = do
 	con <- lexWhile isIdent
-	let conid | null qual = ConId con
-		  | otherwise = QConId (qual,con)
+	let conid | null qual = ConId (toUnqualName con)
+		  | otherwise = QConId (toName UnknownType (qual,con))
 	    qual' | null qual = con
 		  | otherwise = qual ++ '.':con
 	just_a_conid <- alternative (return conid)
@@ -489,10 +488,10 @@ lexConIdOrQual qual = do
 	     | isLower c || c == '_' -> do	-- qualified varid?
 		discard 1
 		ident <- lexWhile isIdent
-		case lookup ident reserved_ids of
+		case Map.lookup (toUnqualName ident) reserved_ids of
 		   -- cannot qualify a reserved word
 		   Just _  -> just_a_conid
-		   Nothing -> return (QVarId (qual', ident))
+		   Nothing -> return (QVarId $ toName UnknownType (qual', ident))
 
 	     | isUpper c -> do		-- qualified conid?
 		discard 1
@@ -501,12 +500,13 @@ lexConIdOrQual qual = do
 	     | isSymbol c -> do	-- qualified symbol?
 		discard 1
 		sym <- lexWhile isSymbol
-		case lookup sym reserved_ops of
+                let nsym = toUnqualName sym
+		case Map.lookup nsym reserved_ops of
 		    -- cannot qualify a reserved operator
 		    Just _  -> just_a_conid
 		    Nothing -> return $ case c of
-			':' -> QConSym (qual', sym)
-			_   -> QVarSym (qual', sym)
+			':' -> QConSym $ toName UnknownType (qual', sym)
+			_   -> QVarSym $ toName UnknownType (qual', sym)
 
 	  _ ->	return conid -- not a qualified thing
 
@@ -689,11 +689,11 @@ pragmas_parsed = [
     (["SUPERSPECIALIZE", "SUPERSPECIALISE"],PragmaSpecialize True)
     ]
 
-pragmas_all = pragmas_parsed ++ [ (xs,PragmaStart x) | xs@(~(x:_)) <- pragmas_std ]
-
-pragmas = Map.fromList $ [ (y,Left x) | xs@(x:_)  <- pragmas_raw, y <- xs] ++  [ (y,Right w) | (xs@(~(x:_)),w)  <- pragmas_all , y <- xs]
+pragmas = Map.fromList $ [ (y,Left x) | xs@(x:_)  <- pragmas_raw, y <- xs] ++  [ (y,Right w) | (xs@(~(x:_)),w)  <- pragmas_all , y <- xs] where
+    pragmas_all = pragmas_parsed ++ [ (xs,PragmaStart x) | xs@(~(x:_)) <- pragmas_std ]
 
 pragmas_ignored = Set.fromList ["LANGUAGE", "OPTIONS_GHC", "UNPACK"]
 
 normPragma :: String -> Either String Token
 normPragma s | ~(Just v) <- Map.lookup s pragmas  = v
+toUnqualName n = toName UnknownType (Nothing :: Maybe Module,n)

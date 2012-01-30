@@ -949,11 +949,11 @@ qopm  :: { HsExp }
       | qconop                { HsCon $1 }
 
 qvarid :: { HsName }
-      : varid                 {  $1 }
-      | QVARID                { toName UnknownType $1 }
+      : varid                 { $1 }
+      | QVARID                { $1 }
 
 varid :: { HsName }
-      : VARID                 { toUnqualName $1 }
+      : VARID                 { $1 }
       | 'as'                  { as_name }
       | 'alias'               { toName UnknownType "alias" }
       | 'kind'                { toName UnknownType "kind" }
@@ -964,18 +964,18 @@ varid :: { HsName }
       | 'exists'              { toName UnknownType "exists" }
 
 qconid :: { HsName }
-      : conid                 {  $1 }
-      | QCONID                { toName UnknownType $1  }
+      : conid                 { $1 }
+      | QCONID                { $1 }
 
 conid :: { HsName }
-      : CONID                 { toUnqualName $1 }
+      : CONID                 { $1 }
 
 qconsym :: { HsName }
-      : consym                {  $1 }
-      | QCONSYM               { toName UnknownType $1 }
+      : consym                { $1 }
+      | QCONSYM               { $1 }
 
 consym :: { HsName }
-      : CONSYM                { toUnqualName $1 }
+      : CONSYM                { $1 }
 
 qvarsym :: { HsName }
       : varsym                { $1 }
@@ -986,7 +986,7 @@ qvarsymm :: { HsName }
       | qvarsym1              { $1 }
 
 varsym :: { HsName }
-      : VARSYM                { toUnqualName $1 }
+      : VARSYM                { $1 }
       | '-'                   { minus_name }
       | '!'                   { pling_name }
       | '?'                   { toName UnknownType "?" }
@@ -997,14 +997,14 @@ varsym :: { HsName }
       | '.'                   { dot_name }
 
 varsymm :: { HsName } -- varsym not including '-'
-      : VARSYM                { toUnqualName $1 }
+      : VARSYM                { $1 }
       | '!'                   { pling_name }
       | '*'                   { star_name }
       | '#'                   { hash_name }
       | '.'                   { dot_name }
 
 qvarsym1 :: { HsName }
-      : QVARSYM               { toName UnknownType $1 }
+      : QVARSYM               { $1 }
 
 literal :: { HsExp }
       : INT                   { HsLit (HsInt (readInteger $1)) }
@@ -1033,8 +1033,8 @@ layout_on  :: { () }  :   {% getSrcLoc `thenP` \sl ->
 -- Miscellaneous (mostly renamings)
 
 modid :: { Module }
-      : CONID                 { toModule $1 }
-      | QCONID                { toModule (fst $1 ++ "." ++ snd $1) }
+      : CONID                 { toModule $ show $1 }
+      | QCONID                { toModule $ show $1 } -- (fst $1 ++ "." ++ snd $1) }
 
 tyconorcls :: { HsName }
       : conid                 { $1 }
