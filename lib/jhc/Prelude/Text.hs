@@ -6,12 +6,8 @@ module Prelude.Text (
     reads, shows, read, lex,
     showChar, showString, readParen, showParen,readIO,readLn ) where
 
--- The instances of Read and Show for
---      Bool, Maybe, Either, Ordering
--- are done via "deriving" clauses in Prelude.hs
 import Jhc.Basics
-import Jhc.Float
-import Jhc.Inst.Show()
+import Jhc.Type.Float
 import Jhc.IO
 import Jhc.Maybe
 import Jhc.Monad
@@ -19,10 +15,7 @@ import Jhc.Num
 import Jhc.Order
 import Jhc.Show
 import Jhc.Text.Read
-import Prelude.Float
 import Prelude.IO
-import Jhc.Inst.Num()
-
 
 import Data.Char(isSpace, isAlpha, isDigit, isAlphaNum,
                  showLitChar, readLitChar, lexLitChar)
@@ -42,21 +35,16 @@ readIO s =  case [x | (x,t) <- reads s, ("","") <- lex t] of
               []  -> ioError (userError "Prelude.readIO: no parse")
               _   -> ioError (userError "Prelude.readIO: ambiguous parse")
 
-
-
 read             :: (Read a) => String -> a
 read s           =  case [x | (x,t) <- reads s, ("","") <- lex t] of
                          [x] -> x
                          []  -> error "Prelude.read: no parse"
                          _   -> error "Prelude.read: ambiguous parse"
 
-
-
 instance  Read Int  where
   readsPrec p r = [(fromInteger i, t) | (i,t) <- readsPrec p r]
         -- Reading at the Integer type avoids
         -- possible difficulty with minInt
-
 
 instance  Read Integer  where
     readsPrec p         = readSigned readDec
@@ -64,10 +52,8 @@ instance  Read Integer  where
 instance  Show Float  where
     showsPrec p         = showFloat
 
-
 instance  Show Double  where
     showsPrec p         = showFloat
-
 
 instance  Show Char  where
     showsPrec p '\'' = showString "'\\''"
@@ -90,18 +76,14 @@ instance  Read Char  where
               readl s            = [(c:cs,u) | (c ,t) <- readLitChar s,
                                                (cs,u) <- readl t       ]
 
-
 instance  (Read a) => Read [a]  where
     readsPrec p      = readList
-
-
 
 instance Read Bool where
     readsPrec d input =
               (\ inp -> [((False) , rest) | ("False" , rest) <- lex inp]) input
               ++
               (\ inp -> [((True) , rest) | ("True" , rest) <- lex inp]) input
-
 
 instance Read Ordering where
     readsPrec d input =
@@ -110,9 +92,6 @@ instance Read Ordering where
               (\ inp -> [((EQ) , rest) | ("EQ" , rest) <- lex inp]) input
               ++
               (\ inp -> [((GT) , rest) | ("GT" , rest) <- lex inp]) input
-
-
-
 
 instance (Read a) => Read (Maybe a) where
     readsPrec d input =

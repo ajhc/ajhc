@@ -37,7 +37,6 @@ readParen b g    =  if b then mandatory else optional
                                                  (x,t)   <- optional s,
                                                  (")",u) <- lex t    ]
 
-
 -- This lexer is not completely faithful to the Haskell lexical syntax.
 -- Current limitations:
 --    Qualified names are not handled properly
@@ -146,3 +145,20 @@ instance (Read a) => Read (Maybe a) where
 	       [((Just aa) , rest) | ("Just" , inp) <- lex inp ,
 		(aa , rest) <- readsPrec 10 inp])
 	      input
+
+-- readInt reads a string of digits using an arbitrary base.
+-- Leading minus signs must be handled elsewhere.
+
+{-# SPECIALIZE readInt :: Int -> (Char -> Bool) -> (Char -> Int) -> ReadS Int #-}
+{-# SPECIALIZE readInt :: Integer -> (Char -> Bool) -> (Char -> Int) -> ReadS Integer #-}
+
+readInt :: (Integral a) => a -> (Char -> Bool) -> (Char -> Int) -> ReadS a
+readInt radix isDig digToInt s =
+   [(foldl1 (\n d -> n * radix + d) (map (fromIntegral . digToInt) ds), r)
+          | (ds,r) <- nonnull isDig s ]
+
+-- Unsigned readers for various bases
+readDec, readOct, readHex :: (Integral a) => ReadS a
+readDec = readInt 10 isDigit    digitToInt
+readOct = readInt  8 isOctDigit digitToInt
+readHex = readInt 16 isHexDigit digitToInt

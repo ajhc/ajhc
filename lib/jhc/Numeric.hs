@@ -7,14 +7,20 @@ module Numeric(fromRat,
                showEFloat, showFFloat, showGFloat, showFloat,
                readFloat, lexDigits) where
 
-import Prelude
-import Data.Word
-import Prelude.CType   ( isDigit, isOctDigit, isHexDigit
-                   , digitToInt, intToDigit )
 import Data.Ratio  ( (%), numerator, denominator )
---import Array  ( (!), Array, array )
-import Prelude.Text
+import Data.Word
+import Jhc.Basics
+import Jhc.Enum
+import Jhc.Float
+import Jhc.IO
+import Jhc.List
+import Jhc.Num
+import Jhc.Numeric
+import Jhc.Order
 import Jhc.Text.Read
+import Data.Char
+import Prelude.CType(isDigit,isOctDigit,isHexDigit,digitToInt,intToDigit)
+import Prelude.Text
 
 -- This converts a rational to a floating.  This should be used in the
 -- Fractional instances of Float and Double.
@@ -96,7 +102,6 @@ integerLogBase b i =
             doDiv i l = if i < b then l else doDiv (i `div` b) (l+1)
         in  doDiv (i `div` (b^l)) l
 
-
 -- Misc utilities to show integers and floats
 {-# SPECIALIZE showSigned :: (Int -> ShowS) -> Int -> Int -> ShowS #-}
 {-# SPECIALIZE showSigned :: (Integer -> ShowS) -> Int -> Integer -> ShowS #-}
@@ -117,7 +122,6 @@ showHex = showIntAtBase 16 intToDigit
 {-# SPECIALIZE showIntAtBase :: Word -> (Int -> Char) -> Word -> ShowS #-}
 {-# SPECIALIZE showIntAtBase :: WordMax -> (Int -> Char) -> WordMax -> ShowS #-}
 
-
 showIntAtBase :: Integral a
 	      => a              -- base
 	      -> (Int -> Char)  -- digit to char
@@ -131,7 +135,6 @@ showIntAtBase base intToDig n rest
     (n',d) = quotRem n base
     rest'  = intToDig (fromIntegral d) : rest
 
-
 readSigned :: (Real a) => ReadS a -> ReadS a
 readSigned readPos = readParen False read'
                      where read' r  = read'' r ++
@@ -139,25 +142,6 @@ readSigned readPos = readParen False read'
                                                 (x,t)   <- read'' s]
                            read'' r = [(n,s)  | (str,s) <- lex r,
                                                 (n,"")  <- readPos str]
-
-
--- readInt reads a string of digits using an arbitrary base.
--- Leading minus signs must be handled elsewhere.
-
-{-# SPECIALIZE readInt :: Int -> (Char -> Bool) -> (Char -> Int) -> ReadS Int #-}
-{-# SPECIALIZE readInt :: Integer -> (Char -> Bool) -> (Char -> Int) -> ReadS Integer #-}
-
-readInt :: (Integral a) => a -> (Char -> Bool) -> (Char -> Int) -> ReadS a
-readInt radix isDig digToInt s =
-   [(foldl1 (\n d -> n * radix + d) (map (fromIntegral . digToInt) ds), r)
-          | (ds,r) <- nonnull isDig s ]
-
--- Unsigned readers for various bases
-readDec, readOct, readHex :: (Integral a) => ReadS a
-readDec = readInt 10 isDigit    digitToInt
-readOct = readInt  8 isOctDigit digitToInt
-readHex = readInt 16 isHexDigit digitToInt
-
 
 showEFloat     :: (RealFloat a) => Maybe Int -> a -> ShowS
 showFFloat     :: (RealFloat a) => Maybe Int -> a -> ShowS
@@ -240,7 +224,6 @@ formatRealFloat fmt decs x
               mkdot0 "" = ""       -- Print 34, not 34.
               mkdot0 s  = '.' : s  -- when the format specifies no
 			           -- digits after the decimal point
-
 
 roundTo :: Int -> Int -> [Int] -> (Bool, [Int])
 roundTo base d is | base `seq` d `seq` True = case f d is of
@@ -332,8 +315,6 @@ floatToDigits base x =
                 let bk = expt base (-k)
                 in  gen [] (r * bk) s (mUp * bk) (mDn * bk)
     in  (map fromIntegral (reverse rds), k)
-
-
 
 -- This floating point reader uses a less restrictive syntax for floating
 -- point than the Haskell lexer.  The `.' is optional.

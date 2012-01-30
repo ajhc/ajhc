@@ -317,3 +317,38 @@ span p xs@(x:xs')
 
 {-# INLINE break #-}
 break p                 =  span (not . p)
+
+-- take n, applied to a list xs, returns the prefix of xs of length n,
+-- or xs itself if n > length xs.  drop n xs returns the suffix of xs
+-- after the first n elements, or [] if n > length xs.  splitAt n xs
+-- is equivalent to (take n xs, drop n xs).
+
+take :: Int -> [a] -> [a]
+take n xs = f n xs where
+    f n _      | n <= zero =  []
+    f _ []              =  []
+    f n (x:xs)          =  x : f (n `minus` one) xs
+
+drop :: Int -> [a] -> [a]
+drop n xs = f n xs where
+    f n xs | n <= zero =  xs
+    f _ [] = []
+    f n (_:xs) = f (n `minus` one) xs
+
+-- replicate n x is a list of length n with x the value of every element
+replicate        :: Int -> a -> [a]
+replicate n x    = f n where
+    f n | n <= zero = []
+    f n = let n' = n `minus` one in n' `seq` (x:f n')
+
+splitAt                  :: Int -> [a] -> ([a],[a])
+--splitAt n xs             =  (take n xs, drop n xs)
+splitAt n ls | n < zero	= ([], ls)
+splitAt n ls = splitAt' n ls where
+    splitAt' :: Int -> [a] -> ([a], [a])
+    splitAt' z  xs | z == zero = ([], xs)
+    splitAt' _  []  = ([], [])
+    splitAt' m (x:xs) = case splitAt' (m `minus` one) xs of
+        (xs', xs'') -> (x:xs', xs'')
+
+{-# RULES "take/repeat"   forall n x . take n (repeat x) = replicate n x #-}

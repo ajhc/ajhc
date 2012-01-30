@@ -28,6 +28,7 @@ Exposed-Modules:
         - Jhc.Basics
         - Jhc.Enum
         - Jhc.Float
+        - Jhc.Numeric
         - Jhc.Handle
         - Jhc.IO
         - Jhc.List

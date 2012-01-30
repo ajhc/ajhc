@@ -2,22 +2,22 @@
 
 module Prelude.Float(readDouble,doubleToDigits,doubleToRational) where
 
-import Data.Word
-import Foreign.C.Types
 import Foreign.Marshal.Alloc
 import Foreign.Ptr
 import Foreign.Storable
 import Jhc.Basics
 import Jhc.Float
-import Jhc.IO
-import Jhc.List
+import Jhc.IO(error)
+import Jhc.List(length,notElem,take,elem)
 import Jhc.Monad
 import Jhc.Num
 import Jhc.Order
 import Jhc.Prim.Bits
+import Jhc.Type.C
 import Numeric
-import Prelude((^),(^^),elem,take)
+import Jhc.Numeric((^),(^^))
 import Prelude.Text
+import System.IO.Unsafe
 
 m4_define(INST,{{
 

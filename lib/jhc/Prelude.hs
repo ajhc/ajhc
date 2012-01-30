@@ -27,6 +27,7 @@ module Prelude(
     tail,
     last,
     init,
+    take,drop,
     takeWhile,
     dropWhile,
     span,
@@ -43,6 +44,7 @@ module Prelude(
     module Jhc.Enum,
     module Jhc.Order,
     module Jhc.Show,
+    module Jhc.Numeric,
     Num(..),
     fromIntegral,
     elem,notElem,
@@ -65,6 +67,7 @@ import Jhc.Basics
 import Jhc.Float
 
 import Jhc.Inst.Enum
+import Jhc.Inst.Num
 import Jhc.Inst.Order
 import Jhc.Inst.Read
 import Jhc.Inst.Show
@@ -77,6 +80,7 @@ import Jhc.List
 import Jhc.Maybe
 import Jhc.Monad
 import Jhc.Num
+import Jhc.Numeric
 import Jhc.Order
 import Jhc.Show
 import Jhc.Tuples
@@ -89,7 +93,7 @@ import qualified Data.Char as Char(isSpace,ord,chr)
 
 -- infixr 9  .
 --infixr 8  ^, ^^, **
-infixr 8  ^, ^^
+--infixr 8  ^, ^^
 --infixl 7  *  , /, `quot`, `rem`, `div`, `mod`
 --infixl 6  +, -
 --infixr 5  :
@@ -101,6 +105,7 @@ infixr 8  ^, ^^
 -- infixr 0  $, $!, `seq`
 
 -- Numeric functions
+{-
 
 {-# SPECIALIZE gcd :: Int -> Int -> Int #-}
 {-# SPECIALIZE gcd :: Integer -> Integer -> Integer #-}
@@ -133,6 +138,7 @@ _ ^ _            = error "Prelude.^: negative exponent"
 (^^)             :: (Fractional a, Integral b) => a -> b -> a
 x ^^ n           =  if n >= 0 then x^n else recip (x^(-n))
 
+-}
 either :: (a -> c) -> (b -> c) -> Either a b -> c
 either f g (Left x)  =  f x
 either f g (Right y) =  g y
@@ -154,12 +160,6 @@ until p f x
 -- scanl1 is similar, again without the starting element:
 --      scanl1 f [x1, x2, ...] == [x1, x1 `f` x2, ...]
 
--- replicate n x is a list of length n with x the value of every element
-
-replicate        :: Int -> a -> [a]
-replicate n x    = f n where
-    f n | n <= 0 = []
-    f n = let n' = n - 1 in n' `seq` (x:f n')
 
 -- cycle ties a finite list into a circular one, or equivalently,
 -- the infinite repetition of the original list.  It is the identity
@@ -168,33 +168,6 @@ replicate n x    = f n where
 cycle            :: [a] -> [a]
 cycle []         =  error "Prelude.cycle: empty list"
 cycle xs         =  xs' where xs' = xs ++ xs'
-
--- take n, applied to a list xs, returns the prefix of xs of length n,
--- or xs itself if n > length xs.  drop n xs returns the suffix of xs
--- after the first n elements, or [] if n > length xs.  splitAt n xs
--- is equivalent to (take n xs, drop n xs).
-
-take :: Int -> [a] -> [a]
-take n xs = f n xs where
-    f n _      | n <= 0 =  []
-    f _ []              =  []
-    f n (x:xs)          =  x : f (n-1) xs
-
-drop :: Int -> [a] -> [a]
-drop n xs = f n xs where
-    f n xs | n <= 0 =  xs
-    f _ [] = []
-    f n (_:xs) = f (n-1) xs
-
-splitAt                  :: Int -> [a] -> ([a],[a])
---splitAt n xs             =  (take n xs, drop n xs)
-splitAt n ls | n < 0	= ([], ls)
-splitAt n ls = splitAt' n ls where
-    splitAt' :: Int -> [a] -> ([a], [a])
-    splitAt' 0  xs  = ([], xs)
-    splitAt' _  []  = ([], [])
-    splitAt' m (x:xs) = case splitAt' (m - 1) xs of
-        (xs', xs'') -> (x:xs', xs'')
 
 -- lines breaks a string up into a list of strings at newline characters.
 -- The resulting strings do not contain newlines.  Similary, words
@@ -331,6 +304,5 @@ unzip3           =  foldr (\(a,b,c) ~(as,bs,cs) -> (a:as,b:bs,c:cs))
 {-# RULES "foldr/zip" forall k z xs ys . foldr k z (zip xs ys) = let zip' (a:as) (b:bs) = k (a,b) (zip' as bs); zip' _ _ = z in zip' xs ys #-}
 -- {-# RULES "foldr/sequence" forall k z xs . foldr k z (sequence xs) = foldr (\x y -> do rx <- x; ry <- y; return (k rx ry)) (return z) xs #-}
 -- {-# RULES "foldr/mapM" forall k z f xs . foldr k z (mapM f xs) = foldr (\x y -> do rx <- f x; ry <- y; return (k rx ry)) (return z) xs   #-}
-{-# RULES "take/repeat"   forall n x . take n (repeat x) = replicate n x #-}
 
 default(Int,Double)

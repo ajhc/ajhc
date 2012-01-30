@@ -1,30 +1,25 @@
 -- Standard functions on rational numbers
-
 module  Data.Ratio (
     Ratio, Rational, (%), numerator, denominator, approxRational ) where
 
-import Prelude
-import Prelude.Text
-import Prelude.Float(doubleToRational)
-import Jhc.Num
-import Jhc.Order
+import Jhc.Basics
 import Jhc.Float
+import Jhc.IO
+import Jhc.Num
+import Jhc.Numeric
+import Jhc.Order
+import Jhc.Type.Basic
+import Prelude.Float()
+import Prelude.Text
 
 infixl 7  %
 
 ratPrec = 7 :: Int
 
-
-
 (%)                     :: (Integral a) => a -> a -> Ratio a
 approxRational          :: (RealFrac a) => a -> a -> Rational
 
-
-
 x % y                   =  reduce (x * signum y) (abs y)
-
-
-
 
 -- "reduce" is a subsidiary function used only in this module.
 -- It normalises a ratio by dividing both numerator
@@ -115,3 +110,8 @@ approxRational x eps    =  simplest (x-eps) (x+eps)
                                      where (q,r)      =  quotRem n d
                                            (q',r')    =  quotRem n' d'
                                            (n'':%d'') =  simplest' d' r' d r
+
+doubleToRational :: Double -> Rational
+doubleToRational x  =  (m:%1)*(b:%1)^^n where
+    (m,n) = decodeFloat x
+    b     = floatRadix  x
