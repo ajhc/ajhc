@@ -17,6 +17,7 @@ import Name.Id
 import Name.Name
 import Options
 import System.IO
+import Util.ContextMonad
 import Util.SetLike
 import qualified FlagDump as FD
 import qualified Stats
@@ -126,7 +127,7 @@ printCheckName'' = hPrintCheckName stderr
 
 hPrintCheckName :: Handle -> DataTable -> TVr -> E -> IO ()
 hPrintCheckName fh dataTable tvr e = do
-    let (ty,pty) = case inferType dataTable [] e of
+    let (ty,pty) = case runContextEither (inferType dataTable [] e) of
             Left err -> (Unknown,vcat $ map text (intersperse "---" $ tail err))
             Right ty -> (ty,pprint ty)
         tmatch = isJust $ match (const Nothing) [] ty (tvrType tvr)

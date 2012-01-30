@@ -126,7 +126,8 @@ runKI env (Ki ki) = (kienv >>= ki') where
     ki' e = runReaderT ki e
 
 
-instance ContextMonad String Ki where
+instance ContextMonad Ki where
+    type ContextOf Ki = String
     withContext nc x = local (\s -> s { kiContext = nc :kiContext s }) x
 
 

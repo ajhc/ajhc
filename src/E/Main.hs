@@ -452,6 +452,7 @@ compileWholeProgram prog = do
     prog <- transformProgram transTypeAnalyze { transformPass = "Main-AfterMethod", transformDumpProgress = verbose } prog
     prog <- simplifyProgram SS.emptySimplifyOpts "Main-One" verbose prog
     prog <- etaExpandProg "Main-AfterOne" prog
+    wdump FD.CorePass $ dumpCore "before-TypeAnalyze-Main-AfterSimp" prog
     prog <- transformProgram transTypeAnalyze { transformPass = "Main-AfterSimp", transformDumpProgress = verbose } prog
     prog <- simplifyProgram SS.emptySimplifyOpts "Main-Two" verbose prog
 

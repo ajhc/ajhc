@@ -28,6 +28,7 @@ import Stats
 import Support.FreeVars
 import Support.TempDir
 import Support.Transform
+import Util.ContextMonad
 import Util.Gen
 import Util.SetLike as S
 import qualified FlagDump as FD
@@ -87,7 +88,7 @@ maybeDie = case optKeepGoing options of
 onerrNone :: IO ()
 onerrNone = return ()
 
-lintCheckE onerr dataTable tvr e | flint = case inferType dataTable [] e of
+lintCheckE onerr dataTable tvr e | flint = case runContextEither $ inferType dataTable [] e of
     Left ss -> do
         onerr
         putErrLn ">>> Type Error"

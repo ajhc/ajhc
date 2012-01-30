@@ -243,7 +243,7 @@ withContextDoc s a = withContext (render s) a
 
 -- | Perform a full typecheck, evaluating type terms as necessary.
 
-inferType :: ContextMonad String m => DataTable -> [(TVr,E)] -> E -> m E
+inferType :: (ContextMonad m, ContextOf m ~ String) => DataTable -> [(TVr,E)] -> E -> m E
 inferType dataTable ds e = rfc e where
     inferType' ds e = inferType dataTable ds e
     prettyE = ePretty
@@ -367,8 +367,8 @@ inferType dataTable ds e = rfc e where
         e1 <- strong nds (t1)
         e2 <- strong nds (t2)
         case typesCompatable dataTable e1 e2 of
-            Right () -> return (e1)
-            Left s -> failDoc $ text "eq:" <+> align $ vcat [ text s, prettyE (e1), prettyE (e2) ]
+            Just () -> return (e1)
+            Nothing -> failDoc $ text "eq:" <+> align $ vcat [ prettyE (e1), prettyE (e2) ]
     fceq nds e1 t2 = do
         withContextDoc (hsep [text "fceq:", align $ vcat [parens $ prettyE e1,  parens $ prettyE t2]]) $ do
         t1 <- inferType' nds e1
@@ -386,7 +386,7 @@ infertype env a = case typecheck env a of
     Right x -> x
 
 instance CanTypeCheck E where
-    typecheck dataTable e = case typeInfer'' dataTable [] e of
+    typecheck dataTable e = case runContextEither $ typeInfer'' dataTable [] e of
         Left ss -> fail $ "\n>>> internal error:\n" ++ unlines ss
         Right v -> return v
 
@@ -408,12 +408,12 @@ instance CanTypeCheck (Alt E) where
 -- wish a more thorough checking of types.
 
 typeInfer :: DataTable -> E -> E
-typeInfer dataTable e = case typeInfer'' dataTable [] e of
+typeInfer dataTable e = case runContextEither $ typeInfer'' dataTable [] e of
     Left ss -> error $ "\n>>> internal error:\n" ++ unlines (tail ss)
     Right v -> v
 
 typeInfer' :: DataTable -> [(TVr,E)] -> E -> E
-typeInfer' dataTable ds e = case typeInfer'' dataTable ds e of
+typeInfer' dataTable ds e = case runContextEither $ typeInfer'' dataTable ds e of
     Left ss -> error $ "\n>>> internal error:\n" ++ unlines (tail ss)
     Right v -> v
 
@@ -427,7 +427,8 @@ data TcEnv = TcEnv {
 newtype Tc a = Tc (Reader TcEnv a)
     deriving(Monad,Functor,MonadReader TcEnv)
 
-instance ContextMonad String Tc where
+instance ContextMonad Tc where
+    type ContextOf Tc = String
     withContext s = local (tcContext_u (s:))
 
 tcE :: E -> Tc E
@@ -465,7 +466,7 @@ tcE e = rfc e where
     fc Unknown = return Unknown
     fc e = failDoc $ text "what's this? " </> (ePretty e)
 
-typeInfer'' :: ContextMonad String m => DataTable -> [(TVr,E)] -> E -> m E
+typeInfer'' :: (ContextMonad m, ContextOf m ~ String) => DataTable -> [(TVr,E)] -> E -> m E
 typeInfer'' dataTable ds e = rfc e where
     inferType' ds e = typeInfer'' dataTable ds e
     rfc e =  withContextDoc (text "fullCheck':" </> ePretty e) (fc e >>= strong')
