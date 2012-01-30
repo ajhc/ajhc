@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: duplicate instances not always detected
+desc: ""
+type: :bugfix
+component: fe
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2012-01-30 03:56:40.834021 Z
+references: []
+
+id: d328eda470a96fe11b0d06e8862aaa7018e50a98
+log_events: 
+- - 2012-01-30 03:56:43.117149 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""
