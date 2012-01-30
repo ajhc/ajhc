@@ -570,6 +570,8 @@ convertExp (Prim p vs ty) | APrim _ req <- p  =  do
 convertExp (BaseOp Eval [v]) = do
     v' <- convertVal v
     return (mempty,f_eval v')
+convertExp (BaseOp GcTouch _) = do
+    return (mempty, emptyExpression)
 convertExp (App a vs _) = do
     lm <- asks rEMap
     vs' <- mapM convertVal vs

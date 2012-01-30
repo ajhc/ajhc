@@ -88,6 +88,7 @@ prettyExp vl (BaseOp NewRegister xs) = vl <> keyword "register" <+> tupled (map 
 prettyExp vl (BaseOp WriteRegister [r,x]) = vl <> prettyVal r <+> keyword ":=" <+> prettyVal x
 prettyExp vl (BaseOp ReadRegister [r]) = vl <> keyword "*" <> prettyVal r
 prettyExp vl (BaseOp GcPush xs) = vl <> keyword "gcPush" <+> tupled (map prettyVal xs)
+prettyExp vl (BaseOp GcTouch xs) = vl <> keyword "gcTouch" <+> tupled (map prettyVal xs)
 prettyExp vl (BaseOp Demote [x]) = vl <> keyword "demote" <+> prettyVal x
 prettyExp vl (BaseOp (StoreNode b) [x]) = vl <> keyword ((if b then "d" else "i") ++ "store") <+> prettyVal x
 prettyExp vl (BaseOp (StoreNode b) [x,y]) = vl <> keyword ((if b then "d" else "i") ++ "store") <+> prettyVal x <> char '@' <> prettyVal y

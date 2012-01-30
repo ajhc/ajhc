@@ -57,6 +57,7 @@ plainPrimMap = Map.fromList
     , "newWorld__" ==> star +> state
     , "unsafeCoerce" ==> star +> star
     , "options_target" ==> hash
+    , "touch_" ==> starHash +> state +> state
     , "zero" ==> starHash
     , "one" ==> starHash
     , "box" ==> hash +> star

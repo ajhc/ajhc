@@ -402,6 +402,8 @@ compile' cenv (tvr,as,e) = ans where
     ce e | Just z <- con e = return (Return z)
 
     ce (EPrim ap@(APrim (PrimPrim prim) _) as _) = f prim as where
+        f "touch_" xs = do
+            return $ BaseOp GcTouch (args $ init xs)
         -- artificial dependencies
         f "newWorld__" [_] = do
             return $ Return []
