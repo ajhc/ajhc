@@ -42,6 +42,7 @@ import Name.Name
 import Options
 import Support.CanType(getType)
 import Support.FreeVars
+import Support.TempDir
 import Support.Transform
 import Util.Gen
 import Util.Graph
@@ -67,7 +68,7 @@ processInitialHo ::
     CollectedHo       -- ^ current accumulated ho
     -> Ho             -- ^ new ho, freshly read from file
     -> IO CollectedHo -- ^ final combined ho data.
-processInitialHo accumho aho = do
+processInitialHo accumho aho = withStackStatus "processInitialHo" $ do
     let Rules rm = hoRules $ hoBuild aho
         newTVrs = fsts $ hoEs (hoBuild aho)
         (_,orphans) = spartition (\ (k,_) -> k `elem` map tvrIdent newTVrs) rm
@@ -94,7 +95,7 @@ processDecls ::
     -> Ho                   -- ^ preliminary haskell object  data
     -> TiData               -- ^ front end output
     -> IO (CollectedHo,Ho)  -- ^ (new accumulated ho, final ho for this modules)
-processDecls cho ho' tiData = do
+processDecls cho ho' tiData = withStackStatus "processDecls" $  do
     -- some useful values
     let ho = choHo cho
         -- XXX typechecker drops foreign exports!
@@ -159,7 +160,8 @@ processDecls cho ho' tiData = do
 
     lintCheckProgram (putErrLn "LintPostProcess") prog
 
-    let entryPoints = fromList . execWriter $ programMapDs_ (\ (t,_) -> when (getProperty prop_EXPORTED t || getProperty prop_INSTANCE t || getProperty prop_SPECIALIZATION t)  (tell [tvrIdent t])) prog
+    let entryPoints = fromList . execWriter $ programMapDs_ (\ (t,_) -> when 
+            (getProperty prop_EXPORTED t || getProperty prop_INSTANCE t || getProperty prop_SPECIALIZATION t)  (tell [tvrIdent t])) prog
     prog <- return $ prog { progEntry = entryPoints `mappend` progSeasoning prog }
 
     lintCheckProgram (putErrLn "InitialLint") prog
@@ -194,6 +196,7 @@ processDecls cho ho' tiData = do
 
     let fint mprog = do
         let names = pprint [ n | (n,_) <- programDs mprog]
+        withStackStatus ("fint: " ++ names) $ do
         when coreMini $ putErrLn ("----\n" ++ names)
         let tparms = transformParms { transformPass = "Init", transformDumpProgress = coreMini }
 
@@ -358,13 +361,15 @@ simplifyProgram sopt name dodump prog = liftIO $ do
             when (corePass && dodump) $ do
                 putStrLn "-- After Occurance Analysis"
                 printProgram nprog
-            return $ SS.programSSimplify sopt  nprog
+            lintCheckProgram (putErrLn "AfterOccurance") nprog
+            return $ SS.programSSimplify sopt nprog
     prog <- transformProgram transformParms { transformCategory = "Simplify"
                                             , transformPass = name
                                             , transformIterate = IterateDone
                                             , transformDumpProgress = dodump
                                             , transformOperation = g } prog { progStats = mempty }
-    when (dodump && (dump FD.Progress || coreSteps)) $ Stats.printLStat (optStatLevel options) ("Total: " ++ name) (progStats prog)
+    when (dodump && (dump FD.Progress || coreSteps)) $ 
+        Stats.printLStat (optStatLevel options) ("Total: " ++ name) (progStats prog)
     return prog { progStats = progStats prog `mappend` istat }
 
 {-

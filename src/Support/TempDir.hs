@@ -7,6 +7,7 @@ module Support.TempDir(
     cleanTempDir,
     setTempDir,
     addAtExit,
+    withStackStatus,
     wrapMain
    ) where
 
@@ -33,8 +34,8 @@ data TempDir = TempDir {
     }
 
 putLog :: String -> IO ()
-putLog = putStrLn
---log _ = return ()
+--putLog = putStrLn
+putLog _ = return ()
 
 cleanTempDir :: Bool -> IO ()
 cleanTempDir b = modifyIORef tdRef $ \x -> x { tempDirClean = b }
@@ -128,11 +129,14 @@ wrapMain main = E.catch (main >> cleanUp) f where
     f (fromException -> Just code) = cleanUp >> exitWith code
     f (fromException -> Just UserInterrupt) = cleanUp >> throwIO UserInterrupt
     f e = do
+        ss <- readIORef stackRef
         td <- readIORef tdRef
         case tempDirPath td of
             Just td -> hPutStrLn stderr $
                 printf "Exiting abnormally. Work directory is '%s'" td
             _ -> return ()
+        unless (null ss) $
+            forM_ ("Stack:":ss) (hPutStrLn stderr)
         throwIO e
 
 -------------------
@@ -161,3 +165,17 @@ mkdtemp template =
         else (template ++ "XXXXXX")) $ \ ptr -> do
             cname <- throwErrnoIfNull "mkdtemp" (c_mkdtemp ptr)
             peekCString cname
+
+{-# NOINLINE stackRef #-}
+stackRef :: IORef [String]
+stackRef = unsafePerformIO $ newIORef []
+
+withStackStatus :: String -> IO a -> IO a
+withStackStatus s action = do
+    cs <- readIORef stackRef
+    writeIORef stackRef (s:cs)
+    r <- action
+    writeIORef stackRef cs
+    return r
+
+

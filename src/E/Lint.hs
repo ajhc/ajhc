@@ -26,6 +26,7 @@ import Name.Id
 import Options
 import Stats
 import Support.FreeVars
+import Support.TempDir
 import Support.Transform
 import Util.Gen
 import Util.SetLike as S
@@ -45,6 +46,7 @@ transformProgram tp prog = liftIO $ do
         pname "" = ""
         pname xs = '-':xs
         iterate = transformIterate tp
+    withStackStatus ("transformProgram: " ++ name) $ do
     when dodump $ putErrLn $ "-- " ++ name
     when (dodump && dump FD.CorePass) $ printProgram prog
     wdump FD.ESize $ printESize ("Before "++name) prog

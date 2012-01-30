@@ -17,7 +17,6 @@ import Name.Id
 import Name.Name
 import Options
 import System.IO
-import Util.Gen hiding(putErrLn)
 import Util.SetLike
 import qualified FlagDump as FD
 import qualified Stats
@@ -25,35 +24,35 @@ import qualified Stats
 data ProgramType = SubProgram Bool | MainProgram | MainComponent
 
 data Program = Program {
-    progExternalNames  :: IdSet,
-    progCombinators    :: [Comb],
-    progDataTable      :: DataTable,
-    progEntry          :: IdSet,
-    progMain           :: Id,
-    progModule         :: Module,
-    progPasses         :: [String],    -- ^ record of passes the program goes through
-    progUsedIds        :: IdSet,       -- ^ filled in by occurance info collection
-    progFreeIds        :: IdSet,       -- ^ filled in by occurance info collection
-    progSeasoning      :: IdSet,       -- ^ these ids are depended on by external names via RULES
-    progType           :: ProgramType,
-    progCombMap        :: IdMap Comb,  -- progCombMap is always (fromList . progCombinators)
-    progStats          :: !Stats.Stat
+    progExternalNames :: IdSet,
+    progCombinators   :: [Comb],
+    progDataTable     :: DataTable,
+    progEntry         :: IdSet,
+    progMain          :: Id,
+    progModule        :: Module,
+    progPasses        :: [String],    -- ^ record of passes the program goes through
+    progUsedIds       :: IdSet,       -- ^ filled in by occurance info collection
+    progFreeIds       :: IdSet,       -- ^ filled in by occurance info collection
+    progSeasoning     :: IdSet,       -- ^ these ids are depended on by external names via RULES
+    progType          :: ProgramType,
+    progCombMap       :: IdMap Comb,  -- progCombMap is always (fromList . progCombinators)
+    progStats         :: !Stats.Stat
     }
 
 program = Program {
-    progExternalNames  = mempty,
-    progCombinators    = mempty,
-    progDataTable      = mempty,
-    progEntry          = mempty,
-    progMain           = emptyId,
-    progModule         = mainModule,
-    progPasses         = [],
-    progUsedIds        = mempty,
-    progFreeIds        = mempty,
-    progSeasoning      = mempty,
-    progType           = MainProgram,
-    progCombMap        = mempty,
-    progStats          = mempty
+    progExternalNames = mempty,
+    progCombinators   = mempty,
+    progDataTable     = mempty,
+    progEntry         = mempty,
+    progMain          = emptyId,
+    progModule        = mainModule,
+    progPasses        = [],
+    progUsedIds       = mempty,
+    progFreeIds       = mempty,
+    progSeasoning     = mempty,
+    progType          = MainProgram,
+    progCombMap       = mempty,
+    progStats         = mempty
     }
 
 progEntryPoints prog = map combHead $ concatMap (progComb prog) (toList $ progEntry prog)
@@ -65,24 +64,21 @@ progComb prog x = case x `mlookup`  progCombMap prog of
     Just c -> return c
 
 programDs :: Program -> [(TVr,E)]
-programDs prog = [ (t,e)  | Comb { combHead = t, combBody = e }  <- progCombinators prog]
+programDs prog = [ (t,e)  | Comb { combHead = t,
+                                   combBody = e } <- progCombinators prog]
 
-progCombinators_u f prog = programUpdate prog { progCombinators = f $ progCombinators prog }
+progCombinators_u f prog =
+    programUpdate prog { progCombinators = f $ progCombinators prog }
 progCombinators_s cs prog = programUpdate prog { progCombinators = cs }
 
 programUpdate ::  Program -> Program
-programUpdate prog = check $ ucache prog where
-    ds = progCombinators prog
-    ucache prog = prog { progCombMap = fromList [ (combIdent c,c) | c <- ds ] }
-    check x
-        | not flint = x
-        | hasRepeatUnder combIdent ds = error $ "programSetDs: program has redundant definitions: \n" ++ names
-        | any (not . isJust . fromId) (map combIdent ds) = error $ "programSetDs: trying to set non unique top level name: \n" ++ names
-        | otherwise = x
-    names = intercalate "\n"  (sort $ map (show . tvrShowName . combHead) ds)
+programUpdate prog = ucache prog where
+    ucache prog = prog { progCombMap =
+        fromList [ (combIdent c,c) | c <- progCombinators prog ] }
 
 programSetDs' :: [(TVr,E)] -> Program -> Program
-programSetDs' ds prog = progCombinators_s [ combRules_s (lupRules (tvrIdent t)) $ bindComb (t,e) | (t,e) <- ds ] prog where
+programSetDs' ds prog = progCombinators_s newDs prog where
+    newDs = [ combRules_s (lupRules (tvrIdent t)) $ bindComb (t,e) | (t,e) <- ds ]
     lupRules t = case mlookup t (progCombMap prog) of
         Just c -> combRules c
         Nothing -> mempty
@@ -117,7 +113,8 @@ programMapDs_ :: Monad m => ((TVr,E) -> m ()) -> Program -> m ()
 programMapDs_ f prog = mapM_ f (programDs prog)
 
 hPrintProgram fh prog@Program {progCombinators = cs, progDataTable = dataTable } = do
-    sequence_ $ intersperse (hPutStrLn fh "") [ hPrintCheckName fh dataTable v e | Comb { combHead = v, combBody = e } <- cs]
+    sequence_ $ intersperse (hPutStrLn fh "") [ hPrintCheckName fh dataTable v e |
+                                                Comb { combHead = v, combBody = e } <- cs]
     when (progMain prog /= emptyId) $
         hPutStrLn fh $ "MainEntry: " ++ pprint (progMainEntry prog)
     when (progEntry prog /= singleton (progMain prog)) $

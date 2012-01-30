@@ -121,7 +121,7 @@ collectOccurance e = f e where
         a <- f a
         (b,tfvs) <- grump (f b)
         case mlookup n tfvs of
-            Nothing -> tell (tfvs,mempty) >>  return (EPi tvr { tvrIdent =  emptyId, tvrType = a } b)
+            Nothing -> tell (tfvs,mempty) >> return (EPi tvr { tvrIdent = emptyId, tvrType = a } b)
             Just occ -> tell (delete n tfvs,singleton n) >> return (EPi (annb' tvr { tvrType = a }) b)
     f (ELit lc@LitCons { litArgs = as, litType = t }) = arg $ do
         t <- f t
@@ -168,7 +168,8 @@ collectOccurance e = f e where
         ct <- arg $ f (eCaseType ec)
         b <- arg (ftvr b)
         tell $ (delete (tvrIdent b) fidm,singleton (tvrIdent b))
-        return $ caseUpdate ec { eCaseScrutinee = scrut', eCaseAlts = as', eCaseBind = annbind' fidm b, eCaseType = ct, eCaseDefault = d'}
+        return $ caseUpdate ec { eCaseScrutinee = scrut', eCaseAlts = as',
+            eCaseBind = annbind' fidm b, eCaseType = ct, eCaseDefault = d'}
     f ELetRec { eDefs = ds, eBody = e } = do
         (e',fve) <- grump (f e)
         ds''' <- collectDs (map bindComb ds) fve
@@ -264,10 +265,11 @@ inLam (OMap om) = OMap (fmap il om) where
 andOM x y = unionWith andOcc x y
 andOcc UseInfo { useOccurance = Unused } x = x
 andOcc x UseInfo { useOccurance = Unused } = x
-andOcc x y = UseInfo { useOccurance = Many, minimumArgs = min (minimumArgs x) (minimumArgs y) }
+andOcc x y = UseInfo { useOccurance = Many,
+    minimumArgs = min (minimumArgs x) (minimumArgs y) }
 
-orMaps ms = OMap $ fmap orMany $ foldl (unionWith (++)) mempty (map (fmap (:[])) (map unOMap ms)) where
-    unOMap (OMap m) = m
+orMaps ms = OMap $ fmap orMany $ foldl (unionWith (++)) mempty (map (fmap (:[]))
+    (map unOMap ms)) where unOMap (OMap m) = m
 
 orMany [] = error "empty orMany"
 orMany xs = f (filter ((/= Unused) . useOccurance) xs) where
@@ -300,7 +302,8 @@ emptySimplifyOpts = SimpOpts { so_noInlining  = False
 
 cacheSimpOpts opts = opts {
     so_boundVarsCache = idMapToIdSet (so_boundVars opts),
-    so_cachedScope = cacheSubst (extendScope initScope mempty { envSubst = mapMaybeIdMap bb  (so_boundVars opts), envRules = rules })
+    so_cachedScope = cacheSubst (extendScope initScope mempty {
+        envSubst = mapMaybeIdMap bb (so_boundVars opts), envRules = rules })
    } where
     bb Comb { combBody = e } | isFullyConst e = Just (Done e)
     bb _ = Nothing
@@ -346,7 +349,8 @@ instance Monoid Forced where
     mappend ForceNoinline _ = ForceNoinline
     mappend ForceInline ForceInline = ForceInline
 
-fixInline finalPhase v bt@IsBoundTo {} = bt { inlineForced = inlineForced bt `mappend` calcForced finalPhase v }  where
+fixInline finalPhase v bt@IsBoundTo {} = bt {
+    inlineForced = inlineForced bt `mappend` calcForced finalPhase v }
 
 calcForced finalPhase v =
     let props = getProperties v in
@@ -373,7 +377,8 @@ insertSuspSubst t e env = insertSuspSubst' (tvrIdent t) e env
 
 insertSuspSubst' :: Id -> InE -> Env -> Env
 insertSuspSubst' z _e env | isEmptyId z = env
-insertSuspSubst' t e env = cacheSubst env { envSubst = minsert t (susp e (envSubst env)) (envSubst env) }
+insertSuspSubst' t e env = cacheSubst env {
+    envSubst = minsert t (susp e (envSubst env)) (envSubst env) }
 
 insertRange :: Id -> Range -> Env -> Env
 insertRange z e env | isEmptyId z = env

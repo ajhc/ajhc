@@ -13,7 +13,6 @@ class Monad m => MonadPlus m where
     mplus :: m a -> m a -> m a
     mzero = fail "mzero"
 
-
 instance MonadPlus Maybe where
     mzero = Nothing
     Nothing `mplus` y = y
@@ -23,9 +22,7 @@ instance MonadPlus [] where
     mzero = []
     mplus = (++)
 
-
 -- Functions
-
 
 msum  :: MonadPlus m => [m a] -> m a
 msum xs  =  foldr mplus mzero xs
@@ -86,7 +83,6 @@ liftM5           :: (Monad m) => (a -> b -> c -> d -> e -> f) ->
 liftM5 f         =  \a b c d e -> do { a' <- a; b' <- b; c' <- c; d' <- d;
        e' <- e; return (f a' b' c' d' e') }
 
-
 -- extensions
 
 -- | Like 'foldM', but discards the result.
@@ -101,7 +97,6 @@ replicateM n x    = sequence (replicate n x)
 -- | Like 'replicateM', but discards the result.
 replicateM_       :: (Monad m) => Int -> m a -> m ()
 replicateM_ n x   = sequence_ (replicate n x)
-
 
 -- | 'forM' is 'mapM' with its arguments flipped
 forM            :: Monad m => [a] -> (a -> m b) -> m [b]

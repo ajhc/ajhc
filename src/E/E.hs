@@ -88,18 +88,18 @@ tvrName (TVr {tvrIdent =  n }) | Just a <- fromId n = return a
 tvrName tvr = fail $ "TVr is not Name: " ++ show tvr
 
 tvrShowName :: TVr -> String
-tvrShowName t = maybe ('x':(show $ tvrIdent t)) show (tvrName t)
+tvrShowName t = show (tvrIdent t)
 
-modAbsurd = "Jhc@.Absurd"
-modBox    = "Jhc@.Box"
+modAbsurd = toModule "Jhc@.Absurd"
+modBox    = toModule "Jhc@.Box"
 
-nameConjured :: String -> E -> Name
+nameConjured :: Module -> E -> Name
 nameConjured mod n = toName TypeConstructor (mod,f n "") where
     f (ESort s) = shows s
     f (EPi TVr { tvrType = t1 } t2) = ('^':) . f t1 . f t2
     f _ = error $ "nameConjured: " ++ show (mod,n)
 
-fromConjured :: Monad m => String -> Name -> m E
+fromConjured :: Monad m => Module -> Name -> m E
 fromConjured mod n = maybeM ("fromConjured: " ++ show (mod,n)) $ do
     let f s = funit s `mplus` flam s
         flam ('^':xs) = do (x,rs) <- f xs; (y,gs) <- f rs; return (EPi tvr { tvrType = x } y,gs)
