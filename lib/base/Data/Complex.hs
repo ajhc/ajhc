@@ -10,6 +10,8 @@ module Data.Complex(
     phase
     )  where
 
+import Jhc.Num
+
 infix  6  :+
 
 -- the standard says this should have a RealFloat constraint, but that is silly.

@@ -1,66 +1,66 @@
 {-# OPTIONS_JHC -funboxed-tuples #-}
 module Prelude(
-    -- export everything here
-    module Prelude,
-    -- export types from elsewhere
-    IO(),
-    IOError(),
-    Rational(),
-    -- functions from elsewhere
-    putStr,
-    putStrLn,
-    error,
-    concatMap,
-    concat,
-    any,
-    all,
-    subtract,
-    even,
-    odd,
-    foldr,
-    and,
-    filter,
-    or,
-    length,
-    null,
-    head,
-    tail,
-    last,
-    init,
-    take,drop,
-    takeWhile,
-    dropWhile,
-    span,
-    break,
-    (!!),
-    Maybe(Just,Nothing),
-    Either(Left,Right),
-    maybe,
-    sequence,
-    sequence_,
-    -- submodules
-    module Jhc.Basics,
-    module Jhc.Float,
-    module Jhc.Enum,
-    module Jhc.Order,
-    module Jhc.Show,
-    module Jhc.Numeric,
-    Num(..),
-    fromIntegral,
-    elem,notElem,
-    realToFrac,
-    Real(..),
-    Integral(..),
-    Fractional(..),
-    Floating(..),
-    RealFrac(properFraction,truncate,round,ceiling,floor),
-    RealFloat(..),
-    module Jhc.Monad,
-    Int(),
-    foldl1,scanl1,foldr1,scanr,scanr1,
+    -- Prelude
+    Bool(False, True),
+    Maybe(Nothing, Just),
+    Either(Left, Right),
+    Ordering(LT, EQ, GT),
+    Char, String, Int, Integer, Float, Double, Rational, IO,
+    module Jhc.Basics, -- for list
+--  List type: []((:), [])
+--  Tuple types: (,)((,)), (,,)((,,)), etc.
+--  Trivial type: ()(())
+--  Functions: (->)
 
-    module Prelude.IO,
-    module Prelude.Text
+    Eq((==), (/=)),
+    Ord(compare, (<), (<=), (>=), (>), max, min),
+    Enum(succ, pred, toEnum, fromEnum, enumFrom, enumFromThen,
+         enumFromTo, enumFromThenTo),
+    Bounded(minBound, maxBound),
+    Num((+), (-), (*), negate, abs, signum, fromInteger),
+    Real(toRational),
+    Integral(quot, rem, div, mod, quotRem, divMod, toInteger),
+    Fractional((/), recip, fromRational),
+    Floating(pi, exp, log, sqrt, (**), logBase, sin, cos, tan,
+             asin, acos, atan, sinh, cosh, tanh, asinh, acosh, atanh),
+    RealFrac(properFraction, truncate, round, ceiling, floor),
+    RealFloat(floatRadix, floatDigits, floatRange, decodeFloat,
+              encodeFloat, exponent, significand, scaleFloat, isNaN,
+              isInfinite, isDenormalized, isIEEE, isNegativeZero, atan2),
+    Monad((>>=), (>>), return, fail),
+    Functor(fmap),
+    mapM, mapM_, sequence, sequence_, (=<<),
+    maybe, either,
+    (&&), (||), not, otherwise,
+    subtract, even, odd, gcd, lcm, (^), (^^),
+    fromIntegral, realToFrac,
+    fst, snd, curry, uncurry, id, const, (.), flip, ($), until,
+    asTypeOf, error, undefined,
+    seq, ($!),
+
+    -- PreludeList
+    map, (++), filter, concat, concatMap,
+    head, last, tail, init, null, length, (!!),
+    foldl, foldl1, scanl, scanl1, foldr, foldr1, scanr, scanr1,
+    iterate, repeat, replicate, cycle,
+    take, drop, splitAt, takeWhile, dropWhile, span, break,
+    lines, words, unlines, unwords, reverse, and, or,
+    any, all, elem, notElem, lookup,
+    sum, product, maximum, minimum,
+    zip, zip3, zipWith, zipWith3, unzip, unzip3,
+
+    -- PreludeText
+    ReadS, ShowS,
+    Read(readsPrec, readList),
+    Show(showsPrec, show, showList),
+    reads, shows, read, lex,
+    showChar, showString, readParen, showParen,
+
+    -- PreludeIO
+    FilePath, IOError, ioError, userError, catch,
+    putChar, putStr, putStrLn, print,
+    getChar, getLine, getContents, interact,
+    readFile, writeFile, appendFile, readIO, readLn
     ) where
 
 import Jhc.Basics
@@ -91,7 +91,7 @@ import Prelude.IO
 import Prelude.Text
 import qualified Data.Char as Char(isSpace,ord,chr)
 
--- infixr 9  .
+--infixr 9  .
 --infixr 8  ^, ^^, **
 --infixr 8  ^, ^^
 --infixl 7  *  , /, `quot`, `rem`, `div`, `mod`
@@ -102,48 +102,13 @@ import qualified Data.Char as Char(isSpace,ord,chr)
 --infixr 2  ||
 --infixl 1  >>, >>=
 --infixr 1  =<<
--- infixr 0  $, $!, `seq`
+--infixr 0  $, $!, `seq`
 
--- Numeric functions
-{-
-
-{-# SPECIALIZE gcd :: Int -> Int -> Int #-}
-{-# SPECIALIZE gcd :: Integer -> Integer -> Integer #-}
-gcd              :: (Integral a) => a -> a -> a
-gcd 0 0          =  error "Prelude.gcd: gcd 0 0 is undefined"
-gcd x y          =  gcd' (abs x) (abs y)
-                    where gcd' x 0  =  x
-                          gcd' x y  =  gcd' y (x `rem` y)
-
-{-# SPECIALIZE lcm :: Int -> Int -> Int #-}
-{-# SPECIALIZE lcm :: Integer -> Integer -> Integer #-}
-lcm              :: (Integral a) => a -> a -> a
-lcm _ 0          =  0
-lcm 0 _          =  0
-lcm x y          =  abs ((x `quot` (gcd x y)) * y)
-
-{-# SPECIALIZE (^) :: Int -> Int -> Int #-}
-{-# SPECIALIZE (^) :: Integer -> Int -> Integer #-}
-{-# SPECIALIZE (^) :: Double -> Int -> Double #-}
-
-(^)              :: (Num a, Integral b) => a -> b -> a
-x ^ 0            =  1
-x ^ n | n > 0    =  f x (n-1) x
-                    where f _ 0 y = y
-                          f x n y = g x n  where
-                                    g x n | even n  = g (x*x) (n `quot` 2)
-                                          | otherwise = f x (n-1) (x*y)
-_ ^ _            = error "Prelude.^: negative exponent"
-
-(^^)             :: (Fractional a, Integral b) => a -> b -> a
-x ^^ n           =  if n >= 0 then x^n else recip (x^(-n))
-
--}
 either :: (a -> c) -> (b -> c) -> Either a b -> c
 either f g (Left x)  =  f x
 either f g (Right y) =  g y
 
-until            :: (a -> Bool) -> (a -> a) -> a -> a
+until :: (a -> Bool) -> (a -> a) -> a -> a
 until p f x
      | p x       =  x
      | otherwise =  until p f (f x)
@@ -159,7 +124,6 @@ until p f x
 -- Note that  last (scanl f z xs) == foldl f z xs.
 -- scanl1 is similar, again without the starting element:
 --      scanl1 f [x1, x2, ...] == [x1, x1 `f` x2, ...]
-
 
 -- cycle ties a finite list into a circular one, or equivalently,
 -- the infinite repetition of the original list.  It is the identity

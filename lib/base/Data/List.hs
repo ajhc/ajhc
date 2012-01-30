@@ -1,4 +1,3 @@
-
 module Data.List (
     elemIndex, elemIndices,
     find, findIndex, findIndices,
@@ -28,7 +27,6 @@ module Data.List (
     sum, product, maximum, minimum, concatMap,
     zip, zip3, zipWith, zipWith3, unzip, unzip3
     ) where
-
 
 infix 5 \\
 
@@ -319,18 +317,13 @@ unzip7          =  foldr (\(a,b,c,d,e,f,g) ~(as,bs,cs,ds,es,fs,gs) ->
 {-# RULES "sort/sort"  forall  xs . sort (sort xs) = sort xs #-}
 {-# RULES "nub/nub"  forall  xs . nub (nub xs) = nub xs #-}
 
-
 -- | A strict version of 'foldl'.
 foldl'           :: (a -> b -> a) -> a -> [b] -> a
 foldl' f z xs = lgo z xs where
     lgo z []     = z
     lgo z (x:xs) = let z' = f z x in z' `seq` lgo z' xs
 
-
 -- | A strict version of 'foldl1'
 foldl1'                  :: (a -> a -> a) -> [a] -> a
 foldl1' f (x:xs)         =  foldl' f x xs
 foldl1' _ []             =  error "foldl1': empty list"
-
-
-

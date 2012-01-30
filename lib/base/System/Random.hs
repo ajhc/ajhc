@@ -28,11 +28,10 @@ module System.Random
 	) where
 
 import Data.Char ( isSpace, chr, ord )
-import Numeric
-import Foreign.Storable
 import Foreign.Ptr
-
-
+import Foreign.Storable
+import Jhc.Num
+import Numeric
 
 class RandomGen g where
     next  :: g -> (Int, g)
@@ -74,7 +73,6 @@ stdFromString s        = (mkStdGen num, rest)
 	where (cs, rest) = splitAt 6 s
               num        = foldl (\a x -> x + 3 * a) 1 (map ord cs)
 
-
 mkStdGen :: Int -> StdGen -- why not Integer ?
 mkStdGen s
  | s < 0     = mkStdGen (-s)
@@ -90,8 +88,6 @@ createStdGen s
       where
 	(q, s1) = s `divMod` 2147483562
 	s2      = q `mod` 2147483398
-
-
 
 class Random a where
   -- Minimal complete definition: random and randomR
@@ -144,8 +140,6 @@ instance Random Double where
 instance Random Float where
   random g        = randomIvalDouble (0::Double,1) realToFrac g
   randomR (a,b) g = randomIvalDouble (realToFrac a, realToFrac b) realToFrac g
-
-
 
 mkStdRNG :: Integer -> IO StdGen
 mkStdRNG o = return (createStdGen o)
@@ -225,7 +219,6 @@ stdSplit std@(StdGen s1 s2)
 -- stdSplit std@(StdGen s1 _) = (std, unsafePerformIO (mkStdRNG (fromInt s1)))
 --  #endif
 
-
 --ptr_a = unsafePerformIO $ malloc
 --ptr_b = unsadePerformIO $ malloc
 
@@ -248,9 +241,7 @@ getStdGen = do
     b <- peekElemOff c_stdrnd 1
     return $ StdGen a b
 
-
 foreign import ccall "&jhc_stdrnd" c_stdrnd :: Ptr Int
-
 
 newStdGen :: IO StdGen
 newStdGen = do
@@ -265,4 +256,3 @@ getStdRandom f = do
    let (v, new_rng) = f rng
    setStdGen new_rng
    return v
-
