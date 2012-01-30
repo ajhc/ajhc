@@ -3,6 +3,7 @@ module FrontEnd.Class(
     printClassHierarchy,
     instanceToTopDecls,
     ClassHierarchy,
+    augmentClassHierarchy,
     ClassRecord(..),
     isClassRecord,
     isClassAliasRecord,
@@ -69,6 +70,16 @@ instance PPrint a (Qual Pred) => PPrint a Inst where
     pprint Inst { instHead = h, instAssocs = as, instDerived = d } = (if d then text "*" else text " ") <> pprint h <+> text "where" <$> vcat [ text "    type" <+> pprint n <+> text "_" <+> hsep (map pprint ts) <+> text "=" <+> pprint sigma  | (n,_,ts,sigma) <- as]
 
 emptyInstance = Inst { instDerived = False, instSrcLoc = bogusASrcLoc, instHead = error "emptyInstance", instAssocs = [] }
+
+-- augment heirarchy with just instances with full class definitions
+augmentClassHierarchy :: ClassHierarchy -> ClassHierarchy -> ClassHierarchy
+augmentClassHierarchy (ClassHierarchy full) (ClassHierarchy restricted) = ans where
+    ans = ClassHierarchy (fmap f restricted)
+    f ch = fl { classInsts = classInsts ch } where
+        fl = case Map.lookup (className ch) full of
+            Nothing -> ch
+            Just f -> combineClassRecords ch f
+
 
 -- | a class record is either a class along with instances, or just instances.
 -- you can tell the difference by the presence of the classArgs field

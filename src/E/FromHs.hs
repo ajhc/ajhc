@@ -186,14 +186,14 @@ nameToEntryPoint dataTable main cname ffi ds = ans where
 createInstanceRules :: Monad m => DataTable -> ClassHierarchy -> [(TVr,E)] -> m Rules
 createInstanceRules dataTable classHierarchy funcs = return $ fromRules ans where
     ans = concatMap cClass (classRecords classHierarchy)
-    cClass classRecord =  concat [ method classRecord n mve | (n,TForAll _ (_ :=> t)) <- classAssumps classRecord, mve <- findName n ]
-
+    cClass classRecord = concat [ method classRecord n mve |
+        (n,TForAll _ (_ :=> t)) <- classAssumps classRecord, mve <- findName n ]
     method classRecord methodName (methodVar,_) = as where
         ty = tvrType methodVar
         defaultName = defaultInstanceName methodName
-
-        as = [ rule  t | Inst { instHead = _ :=> IsIn _ t }  <- snub (classInsts classRecord) ]
-        rule t = makeRule ("Rule.{" ++ show name ++ "}") (toModule (show name),0) RuleSpecialization ruleFvs methodVar (vp:map EVar args) (removeNewtypes dataTable body)  where
+        as = [ rule t | Inst { instHead = _ :=> IsIn _ t } <- snub (classInsts classRecord) ]
+        rule t = makeRule ("Rule.{" ++ show name ++ "}") (toModule (show name),0)
+                RuleSpecialization ruleFvs methodVar (vp:map EVar args) (removeNewtypes dataTable body) where
             ruleFvs = [ t | ~(EVar t) <- vs] ++ args
             (vp,vs) = valToPat' (removeNewtypes dataTable $ tipe t)
             name = instanceName methodName (getTypeCons t)

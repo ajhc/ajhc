@@ -29,6 +29,7 @@ import E.Traverse
 import E.TypeAnalysis
 import E.TypeCheck
 import E.WorkerWrapper
+import FrontEnd.Class(augmentClassHierarchy)
 import FrontEnd.HsSyn
 import FrontEnd.KindInfer
 import FrontEnd.Tc.Module
@@ -123,10 +124,10 @@ processDecls cho ho' tiData = withStackStatus "processDecls" $  do
         theProps = fromList [ (toId x,y) | (x,y) <- Map.toList $ tiProps tiData]
     ds' <- convertDecls tiData theProps
         (hoClassHierarchy $ hoTcInfo ho') allAssumps  fullDataTable decls
-    let ds = [ (v,e) | (v,e) <- classInstances ] ++
-            [ (v,lc) | (n,v,lc) <- ds', v `notElem` fsts classInstances ]
+    let ds = classInstances ++ [ (v,lc) | (n,v,lc) <- ds', v `notElem` fsts classInstances ]
     -- Build rules from instances, specializations, and user specified rules and catalysts
-    instanceRules <- createInstanceRules fullDataTable (hoClassHierarchy $ hoTcInfo ho')  (ds `mappend` hoEs (hoBuild ho))
+    let augmentedClassHierarchy = hoClassHierarchy (hoTcInfo ho) `augmentClassHierarchy` hoClassHierarchy (hoTcInfo ho')
+    instanceRules <- createInstanceRules fullDataTable augmentedClassHierarchy (ds `mappend` hoEs (hoBuild ho))
     userRules <- convertRules (progModule prog) tiData (hoClassHierarchy  $ hoTcInfo ho') allAssumps fullDataTable decls
     (nds,specializeRules) <- procAllSpecs fullDataTable (tiCheckedRules tiData) ds
 
@@ -160,7 +161,7 @@ processDecls cho ho' tiData = withStackStatus "processDecls" $  do
 
     lintCheckProgram (putErrLn "LintPostProcess") prog
 
-    let entryPoints = fromList . execWriter $ programMapDs_ (\ (t,_) -> when 
+    let entryPoints = fromList . execWriter $ programMapDs_ (\ (t,_) -> when
             (getProperty prop_EXPORTED t || getProperty prop_INSTANCE t || getProperty prop_SPECIALIZATION t)  (tell [tvrIdent t])) prog
     prog <- return $ prog { progEntry = entryPoints `mappend` progSeasoning prog }
 
@@ -368,7 +369,7 @@ simplifyProgram sopt name dodump prog = liftIO $ do
                                             , transformIterate = IterateDone
                                             , transformDumpProgress = dodump
                                             , transformOperation = g } prog { progStats = mempty }
-    when (dodump && (dump FD.Progress || coreSteps)) $ 
+    when (dodump && (dump FD.Progress || coreSteps)) $
         Stats.printLStat (optStatLevel options) ("Total: " ++ name) (progStats prog)
     return prog { progStats = progStats prog `mappend` istat }
 
@@ -423,10 +424,11 @@ compileWholeProgram prog = do
 
     when verbose $ do
         putStrLn "Type analyzed methods"
-        flip mapM_ (programDs prog) $ \ (t,e) -> do
+        flip mapM_ (sortUnder (show . fst) (programDs prog)) $ \ (t,e) -> do
         let (_,ts) = fromLam e
             ts' = takeWhile (sortKindLike . getType) ts
-        when (not (null ts')) $ putStrLn $ (pprint t) ++ " \\" ++ concat [ "(" ++ show  (Info.fetch (tvrInfo t) :: Typ) ++ ")" | t <- ts' ]
+        when (not (null ts')) $ putStrLn $ (pprint t) ++ " \\" ++
+            concat [ "(" ++ show  (Info.fetch (tvrInfo t) :: Typ) ++ ")" | t <- ts' ]
     lintCheckProgram onerrNone prog
     prog <- programPrune prog
 
@@ -437,30 +439,41 @@ compileWholeProgram prog = do
             sequence_ [ printCheckName'' dataTable (combHead x) (combBody x) |  x <- es']
         return es'
 
-    prog <- evaluate $ progCombinators_s ([ p | p <- progCombinators prog, combHead p `notElem` map combHead cmethods] ++ cmethods) prog
-    prog <- annotateProgram mempty (\_ nfo -> return $ unsetProperty prop_INSTANCE nfo) letann (\_ nfo -> return nfo) prog
+    prog <- evaluate $ progCombinators_s ([ p | p <- progCombinators prog,
+        combHead p `notElem` map combHead cmethods] ++ cmethods) prog
+    prog <- annotateProgram mempty (\_ nfo -> return $ unsetProperty prop_INSTANCE nfo)
+        letann (\_ nfo -> return nfo) prog
 
     if not (fopts FO.GlobalOptimize) then do
         prog <- programPrune prog
         wdump FD.CoreBeforelift $ printProgram prog
-        prog <- transformProgram transformParms { transformCategory = "LambdaLift", transformDumpProgress = dump FD.Progress, transformOperation = lambdaLift } prog
+        prog <- transformProgram transformParms {
+            transformCategory = "LambdaLift",
+            transformDumpProgress = dump FD.Progress,
+            transformOperation = lambdaLift } prog
         wdump FD.CoreAfterlift $ printProgram prog
         prog <- return $ atomizeApps True prog
         wdump FD.CoreMangled $ dumpCore "mangled" prog
         return prog
      else do
-    prog <- transformProgram transTypeAnalyze { transformPass = "Main-AfterMethod", transformDumpProgress = verbose } prog
+    prog <- transformProgram transTypeAnalyze {
+        transformPass = "Main-AfterMethod",
+        transformDumpProgress = verbose } prog
     prog <- simplifyProgram SS.emptySimplifyOpts "Main-One" verbose prog
     prog <- etaExpandProg "Main-AfterOne" prog
     wdump FD.CorePass $ dumpCore "before-TypeAnalyze-Main-AfterSimp" prog
-    prog <- transformProgram transTypeAnalyze { transformPass = "Main-AfterSimp", transformDumpProgress = verbose } prog
+    prog <- transformProgram transTypeAnalyze {
+        transformPass = "Main-AfterSimp", transformDumpProgress = verbose } prog
     prog <- simplifyProgram SS.emptySimplifyOpts "Main-Two" verbose prog
 
     -- run optimization again with no rules enabled
-    prog <- return $ runIdentity $ annotateProgram mempty (\_ nfo -> return $ modifyProperties (flip (foldr S.delete) [prop_HASRULE,prop_WORKER]) nfo) letann (\_ -> return) prog
+    prog <- return $ runIdentity $ annotateProgram mempty (\_ nfo -> return $
+        modifyProperties (flip (foldr S.delete) [prop_HASRULE,prop_WORKER]) nfo)
+        letann (\_ -> return) prog
     --prog <- transformProgram "float inward" DontIterate True programFloatInward prog
 
-    prog <- simplifyProgram SS.emptySimplifyOpts { SS.so_finalPhase = True } "SuperSimplify no rules" verbose prog
+    prog <- simplifyProgram SS.emptySimplifyOpts { SS.so_finalPhase = True }
+        "SuperSimplify no rules" verbose prog
 
     -- We should float inward right before lambda lifting so that when a case statement is lifted out, it takes any local definitions with it.
 --    prog <- transformProgram transformParms {
@@ -471,17 +484,27 @@ compileWholeProgram prog = do
     -- perform lambda lifting
 --    prog <- denewtypeProgram prog
 
-    prog <- transformProgram transformParms { transformCategory = "BoxifyProgram", transformDumpProgress = dump FD.Progress, transformOperation = boxifyProgram } prog
+    prog <- transformProgram transformParms {
+        transformCategory = "BoxifyProgram",
+        transformDumpProgress = dump FD.Progress,
+        transformOperation = boxifyProgram } prog
     prog <- programPrune prog
 
     prog <- Demand.analyzeProgram prog
     prog <- return $ E.CPR.cprAnalyzeProgram prog
-    prog <- transformProgram transformParms { transformCategory = "Boxy WorkWrap", transformDumpProgress = dump FD.Progress, transformOperation = evaluate . workWrapProgram } prog
-    prog <- simplifyProgram SS.emptySimplifyOpts { SS.so_finalPhase = True } "SuperSimplify after Boxy WorkWrap" verbose prog
+    prog <- transformProgram transformParms {
+        transformCategory = "Boxy WorkWrap",
+        transformDumpProgress = dump FD.Progress,
+        transformOperation = evaluate . workWrapProgram } prog
+    prog <- simplifyProgram SS.emptySimplifyOpts { SS.so_finalPhase = True }
+        "SuperSimplify after Boxy WorkWrap" verbose prog
     prog <- return $ runIdentity $ programMapBodies (return . cleanupE) prog
 
     wdump FD.CoreBeforelift $ dumpCore "before-lift" prog
-    prog <- transformProgram transformParms { transformCategory = "LambdaLift", transformDumpProgress = dump FD.Progress, transformOperation = lambdaLift } prog
+    prog <- transformProgram transformParms {
+        transformCategory = "LambdaLift",
+        transformDumpProgress = dump FD.Progress,
+        transformOperation = lambdaLift } prog
 
     wdump FD.CoreAfterlift $ dumpCore "after-lift" prog
 
@@ -503,7 +526,8 @@ compileWholeProgram prog = do
 
     prog <- Demand.analyzeProgram prog
     prog <- return $ E.CPR.cprAnalyzeProgram prog
-    prog <- simplifyProgram SS.emptySimplifyOpts { SS.so_postLift = True, SS.so_finalPhase = True } "PostLiftSimplify" verbose prog
+    prog <- simplifyProgram SS.emptySimplifyOpts {
+        SS.so_postLift = True, SS.so_finalPhase = True } "PostLiftSimplify" verbose prog
 --    prog <- programFloatInward prog
 
     when verbose $ do

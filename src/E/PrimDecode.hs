@@ -52,18 +52,18 @@ a ==> b = (a,b)
 --plainPrimMap, rawArgPrimMap, prefixPrimMap :: Map.Map Atom Typ
 plainPrimMap :: Map.Map Atom Typ
 plainPrimMap = Map.fromList
-    [ "seq" ==> star +> starHash +> starHash
-    , "dependingOn" ==> star +> starHash +> star
-    , "newWorld__" ==> star +> state
-    , "unsafeCoerce" ==> star +> star
+    [ "seq"            ==> star +> starHash +> starHash
+    , "dependingOn"    ==> star +> starHash +> star
+    , "newWorld__"     ==> star +> state
+    , "unsafeCoerce"   ==> star +> star
     , "options_target" ==> hash
-    , "touch_" ==> starHash +> state +> state
-    , "zero" ==> starHash
-    , "one" ==> starHash
-    , "box" ==> hash +> star
-    , "unbox" ==> star +> hash
-    , "constPeekByte" ==> hash +> hash
-    , "exitFailure__" ==> hash +> hash
+    , "touch_"         ==> starHash +> state +> state
+    , "zero"           ==> starHash
+    , "one"            ==> starHash
+    , "box"            ==> hash +> star
+    , "unbox"          ==> star +> hash
+    , "constPeekByte"  ==> hash +> hash
+    , "exitFailure__"  ==> hash +> hash
     ] `Map.union` fmap (const (starHash +> starHash)) incDec
       `Map.union` fmap (const star) primBoundMap
 
