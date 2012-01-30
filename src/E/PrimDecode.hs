@@ -152,7 +152,7 @@ processPrim dataTable srcLoc pName args rType req = ans where
         return (ePrim (CConst (packString $ "JHC_" ++ c)) [] rType)
     primPrefix (getPrefix "const." -> Just c) _ = checkType' star $ do
         Just ret <- return $ boxResult dataTable rType $ \tr str ->
-            ePrim (CConst $ packString c) [] rType
+            ePrim (CConst $ packString c) [] str
         return ret
     primPrefix (getPrefix "error." -> Just c) _ = return (EError c rType)
     primPrefix _ _ = primUnknown
