@@ -31,10 +31,8 @@ getArgs = case Jhc.Options.target of
         let f n = peekElemOff argv n >>= peekCString
         mapM f [0 .. fromIntegral argc - 1]
 
-
 getEnv s = withCString s c_getenv >>= \p ->
     if p == nullPtr then fail ("getEnv: " ++ show s)  else peekCString p
-
 
 foreign import unsafe ccall "stdlib.h getenv" c_getenv :: Ptr CChar -> IO (Ptr CChar)
 
@@ -52,7 +50,6 @@ ghc_getArgs =
         let f n = peekElemOff argv n >>= peekCString
         mapM f [1 .. fromIntegral p - 1]
 
-
 foreign import unsafe ccall "getProgArgv"
   getProgArgv :: Ptr CInt -> Ptr (Ptr CString) -> IO ()
 
@@ -63,8 +60,6 @@ ghc_getProgName =
      getProgArgv p_argc p_argv
      argv <- peek p_argv
      peekElemOff argv 0 >>= peekCString
-
-
 
 -- |'getEnvironment' retrieves the entire environment as a
 -- list of @(key,value)@ pairs.
