@@ -5,6 +5,8 @@ module Jhc.IO(
     thenIO,
     thenIO_,
     returnIO,
+    fromUIO,
+    fromUIO_,
 
     UIO(),
     UIO_(),
@@ -37,25 +39,24 @@ import Jhc.Type.Handle
 import qualified Jhc.Options
 
 unIO :: IO a -> UIO a
-unIO (IO x) = x
+unIO (IO (ST x)) = x
 
 fromUIO :: UIO a -> IO a
-fromUIO x = IO x
+fromUIO x = IO (ST x)
 
 fromUIO_ :: UIO_ -> IO ()
-fromUIO_ f = IO $ \w -> (# f w, () #)
+fromUIO_ f = IO $ ST (\w -> (# f w, () #))
 
 -- | this ensures the world parameter is eta expanded out
 {-# INLINE etaIO #-}
 etaIO :: IO a -> IO a
-etaIO x = IO $ \w -> unIO x w
+etaIO x = fromUIO (\w -> unIO x w)
 
 -- unsafe operations
 
 unsafePerformIO :: IO a -> a
 unsafePerformIO x = case newWorld__ x of
-    world -> case errorContinuation x of
-        IO y -> case y world of
+    world -> case unIO (errorContinuation x) world of
             (# _, a #) -> a
 
 -- | same as unsafePerformIO, but doesn't set up error handler
@@ -66,8 +67,8 @@ unsafePerformIO' x = case newWorld__ x of
 
 -- we have to replace the error handler because the context might have quit by the time the value is evaluated.
 unsafeInterleaveIO :: IO a -> IO a
-unsafeInterleaveIO action = IO $ \w -> (# w , case action' w of (# _,  a #) -> a #)
-    where IO action' = errorContinuation action
+unsafeInterleaveIO action = fromUIO $ \w -> (# w , case action' w of (# _,  a #) -> a #)
+    where action' = unIO $ errorContinuation action
 
 showError :: IOError -> IO b
 --showError (IOError z) = putErrLn z `thenIO_` exitFailure
@@ -80,24 +81,24 @@ errorContinuation x = catch x showError
 
 ioError :: IOError -> IO a
 ioError e = case Jhc.Options.target of
-    Jhc.Options.GhcHs -> IO $
+    Jhc.Options.GhcHs -> fromUIO $
         \w -> (case raiseIO__ e w of w' -> (# w', raiseError #))
     _ -> showError e
 
 catch :: IO a -> (IOError -> IO a) -> IO a
-catch (IO m) k =  case Jhc.Options.target of
-    Jhc.Options.GhcHs -> IO $ \s -> catch__ m (\ex -> unIO (k ex)) s
-    _ -> IO m  -- no catching on other targets just yet
+catch a k =  case Jhc.Options.target of
+    Jhc.Options.GhcHs -> fromUIO $ \s -> catch__ (unIO a) (\ex -> unIO (k ex)) s
+    _ -> a  -- no catching on other targets just yet
 
 -- IO fixpoint operation
 
 data FixIO a = FixIO World__ a
 
 fixIO :: (a -> IO a) -> IO a
-fixIO k = IO $ \w -> let r = case k ans of
-                               IO z -> case z w of
+fixIO k = fromUIO $ \w -> let r = case k ans of
+                               IO (ST z) -> case z w of
                                          (# w', r' #) -> FixIO w' r'
-                         ans = case r of
+                              ans = case r of
                                  FixIO _ z -> z
                      in case r of
                           FixIO w' z -> (# w', z #)
@@ -110,7 +111,7 @@ foreign import primitive "dependingOn" worldDep__ :: forall b. b -> World__ -> b
 
 -- | this will return a value making it artificially depend on the state of the world. any uses of this value are guarenteed not to float before this point in the IO monad.
 strictReturn :: a -> IO a
-strictReturn a = IO $ \w -> (# w, worldDep__ a w #)
+strictReturn a = IO $ ST $ \w -> (# w, worldDep__ a w #)
 
 {-# INLINE runMain #-}
 -- | this is wrapped around 'main' when compiling programs. it catches any exceptions and prints them to the screen and dies appropriatly.
@@ -118,25 +119,25 @@ runMain :: IO a -> World__ -> World__
 runMain main w = case run w of
         (# w,  _ #) -> w
     where
-    IO run = catch main $ \e ->
+    IO (ST run) = catch main $ \e ->
             putErrLn "\nUncaught Exception:" `thenIO_`
             putErrLn (ioeGetErrorString e)   `thenIO_`
             exitFailure
 
 exitFailure :: IO a
-exitFailure = IO $ \w -> exitFailure__ w
+exitFailure = IO $ ST $ \w -> exitFailure__ w
 
 foreign import primitive exitFailure__ :: World__ -> (# World__, a #)
 
 thenIO_ :: IO a -> IO b -> IO b
-IO a `thenIO_` IO b = IO $ \w -> case a w of
+IO (ST a) `thenIO_` IO (ST b) = IO $ ST $ \w -> case a w of
     (# w', _ #) -> b w'
 
-IO a `thenIO` b = IO $ \w -> case a w of
+IO (ST a) `thenIO` b = IO $ ST $ \w -> case a w of
     (# w', v #) -> unIO (b v) w'
 
 returnIO :: a -> IO a
-returnIO x = IO $ \w -> (# w, x #)
+returnIO x = IO $ ST (\w -> (# w, x #))
 
 {-# NOINLINE error #-}
 error s = unsafePerformIO' $

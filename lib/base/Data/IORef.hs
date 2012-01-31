@@ -16,39 +16,36 @@ import Jhc.Int
 data IORef a = IORef (Ref__ a)
 data Ref__ a :: #
 
-
 foreign import primitive newRef__   :: a -> UIO (Ref__ a)
 foreign import primitive readRef__  :: Ref__ a -> UIO a
 foreign import primitive writeRef__ :: Ref__ a -> a -> UIO_
 
 -- {-# NOINLINE newIORef #-}
 newIORef :: a -> IO (IORef a)
-newIORef v = IO $ \w -> case newRef__ v w of (# w', r #) -> (# w', IORef r #)
-
+newIORef v = fromUIO $ \w -> case newRef__ v w of (# w', r #) -> (# w', IORef r #)
 
 -- {-# NOINLINE readIORef #-}
 readIORef :: IORef a -> IO a
-readIORef (IORef r) = IO $ \w -> readRef__ r w
+readIORef (IORef r) = fromUIO $ \w -> readRef__ r w
 
 -- {-# NOINLINE writeIORef #-}
 writeIORef :: IORef a -> a -> IO ()
-writeIORef (IORef r) v = IO $ \w -> case writeRef__ r v w of w' -> (# w', () #)
+writeIORef (IORef r) v = fromUIO $ \w -> case writeRef__ r v w of w' -> (# w', () #)
 
 --foreign import primitive eqRef__ :: Ref__ a -> Ref__ a -> Bool
 
 --instance Eq (IORef a) where
 --    (IORef x) == (IORef y) = eqRef__ x y
 
-
 --{-# NOINLINE modifyIORef #-}
 modifyIORef :: IORef a -> (a -> a) -> IO ()
-modifyIORef (IORef ref) f = IO $ \w -> case readRef__ ref w of
+modifyIORef (IORef ref) f = fromUIO $ \w -> case readRef__ ref w of
     (# w', a #) -> case writeRef__ ref (f a) w' of
         w'' -> (# w'', () #)
 
 --{-# NOINLINE atomicModifyIORef #-}
 atomicModifyIORef :: IORef a -> (a -> (a,b)) -> IO b
-atomicModifyIORef (IORef r) f = IO $ \w -> case readRef__ r w of
+atomicModifyIORef (IORef r) f = fromUIO $ \w -> case readRef__ r w of
     (# w', a #) -> case f a of
         (a',b) -> case writeRef__ r a' w' of
             w'' -> (# w'', b #)

@@ -6,18 +6,6 @@ import Jhc.String
 import Jhc.Prim.IO
 import Jhc.Type.Word
 
---data Int
---data Char = Char Char_
-
---type Bool__ = Bits16_ -- Change to Bits1_ when the time comes
---type Int__  = Bits32_
---type Char__ = Bits32_
---type Enum__ = Bits16_
-
--- | when no exception wrapper is wanted
-runNoWrapper :: IO a -> World__ -> World__
-runNoWrapper (IO run) w = case run w of (# w, _ #) -> w
-
 -- | this is wrapped around arbitrary expressions and just evaluates them to whnf
 foreign import primitive "seq" runRaw :: a -> World__ -> World__
 foreign import primitive "unsafeCoerce" unsafeCoerce__ :: a -> b

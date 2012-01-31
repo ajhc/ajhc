@@ -3,6 +3,7 @@ module Jhc.Monad where
 
 import Jhc.Basics
 import Jhc.IO
+import Jhc.Prim.IO
 
 -- Monadic classes
 
@@ -76,14 +77,21 @@ instance Functor [] where
     fmap f (x:xs) = f x : fmap f xs
     fmap f [] = []
 
-instance Monad IO where
-    return x = IO $ \w -> (# w, x #)
-    IO x >>= f = IO $ \w -> case x w of
+instance Monad (ST s) where
+    return x = ST $ \w -> (# w, x #)
+    ST x >>= f = ST $ \w -> case x w of
         (# w, v #) -> case f v of
-            IO g -> g w
-    IO x >> IO y = IO $ \w -> case x w of
+            ST g -> g w
+    ST x >> ST y = ST $ \w -> case x w of
         (# w,  _ #) -> y w
+--    fail s = ioError $ userError s
+
+instance Monad IO where
+    return x = fromUIO $ \w -> (# w, x #)
+    x >> y =  x `thenIO_` y
     fail s = ioError $ userError s
+    x >>= f = fromUIO $ \w -> case unIO x w of
+        (# w, v #) -> unIO (f v) w
 
 instance Functor IO where
     fmap f a = a >>= \x -> return (f x)
