@@ -191,7 +191,7 @@ createInstanceRules dataTable classHierarchy funcs = return $ fromRules ans wher
     method classRecord methodName (methodVar,_) = as where
         ty = tvrType methodVar
         defaultName = defaultInstanceName methodName
-        as = [ rule t | Inst { instHead = _ :=> IsIn _ t } <- snub (classInsts classRecord) ]
+        as = [ rule t | Inst { instHead = _ :=> IsIn _ t } <- snub (findClassInsts classHierarchy (className classRecord)) ]
         rule t = makeRule ("Rule.{" ++ show name ++ "}") (toModule (show name),0)
                 RuleSpecialization ruleFvs methodVar (vp:map EVar args) (removeNewtypes dataTable body) where
             ruleFvs = [ t | ~(EVar t) <- vs] ++ args

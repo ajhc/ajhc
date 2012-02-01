@@ -123,7 +123,8 @@ matchPred x y = fail $ "Classes do not match: " ++ show (x,y)
 supersOf :: ClassHierarchy -> Class -> [Class]
 supersOf ch c = asksClassRecord ch c classSupers
 instsOf :: ClassHierarchy -> Class -> [Inst]
-instsOf ch c = asksClassRecord ch c classInsts
+--instsOf ch c = asksClassRecord ch c classInsts
+instsOf ch c = findClassInsts ch c
 
 match :: Monad m => Type -> Type -> m [(Tyvar,Type)]
 match x y = do match' x y

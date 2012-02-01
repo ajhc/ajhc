@@ -787,7 +787,7 @@ dumpHoFile fn = ans where
         putStrLn $ "hoAssumps:" <+> tshow (size $ hoAssumps hoE)
         putStrLn $ "hoFixities:" <+> tshow (size $  hoFixities hoE)
         putStrLn $ "hoKinds:" <+> tshow (size $  hoKinds hoE)
-        putStrLn $ "hoClassHierarchy:" <+> tshow (size $  hoClassHierarchy hoE)
+        putStrLn $ "hoClassHierarchy:" <+> tshow (length $ classRecords $ hoClassHierarchy hoE)
         putStrLn $ "hoTypeSynonyms:" <+> tshow (size $  hoTypeSynonyms hoE)
         wdump FD.Exports $ do
             putStrLn "---- exports information ----";
