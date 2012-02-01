@@ -1,3 +1,4 @@
+{-# OPTIONS -fforall #-}
 -- !!! Local universal quantification.
 module ShouldSucceed where
 

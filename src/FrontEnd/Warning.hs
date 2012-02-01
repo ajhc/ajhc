@@ -107,7 +107,7 @@ fatal = [
     "type-synonym-recursive",
     "type-synonym-partialap" ]
 
-ignore = ["h98-emptydata"]
+ignore = ["h98-emptydata", "h98-forall"]
 
 instance Show Warning where
     show  Warning { warnSrcLoc = sl, warnType = t, warnMessage = m }

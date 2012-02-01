@@ -98,6 +98,7 @@ import Debug.Trace (trace)
       '=>'    { DoubleArrow }
       '-'     { Minus }
       '!'     { Exclamation }
+      'bang!' { BangExclamation }
       '?'     { Quest }
       '??'    { QuestQuest }
       '*!'    { StarBang }
@@ -136,6 +137,7 @@ import Debug.Trace (trace)
       'forall'        { KW_Forall }
       'exists'        { KW_Exists }
       'kind'          { KW_Kind }
+      'family'        { KW_Family }
       'closed'        { KW_Closed }
 
 %monad { P } { thenP } { returnP }
@@ -230,7 +232,6 @@ maybeas :: { Maybe Module }
       : 'as' modid                            { Just $2 }
       | {- empty -}                           { Nothing }
 
-
 maybeimpspec :: { Maybe (Bool, [HsImportSpec]) }
       : impspec                               { Just $1 }
       | {- empty -}                           { Nothing }
@@ -293,6 +294,10 @@ topdecls1 :: { [HsDecl] }
       : topdecls1 semis topdecl       { $3 : $1  }
       | topdecl                       { [$1] }
 
+mkind :: { Maybe HsKind }
+    : '::' kind                       { Just $2 }
+    |                                 { Nothing }
+
 topdecl :: { HsDecl }
       : 'data' ctype srcloc deriving
           {% checkDataHeader $2 `thenP` \(cs,c,t) ->
@@ -300,6 +305,10 @@ topdecl :: { HsDecl }
       | 'data' ctype '::' kind srcloc deriving
           {% checkDataHeader $2 `thenP` \(cs,c,t) ->
              returnP hsDataDecl { hsDeclSrcLoc = $5, hsDeclContext = cs, hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $6, hsDeclHasKind = Just $4 } }
+      | 'data' 'family' simpletype srcloc mkind
+                      { HsTypeFamilyDecl $4 True (fst $3) (snd $3) $5 }
+      | 'type' 'family' simpletype srcloc mkind
+                      { HsTypeFamilyDecl $4 False (fst $3) (snd $3) $5 }
       | 'data' ctype srcloc '=' constrs deriving
                       {% checkDataHeader $2 `thenP` \(cs,c,t) ->
                          returnP hsDataDecl { hsDeclSrcLoc = $3, hsDeclContext = cs, hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $6, hsDeclCons = reverse $5 } }
@@ -341,7 +350,6 @@ topdecl :: { HsDecl }
                                            , hsDeclUniq = error "hsDeclUniq not set"  } }
       | decl          { $1 }
 
-
 rule :: { HsRule }
       : srcloc STRING mfreevars exp '=' exp
          { HsRule { hsRuleSrcLoc = $1, hsRuleString = $2, hsRuleFreeVars = $3, hsRuleLeftExpr = $4, hsRuleRightExpr = $6
@@ -374,10 +382,7 @@ decl :: { HsDecl }
       : signdecl                      { $1 }
       | fixdecl                       { $1 }
       | valdef                        { $1 }
-      | pragmainline                  { $1 }
       | pragmaprops                   { $1 }
-
-
 
 decllist :: { [HsDecl] }
       : '{' decls '}'                 { $2 }
@@ -447,6 +452,7 @@ bkind :: { HsKind }
        |  '*'                   { hsKindStar }
        |  '#'                   { hsKindHash }
        |  '!'                   { hsKindBang }
+       |  'bang!'               { hsKindBang }
        |  '*!'                  { hsKindStarBang }
        |  '?'                   { hsKindQuest }
        |  '??'                  { hsKindQuestQuest }
@@ -478,7 +484,6 @@ gtycon :: { HsName }
       | '[' ']'                       { list_tycon_name }
       | '(' commas ')'                { tuple_tycon_name $2 }
 
-
 -- (Slightly edited) Comment from GHC's hsparser.y:
 -- "context => type" vs  "type" is a problem, because you can't distinguish between
 
@@ -502,7 +507,6 @@ carhs :: { (HsContext, HsContext) }
 
 classhead :: { HsClassHead }
     : ctype {% qualTypeToClassHead $1 }
-
 
 types :: { [HsType] }
       : types ',' type                { $3 : $1 }
@@ -544,15 +548,20 @@ scontype1 :: { (HsName, [HsBangType]) }
       : btype '!' atype               {% splitTyConApp $1 `thenP` \(c,ts) ->
                                          returnP (c,map HsUnBangedTy ts++
                                                       [HsBangedTy $3]) }
+      | btype 'bang!' atype               {% splitTyConApp $1 `thenP` \(c,ts) ->
+                                         returnP (c,map HsUnBangedTy ts++
+                                                      [HsBangedTy $3]) }
       | scontype1 satype              { (fst $1, snd $1 ++ [$2] ) }
 
 satype :: { HsBangType }
       : atype                         { HsUnBangedTy $1 }
       | '!' atype                     { HsBangedTy   $2 }
+      | 'bang!' atype                 { HsBangedTy   $2 }
 
 sbtype :: { HsBangType }
       : btype                         { HsUnBangedTy $1 }
       | '!' atype                     { HsBangedTy   $2 }
+      | 'bang!' atype                 { HsBangedTy   $2 }
 
 fielddecls :: { [([HsName],HsBangType)] }
       : fielddecls ',' fielddecl      { $3 : $1 }
@@ -564,6 +573,7 @@ fielddecl :: { ([HsName],HsBangType) }
 stype :: { HsBangType }
       : type                          { HsUnBangedTy $1 }
       | '!' atype                     { HsBangedTy   $2 }
+      | 'bang!' atype                 { HsBangedTy   $2 }
 
 deriving :: { [HsName] }
       : {- empty -}                   { [] }
@@ -624,8 +634,14 @@ valdefs :: { [HsDecl] }
 valdef :: { HsDecl }
       : 'type' simpletype srcloc '=' type
                       { HsTypeDecl $3 (fst $2) (snd $2) $5 }
+--      | 'data' simpletype srcloc
+--                      { HsTypeFamilyDecl $3 True (fst $2) (snd $2) Nothing }
+--      | 'data' simpletype srcloc '::' kind
+--                      { HsTypeFamilyDecl $3 True (fst $2) (snd $2) (Just $5) }
       | 'type' simpletype srcloc
-                      { HsTypeDecl $3 (fst $2) (snd $2) HsTyAssoc }
+                      { HsTypeFamilyDecl $3 False (fst $2) (snd $2) Nothing }
+      | 'type' simpletype srcloc '::' kind
+                      { HsTypeFamilyDecl $3 False (fst $2) (snd $2) (Just $5) }
       | pinfixexp srcloc rhs optwhere          {% checkValDef $2 $1 $3 $4}
       | srcloc PRAGMASPECIALIZE 'instance'  type PRAGMAEND
                       { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = nameName u_instance , hsDeclType = $4
@@ -711,7 +727,7 @@ aexp1 :: { HsExp }
                                          returnP (HsAsPat n $3) }
       | srcloc '_'                    { HsWildCard $1 }
       | '~' srcloc aexp1 srcloc       { HsIrrPat $ located ($2,$4) $3 }
---      | '!' srcloc aexp1 srcloc       { HsBangPat $ located ($2,$4) $3 }
+      | 'bang!' srcloc aexp1 srcloc   { HsBangPat $ located ($2,$4) $3 }
 
 commas :: { Int }
       : commas ','                    { $1 + 1 }
@@ -759,10 +775,6 @@ pfexp :: { HsExp }
       : pfexp paexp                     { HsApp $1 $2 }
       | paexp                          { $1 }
 
-paexps :: { [HsExp] }
-      : paexps paexp                    { $2 : $1 }
-      | paexp                          { [$1] }
-
 -- UGLY: Because patterns and expressions are mixed, aexp has to be split into
 -- two rules: One left-recursive and one right-recursive. Otherwise we get two
 -- reduce/reduce-errors (for as-patterns and irrefutable patters).
@@ -795,8 +807,7 @@ paexp1 :: { HsExp }
                                          returnP (HsAsPat n $3) }
       | srcloc '_'                    { HsWildCard $1 }
       | '~' srcloc paexp1 srcloc      { HsIrrPat $ located ($2,$4) $3 }
---      | '!' srcloc paexp1 srcloc      { HsBangPat $ located ($2,$4) $3 }
-
+      | 'bang!' srcloc paexp1 srcloc  { HsBangPat $ located ($2,$4) $3 }
 
 ptexps :: { [HsExp] }
       : ptexps ',' pexp                 { $3 : $1 }
@@ -834,7 +845,6 @@ qual  :: { HsStmt }
 altslist :: { [HsAlt] }
       : '{' alts optsemi '}'                  { reverse $2 }
       |     layout_on  alts optsemi close     { reverse $2 }
-
 
 alts :: { [HsAlt] }
       : alts ';' alt                          { $3 : $1 }
@@ -958,6 +968,7 @@ varid :: { HsName }
       | 'alias'               { toName UnknownType "alias" }
       | 'kind'                { toName UnknownType "kind" }
       | 'closed'              { toName UnknownType "closed" }
+      | 'family'              { toName UnknownType "family" }
       | 'qualified'           { qualified_name }
       | 'hiding'              { hiding_name }
       | 'forall'              { toName UnknownType "forall" }
@@ -989,6 +1000,7 @@ varsym :: { HsName }
       : VARSYM                { $1 }
       | '-'                   { minus_name }
       | '!'                   { pling_name }
+      | 'bang!'               { pling_name }
       | '?'                   { toName UnknownType "?" }
       | '??'                  { toName UnknownType "??" }
       | '*!'                  { toName UnknownType "*!" }
@@ -999,6 +1011,7 @@ varsym :: { HsName }
 varsymm :: { HsName } -- varsym not including '-'
       : VARSYM                { $1 }
       | '!'                   { pling_name }
+      | 'bang!'               { pling_name }
       | '*'                   { star_name }
       | '#'                   { hash_name }
       | '.'                   { dot_name }
@@ -1081,7 +1094,6 @@ tuple_con_name i      = toName DataConstructor (toModule "Jhc.Prim.Prim","("++re
 
 unit_con	      = HsCon { {-hsExpSrcSpan = bogusSrcSpan,-} hsExpName = dc_Unit }
 tuple_con i	      = HsCon { {-hsExpSrcSpan = bogusSrcSpan,-} hsExpName = (tuple_con_name i) }
-
 
 unit_tycon_name       = tc_Unit
 fun_tycon_name        = tc_Arrow

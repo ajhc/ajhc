@@ -68,8 +68,8 @@ collectFileOpts options fn s = (lproc opt,isJust fopts)  where
 languageFlags :: [String] -> (Set.Set FO.Flag,Set.Set FO.Flag,[String])
 languageFlags ls = f ls Set.empty Set.empty [] where
     f [] pfs nfs us = (pfs,nfs,us)
-    f (l:ls) pfs nfs us | Just lo <- Map.lookup ll langmap =  f ls (Set.insert lo pfs) nfs us
-                        | 'n':'o':ll <- ll, Just lo <- Map.lookup ll langmap = f ls pfs (Set.insert lo nfs) us
+    f (l:ls) pfs nfs us | Just lo <- Map.lookup ll langmap =  f ls (Set.union lo pfs) nfs us
+                        | 'n':'o':ll <- ll, Just lo <- Map.lookup ll langmap = f ls pfs (nfs Set.\\ lo) us
                         | otherwise = f ls pfs nfs (l:us)
         where ll = map toLower l
 
@@ -81,8 +81,16 @@ langmap = Map.fromList [
     "unboxedtuples" ==> FO.UnboxedTuples,
     "unboxedvalues" ==> FO.UnboxedValues,
     "monomorphismrestriction" ==> FO.MonomorphismRestriction,
+    "explicitforall" ==> FO.Forall,
+    "existentialquantification" =+> [FO.Forall,FO.Exists],
+    "scopedtypevariables" ==> FO.Forall,
+    "rankntypes" ==> FO.Forall,
+    "rank2types" ==> FO.Forall,
+    "polymorphiccomponents" ==> FO.Forall,
+    "TypeFamilies" ==> FO.TypeFamilies,
     "magichash" ==> FO.UnboxedValues
-    ] where x ==> y = (x,y)
+    ] where x ==> y = (x,Set.singleton y)
+            x =+> y = (x,Set.fromList y)
 
 parseHsSource :: Opt -> FilePath -> LBS.ByteString -> IO (HsModule,LBS.ByteString)
 parseHsSource options fp@(FP.splitExtension -> (base,".hsc")) _ = do

@@ -1,3 +1,4 @@
+{-# LANGUAGE raNK2TYpes #-}
 module ShouldSucceed where
 
 data SeqView t a              =  Null

@@ -6,7 +6,6 @@ Various options affecting how jhc interprets and compiles code can be
 controlled with the '-f' flag, the following options are availible, you can
 negate any particular one by prepending 'no-' to it.
 
-
 !Code options
 unboxed-tuples allow unboxed tuple syntax to be recognized
 unboxed-values allow unboxed value syntax
@@ -14,6 +13,11 @@ ffi support foreign function declarations
 cpp pass haskell source through c preprocessor
 m4 pass haskell source through m4 preprocessor
 prelude implicitly import Prelude
+type-families type/data family support
+user-kinds user defined kinds
+forall - forall keyword for rank-n types and explicit quantification
+exists - exists keyword for existential types recognized
+bang-patterns - bang patterns
 
 !Typechecking
 monomorphism-restriction enforce monomorphism restriction
@@ -40,3 +44,4 @@ raw just evaluate main to WHNF and nothing else.
 
 !Default settings
 @default inline-pragmas rules wrapper defaulting type-analysis monomorphism-restriction global-optimize full-int prelude
+@glasgow-exts forall ffi unboxed-tuples

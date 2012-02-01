@@ -1,4 +1,5 @@
 {-# OPTIONS -fglasgow-exts #-}
+{-# LANGUAGE ExistentialQuantification #-}
 
 -- A classic test for type inference
 -- Taken from "Haskell and principal types", Section 3

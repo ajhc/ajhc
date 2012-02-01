@@ -124,7 +124,14 @@ hsNewTypeDecl = HsNewTypeDecl {
     }
 
 data HsDecl
-    = HsTypeDecl	 {
+    = HsTypeFamilyDecl {
+        hsDeclSrcLoc :: SrcLoc,
+        hsDeclData :: Bool,
+        hsDeclName :: HsName,
+        hsDeclTArgs :: [HsType],
+        hsDeclHasKind :: Maybe HsKind
+        }
+    | HsTypeDecl	 {
         hsDeclSrcLoc :: SrcLoc,
         hsDeclName :: HsName,
         hsDeclTArgs :: [HsType],

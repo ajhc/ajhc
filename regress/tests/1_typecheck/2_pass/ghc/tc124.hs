@@ -1,4 +1,5 @@
 {-# OPTIONS -fglasgow-exts #-}
+{-# OPTIONS -fforall #-}
 
 -- !!! Rank 2 polymorphism
 -- Both f and g are rejected by Hugs [April 2001]

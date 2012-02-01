@@ -30,7 +30,9 @@ import FrontEnd.ParseMonad
 import FrontEnd.SrcLoc
 import FrontEnd.Warning
 import Name.Name
+import Options
 import Util.SetLike
+import qualified FlagOpts as FO
 
 data Token
     = VarId      !Name
@@ -85,6 +87,7 @@ data Token
     | QuestQuest
     | StarBang
     | Exclamation
+    | BangExclamation
     | Star
     | Hash
     | Dot
@@ -118,6 +121,7 @@ data Token
     | KW_Forall
     | KW_Exists
     | KW_Kind
+    | KW_Family
     | KW_Closed
     | EOF
 
@@ -182,10 +186,7 @@ reserved_ids = procMap [
  ( "of", 	KW_Of ),
  ( "then", 	KW_Then ),
  ( "type", 	KW_Type ),
- ( "foreign",   KW_Foreign ),
- ( "forall",    KW_Forall ),
  ( "\x2200",    KW_Forall ),
- ( "exists",    KW_Exists ),
  ( ['∃'],       KW_Exists ),
  ( "where", 	KW_Where )
  ]
@@ -193,11 +194,22 @@ reserved_ids = procMap [
 special_varids :: Map.Map Name Token
 special_varids = procMap [
  ( "as", 	KW_As ),
- ( "kind", 	KW_Kind ),
  ( "closed", 	KW_Closed ),
  ( "qualified", KW_Qualified ),
  ( "hiding", 	KW_Hiding )
  ]
+
+-- these become keywords when the cooresponding extensions are enabled.
+optional_ids = procOpt [
+ ( "kind", KW_Kind, FO.UserKinds ),
+ ( "foreign", KW_Foreign, FO.Ffi ),
+ ( "family", KW_Family, FO.TypeFamilies ),
+ ( "forall", KW_Forall, FO.Forall ),
+ ( "exists", KW_Exists, FO.Exists),
+ ( "!"     , BangExclamation, FO.BangPatterns )
+ ]
+
+procOpt xs = Map.fromList [ (toUnqualName w,(o,k)) | (w,k,o) <- xs ]
 
 isIdent :: Char -> Bool
 isIdent  c = isAlpha c || isDigit c || c == '\'' || c == '_'
@@ -341,7 +353,10 @@ lexBOL = do
 lexToken :: Lex a Token
 lexToken = do
     s <- getInput
-    ParseMode { parseUnboxedValues = uval, parseUnboxedTuples = utup, parseFFI = doFFI } <- lexParseMode
+    ParseMode { parseUnboxedValues = uval, parseUnboxedTuples = utup, parseOpt = opt } <- lexParseMode
+    let opt_ids = Map.mapMaybe f optional_ids where
+            f (fo,k) = if fo `Set.member` optFOptsSet opt
+                then Just k else Nothing
     case s of
         [] -> return EOF
         '(':'#':_ | utup -> do
@@ -379,10 +394,7 @@ lexToken = do
 
 	    | isLower c || c == '_' || generalCategory c == OtherLetter -> do
 		(toUnqualName -> ident) <- lexWhile isIdent
-		case Map.lookup ident (reserved_ids `Map.union` special_varids) of
-                        Just KW_Foreign
-                            | doFFI -> return KW_Foreign
-                            | otherwise -> return $ VarId ident
+		case Map.lookup ident (opt_ids `Map.union` reserved_ids `Map.union` special_varids) of
                         Just KW_Do -> setFlagDo >> return KW_Do
 			Just keyword -> return keyword
 			Nothing -> return $ VarId ident
@@ -390,7 +402,7 @@ lexToken = do
 	    | isSymbol c -> do
 		sym <- lexWhile isSymbol
                 let nsym = toUnqualName sym
-		return $ case Map.lookup nsym (reserved_ops `Map.union` special_varops) of
+		return $ case Map.lookup nsym (opt_ids `Map.union` reserved_ops `Map.union` special_varops) of
 			Just t  -> t
 			Nothing -> case c of
 			    ':' -> ConSym nsym

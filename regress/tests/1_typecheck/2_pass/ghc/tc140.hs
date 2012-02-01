@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# OPTIONS -fglasgow-exts -fforall #-}
 
 -- Make sure for-alls can occur in data types
 

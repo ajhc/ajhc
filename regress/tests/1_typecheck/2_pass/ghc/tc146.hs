@@ -1,4 +1,5 @@
 {-# OPTIONS -fglasgow-exts #-}
+{-# OPTIONS -fforall #-}
 
 -- The interesting thign about this one is that
 -- there's an unbound type variable of kind *->*

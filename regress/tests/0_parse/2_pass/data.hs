@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -funboxed-tuples #-}
+{-# OPTIONS_JHC -funboxed-tuples -fforall #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 data MyWorld__ :: #
