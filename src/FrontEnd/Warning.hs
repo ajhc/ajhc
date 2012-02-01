@@ -19,6 +19,7 @@ import System.IO.Unsafe
 
 import FrontEnd.SrcLoc
 import Options
+import PackedString
 import Util.Gen
 
 {-# NOINLINE ioWarnings #-}
@@ -81,9 +82,9 @@ processErrors' doDie ws = mapM_ s ws' >> when (die && doDie) exitFailure >> retu
     s Warning { warnSrcLoc = sl, warnType = t, warnMessage = m }
         | sl == bogusASrcLoc = putErrLn $ msg t m
     s Warning { warnSrcLoc = SrcLoc { srcLocFileName = fn, srcLocLine = -1 },
-                warnType = t ,warnMessage = m } = putErrLn (fn ++ ": "  ++ msg t m)
+                warnType = t ,warnMessage = m } = putErrLn (unpackPS fn ++ ": "  ++ msg t m)
     s Warning { warnSrcLoc = SrcLoc { srcLocFileName = fn, srcLocLine = l },
-                warnType = t ,warnMessage = m } = putErrLn (fn ++ ":" ++ pad 3 (show l) ++  " - "  ++ msg t m)
+                warnType = t ,warnMessage = m } = putErrLn (unpackPS fn ++ ":" ++ pad 3 (show l) ++  " - "  ++ msg t m)
     die = (not $ null $ intersect (map warnType ws') fatal) && not (optKeepGoing options)
 
 --data WarnType
@@ -114,7 +115,7 @@ instance Show Warning where
         | sl == bogusASrcLoc =  msg t m
     show  Warning { warnSrcLoc = SrcLoc { srcLocFileName = fn, srcLocLine = l },
                                           warnType = t ,warnMessage = m } =
-         (fn ++ ":" ++ pad 3 (show l) ++  " - "  ++ msg t m)
+         (unpackPS fn ++ ":" ++ pad 3 (show l) ++  " - "  ++ msg t m)
 msg "diagnostic" m = "Diagnostic: " ++ m
 msg t m = (if t `elem` fatal then "Error: " else "Warning: ") ++ m
 

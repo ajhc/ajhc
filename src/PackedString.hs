@@ -6,13 +6,14 @@ module PackedString (
     ) where
 
 import Data.Binary
+import Data.Generics
 import Data.Monoid
-import Data.Typeable
+import GHC.Exts
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.UTF8 as BSU
 
 newtype PackedString = PS BS.ByteString
-    deriving(Typeable,Binary,Eq,Ord,Monoid)
+    deriving(Typeable,Binary,Eq,Ord,Monoid,Data)
 
 instance Show PackedString where
     showsPrec p ps r = showsPrec p (unpackPS ps) r
@@ -23,3 +24,6 @@ packString str = PS (BSU.fromString str)
 
 unpackPS :: PackedString -> String
 unpackPS (PS bs) = BSU.toString bs
+
+instance IsString PackedString where
+    fromString = packString

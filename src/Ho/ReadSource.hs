@@ -26,6 +26,7 @@ import FrontEnd.Syn.Options
 import FrontEnd.Unlit
 import FrontEnd.Warning
 import Options
+import PackedString
 import RawFiles(prelude_m4)
 import Support.TempDir
 import Util.FilterInput
@@ -69,7 +70,7 @@ languageFlags :: [String] -> (Set.Set FO.Flag,Set.Set FO.Flag,[String])
 languageFlags ls = f ls Set.empty Set.empty [] where
     f [] pfs nfs us = (pfs,nfs,us)
     f (l:ls) pfs nfs us | Just lo <- Map.lookup ll langmap =  f ls (Set.union lo pfs) nfs us
-                        | 'n':'o':ll <- ll, Just lo <- Map.lookup ll langmap = f ls pfs (nfs Set.\\ lo) us
+                        | 'n':'o':ll <- ll, Just lo <- Map.lookup ll langmap = f ls pfs (nfs `Set.union` lo) us
                         | otherwise = f ls pfs nfs (l:us)
         where ll = map toLower l
 
@@ -120,7 +121,7 @@ parseHsSource options fn lbs = do
     fn <- shortenPath fn
     let (fileOpts',ogood) = collectFileOpts options fn s
     unless ogood $
-        warn (bogusASrcLoc { srcLocFileName = fn }) "unknown-option" "Unknown OPTIONS pragma"
+        warn (bogusASrcLoc { srcLocFileName = packString fn }) "unknown-option" "Unknown OPTIONS pragma"
     case runParserWithMode (parseModeOptions fileOpts') { parseFilename = fn } parse  s'  of
                       (ws,ParseOk e) -> processErrors ws >> return (e { hsModuleOpt = fileOpts' },LBSU.fromString s')
                       (_,ParseFailed sl err) -> putErrDie $ show sl ++ ": " ++ err

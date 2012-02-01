@@ -27,15 +27,16 @@ module FrontEnd.ParseMonad(
                 pullCtxtFlag, setFlagDo
 	) where
 
-import qualified Data.Set as Set
-
 import Control.Monad
 import Data.Functor
 import Data.Monoid
+import qualified Control.Applicative as A
+import qualified Data.Set as Set
+
 import FrontEnd.SrcLoc
 import FrontEnd.Warning
 import Options
-import qualified Control.Applicative as A
+import PackedString
 import qualified FlagOpts as FO
 
 -- | The result of a parse.
@@ -135,7 +136,7 @@ runParserWithMode mode (P m) s = case m s 0 1 start emptyParseState mode of
 	Ok s a -> (psWarnings s,ParseOk a)
 	Failed loc msg -> ([],ParseFailed loc msg)
     where start = SrcLoc {
-		srcLocFileName = parseFilename mode,
+		srcLocFileName = packString $ parseFilename mode,
 		srcLocLine = 1,
 		srcLocColumn = 1
 	}

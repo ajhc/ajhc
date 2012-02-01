@@ -31,6 +31,7 @@ import FrontEnd.SrcLoc
 import FrontEnd.Warning
 import Name.Name
 import Options
+import PackedString
 import Util.SetLike
 import qualified FlagOpts as FO
 
@@ -196,7 +197,8 @@ special_varids = procMap [
  ( "as", 	KW_As ),
  ( "closed", 	KW_Closed ),
  ( "qualified", KW_Qualified ),
- ( "hiding", 	KW_Hiding )
+ ( "hiding", 	KW_Hiding ),
+ ( "forall",    KW_Forall )
  ]
 
 -- these become keywords when the cooresponding extensions are enabled.
@@ -298,7 +300,7 @@ setFilePos line column ms = do
     sl <- getSrcLoc
     let sl' = sl { srcLocLine = line, srcLocColumn = column }
     case ms of
-        Just fn -> setSrcLoc sl' { srcLocFileName = fn }
+        Just fn -> setSrcLoc sl' { srcLocFileName = packString fn }
         Nothing -> setSrcLoc sl'
 
 lexNestedComment :: Bool -> Lex a Bool

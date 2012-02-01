@@ -474,8 +474,8 @@ atype :: { HsType }
       | '(' type '=' type ')'         { HsTyEq $2 $4 }
 
 ktype :: { HsType }
-    : srcloc atype '::' kind { HsTyExpKind { hsTySrcLoc = $1, hsTyType = $2, hsTyKind = $4 } }
-    | type                  { $1 }
+    : srcloc atype '::' kind srcloc { HsTyExpKind { hsTyLType = located ($1,$5) $2, hsTyKind = $4 } }
+    | type                          { $1 }
 
 gtycon :: { HsName }
       : qcon                          { $1 }

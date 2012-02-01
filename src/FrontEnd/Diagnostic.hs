@@ -26,9 +26,9 @@ module FrontEnd.Diagnostic (
 import Data.List as List(find)
 import Data.Maybe (isJust)
 import Data.Monoid
-import FrontEnd.SrcLoc
 
---------------------------------------------------------------------------------
+import FrontEnd.SrcLoc
+import PackedString
 
 data TypeError
         = Unification String
@@ -90,7 +90,7 @@ dumpDiagnostic maxContext diagnostics
      mostRecentASrcLoc
          = case List.find hasASrcLoc diagnostics of
                 Just (Msg (Just (SrcLoc fn line col)) _)
-                    -> "on line " ++ show line ++ " in " ++ fn
+                    -> "on line " ++ show line ++ " in " ++ unpackPS fn
                 _ -> "no line information"
 
 {- display an entire stack of diagnostics (it displays the top of

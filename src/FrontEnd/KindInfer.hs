@@ -1,4 +1,3 @@
-
 -- |
 -- This module implements the Kind Inference algorithm, and the routines which
 -- use the product of kind inference to convert haskell source types into the
@@ -32,6 +31,7 @@ import qualified Data.Traversable as T
 import Doc.DocLike
 import Doc.PPrint
 import FrontEnd.HsSyn
+import FrontEnd.SrcLoc
 import FrontEnd.Tc.Kind
 import FrontEnd.Tc.Type
 import FrontEnd.Utils
@@ -44,7 +44,6 @@ import Util.Gen
 import Util.HasSize
 import qualified FlagDump as FD
 import qualified Util.Seq as Seq
-
 
 data KindEnv = KindEnv {
     kindEnv :: Map.Map Name Kind,
@@ -69,8 +68,6 @@ instance FreeVars Kind [Kindvar] where
    freeVars (kind1 `Kfun` kind2) = freeVars kind1 `union` freeVars kind2
    freeVars KBase {} = []
 
-
-
 instance DocLike d =>  PPrint d KindEnv where
     pprint KindEnv { kindEnv = m, kindEnvAssocs = ev, kindEnvClasses = cs } = vcat $
         [ pprint x <+> text "=>" <+> pprint y | (x,y) <- Map.toList m] ++
@@ -79,7 +76,6 @@ instance DocLike d =>  PPrint d KindEnv where
         [empty]
 
 --------------------------------------------------------------------------------
-
 
 -- The kind inference monad
 
@@ -95,7 +91,6 @@ data KiEnv  = KiEnv {
 
 newtype Ki a = Ki (ReaderT KiEnv IO a)
     deriving(Monad,MonadReader KiEnv,MonadIO,Functor)
-
 
 restrictKindEnv :: (Name -> Bool) -> KindEnv -> KindEnv
 restrictKindEnv f ke = ke { kindEnv = Map.filterWithKey (\k _ -> f k) (kindEnv ke) }
@@ -125,15 +120,12 @@ runKI env (Ki ki) = (kienv >>= ki') where
         return KiEnv { kiContext = [], kiEnv = env, kiVarnum = varnum, kiWhere = Other }
     ki' e = runReaderT ki e
 
-
 instance ContextMonad Ki where
     type ContextOf Ki = String
     withContext nc x = local (\s -> s { kiContext = nc :kiContext s }) x
 
-
 getEnv :: Ki KindEnv
 getEnv = do asks kiEnv >>= liftIO . readIORef
-
 
 unify :: Kind -> Kind -> Ki ()
 unify k1 k2 = do
@@ -186,13 +178,11 @@ constrain KindSimple (a `Kfun` b) = do
 constrain con (KVar v) = zonkConstraint con v
 constrain con k = fail $ "constraining kind: " ++ show (con,k)
 
-
 flattenKind :: Kind -> Ki Kind
 flattenKind k = f' k where
     f (a `Kfun` b) = return Kfun `ap` f' a `ap` f' b
     f k = return k
     f' k = findKind k >>= f
-
 
 newKindVar :: KindConstraint -> Ki Kindvar
 newKindVar con = do
@@ -202,7 +192,6 @@ newKindVar con = do
     writeIORef vr $! (n + 1)
     nr <- newIORef Nothing
     return Kindvar { kvarUniq = n, kvarRef = nr, kvarConstraint = con }
-
 
 lookupKind :: KindConstraint -> Name -> Ki Kind
 lookupKind con name = do
@@ -230,7 +219,6 @@ extendEnv newEnv = do
     ref <- asks kiEnv
     liftIO $ modifyIORef ref (mappend newEnv) -- (\ (KindEnv env x) -> KindEnv (env `Map.union` newEnv) (nx `mappend` x))
 
-
 getConstructorKinds :: KindEnv -> Map.Map Name Kind
 getConstructorKinds ke = kindEnv ke -- Map.fromList [ (toName TypeConstructor x,y) | (x,y)<- Map.toList m]
 
@@ -238,7 +226,6 @@ getConstructorKinds ke = kindEnv ke -- Map.fromList [ (toName TypeConstructor x,
 
 -- kind inference proper
 -- this is what gets called from outside of this module
-
 
 printRule :: String -> Ki ()
 printRule s
@@ -264,7 +251,6 @@ postProcess ke = do
     kindEnv <- T.mapM flattenKind kindEnv
     kindEnvClasses <- T.mapM (mapM flattenKind) kindEnvClasses
     return ke { kindEnvClasses = kindEnvClasses, kindEnv = kindEnv }
-
 
 kiType,kiType' :: Kind -> HsType -> Ki ()
 kiType' k t = do
@@ -302,7 +288,7 @@ kiType k HsTyForall { hsTypeVars = vs, hsTypeType = HsQualType con t } = do
     mapM_ initTyVarBind vs
     mapM_ kiPred con
     kiType' k t
-kiType k HsTyExpKind { hsTyType = t, hsTyKind = ek } = do
+kiType k HsTyExpKind { hsTyLType = Located _ t, hsTyKind = ek } = do
     unify (hsKindToKind ek) k
     kiType' k t
 kiType k HsTyExists { hsTypeVars = vs, hsTypeType = HsQualType con t } = do
@@ -315,8 +301,6 @@ initTyVarBind HsTyVarBind { hsTyVarBindName = name, hsTyVarBindKind = kk } = do
     case kk of
         Nothing -> return ()
         Just kk -> unify nk (hsKindToKind kk)
-
-
 
 hsKindToKind (HsKindFn a b) = hsKindToKind a `Kfun` hsKindToKind b
 hsKindToKind a | a == hsKindStar       = kindStar
@@ -376,7 +360,6 @@ kiInitClasses ds =  sequence_ [ f className [classArg] |  HsClassDecl _ (HsQualT
     f className args = do
         args <- mapM (lookupKind KindSimple . toName TypeVal) args
         extendEnv mempty { kindEnvClasses = Map.singleton (toName ClassName className) args }
-
 
 kiDecl :: HsDecl -> Ki ()
 kiDecl HsDataDecl { hsDeclContext = context, hsDeclName = tyconName, hsDeclArgs = args, hsDeclCons = [], hsDeclHasKind = Just kk } = do
@@ -441,7 +424,6 @@ kiHsQualType inputEnv qualType@(HsQualType ps t) = newState where
         mapM_ kiPred ps
         getEnv >>= postProcess
 
-
 --------------------------------------------------------------------------------
 
 kindOf :: Name -> KindEnv -> Kind
@@ -464,7 +446,6 @@ fromTyApp t = f t [] where
     f (HsTyApp a b) rs = f a (b:rs)
     f t rs = (t,rs)
 
-
 aHsTypeToType :: KindEnv -> HsType -> Type
 aHsTypeToType kt@KindEnv { kindEnvAssocs = at } t | (HsTyCon con,xs) <- fromTyApp t, let nn = toName TypeConstructor con, Just (n1,n2) <- Map.lookup nn at =
     TAssoc {
@@ -473,11 +454,10 @@ aHsTypeToType kt@KindEnv { kindEnvAssocs = at } t | (HsTyCon con,xs) <- fromTyAp
         typeExtraArgs = map (aHsTypeToType kt) (take n2 $ drop n1 xs)
     }
 aHsTypeToType kt (HsTyFun t1 t2) = aHsTypeToType kt t1 `fn` aHsTypeToType kt t2
-aHsTypeToType kt HsTyExpKind { hsTyType = t } = aHsTypeToType kt t
+aHsTypeToType kt HsTyExpKind { hsTyLType = Located _ t } = aHsTypeToType kt t
 aHsTypeToType kt tuple@(HsTyTuple types) = tTTuple $ map (aHsTypeToType kt) types
 aHsTypeToType kt tuple@(HsTyUnboxedTuple types) = tTTuple' $ map (aHsTypeToType kt) types
 aHsTypeToType kt (HsTyApp t1 t2) = tAp (aHsTypeToType kt t1) (aHsTypeToType kt t2)
-
 
 -- variables, we must know the kind of the variable here!
 -- they are assumed to already exist in the kindInfoTable
@@ -503,15 +483,12 @@ toTyvar kt name =  tyvar  nn (kindOf nn kt) where
 aHsQualTypeToQualType :: KindEnv -> HsQualType -> Qual Type
 aHsQualTypeToQualType kt (HsQualType cntxt t) = map (hsAsstToPred kt) cntxt :=> aHsTypeToType kt t
 
-
 hsAsstToPred :: KindEnv -> HsAsst -> Pred
 hsAsstToPred kt (HsAsst className [varName])
    -- = IsIn className (TVar $ Tyvar varName (kindOf varName kt))
    | isConstructorLike varName = IsIn  (toName ClassName className) (TCon (Tycon (toName TypeConstructor varName) (head $ kindOfClass (toName ClassName className) kt)))
    | otherwise = IsIn (toName ClassName className) (TVar $ tyvar (toName TypeVal varName) (head $ kindOfClass (toName ClassName className) kt))
 hsAsstToPred kt (HsAsstEq t1 t2) = IsEq (runIdentity $ hsTypeToType' kt t1) (runIdentity $ hsTypeToType' kt t2)
-
-
 
 hsQualTypeToSigma kt qualType = hsQualTypeToType kt (Just []) qualType
 
@@ -521,7 +498,6 @@ hsTypeToType kt t = return $ unsafePerformIO $ runKI kt $
                        kiType (KVar kv) t
                        kt' <- postProcess =<< getEnv
                        hsTypeToType' kt' t
-
 
 hsTypeToType' :: Monad m => KindEnv -> HsType -> m Type
 hsTypeToType' kt t = return $ hoistType $ aHsTypeToType kt t -- (forallHoist t)

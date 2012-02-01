@@ -192,7 +192,7 @@ tiExpr (HsAsPat n e) typ = do
     return (HsAsPat n e)
 
 -- comb LET-S and VAR
-tiExpr expr@(HsExpTypeSig sloc e qt) typ = 
+tiExpr expr@(HsExpTypeSig sloc e qt) typ =
     deNameContext (Just sloc) "in the annotated expression" expr $ do
     kt <- getKindEnv
     s <- hsQualTypeToSigma kt qt
@@ -274,7 +274,7 @@ tiExpr expr@(HsLambda sloc ps e) typ = do
             doCoerce (ctAbs ts) e
     lam ps e typ []
 
-tiExpr (HsIf e e1 e2) typ = do 
+tiExpr (HsIf e e1 e2) typ = do
     dn <- getDeName
     withContext (simpleMsg $ "in the if expression\n   if " ++ show (dn e) ++ "...") $ do
     e <- tcExpr e tBool

@@ -80,10 +80,11 @@ data HsAssoc = HsAssocNone | HsAssocLeft | HsAssocRight
   {-! derive: Binary !-}
 
 instance HasLocation HsDecl where
-    srcLoc HsTypeDecl	  { hsDeclSrcLoc  = sl } = sl
-    srcLoc HsDeclDeriving { hsDeclSrcLoc  = sl } = sl
-    srcLoc HsSpaceDecl    { hsDeclSrcLoc  = sl } = sl
-    srcLoc HsDataDecl	  { hsDeclSrcLoc  = sl } = sl
+    srcLoc HsTypeDecl	  { hsDeclSrcLoc = sl } = sl
+    srcLoc HsTypeFamilyDecl { hsDeclSrcLoc = sl } = sl
+    srcLoc HsDeclDeriving { hsDeclSrcLoc = sl } = sl
+    srcLoc HsSpaceDecl    { hsDeclSrcLoc = sl } = sl
+    srcLoc HsDataDecl	  { hsDeclSrcLoc = sl } = sl
     srcLoc HsInfixDecl    { hsDeclSrcLoc = sl } = sl
     srcLoc HsNewTypeDecl  { hsDeclSrcLoc = sl } = sl
     srcLoc HsPragmaSpecialize { hsDeclSrcLoc = sl } = sl
@@ -125,59 +126,59 @@ hsNewTypeDecl = HsNewTypeDecl {
 
 data HsDecl
     = HsTypeFamilyDecl {
-        hsDeclSrcLoc :: SrcLoc,
-        hsDeclData :: Bool,
-        hsDeclName :: HsName,
-        hsDeclTArgs :: [HsType],
+        hsDeclSrcLoc  :: SrcLoc,
+        hsDeclData    :: !Bool,
+        hsDeclName    :: HsName,
+        hsDeclTArgs   :: [HsType],
         hsDeclHasKind :: Maybe HsKind
         }
     | HsTypeDecl	 {
         hsDeclSrcLoc :: SrcLoc,
-        hsDeclName :: HsName,
-        hsDeclTArgs :: [HsType],
-        hsDeclType :: HsType
+        hsDeclName   :: HsName,
+        hsDeclTArgs   :: [HsType],
+        hsDeclType   :: HsType
         }
     | HsDataDecl	 {
-        hsDeclKindDecl :: Bool,
-        hsDeclSrcLoc :: SrcLoc,
-        hsDeclContext :: HsContext,
-        hsDeclName :: HsName,
-        hsDeclArgs :: [HsName],
-        hsDeclCons :: [HsConDecl],
-        hsDeclHasKind :: Maybe HsKind,
+        hsDeclKindDecl :: !Bool,
+        hsDeclSrcLoc   :: SrcLoc,
+        hsDeclContext  :: HsContext,
+        hsDeclName     :: HsName,
+        hsDeclArgs     :: [Name],
+        hsDeclCons     :: [HsConDecl],
+        hsDeclHasKind  :: Maybe HsKind,
         {- deriving -} hsDeclDerives :: [HsName]
         }
     | HsNewTypeDecl {
-        hsDeclSrcLoc :: SrcLoc,
+        hsDeclSrcLoc  :: SrcLoc,
         hsDeclContext :: HsContext,
-        hsDeclName :: HsName,
-        hsDeclArgs :: [HsName],
-        hsDeclCon :: HsConDecl,
+        hsDeclName    :: HsName,
+        hsDeclArgs    :: [Name],
+        hsDeclCon     :: HsConDecl,
         {- deriving -} hsDeclDerives :: [HsName]
         }
     | HsInfixDecl   {
         hsDeclSrcLoc :: SrcLoc,
-        hsDeclAssoc :: HsAssoc,
-        hsDeclInt :: !Int,
-        hsDeclNames :: [HsName]
+        hsDeclAssoc  :: HsAssoc,
+        hsDeclInt    :: !Int,
+        hsDeclNames  :: [HsName]
         }
     | HsClassDecl   {
-        hsDeclSrcLoc :: SrcLoc,
+        hsDeclSrcLoc   :: SrcLoc,
         hsDeclQualType :: HsQualType,
-        hsDeclDecls :: [HsDecl]
+        hsDeclDecls    :: [HsDecl]
         }
     | HsClassAliasDecl {
-        hsDeclSrcLoc :: SrcLoc,
-        hsDeclName :: HsName,
+        hsDeclSrcLoc   :: SrcLoc,
+        hsDeclName     :: HsName,
         hsDeclTypeArgs :: [HsType],
         {- rhs -} hsDeclContext :: HsContext,
                   hsDeclClasses :: HsContext,
         hsDeclDecls :: [HsDecl]
         }
     | HsInstDecl    {
-        hsDeclSrcLoc :: SrcLoc,
+        hsDeclSrcLoc   :: SrcLoc,
         hsDeclQualType :: HsQualType,
-        hsDeclDecls :: [HsDecl]
+        hsDeclDecls    :: [HsDecl]
         }
     | HsDefaultDecl SrcLoc HsType
     | HsTypeSig	 SrcLoc [HsName] HsQualType
@@ -211,26 +212,26 @@ data HsDecl
     | HsPragmaProps SrcLoc String [HsName]
     | HsPragmaRules [HsRule]
     | HsPragmaSpecialize {
-        hsDeclUniq :: (Module,Int),
+        hsDeclUniq   :: (Module,Int),
         hsDeclSrcLoc :: SrcLoc,
-        hsDeclBool :: Bool,
-        hsDeclName :: HsName,
-        hsDeclType :: HsType
+        hsDeclBool   :: Bool,
+        hsDeclName   :: HsName,
+        hsDeclType   :: HsType
         }
     | HsDeclDeriving {
-        hsDeclSrcLoc :: SrcLoc,
+        hsDeclSrcLoc    :: SrcLoc,
         hsDeclClassHead :: HsClassHead
         }
   deriving(Eq,Show)
   {-! derive: is !-}
 
 data HsRule = HsRule {
-    hsRuleUniq :: (Module,Int),
-    hsRuleSrcLoc :: SrcLoc,
-    hsRuleIsMeta :: Bool,
-    hsRuleString :: String,
-    hsRuleFreeVars :: [(HsName,Maybe HsType)],
-    hsRuleLeftExpr :: HsExp,
+    hsRuleUniq      :: (Module,Int),
+    hsRuleSrcLoc    :: SrcLoc,
+    hsRuleIsMeta    :: Bool,
+    hsRuleString    :: String,
+    hsRuleFreeVars  :: [(HsName,Maybe HsType)],
+    hsRuleLeftExpr  :: HsExp,
     hsRuleRightExpr :: HsExp
     }
   deriving(Eq,Show)
@@ -240,16 +241,26 @@ instance HasLocation HsMatch where
 
 data HsMatch = HsMatch {
     hsMatchSrcLoc :: SrcLoc,
-    hsMatchName :: HsName,
-    hsMatchPats :: [HsPat],
-    hsMatchRhs :: HsRhs,
+    hsMatchName   :: HsName,
+    hsMatchPats   :: [HsPat],
+    hsMatchRhs    :: HsRhs,
     {-where-} hsMatchDecls :: [HsDecl]
     }
   deriving(Eq,Show)
 
 data HsConDecl
-	 = HsConDecl { hsConDeclSrcLoc :: SrcLoc, hsConDeclExists :: [HsTyVarBind], hsConDeclName :: HsName, hsConDeclConArg :: [HsBangType] }
-	 | HsRecDecl { hsConDeclSrcLoc :: SrcLoc, hsConDeclExists :: [HsTyVarBind], hsConDeclName :: HsName, hsConDeclRecArg :: [([HsName],HsBangType)] }
+    = HsConDecl {
+        hsConDeclSrcLoc :: SrcLoc,
+        hsConDeclExists :: [HsTyVarBind],
+        hsConDeclName :: HsName,
+        hsConDeclConArg :: [HsBangType]
+        }
+    | HsRecDecl {
+        hsConDeclSrcLoc :: SrcLoc,
+        hsConDeclExists :: [HsTyVarBind],
+        hsConDeclName :: HsName,
+        hsConDeclRecArg :: [([HsName],HsBangType)]
+        }
   deriving(Eq,Show)
   {-! derive: is, update !-}
 
@@ -275,27 +286,31 @@ data HsQualType = HsQualType {
     } deriving(Data,Typeable,Eq,Ord,Show)
   {-! derive: Binary !-}
 
+type LHsType = Located HsType
+
 data HsType
-	 = HsTyFun   HsType HsType
-	 | HsTyTuple [HsType]
-	 | HsTyUnboxedTuple [HsType]
-	 | HsTyApp   HsType HsType
-	 | HsTyVar   { hsTypeName :: HsName }
-	 | HsTyCon   { hsTypeName :: HsName }
-         | HsTyForall {
-            hsTypeVars :: [HsTyVarBind],
-            hsTypeType :: HsQualType }
-         | HsTyExists {
-            hsTypeVars :: [HsTyVarBind],
-            hsTypeType :: HsQualType }
-         | HsTyExpKind {
-             hsTySrcLoc :: SrcLoc,
-             hsTyType :: HsType,
-             hsTyKind :: HsKind
-             }
-         -- the following are used internally
-         | HsTyAssoc
-         | HsTyEq HsType HsType
+    = HsTyFun HsType HsType
+    | HsTyTuple [HsType]
+    | HsTyUnboxedTuple [HsType]
+    | HsTyApp HsType HsType
+    | HsTyVar { hsTypeName :: HsName }
+    | HsTyCon { hsTypeName :: HsName }
+    | HsTyForall {
+       hsTypeVars :: [HsTyVarBind],
+       hsTypeType :: HsQualType }
+    | HsTyExists {
+       hsTypeVars :: [HsTyVarBind],
+       hsTypeType :: HsQualType }
+    | HsTyExpKind {
+        hsTyLType :: LHsType,
+        hsTyKind :: HsKind }
+    | HsTyStrictType {
+        hsTyStrict :: !Bool,
+        hsTyLType :: LHsType
+    }
+    -- the following is used internally
+    | HsTyAssoc
+    | HsTyEq HsType HsType
   deriving(Data,Typeable,Eq,Ord,Show)
   {-! derive: Binary, is !-}
 

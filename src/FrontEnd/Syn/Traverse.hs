@@ -2,6 +2,7 @@ module FrontEnd.Syn.Traverse where
 
 import Control.Monad.Writer
 import qualified Data.Set as Set
+import qualified Data.Traversable as T
 
 import FrontEnd.HsSyn
 import FrontEnd.SrcLoc
@@ -167,9 +168,11 @@ traverseHsType f (HsTyForall vs qt) = doQual HsTyForall f vs qt
 traverseHsType f (HsTyExists vs qt) = doQual HsTyExists f vs qt
 traverseHsType _ x@HsTyVar {} = return x
 traverseHsType _ x@HsTyCon {} = return x
-traverseHsType _ HsTyAssoc = return HsTyAssoc
-traverseHsType f x@HsTyExpKind { hsTyType = t } = f t >>= \t' -> return x { hsTyType = t' }
+traverseHsType f HsTyExpKind { .. } = do
+    hsTyLType <- T.mapM f hsTyLType
+    return HsTyExpKind { .. }
 traverseHsType f (HsTyEq a b) = return HsTyEq `ap` f a `ap` f b
+traverseHsType f (HsTyStrictType a b ) = return HsTyStrictType `ap` return a `ap` T.mapM f b
 
 doQual :: Monad m => (a -> HsQualType -> b) -> (HsType -> m HsType) -> a -> HsQualType -> m b
 doQual hsTyForall f vs qt = do

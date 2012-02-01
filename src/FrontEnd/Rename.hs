@@ -257,6 +257,12 @@ instance Rename HsDecl where
             hsNames' <- rename hsNames
             t' <- rename t
             return (HsTypeDecl srcLoc  hsName' hsNames' t')
+    rename HsTypeFamilyDecl { .. } = do
+        withSrcLoc hsDeclSrcLoc $ do
+        hsDeclCName <- renameTypeName hsDeclName
+        updateWith (Set.toList $ freeVars hsDeclTArgs :: [Name]) $ do
+            hsDeclTArgs <- rename hsDeclTArgs
+            return HsTypeFamilyDecl { .. }
     rename (HsNewTypeDecl srcLoc hsContext hsName hsNames1 hsConDecl hsNames2) = do
         withSrcLoc srcLoc $ do
         hsName' <- renameTypeName hsName
@@ -363,7 +369,8 @@ renameClassHead (HsQualType hsContext hsType) = do
     return (HsQualType ctx typ)
 
 instance Rename HsQualType where
-    rename (HsQualType hsContext hsType) = HsQualType <$> rename hsContext <*> rename hsType
+    rename (HsQualType hsContext hsType) =
+        HsQualType <$> rename hsContext <*> rename hsType
 
 instance Rename HsAsst where
     rename (HsAsst hsName1 hsName2s) = do
@@ -373,13 +380,14 @@ instance Rename HsAsst where
     rename (HsAsstEq t1 t2) = HsAsstEq <$> rename t1 <*> rename t2
 
 instance Rename HsConDecl where
-    rename cd@(HsConDecl { hsConDeclSrcLoc = srcLoc, hsConDeclName = hsName, hsConDeclConArg = hsBangTypes }) = do
-        withSrcLoc srcLoc $ do
+    --rename cd@(HsConDecl { hsConDeclSrcLoc = srcLoc, hsConDeclName = hsName, hsConDeclConArg = hsBangTypes }) = do
+    rename cd@(HsConDecl {  hsConDeclName = hsName, hsConDeclConArg = hsBangTypes, .. }) = do
+        withSrcLoc hsConDeclSrcLoc $ do
         hsName' <- renameValName hsName
-        updateWith  (map (toName TypeVal . hsTyVarBindName) (hsConDeclExists cd)) $ do
-        es <- rename (hsConDeclExists cd)
+        updateWith  (map (toName TypeVal . hsTyVarBindName) hsConDeclExists) $ do
+        hsConDeclExists <- rename hsConDeclExists
         hsBangTypes' <- rename hsBangTypes
-        return cd { hsConDeclName = hsName', hsConDeclConArg = hsBangTypes', hsConDeclExists = es }
+        return cd { hsConDeclName = hsName', hsConDeclConArg = hsBangTypes', hsConDeclExists }
     rename cd@HsRecDecl { hsConDeclSrcLoc = srcLoc, hsConDeclName = hsName, hsConDeclRecArg = stuff} = do
         withSrcLoc srcLoc $ do
         hsName' <- renameValName hsName
@@ -867,7 +875,7 @@ instance DeNameable HsPat where
         f p = p
 
 --instance DeNameable n => DeNameable Located l n where
---    deName mod p 
+--    deName mod p
 
 instance DeNameable HsAlt where
     deName _ n = n

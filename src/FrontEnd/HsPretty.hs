@@ -406,7 +406,7 @@ ppHsTypePrec p HsTyForall { hsTypeVars = vs, hsTypeType = qt } = parensIf (p > 1
 ppHsTypePrec p HsTyExists { hsTypeVars = vs, hsTypeType = qt } = parensIf (p > 1) $ do
     pp <- ppHsQualType qt
     return $ DL.text "exists" DL.<+> DL.hsep (map pprint vs) DL.<+> DL.char '.' DL.<+> pp
-ppHsTypePrec _ HsTyExpKind { hsTyType = t, hsTyKind = k } = do
+ppHsTypePrec _ HsTyExpKind { hsTyLType = Located _ t, hsTyKind = k } = do
     t <- ppHsType t
     return $ DL.parens ( t DL.<+> DL.text "::" DL.<+> pprint k)
 

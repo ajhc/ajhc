@@ -5,19 +5,20 @@ import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.Foldable
 import Data.Traversable
-
 import Data.Binary
 import Data.Generics
 
-data SrcLoc = SrcLoc { srcLocFileName :: String, srcLocLine :: {-# UNPACK #-} !Int, srcLocColumn :: {-# UNPACK #-}  !Int}
+import PackedString
+
+data SrcLoc = SrcLoc { srcLocFileName :: PackedString, srcLocLine :: {-# UNPACK #-} !Int, srcLocColumn :: {-# UNPACK #-}  !Int}
     deriving(Data,Typeable,Eq,Ord)
     {-! derive: update, Binary !-}
 
 data SrcSpan = SrcSpan { srcSpanBegin :: !SrcLoc, srcSpanEnd :: !SrcLoc }
     deriving(Data,Typeable,Eq,Ord)
-    {-! derive: update !-}
+    {-! derive: update, Binary !-}
 
-bogusASrcLoc = SrcLoc "bogus#" (-1) (-1)
+bogusASrcLoc = SrcLoc (packString "bogus#") (-1) (-1)
 bogusSrcSpan = SrcSpan bogusASrcLoc bogusASrcLoc
 
 instance Monoid SrcLoc where
@@ -53,6 +54,7 @@ instance HasLocation (Located a) where
 
 data Located x = Located SrcSpan x
     deriving(Ord,Show,Data,Typeable,Eq)
+    {-! derive: Binary !-}
 
 fromLocated :: Located x -> x
 fromLocated (Located _ x) = x
@@ -102,7 +104,7 @@ instance MonadSetSrcLoc Identity where
 -----------------
 
 instance Show SrcLoc where
-    show (SrcLoc fn l c) = fn ++ f l ++ f c where
+    show (SrcLoc fn l c) = unpackPS fn ++ f l ++ f c where
         f (-1) = ""
         f n = ':':show n
 

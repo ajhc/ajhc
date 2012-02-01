@@ -110,13 +110,10 @@ renameHsDecl (HsTypeSig srcLoc hsNames hsQualType) subTable = withSrcLoc srcLoc 
     hsQualType' <- renameHsQualType hsQualType subTable
     return (HsTypeSig srcLoc hsNames' hsQualType')
 
-renameHsDecl dl@HsDataDecl { hsDeclContext = hsContext, hsDeclName = hsName, hsDeclArgs = hsNames1, hsDeclCons = hsConDecls  } subTable = do
-    hsName' <- renameTypeHsName hsName subTable
+renameHsDecl dl@HsDataDecl { hsDeclContext = hsContext, hsDeclCons = hsConDecls  } subTable = do
     hsContext' <- renameHsContext hsContext subTable
-    hsNames1' <- renameHsNames hsNames1 subTable
     hsConDecls' <- renameHsConDecls hsConDecls subTable
-    -- don't need to rename the hsNames2 as it is just a list of TypeClasses
-    return dl { hsDeclContext = hsContext', hsDeclName = hsName', hsDeclArgs = hsNames1', hsDeclCons = hsConDecls' }
+    return dl { hsDeclContext = hsContext', hsDeclCons = hsConDecls' }
 renameHsDecl (HsTypeDecl srcLoc name hsNames t) subTable = withSrcLoc srcLoc $ do
     hsName' <- renameTypeHsName name subTable
     t' <- renameHsType' False t undefined
@@ -124,9 +121,8 @@ renameHsDecl (HsTypeDecl srcLoc name hsNames t) subTable = withSrcLoc srcLoc $ d
 
 renameHsDecl (HsNewTypeDecl srcLoc hsContext hsName hsNames1 hsConDecl hsNames2) subTable = withSrcLoc srcLoc $ do
     hsContext' <- renameHsContext hsContext subTable
-    hsNames1' <- renameHsNames hsNames1 subTable
     hsConDecl' <- renameHsConDecl hsConDecl subTable
-    return (HsNewTypeDecl srcLoc hsContext' hsName hsNames1' hsConDecl' hsNames2)
+    return (HsNewTypeDecl srcLoc hsContext' hsName hsNames1 hsConDecl' hsNames2)
 renameHsDecl decl@HsActionDecl { hsDeclSrcLoc = srcLoc, hsDeclExp = e }  subTable = withSrcLoc srcLoc $ do
     e <- renameHsExp e subTable
     return decl { hsDeclExp = e }
@@ -200,38 +196,38 @@ renameHsBangType (HsUnBangedTy hsType) subTable = do
 
 renameHsType = renameHsType' True
 
-renameHsType' dovar t st = pp (rt t st) where
-    rt :: HsType -> SubTable -> ScopeSM (HsType)
-    rt (HsTyFun hsType1 hsType2) subTable = do
-        hsType1' <- rt hsType1 subTable
-        hsType2' <- rt hsType2 subTable
+renameHsType' dovar t st = pp (rt t) where
+    rt :: HsType -> ScopeSM HsType
+    rt (HsTyFun hsType1 hsType2) = do
+        hsType1' <- rt hsType1
+        hsType2' <- rt hsType2
         return (HsTyFun hsType1' hsType2')
-    rt (HsTyTuple hsTypes) subTable = do
-        hsTypes' <- mapRename rt hsTypes subTable
+    rt (HsTyTuple hsTypes) = do
+        hsTypes' <- mapM rt hsTypes
         return (HsTyTuple hsTypes')
-    rt (HsTyUnboxedTuple hsTypes) subTable = do
-        hsTypes' <- mapRename rt hsTypes subTable
+    rt (HsTyUnboxedTuple hsTypes) = do
+        hsTypes' <- mapM rt hsTypes
         return (HsTyUnboxedTuple hsTypes')
-    rt (HsTyApp hsType1 hsType2) subTable = do
-        hsType1' <- rt hsType1 subTable
-        hsType2' <- rt hsType2 subTable
+    rt (HsTyApp hsType1 hsType2) = do
+        hsType1' <- rt hsType1
+        hsType2' <- rt hsType2
         return (HsTyApp hsType1' hsType2')
-    rt (HsTyVar hsName) subTable | dovar = do
-        hsName' <- renameTypeHsName hsName subTable
+    rt (HsTyVar hsName) | dovar = do
+        hsName' <- renameTypeHsName hsName ()
         return (HsTyVar hsName')
-    rt v@(HsTyVar _) _   = return v
-    rt (HsTyCon hsName) subTable = do
-        hsName' <- renameTypeHsName hsName subTable
+    rt (HsTyCon hsName) = do
+        hsName' <- renameTypeHsName hsName  ()
         return (HsTyCon hsName')
-    rt (HsTyForall ts v) subTable  = do
-        v <- renameHsQualType v subTable
+    rt (HsTyForall ts v) = do
+        v <- renameHsQualType v  ()
         return $ HsTyForall ts v
-    rt (HsTyExists ts v) subTable  = do
-        v <- renameHsQualType v subTable
+    rt (HsTyExists ts v) = do
+        v <- renameHsQualType v  ()
         return $ HsTyExists ts v
-    rt (HsTyAssoc) subTable = return HsTyAssoc
-    rt (HsTyEq a b) subTable = return HsTyEq `ap` (flip rt subTable a) `ap` (flip rt subTable b)
-    rt HsTyExpKind {} _subTable = error "cannot rename HsTyExpKind TypeSyns"
+ --   rt (HsTyAssoc) = return HsTyAssoc
+--    rt (HsTyEq a b) = return HsTyEq `ap` (flip rt a) `ap` (flip rt b)
+ --   rt HsTyExpKind {} _subTable = error "cannot rename HsTyExpKind TypeSyns"
+    rt ty = traverseHsType rt ty
     pp t | not dovar = t
     pp t = do
         t' <- t
