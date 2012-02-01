@@ -244,7 +244,7 @@ tiModules htc ms = do
     let tcInfo = tcInfoEmpty {
         tcInfoEnv = hoAssumps htc `mappend` localDConsEnv, -- (importVarEnv `mappend` globalDConsEnv),
         tcInfoSigEnv = sigEnv,
-        tcInfoModName =  show moduleName,
+        tcInfoModName = moduleName,
         tcInfoKindInfo = kindInfo,
         tcInfoClassHierarchy = cHierarchyWithInstances
         }

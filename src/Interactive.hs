@@ -217,10 +217,9 @@ tcStatementTc (HsQualifier e) = do
     let tcInfo = tcInfoEmpty {
         tcInfoEnv = (hoAssumps ho),
         tcInfoSigEnv =  collectSigEnv (hoKinds ho) (HsQualifier e),
-        tcInfoModName =  show (stateModule is),
+        tcInfoModName =  (stateModule is),
         tcInfoKindInfo = (hoKinds ho),
         tcInfoClassHierarchy = (hoClassHierarchy ho)
-
         }
     runTc tcInfo $ do
     box <- newBox kindFunRet

@@ -8,7 +8,6 @@ import FrontEnd.SrcLoc
 import Name.Name
 import Support.FreeVars
 
-
 --instance FreeVars HsType (Set.Set HsName) where
 --    freeVars t = execWriter (f t) where
 --        f (HsTyVar v) = tell (Set.singleton v)
@@ -23,10 +22,8 @@ instance FreeVars HsType (Set.Set Name) where
 traverse_ :: Monad m => (a -> m b) -> a -> m a
 traverse_ fn x = fn x >> return x
 
-
 traverseHsExp_ :: MonadSetSrcLoc m => (HsExp -> m ()) -> HsExp -> m ()
 traverseHsExp_ fn e = traverseHsExp (traverse_ fn) e >> return ()
-
 
 traverseHsExp :: MonadSetSrcLoc m => (HsExp -> m HsExp) -> HsExp -> m HsExp
 traverseHsExp fn e = f e where
@@ -277,5 +274,3 @@ getNamesFromHsPat p = execWriter (getNamesFromPat p) where
         tell [toName Val hsName]
         getNamesFromPat hsPat
     getNamesFromPat p = traverseHsPat_ getNamesFromPat p
-
-

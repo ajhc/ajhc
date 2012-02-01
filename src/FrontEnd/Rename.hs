@@ -3,15 +3,17 @@ module FrontEnd.Rename(
     unRename,
     collectDefsHsModule,
     FieldMap(..),
+    DeNameable(..),
     renameStatement
     ) where
 
-import Data.Char
 import Control.Applicative
+import Control.Monad.Identity
 import Control.Monad.RWS
 import Control.Monad.Writer
-import List hiding(union)
+import Data.Char
 import Data.Maybe
+import List hiding(union)
 import qualified Data.Foldable as Seq
 import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
@@ -43,7 +45,7 @@ instance Monoid FieldMap where
     mappend (FieldMap a b) (FieldMap c d) =
         FieldMap (a `mappend` c) (b `mappend` d)
 
-type SubTable = Map.Map HsName HsName
+type SubTable = Map.Map Name Name
 
 newtype ScopeState = ScopeState {
     unique         :: Int
@@ -81,11 +83,11 @@ addTopLevels  hsmod action = do
     let amb k x y | x == y = x
         amb k (Right n1) (Right n2) = Left (ambig k [n1,n2])
         amb _ _ l  = l
-        
+
     local ( \e -> e { envNameMap = Map.unionWithKey amb (Map.map Right $ Map.fromList nmap) (envNameMap e) }) action
 
 createSelectors sloc ds = mapM g ns where
-    ds' :: [(HsName,[(HsName,HsBangType)])]
+    ds' :: [(Name,[(Name,HsBangType)])]
     ds' = [ (c,[(n,t) | (ns,t) <- rs , n <- ns ]) | HsRecDecl { hsConDeclName = c, hsConDeclRecArg = rs } <- ds ]
     ns = sortGroupUnderF fst $ concatMap f ds' -- [  | (c,nts) <- ds' ]
     f (c,nts) = [ (n,(c,i,length nts)) | (n,_) <- nts | i <- [0..]]
@@ -160,7 +162,7 @@ getTypeClassModule typ =
       HsTyApp cls arg -> getModule (hsTypeName cls)
       _ -> error "instance must consist of a type class application"
 
-qualifyMethodName :: Maybe Module -> HsName -> HsName
+qualifyMethodName :: Maybe Module -> Name -> Name
 qualifyMethodName Nothing name = name
 qualifyMethodName (Just mod) name = qualifyName mod name
 
@@ -251,7 +253,7 @@ instance Rename HsDecl where
     rename (HsTypeDecl srcLoc name hsNames t) = do
         withSrcLoc srcLoc $ do
         hsName' <- renameTypeName name
-        updateWith (Set.toList $ freeVars hsNames :: [HsName]) $ do
+        updateWith (Set.toList $ freeVars hsNames :: [Name]) $ do
             hsNames' <- rename hsNames
             t' <- rename t
             return (HsTypeDecl srcLoc  hsName' hsNames' t')
@@ -470,7 +472,7 @@ instance Rename HsPat where
     rename (HsPTypeSig sl hsPat qt)  = HsPTypeSig sl <$> rename hsPat <*> rename qt
     rename p = traverseHsPat rename p
 
-buildRecPat :: FieldMap -> HsName -> [HsPatField] -> RM HsPat
+buildRecPat :: FieldMap -> Name -> [HsPatField] -> RM HsPat
 buildRecPat (FieldMap amp fls) n us = case mlookup (toName DataConstructor n) amp of
     Nothing -> failRename $ "Unknown Constructor: " ++ show n
     Just t -> do
@@ -490,7 +492,7 @@ buildRecPat (FieldMap amp fls) n us = case mlookup (toName DataConstructor n) am
 instance Rename HsPatField where
     rename (HsPFieldPat hsName hsPat) = do
         --gt <- gets globalSubTable      -- field names are not shadowed by local definitions.
-        hsName' <- renameName (toName FieldLabel hsName) --renameHsName hsName gt
+        hsName' <- renameName (toName FieldLabel hsName) --renameName hsName gt
         hsPat' <- rename hsPat
         return (HsPFieldPat hsName' hsPat')
 
@@ -510,7 +512,7 @@ f_fromRational = HsVar $ nameName (toUnqualified v_fromRational)
 newVar = do
     unique <- newUniq
     mod <- getCurrentModule
-    --let hsName'' = (Qual mod (HsIdent $ show unique {- ++ fromHsName hsName' -} ++ "_var@"))
+    --let hsName'' = (Qual mod (HsIdent $ show unique {- ++ fromName hsName' -} ++ "_var@"))
     let hsName'' = toName Val (mod,show unique ++ "_var@")
     return hsName''
 
@@ -577,7 +579,7 @@ failRename s = do
     sl <- getSrcLoc
     fail (show sl ++ ": " ++ s)
 
-buildRecConstr ::  FieldMap -> HsName -> [HsFieldUpdate] -> RM HsExp
+buildRecConstr ::  FieldMap -> Name -> [HsFieldUpdate] -> RM HsExp
 buildRecConstr (FieldMap amp fls) n us = do
     undef <- createError HsErrorUninitializedField "Uninitialized Field"
     case mlookup (toName DataConstructor n) amp of
@@ -655,15 +657,15 @@ instance Rename HsStmt where
 instance Rename HsFieldUpdate where
     rename (HsFieldUpdate hsName hsExp) = do
 --        gt <- gets globalSubTable              -- field names are global and not shadowed
- --       hsName' <- renameHsName hsName gt      -- TODO field names should have own namespace
+ --       hsName' <- renameName hsName gt      -- TODO field names should have own namespace
         hsName' <- renameName (toName FieldLabel hsName)      -- TODO field names should have own namespace
         hsExp' <- rename hsExp
         return (HsFieldUpdate hsName' hsExp')
 
-renameValName :: HsName -> RM HsName
+renameValName :: Name -> RM Name
 renameValName hsName = renameName (fromValishHsName hsName)
 
-renameTypeName :: HsName -> RM HsName
+renameTypeName :: Name -> RM Name
 renameTypeName hsName = renameName (fromTypishHsName hsName)
 
 -- This looks up a replacement name in the subtable.
@@ -695,17 +697,17 @@ clobberedName hsName = do
     currModule <- getCurrentModule
     return $ renameAndQualify hsName unique currModule
 
-clobberName :: HsName -> RM SubTable
+clobberName :: Name -> RM SubTable
 clobberName hsName = do
     hsName' <- clobberedName hsName
     return $ msingleton hsName hsName'
 
-renameAndQualify :: HsName -> Int -> Module -> HsName
+renameAndQualify :: Name -> Int -> Module -> Name
 renameAndQualify name unique currentMod = qualifyName currentMod (renameName name unique) where
     renameName n unique = mapName (id,((show unique ++ "_") ++)) n
 
 -- | unRename gets the original identifier name from the renamed version
-unRename :: HsName -> HsName
+unRename :: Name -> Name
 unRename name = mapName (id,unRenameString) name
 
 unRenameString :: String -> String
@@ -722,21 +724,21 @@ updateWith x action = getUpdates x >>= flip withSubTable action
 getUpdates x = unions `fmap` mapM clobberName (getNames x)
 
 class UpdateTable a where
-    getNames :: a -> [HsName]
+    getNames :: a -> [Name]
     getNames a = []
 
 instance UpdateTable a => UpdateTable [a] where
     getNames xs = concatMap getNames xs
 
-instance UpdateTable HsName where
+instance UpdateTable Name where
     getNames x = [x]
 
 instance UpdateTable HsDecl where
-    getNames hsDecl = fsts $ getHsNamesAndASrcLocsFromHsDecl hsDecl
+    getNames hsDecl = fsts $ getNamesAndASrcLocsFromHsDecl hsDecl
 instance UpdateTable HsPat where
     getNames hsPat = getNamesFromHsPat hsPat
 instance UpdateTable HsStmt where
-    getNames hsStmt = fsts $ getHsNamesAndASrcLocsFromHsStmt hsStmt
+    getNames hsStmt = fsts $ getNamesAndASrcLocsFromHsStmt hsStmt
 instance UpdateTable HsQualType where
     getNames (HsQualType _hsContext hsType) = getNames hsType
 instance UpdateTable HsType where
@@ -744,8 +746,8 @@ instance UpdateTable HsType where
         getNamesFromType (HsTyVar hsName) = tell [fromTypishHsName hsName]
         getNamesFromType t = traverseHsType_ getNamesFromType t
 
-getHsNamesAndASrcLocsFromHsDecl :: HsDecl -> [(HsName, SrcLoc)]
-getHsNamesAndASrcLocsFromHsDecl d = f d where
+getNamesAndASrcLocsFromHsDecl :: HsDecl -> [(Name, SrcLoc)]
+getNamesAndASrcLocsFromHsDecl d = f d where
     f (HsPatBind srcLoc (HsPVar hsName) _ _) = [(fromValishHsName hsName, srcLoc)]
     f (HsPatBind sloc _ _ _) = error $ "non simple pattern binding found (sloc): " ++ show sloc
     f (HsFunBind (HsMatch { .. }:_)) = [(fromValishHsName hsMatchName,hsMatchSrcLoc)]
@@ -801,10 +803,10 @@ collectDefsHsModule m = (\ (x,y) -> (Seq.toList x,Seq.toList y)) $ execWriter (m
     namesHsDeclTS' toName (HsTypeDecl sl n _ _) = [(toName TypeConstructor n,sl)]
     namesHsDeclTS' _ _ = []
 
-getHsNamesAndASrcLocsFromHsStmt :: HsStmt -> [(HsName, SrcLoc)]
-getHsNamesAndASrcLocsFromHsStmt (HsGenerator srcLoc hsPat _hsExp) = zip (getNamesFromHsPat hsPat) (repeat srcLoc)
-getHsNamesAndASrcLocsFromHsStmt (HsQualifier _hsExp) = []
-getHsNamesAndASrcLocsFromHsStmt (HsLetStmt hsDecls) = concat $ map getHsNamesAndASrcLocsFromHsDecl hsDecls
+getNamesAndASrcLocsFromHsStmt :: HsStmt -> [(Name, SrcLoc)]
+getNamesAndASrcLocsFromHsStmt (HsGenerator srcLoc hsPat _hsExp) = zip (getNamesFromHsPat hsPat) (repeat srcLoc)
+getNamesAndASrcLocsFromHsStmt (HsQualifier _hsExp) = []
+getNamesAndASrcLocsFromHsStmt (HsLetStmt hsDecls) = concat $ map getNamesAndASrcLocsFromHsDecl hsDecls
 
 -----------
 -- RM Monad
@@ -837,3 +839,74 @@ instance MonadSetSrcLoc RM where
     withSrcLoc sl a = local (\s -> s { envSrcLoc = sl `mappend` envSrcLoc s}) a
 instance OptionMonad RM where
     getOptions = asks envOptions
+
+class DeNameable a where
+    deName :: Module -> a -> a
+
+instance (Functor f,DeNameable a) => DeNameable (f a) where
+    deName m fx = fmap (deName m) fx
+
+instance DeNameable Name where
+    deName mod name = mapName' fm unRenameString name where
+        fm (Just m) | m == mod = Nothing
+                    | m `elem` removedMods = Nothing
+        fm m = m
+        removedMods = map toModule [
+            "Prelude","Jhc.Basics","Jhc.Prim.IO","Jhc.Type.Word","Jhc.Type.Basic"]
+
+instance DeNameable HsPat where
+    deName mod p = f p where
+        f (HsPVar v) = HsPVar (deName mod v)
+        f (HsPNeg p) = HsPNeg (f p)
+        f (HsPIrrPat p) = HsPIrrPat (deName mod p)
+        f (HsPBangPat p) = HsPBangPat (deName mod p)
+        f (HsPParen p) = HsPParen (f p)
+        f (HsPApp cn pats) = HsPApp (deName mod cn) (deName mod pats)
+        f (HsPList pats) = HsPList (deName mod pats)
+        f (HsPAsPat n p) = HsPAsPat (deName mod n) (deName mod p)
+        f p = p
+
+--instance DeNameable n => DeNameable Located l n where
+--    deName mod p 
+
+instance DeNameable HsAlt where
+    deName _ n = n
+
+instance DeNameable HsExp where
+    deName mod e = f e where
+        dn :: DeNameable b => b -> b
+        dn n = deName mod n
+        f (HsVar hsName) = HsVar (dn hsName)
+        f (HsCon hsName) = HsCon (dn hsName)
+        f (HsLambda srcLoc hsPats hsExp) =
+            HsLambda srcLoc (dn hsPats) (dn hsExp)
+        f (HsCase hsExp hsAlts) =
+            HsCase (dn hsExp) (dn hsAlts)
+        f p = runIdentity $ traverseHsExp (return . dn) p
+--        f (HsDo hsStmts) = do
+--        (ss,()) <- renameHsStmts hsStmts (return ())
+--        doToExp newVar (nameName v_bind) (nameName v_bind_) (nameName v_fail) ss
+--    rename (HsRecConstr hsName hsFieldUpdates) = do
+--        hsName' <- renameValName hsName
+--        hsFieldUpdates' <- rename hsFieldUpdates
+--        fls <- asks envFieldLabels
+--        buildRecConstr fls hsName' (hsFieldUpdates'::[HsFieldUpdate])
+--    rename (HsRecUpdate hsExp hsFieldUpdates) = do
+--        hsExp' <- rename hsExp
+--        hsFieldUpdates' <- rename hsFieldUpdates
+--        fls <- asks envFieldLabels
+--        buildRecUpdate fls hsExp' hsFieldUpdates' -- HsRecConstr hsName' hsFieldUpdates')
+        --return (HsRecUpdate hsExp' hsFieldUpdates')
+--    rename (HsListComp hsExp hsStmts) = do
+--        (ss,e) <- renameHsStmts hsStmts (rename hsExp)
+--        listCompToExp newVar e ss
+--    rename (HsExpTypeSig srcLoc hsExp hsQualType) = do
+--        hsExp' <- rename hsExp
+--        updateWith hsQualType $ do
+--            hsQualType' <- rename hsQualType
+--            return (HsExpTypeSig srcLoc hsExp' hsQualType')
+--    rename (HsAsPat hsName hsExp) = HsAsPat <$> renameValName hsName <*> rename hsExp
+--    rename (HsWildCard sl) = do
+--        withSrcLoc sl $ do
+--            e <- createError HsErrorUnderscore ("_")
+--            return e

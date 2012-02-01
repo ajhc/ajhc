@@ -150,7 +150,9 @@ tiExpr (HsVar v) typ = do
       else do
         doCoerce f (HsVar v)
 
-tiExpr (HsCase e alts) typ = withContext (simpleMsg $ "in the case expression\n   case " ++ render (ppHsExp e) ++ " of ...") $ do
+tiExpr (HsCase e alts) typ = do
+    dn <- getDeName
+    withContext (simpleMsg $ "in the case expression\n   case " ++ render (ppHsExp $ dn e) ++ " of ...") $ do
     scrutinee <- newBox kindFunRet
     e' <- tcExpr e scrutinee
     alts' <- mapM (tcAlt scrutinee typ) alts
@@ -190,7 +192,8 @@ tiExpr (HsAsPat n e) typ = do
     return (HsAsPat n e)
 
 -- comb LET-S and VAR
-tiExpr expr@(HsExpTypeSig sloc e qt) typ =  withContext (locMsg sloc "in the annotated expression" $ render $ ppHsExp expr) $ do
+tiExpr expr@(HsExpTypeSig sloc e qt) typ = 
+    deNameContext (Just sloc) "in the annotated expression" expr $ do
     kt <- getKindEnv
     s <- hsQualTypeToSigma kt qt
     s `subsumes` typ
@@ -217,7 +220,7 @@ tiExpr (HsRightSection e1 e2) typ = do
     (arg `fn` ret) `subsumes` typ
     return (HsRightSection e1 e2)
 
-tiExpr expr@HsApp {} typ = withContext (makeMsg "in the application" $ render $ ppHsExp $ backToApp h as) $ do
+tiExpr expr@HsApp {} typ = deNameContext Nothing "in the application" (backToApp h as) $ do
     (h,as) <- tcApps h as typ
     return $ backToApp h as
     where
@@ -227,7 +230,7 @@ tiExpr expr@HsApp {} typ = withContext (makeMsg "in the application" $ render $ 
         f (HsApp a b) rs = f a (b:rs)
         f t rs = (t,rs)
 
-tiExpr expr@(HsInfixApp e1 e2 e3) typ = withContext (makeMsg "in the infix application" $ render $ ppHsExp expr) $ do
+tiExpr expr@(HsInfixApp e1 e2 e3) typ = deNameContext Nothing "in the infix application" expr $ do
     (e2',[e1',e3']) <- tcApps e2 [e1,e3] typ
     return (HsInfixApp e1' e2' e3')
 
@@ -235,13 +238,15 @@ tiExpr expr@(HsInfixApp e1 e2 e3) typ = withContext (makeMsg "in the infix appli
 -- cNum, just for cases such as:
 -- foo = \x -> -x
 
-tiExpr expr@(HsNegApp e) typ = withContext (makeMsg "in the negative expression" $ render $ ppHsExp expr) $ do
+tiExpr expr@(HsNegApp e) typ = deNameContext Nothing "in the negative expression" expr $ do
         e <- tcExpr e typ
         addPreds [IsIn class_Num typ]
         return (HsNegApp e)
 
 -- ABS1
-tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lambda expression\n   \\" ++ show (pprint ps:: P.Doc) ++ " -> ...") $ do
+tiExpr expr@(HsLambda sloc ps e) typ = do
+    dn <- getDeName
+    withContext (locSimple sloc $ "in the lambda expression\n   \\" ++ show (pprint (dn ps):: P.Doc) ++ " -> ...") $ do
     let lam (p:ps) e (TMetaVar mv) rs = do -- ABS2
             withMetaVars mv [kindArg,kindFunRet] (\ [a,b] -> a `fn` b) $ \ [a,b] -> lam (p:ps) e (a `fn` b) rs
         lam (p:ps) e (TArrow s1' s2') rs = do -- ABS1
@@ -269,18 +274,20 @@ tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lam
             doCoerce (ctAbs ts) e
     lam ps e typ []
 
-tiExpr (HsIf e e1 e2) typ = withContext (simpleMsg $ "in the if expression\n   if " ++ show e ++ "...") $ do
+tiExpr (HsIf e e1 e2) typ = do 
+    dn <- getDeName
+    withContext (simpleMsg $ "in the if expression\n   if " ++ show (dn e) ++ "...") $ do
     e <- tcExpr e tBool
     e1 <- tcExpr e1 typ
     e2 <- tcExpr e2 typ
     return (HsIf e e1 e2)
 
-tiExpr tuple@(HsTuple exps@(_:_)) typ = withContext (makeMsg "in the tuple" $ render $ ppHsExp tuple) $ do
+tiExpr tuple@(HsTuple exps@(_:_)) typ = deNameContext Nothing "in the tuple" tuple $ do
     --(_,exps') <- tcApps (HsCon (toTuple (length exps))) exps typ
     (_,exps') <- tcApps (HsCon (nameTuple TypeConstructor (length exps))) exps typ
     return (HsTuple exps')
 
-tiExpr tuple@(HsUnboxedTuple exps) typ = withContext (makeMsg "in the unboxed tuple" $ render $ ppHsExp tuple) $ do
+tiExpr tuple@(HsUnboxedTuple exps) typ = deNameContext Nothing "in the unboxed tuple" tuple $ do
     (_,exps') <- tcApps (HsCon (nameName $ unboxedNameTuple DataConstructor (length exps))) exps typ
     return (HsUnboxedTuple exps')
 
@@ -297,12 +304,12 @@ tiExpr (HsList []) typ = do
     wrapInAsPatEnv (HsList []) typ
 
 -- non empty list
-tiExpr expr@(HsList exps@(_:_)) (TAp tList' v) | tList == tList' = withContext (makeMsg "in the list " $ render $ ppHsExp expr) $ do
+tiExpr expr@(HsList exps@(_:_)) (TAp tList' v) | tList == tList' = deNameContext Nothing "in the list " expr $ do
         exps' <- mapM (`tcExpr` v) exps
         wrapInAsPatEnv (HsList exps') (TAp tList' v)
 
 -- non empty list
-tiExpr expr@(HsList exps@(_:_)) typ = withContext (makeMsg "in the list " $ render $ ppHsExp expr) $ do
+tiExpr expr@(HsList exps@(_:_)) typ = deNameContext Nothing "in the list " expr $ do
         v <- newBox kindStar
         exps' <- mapM (`tcExpr` v) exps
         (TAp tList v) `subsumes` typ
@@ -314,7 +321,7 @@ tiExpr (HsParen e) typ = tcExpr e typ
 --        newExp <- doToExp stmts
 --        tcExpr newExp typ
 
-tiExpr expr@(HsLet decls e) typ = withContext (makeMsg "in the let binding" $ render $ ppHsExp expr) $ do
+tiExpr expr@(HsLet decls e) typ = deNameContext Nothing "in the let binding" expr $ do
     sigEnv <- getSigEnv
     let bgs = getFunDeclsBg sigEnv decls
         f (bg:bgs) rs = do
@@ -336,6 +343,12 @@ tcWheres decls = do
             localEnv env $ f bgs (ds ++ rs) (env `mappend` cenv)
         f [] rs cenv = return (rs,cenv)
     f bgs [] mempty
+
+deNameContext :: Maybe SrcLoc -> String -> HsExp -> Tc a -> Tc a
+deNameContext sl desc e action = do
+    dn <- getDeName
+    let mm = maybe makeMsg locMsg  sl
+    withContext (mm desc (render $ ppHsExp (dn e))) action
 
 -----------------------------------------------------------------------------
 

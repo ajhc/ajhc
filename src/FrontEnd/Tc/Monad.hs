@@ -1,3 +1,4 @@
+{-# LANGUAGE ImpredicativeTypes #-}
 module FrontEnd.Tc.Monad(
     CoerceTerm(..),
     Tc(),
@@ -20,8 +21,8 @@ module FrontEnd.Tc.Monad(
     getClassHierarchy,
     getCollectedEnv,
     getCollectedCoerce,
+    getDeName,
     getKindEnv,
-    getModName,
     getSigEnv,
     evalFullType,
     inst,
@@ -67,6 +68,7 @@ import Doc.PPrint
 import FrontEnd.Class
 import FrontEnd.Diagnostic
 import FrontEnd.KindInfer
+import FrontEnd.Rename(DeNameable(..))
 import FrontEnd.SrcLoc(bogusASrcLoc,MonadSrcLoc(..))
 import FrontEnd.Tc.Kind
 import FrontEnd.Tc.Type
@@ -118,10 +120,15 @@ newtype Tc a = Tc (ReaderT TcEnv (WriterT Output IO) a)
 data TcInfo = TcInfo {
     tcInfoEnv :: TypeEnv, -- initial typeenv, data constructors, and previously infered types
     tcInfoSigEnv :: TypeEnv, -- type signatures used for binding analysis
-    tcInfoModName :: String,
+    tcInfoModName :: Module,
     tcInfoKindInfo :: KindEnv,
     tcInfoClassHierarchy :: ClassHierarchy
     }
+
+getDeName :: DeNameable n => Tc (n -> n)
+getDeName = do
+    mn <- asks (tcInfoModName . tcInfo)
+    return (\n -> deName mn n)
 
 -- | run a computation with a local environment
 localEnv :: TypeEnv -> Tc a -> Tc a
@@ -130,10 +137,12 @@ localEnv te act = do
     let (cenv,menv) = Map.partition (Set.null . freeMetaVars) te'
     --if any isBoxy (Map.elems te') then
     --    fail $ "localEnv error!\n" ++ show te
-    local (tcConcreteEnv_u (cenv `Map.union`) . tcMutableEnv_u ((menv `Map.union`) . Map.filterWithKey (\k _ -> k `Map.notMember` cenv))) act
+    local (tcConcreteEnv_u (cenv `Map.union`) . tcMutableEnv_u ((menv `Map.union`) .
+        Map.filterWithKey (\k _ -> k `Map.notMember` cenv))) act
 
--- | add to the collected environment which will be used to annotate uses of variables with their instantiated types.
--- should contain @-aliases for each use of a polymorphic variable or pattern match.
+-- | add to the collected environment which will be used to annotate uses of
+-- variables with their instantiated types.  should contain @-aliases for each
+-- use of a polymorphic variable or pattern match.
 
 addToCollectedEnv :: TypeEnv -> Tc ()
 addToCollectedEnv te = do
@@ -167,17 +176,18 @@ runTc tcInfo  (Tc tim) = do
     ce <- newIORef mempty
     cc <- newIORef mempty
     (a,out) <- runWriterT $ runReaderT tim TcEnv {
-        tcCollectedEnv = ce,
+        tcCollectedEnv    = ce,
         tcCollectedCoerce = cc,
-        tcConcreteEnv = tcInfoEnv tcInfo `mappend` tcInfoSigEnv tcInfo,
-        tcMutableEnv = mempty,
-        tcVarnum = vn,
-        tcDiagnostics = [Msg Nothing $ "Compilation of module: " ++ tcInfoModName tcInfo],
-        tcInfo = tcInfo,
-        tcRecursiveCalls = mempty,
-        tcInstanceEnv = makeInstanceEnv (tcInfoClassHierarchy tcInfo),
-        tcCurrentScope = mempty,
-        tcOptions = opt
+        tcConcreteEnv     = tcInfoEnv tcInfo `mappend` tcInfoSigEnv tcInfo,
+        tcMutableEnv      = mempty,
+        tcVarnum          = vn,
+        tcDiagnostics     = [Msg Nothing $
+            "Compilation of module: " ++ show (tcInfoModName tcInfo)],
+        tcInfo            = tcInfo,
+        tcRecursiveCalls  = mempty,
+        tcInstanceEnv     = makeInstanceEnv (tcInfoClassHierarchy tcInfo),
+        tcCurrentScope    = mempty,
+        tcOptions         = opt
         }
     liftIO $ processErrors (T.toList $ tcWarnings out)
     return a
@@ -208,9 +218,6 @@ getKindEnv = asks (tcInfoKindInfo . tcInfo)
 getSigEnv :: Tc TypeEnv
 getSigEnv = asks (tcInfoSigEnv . tcInfo)
 
-getModName :: Tc String
-getModName = asks ( tcInfoModName . tcInfo)
-
 askCurrentEnv = do
     env1 <- asks tcConcreteEnv
     env2 <- asks tcMutableEnv
@@ -233,7 +240,8 @@ unificationError t1 t2 = do
     t1 <- evalFullType t1
     t2 <- evalFullType t2
     diagnosis <- getErrorContext
-    let Left msg = typeError (Unification $ "attempted to unify " ++ prettyPrintType t1 ++ " with " ++ prettyPrintType t2) diagnosis
+    let Left msg = typeError (Unification $ "attempted to unify " ++
+            prettyPrintType t1 ++ " with " ++ prettyPrintType t2) diagnosis
     liftIO $ processIOErrors
     liftIO $ putErrLn msg
     liftIO $ exitFailure
@@ -282,7 +290,7 @@ instance Instantiate t => Instantiate (Qual t) where
   inst mm ts (ps :=> t) = inst mm ts ps :=> inst mm ts t
 
 instance Instantiate Pred where
-  inst mm ts is = tickle (inst mm ts :: Type -> Type) is -- (IsIn c t) = IsIn c (inst mm ts t)
+  inst mm ts is = tickle (inst mm ts :: Type -> Type) is
 
 freshInstance :: MetaVarType -> Sigma -> Tc ([Type],Rho)
 freshInstance typ (TForAll as qt) = do
@@ -295,16 +303,20 @@ freshInstance _ x = return ([],x)
 addPreds :: Preds -> Tc ()
 addPreds ps = do
     sl <- getSrcLoc
-    Tc $ tell mempty { collectedPreds = [ p | p@IsIn {} <- ps ], constraints = Seq.fromList [ Equality { constraintSrcLoc = sl, constraintType1 = a, constraintType2 = b } | IsEq a b <- ps ] }
+    Tc $ tell mempty { collectedPreds = [ p | p@IsIn {} <- ps ],
+        constraints = Seq.fromList [ Equality { constraintSrcLoc = sl,
+        constraintType1 = a, constraintType2 = b } | IsEq a b <- ps ] }
 
 addConstraints :: [Constraint] -> Tc ()
 addConstraints ps = Tc $ tell mempty { constraints = Seq.fromList ps }
 
 listenPreds :: Tc a -> Tc (a,Preds)
-listenPreds action = censor (\x -> x { collectedPreds = mempty }) $ listens collectedPreds action
+listenPreds action = censor (\x -> x { collectedPreds = mempty }) $
+    listens collectedPreds action
 
 listenCPreds :: Tc a -> Tc (a,(Preds,[Constraint]))
-listenCPreds action = censor (\x -> x { constraints = mempty, collectedPreds = mempty }) $ listens (\x -> (collectedPreds x,T.toList $ constraints x)) action
+listenCPreds action = censor (\x -> x { constraints = mempty, collectedPreds = mempty }) $
+    listens (\x -> (collectedPreds x,T.toList $ constraints x)) action
 
 listenCheckedRules :: Tc a -> Tc (a,[Rule])
 listenCheckedRules action = do
@@ -445,13 +457,15 @@ varBind u t
         --(t,be,_) <- unbox t
         --when be $ error $ "binding boxy: " ++ tupled [pprint u,prettyPrintType t]
         tt <- evalFullType tt
-        when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "varBind: " ++ pprint u <+> text ":=" <+> prettyPrintType tt
+        when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "varBind: " ++ pprint u <+>
+            text ":=" <+> prettyPrintType tt
         when (u `Set.member` freeMetaVars tt) $ do
             unificationError (TMetaVar u) tt -- occurs check
         let r = metaRef u
         x <- liftIO $ readIORef r
         case x of
-            Just r -> fail $ "varBind: binding unfree: " ++ tupled [pprint u,prettyPrintType tt,prettyPrintType r]
+            Just r -> fail $ "varBind: binding unfree: " ++
+                tupled [pprint u,prettyPrintType tt,prettyPrintType r]
             Nothing -> liftIO $ do
                 --when (dump FD.BoxySteps) $ putStrLn $ "varBind: " ++ pprint u <+> text ":=" <+> prettyPrintType t
                 writeIORef r (Just tt)
@@ -488,8 +502,8 @@ elimBox mv = error $ "elimBox: nonboxy" ++ show mv
 -- Declaration of instances, boilerplate
 ----------------------------------------
 
-pretty  :: PPrint Doc a => a -> String
-pretty x  = show (pprint x :: Doc)
+pretty :: PPrint Doc a => a -> String
+pretty x = show (pprint x :: Doc)
 
 instance Monad Tc where
     return a = Tc $ return a
@@ -502,7 +516,6 @@ instance Monad Tc where
         liftIO $ fail x
 
 instance MonadWarn Tc where
---    addWarning w = liftIO $ processErrors [w]
     addWarning w = tell mempty { tcWarnings = Seq.singleton w }
 
 instance MonadSrcLoc Tc where
@@ -522,11 +535,11 @@ instance UniqueProducer Tc where
         return n
 
 tcInfoEmpty = TcInfo {
-    tcInfoEnv = mempty,
-    tcInfoModName = "(unknown)",
-    tcInfoKindInfo = mempty,
+    tcInfoEnv            = mempty,
+    tcInfoModName        = toModule "(unknown)",
+    tcInfoKindInfo       = mempty,
     tcInfoClassHierarchy = mempty,
-    tcInfoSigEnv = mempty
+    tcInfoSigEnv         = mempty
 }
 
 withMetaVars :: MetaVar -> [Kind] -> ([Sigma] -> Sigma) -> ([Sigma'] -> Tc a) -> Tc a

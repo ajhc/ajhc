@@ -108,8 +108,7 @@ emptyCase = ECase {
 eCaseTup e vs w = caseUpdate emptyCase { eCaseScrutinee = e, eCaseBind =  (tVr emptyId (getType e)), eCaseType = getType w, eCaseAlts =  [Alt litCons { litName = nameTuple DataConstructor (length vs), litArgs = vs, litType = getType e } w] }
 eCaseTup' e vs w = caseUpdate emptyCase { eCaseScrutinee = e, eCaseBind = (tVr emptyId (getType e)), eCaseType = getType w, eCaseAlts =  [Alt litCons { litName = unboxedNameTuple DataConstructor (length vs), litArgs = vs, litType = getType e} w] }
 
-eJustIO w x = eTuple' [w,x] -- ELit litCons { litName = dc_JustIO, litArgs = [w,x], litType = ELit litCons { litName = tc_IOResult, litArgs = [getType x], litType = eStar } }
-tIO t = ELit (litCons { litName = tc_IO, litArgs = [t], litType = eStar })
+eJustIO w x = eTuple' [w,x]
 
 eCase e alts@(alt:_) Unknown = caseUpdate emptyCase { eCaseScrutinee = e, eCaseBind = (tVr emptyId (getType e)), eCaseType = getType alt,  eCaseAlts =  alts }
 eCase e alts els = caseUpdate emptyCase { eCaseScrutinee = e, eCaseBind = (tVr emptyId (getType e)), eCaseDefault = Just els, eCaseAlts =  alts, eCaseType = getType els }
@@ -159,7 +158,6 @@ prim_unsafeCoerce e t = p e' where
 from_unsafeCoerce (EPrim pp [e] t) | pp == p_unsafeCoerce = return (e,t)
 from_unsafeCoerce _ = fail "Not unsafeCoerce primitive"
 
---tWorldzh = ELit litCons { litName = tc_World__, litArgs = [], litType = eHash }
 isState_ e = case e of
     ELit (LitCons { litName = name }) | name == tc_State_ -> True
     _ -> False

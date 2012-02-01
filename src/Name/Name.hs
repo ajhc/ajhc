@@ -16,6 +16,7 @@ module Name.Name(
     mainModule,
     preludeModule,
     mapName,
+    mapName',
     nameName,
     nameParts,
     nameType,
@@ -190,6 +191,9 @@ mapName :: (Module -> Module,String -> String) -> Name -> Name
 mapName (f,g) n = case nameParts n of
     (nt,Nothing,i) -> toName nt (g i)
     (nt,Just m,i) -> toName nt (Just (f m :: Module),g i)
+mapName' :: (Maybe Module -> Maybe Module) -> (String -> String) -> Name -> Name
+mapName' f g n = case nameParts n of
+    (nt,m,i) -> toName nt (f m,g i)
 
 mainModule = Module "Main@"
 primModule = Module "Prim@"
