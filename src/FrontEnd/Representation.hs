@@ -164,8 +164,6 @@ instance (DocLike d,PPrint d t) => PPrint d (Qual t) where
     pprint ([x] :=> r) = pprint x <+> text "=>" <+> pprint r
     pprint (xs :=> r) = tupled (map pprint xs) <+> text "=>" <+> pprint r
 
-type Class = Name
-
 instance  DocLike d => PPrint d Tyvar where
   pprint tv = tshow (tyvarName tv)
 

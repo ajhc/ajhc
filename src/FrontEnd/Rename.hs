@@ -78,7 +78,7 @@ addTopLevels  hsmod action = do
             | otherwise = let nn = toUnqualified hsName in (nn,hsName):(hsName,hsName):r
         f r z = let nn = qualifyName mod z in (z,nn):(nn,nn):r
         z ns = mapM mult (filter (\x -> length x > 1) $ groupBy (\a b -> fst a == fst b) (sort ns))
-        mult xs@(~((n,sl):_)) = warn sl "multiply-defined" (show n ++ " is defined multiple times: " ++ show xs)
+        mult xs@(~((n,sl):_)) = warn sl (MultiplyDefined n (snds xs)) (show n ++ " is defined multiple times: " ++ show xs)
     z cdefs
     let amb k x y | x == y = x
         amb k (Right n1) (Right n2) = Left (ambig k [n1,n2])
@@ -149,7 +149,7 @@ checkExportSpec e = f e  where
         let idef = any isJust (map (flip mlookup nm) $ zipWith toName ts (repeat n))
         unless idef $ do
             sl <- getSrcLoc
-            warn sl "undefined-name" ("unknown name in export list: " ++ show n)
+            warn sl (UndefinedName n) ("unknown name in export list: " ++ show n)
 
 expandTypeSigs :: [HsDecl] -> [HsDecl]
 expandTypeSigs ds =  (concatMap f ds) where
@@ -691,12 +691,12 @@ renameName hsName = do
         Just (Right name) -> return name
         Just (Left err) -> do
             sl <- getSrcLoc
-            warn sl "undefined-name" err
+            warn sl (UndefinedName hsName) err
             return hsName
         Nothing -> do
             sl <- getSrcLoc
             let err = "Unknown name: " ++ show hsName
-            warn sl "undefined-name" err
+            warn sl (UndefinedName hsName) err
             return hsName
 
 clobberedName :: Name -> RM Name

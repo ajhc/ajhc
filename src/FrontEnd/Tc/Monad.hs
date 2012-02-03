@@ -118,10 +118,10 @@ newtype Tc a = Tc (ReaderT TcEnv (WriterT Output IO) a)
 
 -- | information that is passed into the type checker.
 data TcInfo = TcInfo {
-    tcInfoEnv :: TypeEnv, -- initial typeenv, data constructors, and previously infered types
-    tcInfoSigEnv :: TypeEnv, -- type signatures used for binding analysis
-    tcInfoModName :: Module,
-    tcInfoKindInfo :: KindEnv,
+    tcInfoEnv            :: TypeEnv, -- initial typeenv, data constructors, and previously infered types
+    tcInfoSigEnv         :: TypeEnv, -- type signatures used for binding analysis
+    tcInfoModName        :: Module,
+    tcInfoKindInfo       :: KindEnv,
     tcInfoClassHierarchy :: ClassHierarchy
     }
 

@@ -89,7 +89,7 @@ determineExports' owns doneMods todoMods = mdo
     ce m x = mapM f (toRelationList x) where
         f (x,[y]) = return y
         f (_,[]) = error "can't happen"
-        f (x,ys) = warn bogusASrcLoc "ambiguous-export" ("module " <> fromModule (modInfoName m) <> " has ambiguous exports: " ++ show ys) >> return (head ys)
+        f (x,ys) = warn bogusASrcLoc (AmbiguousExport (modInfoName m) ys) ("module " <> fromModule (modInfoName m) <> " has ambiguous exports: " ++ show ys) >> return (head ys)
 
     getExports :: Monad m => ModInfo -> (Module -> m (Rel Name Name)) -> m (Rel Name Name)
     getExports mi@ModInfo { modInfoHsModule = m@HsModule { hsModuleExports = Nothing } } _ = return $ defsToRel (modInfoDefs mi)

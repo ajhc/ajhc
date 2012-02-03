@@ -266,7 +266,7 @@ lexWhiteSpace bol = do
             | pname `Map.member` pragmas -> return bol
             | otherwise -> do
                 when (pname `Set.notMember` pragmas_ignored) $
-                    addWarn "unknown-pragma" $ "The pragma '" ++ pname ++ "' is unknown"
+                    addWarn (UnknownPragma $ packString pname) $ "The pragma '" ++ pname ++ "' is unknown"
                 discard 2
                 bol <- lexNestedComment bol
                 lexWhiteSpace bol

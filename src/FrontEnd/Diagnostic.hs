@@ -14,11 +14,12 @@
 -------------------------------------------------------------------------------}
 
 module FrontEnd.Diagnostic (
-       Diagnostic(..), dumpDiagnostic,
+       Diagnostic(..),
        makeMsg,
        locMsg,
        locSimple,
        simpleMsg,
+       dumpDiagnostic,
        typeError,
        TypeError (..),
        ) where
@@ -32,7 +33,6 @@ import PackedString
 
 data TypeError
         = Unification String
-        | BogusError
         | Failure String
 
 typeError :: Monad m => TypeError -> [Diagnostic] -> m a
@@ -45,7 +45,6 @@ typeError err ds
    (whatStr, whyStr) =
         case err of
            Unification s -> ("type unification error", s)
-           BogusError    -> ("bogus reason", "bogus reason")
            Failure s ->  ("failure", s)
 
 data Diagnostic = Msg (Maybe SrcLoc) String

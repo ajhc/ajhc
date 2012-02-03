@@ -156,7 +156,7 @@ splitReduce fs gs ps = do
     flip mapM_ sub $ \ (x,y) ->  do
         let msg = "defaulting: " <+> pprint x <+> "=>" <+> prettyPrintType y
         wdump FD.BoxySteps $ liftIO $ putStrLn msg
-        addWarn "type-defaults" msg
+        --addWarn "type-defaults" msg
     sequence_ [ varBind x y | (x,y) <- nub sub]
     return (Set.toList gs List.\\ map fst sub, ds, rs')
 

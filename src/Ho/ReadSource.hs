@@ -121,7 +121,8 @@ parseHsSource options fn lbs = do
     fn <- shortenPath fn
     let (fileOpts',ogood) = collectFileOpts options fn s
     unless ogood $
-        warn (bogusASrcLoc { srcLocFileName = packString fn }) "unknown-option" "Unknown OPTIONS pragma"
+        warn (bogusASrcLoc { srcLocFileName = packString fn })
+            UnknownOption "Invalid options in OPTIONS pragma"
     case runParserWithMode (parseModeOptions fileOpts') { parseFilename = fn } parse  s'  of
                       (ws,ParseOk e) -> processErrors ws >> return (e { hsModuleOpt = fileOpts' },LBSU.fromString s')
                       (_,ParseFailed sl err) -> putErrDie $ show sl ++ ": " ++ err

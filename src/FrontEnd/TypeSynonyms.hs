@@ -61,7 +61,7 @@ declsToTypeSynonyms :: MonadWarn m => TypeSynonyms -> [HsDecl] -> m TypeSynonyms
 declsToTypeSynonyms tsin ds = f tsin gr [] where
     gr = G.scc $ G.newGraph [ (toName TypeConstructor name,( args , quantifyHsType args (HsQualType [] t) , sl)) | (HsTypeDecl sl name args' t) <- ds, let args = [ n | ~(HsTyVar n) <- args'] ] fst (Set.toList . freeVars . (\ (_,(_,t,_)) -> t))
     f tsin (Right ns:xs) rs = do
-            warn (head [ sl | (_,(_,_,sl)) <- ns]) "type-synonym-recursive" ("Recursive type synonyms:" <+> show (fsts ns))
+            warn (head [ sl | (_,(_,_,sl)) <- ns]) TypeSynonymRecursive ("Recursive type synonyms:" <+> show (fsts ns))
             f tsin xs rs
     f tsin (Left (n,(as,body,sl)):xs) rs = do
         body' <- removeSynonymsFromType tsin body
@@ -89,7 +89,7 @@ evalTypeSyms (TypeSynonyms tmap) t = execUniqT 1 (eval [] t) where
     eval stack x@(HsTyCon n) | Just (args, t, sl) <- Map.lookup (toName TypeConstructor n) tmap = do
         let excess = length stack - length args
         if (excess < 0) then do
-            lift $ warn sl "type-synonym-partialap" ("Partially applied typesym:" <+> show n <+> "need" <+> show (- excess) <+> "more arguments.")
+            lift $ warn sl TypeSynonymPartialAp ("Partially applied typesym:" <+> show n <+> "need" <+> show (- excess) <+> "more arguments.")
             unwind x stack
           else case t of
             HsTyAssoc -> unwind x stack

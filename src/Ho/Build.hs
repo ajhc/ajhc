@@ -46,7 +46,7 @@ import FrontEnd.Infix
 import FrontEnd.ParseMonad
 import FrontEnd.SrcLoc
 import FrontEnd.Unlit
-import FrontEnd.Warning
+import FrontEnd.Warning(err,processIOErrors,WarnType(..))
 import Ho.Binary
 import Ho.Collected()
 import Ho.Library
@@ -96,8 +96,8 @@ import qualified Util.Graph as G
 type LibraryName = PackedString
 
 findFirstFile :: String -> [(FilePath,a)] -> IO (LBS.ByteString,FilePath,a)
-findFirstFile err [] = FrontEnd.Warning.err "missing-dep" ("Module not found: " ++ err) >> fail ("Module not found: " ++ err) -- return (error "findFirstFile not found","",undefined)
-findFirstFile err ((x,a):xs) = flip catch (\e ->   findFirstFile err xs) $ do
+findFirstFile err [] = FrontEnd.Warning.err (MissingDep err) ("Module not found: " ++ err) >> fail ("Module not found: " ++ err)
+findFirstFile err ((x,a):xs) = flip catch (\e -> findFirstFile err xs) $ do
     bs <- LBS.readFile x
     return (bs,x,a)
 

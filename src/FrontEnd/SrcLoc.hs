@@ -10,7 +10,11 @@ import Data.Generics
 
 import PackedString
 
-data SrcLoc = SrcLoc { srcLocFileName :: PackedString, srcLocLine :: {-# UNPACK #-} !Int, srcLocColumn :: {-# UNPACK #-}  !Int}
+data SrcLoc = SrcLoc {
+        srcLocFileName :: PackedString,
+        srcLocLine :: {-# UNPACK #-} !Int,
+        srcLocColumn :: {-# UNPACK #-} !Int
+        }
     deriving(Data,Typeable,Eq,Ord)
     {-! derive: update, Binary !-}
 
@@ -18,7 +22,12 @@ data SrcSpan = SrcSpan { srcSpanBegin :: !SrcLoc, srcSpanEnd :: !SrcLoc }
     deriving(Data,Typeable,Eq,Ord)
     {-! derive: update, Binary !-}
 
-bogusASrcLoc = SrcLoc (packString "bogus#") (-1) (-1)
+-- Useful bogus file names used to indicate where non file based errors are.
+fileNameCommandLine = packString "(command line)"
+fileNameUnknown = packString "(unknown)"
+fileNameGenerated = packString "(generated)"
+
+bogusASrcLoc = SrcLoc fileNameUnknown (-1) (-1)
 bogusSrcSpan = SrcSpan bogusASrcLoc bogusASrcLoc
 
 instance Monoid SrcLoc where

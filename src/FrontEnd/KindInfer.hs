@@ -1,3 +1,4 @@
+{-# OPTIONS -funbox-strict-fields #-}
 -- |
 -- This module implements the Kind Inference algorithm, and the routines which
 -- use the product of kind inference to convert haskell source types into the
@@ -26,6 +27,7 @@ import Data.List
 import System.IO.Unsafe
 import Util.Inst()
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import qualified Data.Traversable as T
 
 import Doc.DocLike
@@ -63,10 +65,10 @@ instance Binary KindEnv where
 instance HasSize KindEnv where
     size KindEnv { kindEnv = env } = size env
 
-instance FreeVars Kind [Kindvar] where
-   freeVars (KVar kindvar) = [kindvar]
-   freeVars (kind1 `Kfun` kind2) = freeVars kind1 `union` freeVars kind2
-   freeVars KBase {} = []
+instance FreeVars Kind (Set.Set Kindvar) where
+   freeVars (KVar kindvar) = Set.singleton kindvar
+   freeVars (kind1 `Kfun` kind2) = freeVars kind1 `Set.union` freeVars kind2
+   freeVars KBase {} = mempty
 
 instance DocLike d =>  PPrint d KindEnv where
     pprint KindEnv { kindEnv = m, kindEnvAssocs = ev, kindEnvClasses = cs } = vcat $
@@ -84,9 +86,9 @@ data KiWhere = InClass | InInstance | Other
 
 data KiEnv  = KiEnv {
     kiContext :: [String],
-    kiEnv :: IORef KindEnv,
-    kiWhere :: KiWhere,
-    kiVarnum :: IORef Int
+    kiEnv     :: !(IORef KindEnv),
+    kiWhere   :: !KiWhere,
+    kiVarnum  :: !(IORef Int)
     }
 
 newtype Ki a = Ki (ReaderT KiEnv IO a)
@@ -148,7 +150,7 @@ varBind u k = do
     k <- flattenKind k
     printRule $ "varBind:" <+> pprint u <+> text ":=" <+> pprint k
     if k == KVar u then return () else do
-    when (u `elem` freeVars k) $ fail $ "occurs check failed in kind inference: " ++ show u ++ " := " ++ show k
+    when (u `Set.member` freeVars k) $ fail $ "occurs check failed in kind inference: " ++ show u ++ " := " ++ show k
     v <- liftIO $ readIORef (kvarRef u)
     case v of
         Just v -> fail $ "varBind unfree"
@@ -245,7 +247,7 @@ kiDecls inputEnv classAndDataDecls = ans where
 postProcess ke = do
     kindEnv <- T.mapM flattenKind (kindEnv ke)
     kindEnvClasses <- T.mapM (mapM flattenKind) (kindEnvClasses ke)
-    let defs = snub (freeVars (Map.elems kindEnv,Map.elems kindEnvClasses))
+    let defs = Set.toList (freeVars (Map.elems kindEnv,Map.elems kindEnvClasses))
     printRule $ "defaulting the following kinds: " ++ pprint defs
     mapM_ (flip varBind kindStar) defs
     kindEnv <- T.mapM flattenKind kindEnv
@@ -362,6 +364,9 @@ kiInitClasses ds =  sequence_ [ f className [classArg] |  HsClassDecl _ (HsQualT
         extendEnv mempty { kindEnvClasses = Map.singleton (toName ClassName className) args }
 
 kiDecl :: HsDecl -> Ki ()
+kiDecl HsTypeFamilyDecl { .. } = do
+    kc <- lookupKind KindSimple (toName TypeConstructor hsDeclName)
+    kiApps kc hsDeclTArgs (maybe kindStar hsKindToKind hsDeclHasKind)
 kiDecl HsDataDecl { hsDeclContext = context, hsDeclName = tyconName, hsDeclArgs = args, hsDeclCons = [], hsDeclHasKind = Just kk } = do
     args <- mapM (lookupKind KindSimple . toName TypeVal) args
     kc <- lookupKind KindAny (toName TypeConstructor tyconName)
@@ -525,20 +530,13 @@ hoistType t = f t where
     f t@TMetaVar {} = t
     f t@TAssoc {} = t { typeClassArgs = map f (typeClassArgs t), typeExtraArgs = map f (typeExtraArgs t) }
     f (TAp a b) = TAp (f a) (f b)
-    f (TForAll vs (ps :=> t))
+    f (TForAll vs (ps :=> (f -> nt)))
         | (TForAll vs' (ps' :=> t')) <- nt = f $ TForAll (vs ++ vs') ((ps ++ ps') :=> t')
         | otherwise = TForAll vs (ps :=> nt)
-        where
-        nt = f t
-    f (TExists vs (ps :=> t))
+    f (TExists vs (ps :=> (f -> nt)))
         | (TExists vs' (ps' :=> t')) <- nt = f $ TExists (vs ++ vs') ((ps ++ ps') :=> t')
         | otherwise = TExists vs (ps :=> nt)
-        where
-        nt = f t
-    f (TArrow a b)
+    f (TArrow (f -> na) (f -> nb))
         | TForAll vs (ps :=> t) <- nb = f $ TForAll vs (ps :=> TArrow na t)
         | TExists vs (ps :=> t) <- na = f $ TForAll vs (ps :=> TArrow t nb)
         | otherwise = TArrow na nb
-        where
-        na = f a
-        nb = f b

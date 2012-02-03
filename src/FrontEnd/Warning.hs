@@ -1,12 +1,12 @@
 module FrontEnd.Warning(
     Warning(..),
     MonadWarn(..),
+    WarnType(..),
     processErrors,
     warn,
-    warnF,
     err,
-    addDiag,
     addWarn,
+    -- IO monad
     processIOErrors,
     printIOErrors
     ) where
@@ -14,21 +14,18 @@ module FrontEnd.Warning(
 import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.IORef
-import Data.List
 import System.IO.Unsafe
 
 import FrontEnd.SrcLoc
+import Name.Name
 import Options
 import PackedString
+import StringTable.Atom
 import Util.Gen
 
-{-# NOINLINE ioWarnings #-}
-ioWarnings :: IORef [Warning]
-ioWarnings = unsafePerformIO $ newIORef []
-
 data Warning = Warning {
-    warnSrcLoc :: !SrcLoc,
-    warnType :: String,
+    warnSrcLoc  :: !SrcLoc,
+    warnType    :: WarnType,
     warnMessage :: String
     } deriving(Eq,Ord)
 
@@ -36,24 +33,17 @@ class Monad m => MonadWarn m where
     addWarning :: Warning -> m ()
     addWarning w = fail $ show w
 
--- If in the IO monad, just show the warning
-instance MonadWarn IO where
-    addWarning w = modifyIORef ioWarnings (w:)
-
-instance MonadWarn (Writer [Warning]) where
-    addWarning w = tell [w]
-instance MonadWarn Identity where
-    addWarning w = fail $ show w
-
+addWarn :: (MonadWarn m, MonadSrcLoc m) => WarnType -> String -> m ()
 addWarn t m = do
     sl <- getSrcLoc
     warn sl t m
 
-addDiag s = warn bogusASrcLoc "diagnostic" s
+warn :: MonadWarn m => SrcLoc -> WarnType -> String -> m ()
 warn s t m = addWarning Warning
     { warnSrcLoc = s, warnType = t, warnMessage = m }
+
+err :: MonadWarn m => WarnType -> String -> m ()
 err t m = warn bogusASrcLoc t m
-warnF fn t m  = warn bogusASrcLoc { srcLocFileName = fn } t m
 
 pad n s = case length s of
     x | x >= n -> s
@@ -77,38 +67,50 @@ processErrors :: [Warning] -> IO ()
 processErrors ws = processErrors' True ws >> return ()
 
 processErrors' :: Bool -> [Warning] -> IO Bool
-processErrors' doDie ws = mapM_ s ws' >> when (die && doDie) exitFailure >> return die where
-    ws' = filter ((`notElem` ignore) . warnType ) $ snub ws
+processErrors' doDie ws = mapM_ s (snub ws) >> when (die && doDie) exitFailure >> return die where
+--    ws' = filter ((`notElem` ignore) . warnType ) $ snub ws
     s Warning { warnSrcLoc = sl, warnType = t, warnMessage = m }
         | sl == bogusASrcLoc = putErrLn $ msg t m
     s Warning { warnSrcLoc = SrcLoc { srcLocFileName = fn, srcLocLine = -1 },
                 warnType = t ,warnMessage = m } = putErrLn (unpackPS fn ++ ": "  ++ msg t m)
     s Warning { warnSrcLoc = SrcLoc { srcLocFileName = fn, srcLocLine = l },
                 warnType = t ,warnMessage = m } = putErrLn (unpackPS fn ++ ":" ++ pad 3 (show l) ++  " - "  ++ msg t m)
-    die = (not $ null $ intersect (map warnType ws') fatal) && not (optKeepGoing options)
+    die = (any warnIsFatal (map warnType ws)) && not (optKeepGoing options)
 
---data WarnType
---    = UndefinedName Name
---    | AmbiguousName Name
---    | MultiplyDefined Name
---    | UnknownImport Module
---    | ParseError
+data WarnType
+    = AmbiguousExport Module [Name]
+    | AmbiguousName Name [Name]
+    | InvalidDecl
+    | MissingDep String
+    | MissingModule Module
+    | MultiplyDefined Name [SrcLoc]
+    | OccursCheck
+    | PrimitiveBadType
+    | PrimitiveUnknown Atom
+    | TypeSynonymPartialAp
+    | TypeSynonymRecursive
+    | UndefinedName Name
+    | UnificationError
+    | UnknownDeriving [Class]
+    | UnknownOption
+    | UnknownPragma PackedString
+    deriving(Eq,Ord)
 
-fatal = [
-    "undefined-name",
-    "ambiguous-name",
-    "multiply-defined",
-    "ambiguous-export",
-    "unknown-import",
-    "parse-error",
-    "missing-dep",
-    "invalid-decl",
-    "invalid-assoc",
-    "invalid-primitive",
-    "type-synonym-recursive",
-    "type-synonym-partialap" ]
-
-ignore = ["h98-emptydata", "h98-forall"]
+warnIsFatal w = f w where
+    f AmbiguousExport {} = True
+    f AmbiguousName {} = True
+    f InvalidDecl {} = True
+    f MissingDep {} = True
+    f MissingModule {} = True
+    f MultiplyDefined {} = True
+    f OccursCheck {} = True
+    f TypeSynonymPartialAp {} = True
+    f TypeSynonymRecursive {} = True
+    f UndefinedName {} = True
+    f UnificationError {} = True
+    f UnknownDeriving {} = True
+    f UnknownOption {} = True
+    f _ = False
 
 instance Show Warning where
     show  Warning { warnSrcLoc = sl, warnType = t, warnMessage = m }
@@ -116,8 +118,7 @@ instance Show Warning where
     show  Warning { warnSrcLoc = SrcLoc { srcLocFileName = fn, srcLocLine = l },
                                           warnType = t ,warnMessage = m } =
          (unpackPS fn ++ ":" ++ pad 3 (show l) ++  " - "  ++ msg t m)
-msg "diagnostic" m = "Diagnostic: " ++ m
-msg t m = (if t `elem` fatal then "Error: " else "Warning: ") ++ m
+msg t m = (if warnIsFatal t then "Error: " else "Warning: ") ++ m
 
 _warnings = [
     ("deprecations", "warn about uses of functions & types that are deprecated"),
@@ -136,3 +137,17 @@ _warnings = [
     ("unused-imports", "warn about unnecessary imports"),
     ("unused-matches", "warn about variables in patterns that aren't used")
     ]
+
+----------------
+-- Warning monad
+----------------
+
+{-# NOINLINE ioWarnings #-}
+ioWarnings :: IORef [Warning]
+ioWarnings = unsafePerformIO $ newIORef []
+
+instance MonadWarn IO where
+    addWarning w = modifyIORef ioWarnings (w:)
+instance MonadWarn (Writer [Warning]) where
+    addWarning w = tell [w]
+instance MonadWarn Identity

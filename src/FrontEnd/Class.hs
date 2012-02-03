@@ -5,6 +5,7 @@ module FrontEnd.Class(
     ClassHierarchy(),
     augmentClassHierarchy,
     ClassRecord(..),
+    ClassType(..),
     instanceName,
     defaultInstanceName,
     printClassSummary,
@@ -76,21 +77,17 @@ augmentClassHierarchy (CH full _) (CH res is) = ans where
     ans = CH (Map.mapWithKey f is) is
     f cn _ = r where Just r = Map.lookup cn (Map.union res full)
 
--- | a class record is either a class along with instances, or just instances.
--- you can tellthe difference by the presence of the classArgs field
-
-data ClassType
-    = ClassNormal | ClassTypeFamily | ClassDataFamily | ClassAlias
+data ClassType = ClassNormal | ClassTypeFamily | ClassDataFamily | ClassAlias
         deriving(Eq,Ord)
 
 -- Bool is true if data declaration instead of type declaration
-data AssociatedType = Assoc Tycon !Bool [Tyvar] Kind
+data AssociatedType = Assoc !Tycon !Bool [Tyvar] Kind
     deriving(Eq,Show)
     {-! derive: Binary !-}
 
 data ClassRecord = ClassRecord {
-    className    :: Class, -- ^ can be a TypeConstructor if we are a type or data family
-    classSrcLoc  :: SrcLoc,
+    className    :: !Class, -- ^ can be a TypeConstructor if we are a type or data family
+    classSrcLoc  :: !SrcLoc,
     classArgs    :: [Tyvar],
     classSupers  :: [Class], -- TODO: should be Pred
     classAlias   :: Maybe (Qual [Pred]),

@@ -2,6 +2,7 @@
 module Name.Name(
     Module(..),
     Name,
+    Class,
     NameType(..),
     ToName(..),
     ffiExportName,
@@ -207,6 +208,9 @@ ffiExportName (FfiExport cn _ cc _ _) = toName Val (Module "FE@", show cc ++ "."
 
 newtype Module = Module Atom
   deriving(Eq,Data,Typeable,ToAtom,FromAtom)
+
+-- useful synonym
+type Class = Name
 
 instance Ord Module where
     compare x y = show x `compare` show y
