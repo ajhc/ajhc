@@ -127,7 +127,7 @@ renameHsDecl decl@HsActionDecl { hsDeclSrcLoc = srcLoc, hsDeclExp = e }  subTabl
     e <- renameHsExp e subTable
     return decl { hsDeclExp = e }
 renameHsDecl (HsClassDecl srcLoc hsQualType hsDecls) subTable = withSrcLoc srcLoc $ do
-    hsQualType' <- renameHsQualType hsQualType undefined
+    hsQualType' <- renameHsClassHead hsQualType
     hsDecls' <- renameHsDecls hsDecls subTable
     return (HsClassDecl srcLoc hsQualType' hsDecls')
 renameHsDecl (HsInstDecl srcLoc hsQualType hsDecls) subTable = withSrcLoc srcLoc $ do
@@ -156,6 +156,11 @@ renameHsQualType (HsQualType hsContext hsType) subTable = do
       hsContext' <- renameHsContext hsContext subTable
       hsType' <- renameHsType hsType subTable
       return (HsQualType hsContext' hsType')
+renameHsClassHead :: HsClassHead -> ScopeSM (HsClassHead)
+renameHsClassHead HsClassHead { .. }  = do
+      hsClassHeadContext <- renameHsContext hsClassHeadContext ()
+      hsClassHeadArgs <- mapM (flip renameHsType ()) hsClassHeadArgs
+      return HsClassHead { .. }
 
 renameHsContext :: HsContext -> SubTable -> ScopeSM (HsContext)
 renameHsContext = mapRename renameHsAsst

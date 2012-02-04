@@ -57,7 +57,6 @@ delete $ENV{JHC_OPTS};
 delete $ENV{JHC_CACHE};
 delete $ENV{JHC_LIBRARY_PATH};
 
-
 @opts = (@opts, (map { "-f$_" } @fopts), (map { "-m$_" } @mopts));
 @opts = (@opts, '--no-ho', '--stop', 'typecheck') if $opt_tc;
 
@@ -90,7 +89,6 @@ my $results_dir = "$regress_dir/results";
 my $time = `date +%Y%m%d%H%M%S`;
 chomp $time;
 
-
 my $jhc_version = `$jhc_dir/jhc --version`;
 $? == 0 or die "Could not run $jhc_dir/jhc --version";
 
@@ -99,7 +97,6 @@ mkdir $rd or die "$!: could not make $rd";
 
 unlink "$results_dir/current";
 system "ln -sf $time $results_dir/current";
-
 
 my $ho_dir = $opt_clean ? "$rd/ho" : "$results_dir/ho";
 $ho_dir .= "_l" if $opt_l;
@@ -113,8 +110,6 @@ rlog("$now_string");
 rlog("$jhc_version");
 rlog("regress ", join " ", @saved_args) if @saved_args;
 rlog("-----------------------------------");
-
-
 
 -d $test_dir or die "could not find $test_dir";
 
@@ -206,7 +201,7 @@ sub run_test {
     }
     rlog "---- $name";
     my @jhc  = $opt_p ? ("$jhc_dir/jhcp",'+RTS', "-S$rd/$name.jhcp_prof",@opt_rts,'-RTS')  :  ("$jhc_dir/jhc");
-    my @cmd = (@jhc, ($verbose ? ('-v') : ()), ($opt_win ? ('-mwin32') : ()), @libs , @fast, '-o', "$rd/$name", @flags, @opts, "$cwd/$fn");
+    my @cmd = (@jhc,"$cwd/$fn", ($verbose ? ('-v') : ()), ($opt_win ? ('-mwin32') : ()), @libs , @fast, '-o', "$rd/$name", @flags, @opts);
     my $res = join(" ",@cmd) . " > '$rd/$name.jhc_out' 2>&1";
     my ($r,$time) = my_system $res;
     my $result = { name => $name, compile_command => $res, compile_status => $r, compile_results => "$rd/$name.jhc_out", compile_time => $time };
@@ -307,7 +302,6 @@ do_it($test_dir,"", {
     });
 done();
 
-
 sub statf {
     return $_[0] if defined $_[0] && $_[0] =~ /[a-zA-Z]+/;
     return defined $_[0] ? ($_[0] == 64512 || ($_[0] & 127) == SIGINT()  ? "INT" : $_[0] == 35072 || ($_[0] & 127) ==  24 ? "TIME" : $_[0]) : "-";
@@ -343,7 +337,6 @@ sub done {
     }
     exit 0;
 }
-
 
 __END__
 

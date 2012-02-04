@@ -1,2 +1,2 @@
-jhc_flags: --stop parse --stale Main
+jhc_flags: --stop parse --stale Main --no-ho
 run: no

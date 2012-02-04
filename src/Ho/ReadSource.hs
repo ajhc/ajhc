@@ -87,6 +87,7 @@ langmap = Map.fromList [
     "scopedtypevariables" ==> FO.Forall,
     "rankntypes" ==> FO.Forall,
     "rank2types" ==> FO.Forall,
+    "bangpatterns" ==> FO.BangPatterns,
     "polymorphiccomponents" ==> FO.Forall,
     "TypeFamilies" ==> FO.TypeFamilies,
     "magichash" ==> FO.UnboxedValues

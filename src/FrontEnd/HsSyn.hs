@@ -163,9 +163,9 @@ data HsDecl
         hsDeclNames  :: [HsName]
         }
     | HsClassDecl   {
-        hsDeclSrcLoc   :: SrcLoc,
-        hsDeclQualType :: HsQualType,
-        hsDeclDecls    :: [HsDecl]
+        hsDeclSrcLoc    :: SrcLoc,
+        hsDeclClassHead :: HsClassHead,
+        hsDeclDecls     :: [HsDecl]
         }
     | HsClassAliasDecl {
         hsDeclSrcLoc   :: SrcLoc,
@@ -400,7 +400,10 @@ data HsExp
  deriving(Eq,Show)
     {-! derive: is, update !-}
 
-data HsClassHead = HsClassHead { hsClassHeadContext :: HsContext, hsClassHead :: HsName, hsClassHeadArgs :: [HsType] }
+data HsClassHead = HsClassHead {
+    hsClassHeadContext :: HsContext,
+    hsClassHead :: HsName,
+    hsClassHeadArgs :: [HsType] }
  deriving(Eq,Show)
     {-! derive: update !-}
 

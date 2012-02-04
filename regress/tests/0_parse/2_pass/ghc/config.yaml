@@ -3,8 +3,6 @@ tests:
         skip: known_bug
     read030:
         skip: known_bug
-    read042:
-        skip: BangPatterns
     read050:
         skip: KindSignatures
     read054:

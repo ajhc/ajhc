@@ -318,7 +318,7 @@ topdecl :: { HsDecl }
       | 'newtype' ctype srcloc '=' constr deriving
                       {% checkDataHeader $2 `thenP` \(cs,c,t) ->
                          returnP (HsNewTypeDecl $3 cs c t $5 $6) }
-      | 'class' srcloc ctype optfundep optcbody
+      | 'class' srcloc classhead optfundep optcbody
                       { HsClassDecl $2 $3 $5 }
       | 'class' 'alias' srcloc conid varids '=' carhs optcbody
                       {% let

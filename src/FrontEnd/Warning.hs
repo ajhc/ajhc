@@ -12,6 +12,7 @@ module FrontEnd.Warning(
     ) where
 
 import Control.Monad.Identity
+import Control.Monad.Reader
 import Control.Monad.Writer
 import Data.IORef
 import System.IO.Unsafe
@@ -67,7 +68,8 @@ processErrors :: [Warning] -> IO ()
 processErrors ws = processErrors' True ws >> return ()
 
 processErrors' :: Bool -> [Warning] -> IO Bool
-processErrors' doDie ws = mapM_ s (snub ws) >> when (die && doDie) exitFailure >> return die where
+processErrors' _ [] = return False
+processErrors' doDie ws = putErrLn "" >> mapM_ s (snub ws) >> when (die && doDie) exitFailure >> return die where
 --    ws' = filter ((`notElem` ignore) . warnType ) $ snub ws
     s Warning { warnSrcLoc = sl, warnType = t, warnMessage = m }
         | sl == bogusASrcLoc = putErrLn $ msg t m
@@ -94,6 +96,7 @@ data WarnType
     | UnknownDeriving [Class]
     | UnknownOption
     | UnknownPragma PackedString
+    | UnsupportedFeature
     deriving(Eq,Ord)
 
 warnIsFatal w = f w where
@@ -110,6 +113,7 @@ warnIsFatal w = f w where
     f UnificationError {} = True
     f UnknownDeriving {} = True
     f UnknownOption {} = True
+    f UnsupportedFeature {} = True
     f _ = False
 
 instance Show Warning where
@@ -151,3 +155,5 @@ instance MonadWarn IO where
 instance MonadWarn (Writer [Warning]) where
     addWarning w = tell [w]
 instance MonadWarn Identity
+instance MonadWarn m => MonadWarn (ReaderT a m) where
+    addWarning w = lift $ addWarning w

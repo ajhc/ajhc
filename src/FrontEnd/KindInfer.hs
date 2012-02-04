@@ -37,6 +37,7 @@ import FrontEnd.SrcLoc
 import FrontEnd.Tc.Kind
 import FrontEnd.Tc.Type
 import FrontEnd.Utils
+import FrontEnd.Warning
 import Name.Name
 import Options
 import Support.FreeVars
@@ -55,7 +56,8 @@ data KindEnv = KindEnv {
         {-!derive: Monoid !-}
 
 instance Binary KindEnv where
-    put KindEnv { kindEnv = a, kindEnvAssocs = b, kindEnvClasses = c } = putMap a >> putMap b >> putMap c
+    put KindEnv { kindEnv = a, kindEnvAssocs = b, kindEnvClasses = c } =
+        putMap a >> putMap b >> putMap c
     get = do
         a <- getMap
         b <- getMap
@@ -85,6 +87,7 @@ data KiWhere = InClass | InInstance | Other
     deriving(Eq)
 
 data KiEnv  = KiEnv {
+    kiSrcLoc  :: SrcLoc,
     kiContext :: [String],
     kiEnv     :: !(IORef KindEnv),
     kiWhere   :: !KiWhere,
@@ -92,12 +95,15 @@ data KiEnv  = KiEnv {
     }
 
 newtype Ki a = Ki (ReaderT KiEnv IO a)
-    deriving(Monad,MonadReader KiEnv,MonadIO,Functor)
+    deriving(Monad,MonadReader KiEnv,MonadIO,Functor,MonadWarn)
+
+instance MonadSrcLoc Ki where
+    getSrcLoc = asks kiSrcLoc
+instance MonadSetSrcLoc Ki where
+    withSrcLoc sl = local (\s -> s { kiSrcLoc = sl })
 
 restrictKindEnv :: (Name -> Bool) -> KindEnv -> KindEnv
 restrictKindEnv f ke = ke { kindEnv = Map.filterWithKey (\k _ -> f k) (kindEnv ke) }
-
---------------------------------------------------------------------------------
 
 findKind :: MonadIO m => Kind -> m Kind
 findKind tv@(KVar Kindvar {kvarRef = r, kvarConstraint = con }) = liftIO $ do
@@ -119,7 +125,12 @@ runKI env (Ki ki) = (kienv >>= ki') where
     kienv = do
         env <- newIORef env
         varnum <- newIORef 0
-        return KiEnv { kiContext = [], kiEnv = env, kiVarnum = varnum, kiWhere = Other }
+        return KiEnv {
+            kiSrcLoc = bogusASrcLoc,
+            kiContext = [],
+            kiEnv = env,
+            kiVarnum = varnum,
+            kiWhere = Other }
     ki' e = runReaderT ki e
 
 instance ContextMonad Ki where
@@ -143,14 +154,14 @@ mgu (Kfun a b) (Kfun a' b') = do
     unify b b'
 mgu (KVar u) k = varBind u k
 mgu k (KVar u) = varBind u k
-mgu k1 k2 = fail $ "attempt to unify these two kinds: " ++ show k1 ++ " <-> " ++ show k2
+mgu k1 k2 = addWarn UnificationError ("attempt to unify these two kinds: " ++ show k1 ++ " <-> " ++ show k2)
 
 varBind :: Kindvar -> Kind -> Ki ()
 varBind u k = do
     k <- flattenKind k
     printRule $ "varBind:" <+> pprint u <+> text ":=" <+> pprint k
     if k == KVar u then return () else do
-    when (u `Set.member` freeVars k) $ fail $ "occurs check failed in kind inference: " ++ show u ++ " := " ++ show k
+    when (u `Set.member` freeVars k) $ addWarn OccursCheck $ "occurs check failed in kind inference: " ++ show u ++ " := " ++ show k
     v <- liftIO $ readIORef (kvarRef u)
     case v of
         Just v -> fail $ "varBind unfree"
@@ -354,55 +365,91 @@ kiPred (HsAsstEq a b) = do
     kiType  (KVar mv) a
     kiType' (KVar mv) b
 
+-- first pass over declarations adds classes to environment.
 kiInitClasses :: [HsDecl] -> Ki ()
-kiInitClasses ds =  sequence_ [ f className [classArg] |  HsClassDecl _ (HsQualType _ (HsTyApp (HsTyCon className) (HsTyVar classArg))) _ <- ds]
-                    >> sequence_ [ f (hsDeclName cad) [v | HsTyVar v <- hsDeclTypeArgs cad]
-                                   | cad@(HsClassAliasDecl {}) <- ds ]
-    where
-    f className args = do
-        args <- mapM (lookupKind KindSimple . toName TypeVal) args
-        extendEnv mempty { kindEnvClasses = Map.singleton (toName ClassName className) args }
+kiInitClasses ds = do
+--    sequence_ [ f className [classArg] |  HsClassDecl _ (HsQualType _ (HsTyApp (HsTyCon className) (HsTyVar classArg))) _ <- ds]
+--    sequence_ [ f (hsDeclName cad) [v | HsTyVar v <- hsDeclTypeArgs cad] | cad@(HsClassAliasDecl {}) <- ds ]
+    mapM_ kiInitDecl ds
+--    where
+--    f className args = do
+--        args <- mapM (lookupKind KindSimple . toName TypeVal) args
+--        extendEnv mempty { kindEnvClasses = Map.singleton className args }
+kiInitDecl :: HsDecl -> Ki ()
+kiInitDecl d = withSrcLoc (srcLoc d) (f d) where
+    f HsClassDecl { .. } = do
+        args <- mapM (\_ -> newKindVar KindAny) (hsClassHeadArgs hsDeclClassHead)
+        extendEnv mempty { kindEnvClasses =
+            Map.singleton (hsClassHead hsDeclClassHead) (map KVar args) }
+    f _ = return ()
 
 kiDecl :: HsDecl -> Ki ()
-kiDecl HsTypeFamilyDecl { .. } = do
-    kc <- lookupKind KindSimple (toName TypeConstructor hsDeclName)
-    kiApps kc hsDeclTArgs (maybe kindStar hsKindToKind hsDeclHasKind)
-kiDecl HsDataDecl { hsDeclContext = context, hsDeclName = tyconName, hsDeclArgs = args, hsDeclCons = [], hsDeclHasKind = Just kk } = do
-    args <- mapM (lookupKind KindSimple . toName TypeVal) args
-    kc <- lookupKind KindAny (toName TypeConstructor tyconName)
-    kiApps' kc args (hsKindToKind kk)
-    mapM_ kiPred context
-kiDecl HsDataDecl { hsDeclContext = context, hsDeclName = tyconName, hsDeclArgs = args, hsDeclCons = condecls } = kiData context tyconName args condecls
-kiDecl HsNewTypeDecl { hsDeclContext = context, hsDeclName = tyconName, hsDeclArgs = args, hsDeclCon = condecl } = kiAlias context tyconName args condecl
-kiDecl HsTypeDecl { hsDeclName = name, hsDeclTArgs = args, hsDeclType = ty } = do
-    wh <- asks kiWhere
-    let theconstraint = if wh == Other then KindAny else KindSimple
-    kc <- lookupKind theconstraint (toName TypeConstructor name)
-    mv <- newKindVar theconstraint
-    kiApps kc args (KVar mv)
-    kiType' (KVar mv) ty
-kiDecl (HsTypeSig _ _ (HsQualType ps t)) = do
-    mapM_ kiPred ps
-    kiType kindStar t
-kiDecl (HsClassDecl _sloc qualType sigsAndDefaults) = ans where
-    HsQualType contxt (HsTyApp (HsTyCon _className) (HsTyVar classArg)) =  qualType
-    ans = do
+kiDecl d = withSrcLoc (srcLoc d) (f d) where
+    f HsTypeFamilyDecl { .. } = do
+        kc <- lookupKind KindSimple (toName TypeConstructor hsDeclName)
+        kiApps kc hsDeclTArgs (maybe kindStar hsKindToKind hsDeclHasKind)
+    f HsDataDecl {
+            hsDeclContext = context,
+            hsDeclName = tyconName,
+            hsDeclArgs = args,
+            hsDeclCons = [],
+            hsDeclHasKind = Just kk } = do
+        args <- mapM (lookupKind KindSimple . toName TypeVal) args
+        kc <- lookupKind KindAny (toName TypeConstructor tyconName)
+        kiApps' kc args (hsKindToKind kk)
+        mapM_ kiPred context
+    f HsDataDecl { .. }    = kiData hsDeclContext hsDeclName hsDeclArgs hsDeclCons
+    f HsNewTypeDecl { .. } = kiAlias hsDeclContext hsDeclName hsDeclArgs hsDeclCon
+    f HsTypeDecl { hsDeclName = name, hsDeclTArgs = args, hsDeclType = ty } = do
+        wh <- asks kiWhere
+        let theconstraint = if wh == Other then KindAny else KindSimple
+        kc <- lookupKind theconstraint (toName TypeConstructor name)
+        mv <- newKindVar theconstraint
+        kiApps kc args (KVar mv)
+        kiType' (KVar mv) ty
+    f (HsTypeSig _ _ (HsQualType ps t)) = do
+        mapM_ kiPred ps
+        kiType kindStar t
+    f (HsClassDecl _sloc HsClassHead { .. } sigsAndDefaults) = do
+        let varLike HsTyVar {} = True
+            varLike HsTyExpKind { hsTyLType = Located _ t } = varLike t
+            varLike _ = False
+        when (length hsClassHeadArgs /= 1) $
+            addWarn UnsupportedFeature "Multi-parameter type classes not supported"
+        unless (all varLike hsClassHeadArgs) $
+            addWarn InvalidDecl "Class parameters must be variables"
+        env <- getEnv
+        let ks = kindOfClass hsClassHead env
+            [fromHsTyVar -> Just classArg] = hsClassHeadArgs
+        zipWithM_ kiType' ks hsClassHeadArgs
+        mapM_ kiPred hsClassHeadContext
+        let rn = Seq.toList $ everything (Seq.<>) (mkQ Seq.empty g) newClassBodies
+            newClassBodies = map typeFromSig $ filter isHsTypeSig sigsAndDefaults
+            typeFromSig (HsTypeSig _sloc _names qualType) = qualType
+            g (HsTyVar n') | hsNameToOrig n' == hsNameToOrig classArg = Seq.single (toName TypeVal n')
+            g _ = Seq.empty
         carg <- lookupKind KindSimple (toName TypeVal classArg)
-        mapM_ kiPred contxt
-        extendEnv mempty { kindEnvAssocs = Map.fromList assocs }
         mapM_ (\n -> lookupKind KindSimple n >>= unify carg ) rn
         local (\e -> e { kiWhere = InClass }) $ mapM_ kiDecl sigsAndDefaults
 
-    numClassArgs = 1
-    newAssocs = [ (name,[ n | ~(HsTyVar n) <- names],t,names) | HsTypeDecl _sloc name names t <- sigsAndDefaults ]
-    assocs = [ (toName TypeConstructor n,(numClassArgs,length names - numClassArgs)) | (n,names,_,_) <- newAssocs ]
-    rn = Seq.toList $ everything (Seq.<>) (mkQ Seq.empty f) (newClassBodies,newAssocs)
-    newClassBodies = map typeFromSig $ filter isHsTypeSig sigsAndDefaults
-    f (HsTyVar n') | hsNameToOrig n' == hsNameToOrig classArg = Seq.single (toName TypeVal n')
-    f _ = Seq.empty
-    typeFromSig :: HsDecl -> HsQualType
-    typeFromSig (HsTypeSig _sloc _names qualType) = qualType
-kiDecl _ = return ()
+  --      HsQualType contxt (HsTyApp (HsTyCon _className) (HsTyVar classArg)) =  qualType
+  --      ans = do
+  --          carg <- lookupKind KindSimple (toName TypeVal classArg)
+  --          mapM_ kiPred contxt
+--            extendEnv mempty { kindEnvAssocs = Map.fromList assocs }
+--            mapM_ (\n -> lookupKind KindSimple n >>= unify carg ) rn
+--            local (\e -> e { kiWhere = InClass }) $ mapM_ kiDecl sigsAndDefaults
+
+--        numClassArgs = 1
+--        newAssocs = [ (name,[ n | ~(HsTyVar n) <- names],t,names) | HsTypeDecl _sloc name names t <- sigsAndDefaults ]
+--        assocs = [ (toName TypeConstructor n,(numClassArgs,length names - numClassArgs)) | (n,names,_,_) <- newAssocs ]
+--        rn = Seq.toList $ everything (Seq.<>) (mkQ Seq.empty f) (newClassBodies,newAssocs)
+--        newClassBodies = map typeFromSig $ filter isHsTypeSig sigsAndDefaults
+--        f (HsTyVar n') | hsNameToOrig n' == hsNameToOrig classArg = Seq.single (toName TypeVal n')
+--        f _ = Seq.empty
+--        typeFromSig :: HsDecl -> HsQualType
+--        typeFromSig (HsTypeSig _sloc _names qualType) = qualType
+    f _ = return ()
 
 kiAlias context tyconName args condecl = do
     args <- mapM (lookupKind KindSimple . toName TypeVal) args
@@ -540,3 +587,7 @@ hoistType t = f t where
         | TForAll vs (ps :=> t) <- nb = f $ TForAll vs (ps :=> TArrow na t)
         | TExists vs (ps :=> t) <- na = f $ TForAll vs (ps :=> TArrow t nb)
         | otherwise = TArrow na nb
+
+fromHsTyVar (HsTyVar v) = return v
+fromHsTyVar (HsTyExpKind (Located _ t) _) = fromHsTyVar t
+fromHsTyVar _ = fail "fromHsTyVar"

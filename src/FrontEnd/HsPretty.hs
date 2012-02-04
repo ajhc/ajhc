@@ -267,10 +267,10 @@ ppHsDecl (HsNewTypeDecl pos context name nameList constr derives) =
 -- special case for empty class declaration
 ppHsDecl (HsClassDecl pos qualType []) =
 	   --blankline $
-	   mySep [text "class", ppHsQualType qualType]
+	   mySep [text "class", ppClassHead qualType]
 ppHsDecl (HsClassDecl pos qualType declList) =
 	   --blankline $
-	   mySep [text "class", ppHsQualType qualType, text "where"]
+	   mySep [text "class", ppClassHead qualType, text "where"]
 	   $$$ body classIndent (map ppHsDecl declList)
 
 ppHsDecl (HsClassAliasDecl pos name args context classes declList) =

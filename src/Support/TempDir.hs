@@ -22,6 +22,7 @@ import System.Exit
 import System.FilePath as FP
 import System.IO
 import System.IO.Unsafe
+import System.Posix.Signals
 import Text.Printf
 import qualified Data.Set as Set
 
@@ -127,7 +128,7 @@ addCleanup fp = do
 wrapMain :: IO () -> IO ()
 wrapMain main = E.catch (main >> cleanUp) f where
     f (fromException -> Just code) = cleanUp >> exitWith code
-    f (fromException -> Just UserInterrupt) = cleanUp >> throwIO UserInterrupt
+    f (fromException -> Just UserInterrupt) = cleanUp >> raiseSignal sigINT
     f e = do
         ss <- readIORef stackRef
         td <- readIORef tdRef
@@ -177,5 +178,3 @@ withStackStatus s action = do
     r <- action
     writeIORef stackRef cs
     return r
-
-

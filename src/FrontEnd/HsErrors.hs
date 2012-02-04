@@ -42,6 +42,10 @@ hsDeclLocal = hsDecl Local
 
 hsDecl :: MonadWarn m => Context -> HsDecl -> m ()
 hsDecl cntx decl = f cntx decl where
+    f _ d@HsTypeFamilyDecl { } = do
+        warn (srcLoc d) UnsupportedFeature "Type families currently not supported"
+    f l d@HsTypeDecl { } | l /= TopLevel= do
+        warn (srcLoc d) UnsupportedFeature "Type families currently not supported"
     f TopLevel HsDataDecl { hsDeclSrcLoc = sl, hsDeclCons = cs, hsDeclDerives = ds' } = do
         let ds = map (toName ClassName) ds'
 --        when (null cs) $ warn sl "h98-emptydata" "data types with no constructors are a non-haskell98 feature"
@@ -55,15 +59,16 @@ hsDecl cntx decl = f cntx decl where
         checkDeriving sl True ds
         return ()
     f context@TopLevel decl@HsTypeDecl { hsDeclTArgs = as } | any (not . isHsTyVar) as = warn (srcLoc decl) InvalidDecl $ "complex type arguments not allowed " ++ show context
-    f context@(InClass ts) decl@HsTypeDecl { hsDeclTArgs = as }
-        | any (not . isHsTyVar) as = warn (srcLoc decl) InvalidDecl $ "complex type arguments not allowed " ++ show context
+--    f context@(InClass ts) decl@HsTypeDecl { hsDeclTArgs = as }
+--        | any (not . isHsTyVar) as = warn (srcLoc decl) InvalidDecl $ "complex type arguments not allowed " ++ show context
     --    | length as < length ts || or (zipWith (/=) as ts) = warn (srcLoc decl) "invalid-assoc" $ "arguments to associated type must match class decl" ++ show (as,ts)
     f context@(InInstance ts) decl@HsTypeDecl { hsDeclTArgs = as }
     --    | length as < length ts || or (zipWith (==) as ts) = warn (srcLoc decl) "invalid-assoc" $ "arguments to associated type must match instance head"
         | any (not . isHsTyVar) (drop (length ts) as) = warn (srcLoc decl) InvalidDecl $ "extra complex type arguments not allowed " ++ show context
     f context decl@HsDataDecl {} = warn (srcLoc decl) InvalidDecl $ "data declaration not allowed " ++ show context
     f context decl@HsNewTypeDecl {} = warn (srcLoc decl) InvalidDecl $ "newtype declaration not allowed " ++ show context
-    f TopLevel decl@HsClassDecl { hsDeclQualType = qt, hsDeclDecls = decls } = do args <- fetchQtArgs (srcLoc decl) qt; mapM_ (f (InClass args)) decls
+--    f TopLevel decl@HsClassDecl { hsDeclQualType = qt, hsDeclDecls = decls } = do args <- fetchQtArgs (srcLoc decl) qt; mapM_ (f (InClass args)) decls
+    f TopLevel decl@HsClassDecl { hsDeclClassHead = ch, hsDeclDecls = decls } = do mapM_ (f (InClass (hsClassHeadArgs ch))) decls
     f TopLevel decl@HsInstDecl { hsDeclQualType = qt, hsDeclDecls = decls } = do args <- fetchQtArgs (srcLoc decl) qt; mapM_ (f (InInstance args)) decls
     f context decl@HsClassDecl {} = warn (srcLoc decl) InvalidDecl $ "class declaration not allowed " ++ show context
     f context decl@HsInstDecl {} = warn (srcLoc decl) InvalidDecl $ "instance declaration not allowed " ++ show context

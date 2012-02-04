@@ -737,10 +737,10 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
         let elet = eLetRec [ (b,c) | (_,b,c) <- nds]
         return (ps,elet . cg )
 
-    cClassDecl (HsClassDecl _ (HsQualType _ (HsTyApp (HsTyCon name) _)) decls) = do
+    cClassDecl (HsClassDecl _ chead decls) = do
         props <- asks ceProps
         let cr = findClassRecord classHierarchy className
-            className = (toName ClassName name)
+            className = hsClassHead chead
             cClass classRecord =  [ f n (toId n) (removeNewtypes dataTable $ tipe t) | (n,t) <- classAssumps classRecord ] where
                 f n i t = (n,setProperties [prop_METHOD,prop_PLACEHOLDER] $ tVr i t, foldr ELam (EPrim (primPrim ("Placeholder: " ++ show n)) [] ft) args)  where
                     (ft',as) = fromPi t

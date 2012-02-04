@@ -245,6 +245,13 @@ qtToClassHead kt qt@(HsQualType cntx (HsTyApp (HsTyCon className) ty)) =
                                            [runIdentity $ hsTypeToType (kiHsQualType kt (HsQualType cntx (HsTyTuple []))) ty]))
     in vtrace ("=" <+> show res) res
 
+chToClassHead :: KindEnv -> HsClassHead -> ([Pred],(Name,[Type]))
+chToClassHead kt qt@HsClassHead { .. }  =
+    vtrace ("qtToClassHead" <+> show qt) $
+    let res = (map (hsAsstToPred kt) hsClassHeadContext,(hsClassHead,
+            map (runIdentity . hsTypeToType (kiHsQualType kt (HsQualType hsClassHeadContext (HsTyTuple [])))) hsClassHeadArgs))
+    in vtrace ("=" <+> show res) res
+
 createClassAssocs kt decls = [ Assoc (ctc n) False (map ct as) (ctype t) | HsTypeDecl { hsDeclName = n, hsDeclTArgs = as, hsDeclType = t } <- decls ] where
     ctc n = let nn = toName TypeConstructor n in Tycon nn (kindOf nn kt)
     ct (HsTyVar n) = let nn = toName TypeVal n in tyvar nn (kindOf nn kt)
@@ -272,9 +279,10 @@ instanceToTopDecls kt ch@(CH classHierarchy _) (HsInstDecl _ qualType methods)
         Just crecord -> crecord
     tsubst na vv v = applyTyvarMap [(na,vv)] v
 
-instanceToTopDecls kt ch@(CH classHierarchy _) (HsClassDecl _ qualType methods)
-   = unzip $ map (defaultMethodToTopDecls kt methodSigs qualType) $ methodGroups where
-   HsQualType _ (HsTyApp (HsTyCon className) _) = qualType
+instanceToTopDecls kt ch@(CH classHierarchy _) (HsClassDecl _ chead methods)
+   = unzip $ map (defaultMethodToTopDecls kt methodSigs chead) $ methodGroups where
+   className = hsClassHead chead
+   --HsQualType _ (HsTyApp (HsTyCon className) _) = qualType
    methodGroups = groupEquations (filter (\x -> isHsPatBind x || isHsFunBind x)  methods)
    methodSigs = case Map.lookup (toName ClassName className) classHierarchy  of
            Nothing -> error $ "defaultInstanceToTopDecls: could not find class " ++ show className ++ "in class hierarchy"
@@ -320,11 +328,12 @@ methodToTopDecls _  kt preds crecord qt (methodName, methodDecls)
     instantiatedSig = newMethodSig' kt methodName (preds ++ cntxt) sigFromClass argType
     renamedMethodDecls = renameOneDecl newMethodName methodDecls
 
-defaultMethodToTopDecls :: KindEnv -> [Assump] -> HsQualType -> (Name, HsDecl) -> (HsDecl,Assump)
+defaultMethodToTopDecls :: KindEnv -> [Assump] -> HsClassHead -> (Name, HsDecl) -> (HsDecl,Assump)
 
-defaultMethodToTopDecls kt methodSigs (HsQualType cntxt classApp) (methodName, methodDecls)
+defaultMethodToTopDecls kt methodSigs HsClassHead { .. } (methodName, methodDecls)
    = (renamedMethodDecls,(newMethodName,sigFromClass)) where
-    (HsTyApp (HsTyCon className) _) = classApp
+    --(HsTyApp (HsTyCon className) _) = classApp
+    className = hsClassHead
     newMethodName = defaultInstanceName methodName
     sigFromClass = case [ s | (n, s) <- methodSigs, n == methodName] of
         [x] -> x
@@ -424,13 +433,18 @@ failSl sl m = fail $ show sl ++ ": " ++ m
 classHierarchyFromRecords rs =
     CH (Map.fromList [ (className x,x)| x <- rs ]) mempty
 
+fromHsTyVar (HsTyVar v) = return v
+fromHsTyVar (HsTyExpKind (Located _ t) _) = fromHsTyVar t
+fromHsTyVar _ = fail "fromHsTyVar"
+
 makeClassHierarchy :: ClassHierarchy -> KindEnv -> [HsDecl] -> ClassHierarchy
 makeClassHierarchy (CH ch _is) kt ds = ans where
     ans =  execWriter (mapM_ f ds) -- Map.fromListWith combineClassRecords [  (className x,x)| x <- execWriter (mapM_ f ds) ]
-    f (HsClassDecl sl t decls)
-        | HsTyApp (HsTyCon className) (HsTyVar argName)  <- tbody = do
+    f (HsClassDecl sl chead decls) = do
             let qualifiedMethodAssumps = concatMap (aHsTypeSigToAssumps kt . qualifyMethod newClassContext) (filter isHsTypeSig decls)
                 newClassContext = [HsAsst className [argName]] -- hsContextToContext [(className, argName)]                                                                                                                                                                   -- TODO
+                className = hsClassHead chead
+                [Just argName] = map fromHsTyVar (hsClassHeadArgs chead)
             tell $ classHierarchyFromRecords [ClassRecord {
                 classArgs,
                 classAssocs,
@@ -440,11 +454,11 @@ makeClassHierarchy (CH ch _is) kt ds = ans where
                 classSupers = [ toName ClassName x | HsAsst x _ <- cntxt],
                 --classInsts = [ emptyInstance { instHead = i } | i@(_ :=> IsIn n _) <- [], nameName n == className],
                 classAssumps = qualifiedMethodAssumps }]
-        | otherwise = failSl sl "Invalid Class declaration."
         where
-        HsQualType cntxt tbody = t
+        cntxt = hsClassHeadContext chead
+        --HsQualType cntxt tbody = t
         classAssocs = createClassAssocs kt decls
-        (_,(_,classArgs')) = qtToClassHead kt t
+        (_,(_,classArgs')) = chToClassHead kt chead
         classArgs = [ v | ~(TVar v) <- classArgs' ]
 --    f decl@(HsClassAliasDecl {}) = trace ("makeClassHierarchy: "++show decl) $ do
 --        tell [ClassAliasRecord { className = toName ClassName (hsDeclName decl),

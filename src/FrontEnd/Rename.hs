@@ -272,12 +272,12 @@ instance Rename HsDecl where
             hsConDecl' <- rename hsConDecl
             hsNames2' <- mapM (renameName . toName ClassName) hsNames2
             return (HsNewTypeDecl srcLoc hsContext' hsName' hsNames1' hsConDecl' hsNames2')
-    rename (HsClassDecl srcLoc hsQualType hsDecls) = do
+    rename (HsClassDecl srcLoc classHead hsDecls) = do
         withSrcLoc srcLoc $ do
-        hsQualType' <- updateWithN TypeVal hsQualType $ renameClassHead hsQualType
-        doesClassMakeSense hsQualType'
+        classHead' <- updateWithN TypeVal (hsClassHeadArgs classHead) $ rename classHead
+        --doesClassMakeSense hsQualType'
         hsDecls' <- rename hsDecls
-        return (HsClassDecl srcLoc hsQualType' hsDecls')
+        return (HsClassDecl srcLoc classHead' hsDecls')
     rename (HsClassAliasDecl srcLoc name args hsContext hsClasses hsDecls) = do
         withSrcLoc srcLoc $ do
         name' <- renameTypeName name
@@ -737,6 +737,8 @@ class UpdateTable a where
 
 instance UpdateTable a => UpdateTable [a] where
     getNames xs = concatMap getNames xs
+instance (UpdateTable a, UpdateTable b) => UpdateTable (a,b) where
+    getNames (a,b) = getNames a ++ getNames b
 
 instance UpdateTable Name where
     getNames x = [x]

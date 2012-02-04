@@ -125,23 +125,16 @@ getDataDesc d = g d where
 -- FIXME: Use an warnings+writer+error monad instead of IO.
 tiModules ::  HoTcInfo -> [ModInfo] -> IO (HoTcInfo,TiData)
 tiModules htc ms = do
---    let importVarEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps me, nameType x == Name.Val ]
---        importDConsEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps me, nameType x ==  Name.DataConstructor ]
     let importClassHierarchy = hoClassHierarchy htc
         importKindEnv = hoKinds htc
-    --wdump FD.Progress $ do
-    --    putErrLn $ "Typing: " ++ show ([ m | Module m <- map modInfoName ms])
-    -- 'processModule' doesn't need IO. We can use a plain writer+error monad.
     let nfm = buildFieldMap ms `mappend` hoFieldMap htc
     mserrs <- mapM (processModule nfm) ms
     let ms = fsts mserrs
     let thisFixityMap = buildFixityMap (concat [ filter isHsInfixDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms])
     let fixityMap = thisFixityMap  `mappend` hoFixities htc
-    --let thisTypeSynonyms =  (declsToTypeSynonyms $ concat [ filter isHsTypeDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms])
     thisTypeSynonyms <- declsToTypeSynonyms (hoTypeSynonyms htc) $ concat [ filter isHsTypeDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms]
 --    putStrLn "Synonyms"
 --    putStrLn $ HsPretty.render $ showSynonyms pprint thisTypeSynonyms
-
     let ts = thisTypeSynonyms `mappend` hoTypeSynonyms htc
     -- 'expandTypeSyns' is in the Warning monad and doesn't require IO.
     let f x = expandTypeSyns ts (modInfoHsModule x) >>= return . FrontEnd.Infix.infixHsModule fixityMap >>= \z -> return (modInfoHsModule_s ( z) x)

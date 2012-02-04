@@ -15,14 +15,7 @@ maybeGetDeclName (HsActionDecl sloc (HsPVar name) _) = return (toName Val name)
 maybeGetDeclName (HsFunBind ((HsMatch _ name _ _ _):_)) = return (toName Val name)
 maybeGetDeclName HsDataDecl { hsDeclName = name } = return (toName TypeConstructor name)
 maybeGetDeclName HsNewTypeDecl { hsDeclName = name } = return (toName TypeConstructor name)
-maybeGetDeclName (HsClassDecl _ qualType _) = case qualType of
-            HsQualType _cntxt t -> return $ leftMostTyCon t
-        where
-            leftMostTyCon (HsTyTuple ts) = error "leftMostTyCon applied to tuple" -- toTuple (length ts)
-            leftMostTyCon (HsTyApp t1 _) = leftMostTyCon t1
-            leftMostTyCon (HsTyVar _) = error "leftMostTyCon: applied to a variable"
-            leftMostTyCon (HsTyCon n) = (toName ClassName n)
-            leftMostTyCon x = error $ "leftMostTyCon: " ++ show x
+maybeGetDeclName HsClassDecl { hsDeclClassHead = h } = return $ toName ClassName $ hsClassHead h
 maybeGetDeclName x@HsForeignDecl {} = return $ toName Val $ hsDeclName x
 maybeGetDeclName (HsForeignExport _ e _ _)   = return $ ffiExportName e
 --maybeGetDeclName (HsTypeSig _ [n] _ ) = return n
