@@ -10,6 +10,7 @@ import qualified Text.PrettyPrint.HughesPJ as P
 
 import Doc.DocLike
 import Doc.PPrint as PPrint
+import FrontEnd.Class
 import FrontEnd.DeclsDepends(getDeclDeps)
 import FrontEnd.Diagnostic
 import FrontEnd.HsPretty
@@ -610,35 +611,41 @@ tcRhs rhs typ = case rhs of
         gas <- mapM (tcGuardedRhs typ) as
         return (HsGuardedRhss gas)
 
-tcPragmaDecl spec@HsPragmaSpecialize { hsDeclSrcLoc = sloc, hsDeclName = n, hsDeclType = t } = do
-    withContext (locMsg sloc "in the SPECIALIZE pragma" $ show n) ans where
-    ans = do
+tcMiscDecl d = withContext (locMsg (srcLoc d) "in the declaration" "") $ f d where
+    f spec@HsPragmaSpecialize { hsDeclSrcLoc = sloc, hsDeclName = n, hsDeclType = t } = do
+        withContext (locMsg sloc "in the SPECIALIZE pragma" $ show n) ans where
+        ans = do
+            kt <- getKindEnv
+            t <- hsTypeToType kt t
+            let nn = toName Val n
+            sc <- lookupName nn
+            listenPreds $ sc `subsumes` t
+            addRule RuleSpec { ruleUniq = hsDeclUniq spec, ruleName = nn, ruleType = t, ruleSuper = hsDeclBool spec }
+            return [spec]
+    f i@HsInstDecl {} = tcClassHead (hsDeclClassHead i)
+    f i@HsDeclDeriving {} = tcClassHead (hsDeclClassHead i)
+    f (HsPragmaRules rs) = do
+        rs' <- mapM tcRule rs
+        return [HsPragmaRules rs']
+    f fd@(HsForeignDecl _ _ n qt) = do
         kt <- getKindEnv
-        t <- hsTypeToType kt t
-        let nn = toName Val n
-        sc <- lookupName nn
-        listenPreds $ sc `subsumes` t
-        addRule RuleSpec { ruleUniq = hsDeclUniq spec, ruleName = nn, ruleType = t, ruleSuper = hsDeclBool spec }
-        return [spec]
+        s <- hsQualTypeToSigma kt qt
+        addToCollectedEnv (Map.singleton (toName Val n) s)
+        return []
+    f fd@(HsForeignExport _ e n qt) = do
+        kt <- getKindEnv
+        s <- hsQualTypeToSigma kt qt
+        addToCollectedEnv (Map.singleton (ffiExportName e) s)
+        return []
+    f _ = return []
+    tcClassHead cHead@HsClassHead { .. } = do
+        ch <- getClassHierarchy
+        ke <- getKindEnv
+        let supers = asksClassRecord ch hsClassHead classSupers
+            (ctx,(cn,[a])) = chToClassHead ke cHead
+        assertEntailment ctx [ IsIn s a | s <- supers]
+        return []
 
-tcPragmaDecl (HsPragmaRules rs) = do
-    rs' <- mapM tcRule rs
-    return [HsPragmaRules rs']
-
--- foreign decls are accumulated by tiExpl
-tcPragmaDecl fd@(HsForeignDecl _ _ n qt) = do
-    kt <- getKindEnv
-    s <- hsQualTypeToSigma kt qt
-    addToCollectedEnv (Map.singleton (toName Val n) s)
-    return []
-
-tcPragmaDecl fd@(HsForeignExport _ e n qt) = do
-    kt <- getKindEnv
-    s <- hsQualTypeToSigma kt qt
-    addToCollectedEnv (Map.singleton (ffiExportName e) s)
-    return []
-
-tcPragmaDecl _ = return []
 
 tcRule prule@HsRule { hsRuleUniq = uniq, hsRuleFreeVars = vs, hsRuleLeftExpr = e1, hsRuleRightExpr = e2, hsRuleSrcLoc = sloc } =
     withContext (locMsg sloc "in the RULES pragma" $ hsRuleString prule) ans where
@@ -780,7 +787,7 @@ tiProgram bgs es = ans where
         localEnv env $ f pr' bgs (ds ++ rs)
     f _ [] rs = do
         ch <- getClassHierarchy
-        pdecls <- mapM tcPragmaDecl es
+        pdecls <- mapM tcMiscDecl es
         wdump FD.Progress $ liftIO $ do hPutStr stderr ")\n"
         return (rs ++ concat pdecls)
 
@@ -805,8 +812,6 @@ tiLit (HsFrac _) = do
 
 tiLit (HsStringPrim _)  = return (TCon (Tycon tc_BitsPtr kindHash))
 tiLit (HsString _)  = return tString
-
---tiProgram = undefined
 
 ------------------------------------------
 -- Binding analysis and program generation

@@ -4,6 +4,7 @@ module FrontEnd.Class(
     instanceToTopDecls,
     ClassHierarchy(),
     augmentClassHierarchy,
+    chToClassHead,
     ClassRecord(..),
     ClassType(..),
     instanceName,
