@@ -1,0 +1,6 @@
+
+tcfail033.hs:4:12:
+    Occurs check: cannot construct the infinite type: t0 = (t0, t1)
+    In the expression: x
+    In the expression: [x | (x, y) <- buglet]
+    In an equation for `buglet': buglet = [x | (x, y) <- buglet]

@@ -1,0 +1,6 @@
+
+tcfail152.hs:10:14:
+    No instance for (Integral a)
+      arising from a use of `toInteger'
+    In the expression: toInteger x
+    In an equation for `test': test (C x) = toInteger x

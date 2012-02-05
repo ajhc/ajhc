@@ -1,0 +1,8 @@
+
+tcfail090.hs:8:9:
+    Couldn't match kind `*' against `#'
+    Kind incompatibility when matching types:
+      a0 :: *
+      ByteArray# :: #
+    In the expression: undefined
+    In an equation for `die': die _ = undefined

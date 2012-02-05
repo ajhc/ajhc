@@ -1,0 +1,4 @@
+
+tcfail161.hs:5:7:
+    Expecting one more argument to `Maybe'
+    In the type signature for `f': f :: [Maybe]

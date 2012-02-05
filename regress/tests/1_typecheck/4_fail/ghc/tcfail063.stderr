@@ -1,0 +1,4 @@
+
+tcfail063.hs:6:9:
+    Expecting one more argument to `Num'
+    In the type signature for `moby': moby :: Num => Int -> a -> Int

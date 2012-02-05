@@ -1,0 +1,8 @@
+
+tcfail123.hs:11:10:
+    Couldn't match kind `*' against `#'
+    Kind incompatibility when matching types:
+      t0 :: *
+      GHC.Prim.Int# :: #
+    In the first argument of `f', namely `3#'
+    In the expression: f 3#

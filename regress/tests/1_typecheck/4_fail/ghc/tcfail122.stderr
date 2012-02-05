@@ -1,0 +1,11 @@
+
+tcfail122.hs:8:9:
+    Couldn't match kind `* -> *' against `*'
+    Kind incompatibility when matching types:
+      c0 :: (* -> *) -> *
+      a0 :: * -> *
+    In the expression:
+        undefined :: forall (c :: (* -> *) -> *) (d :: * -> *). c d
+    In the expression:
+      [undefined :: forall a b. a b,
+       undefined :: forall (c :: (* -> *) -> *) (d :: * -> *). c d]

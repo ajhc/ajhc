@@ -1,0 +1,9 @@
+tests:
+   T3468:
+     skip: no SOURCE pragma
+   T3966:
+     skip: no UNPACK pragma
+   Tcfail186_Help:
+     skip: not test
+   T5084:
+     skip: not error in jhc
