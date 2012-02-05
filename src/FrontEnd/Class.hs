@@ -228,7 +228,7 @@ hsInstDeclToInst kt (HsInstDecl sloc qType decls)
                       "an instance of class " ++ show className ++
                       " (with kind " ++ show classKind ++ ") " ++ show subsumptions
    where
-   (cntxt, (className, cargs@[convertedArgType])) = qtToClassHead kt qType
+   (cntxt, (className, cargs@[convertedArgType])) = chToClassHead kt qType
    classKind = kindOfClass className kt
    argTypeKind = map getType cargs
    subsumptions = zipWith isSubsumedBy classKind argTypeKind
@@ -238,16 +238,9 @@ hsInstDeclToInst _ _ = return []
 vtrace s v | False && verbose = trace s v
 vtrace s v | otherwise = v
 
-qtToClassHead :: KindEnv -> HsQualType -> ([Pred],(Name,[Type]))
-qtToClassHead kt qt@(HsQualType cntx (HsTyApp (HsTyCon className) ty)) =
-    vtrace ("qtToClassHead" <+> show qt) $
-    let res = (map (hsAsstToPred kt) cntx,(toName ClassName className,
-                                           [runIdentity $ hsTypeToType (kiHsQualType kt (HsQualType cntx (HsTyTuple []))) ty]))
-    in vtrace ("=" <+> show res) res
-
 chToClassHead :: KindEnv -> HsClassHead -> ([Pred],(Name,[Type]))
 chToClassHead kt qt@HsClassHead { .. }  =
-    vtrace ("qtToClassHead" <+> show qt) $
+    vtrace ("chToClassHead" <+> show qt) $
     let res = (map (hsAsstToPred kt) hsClassHeadContext,(hsClassHead,
             map (runIdentity . hsTypeToType (kiHsQualType kt (HsQualType hsClassHeadContext (HsTyTuple [])))) hsClassHeadArgs))
     in vtrace ("=" <+> show res) res
@@ -258,7 +251,7 @@ createClassAssocs kt decls = [ Assoc (ctc n) False (map ct as) (ctype t) | HsTyp
     ctype HsTyAssoc = kindStar
 --    ctype t = Just $ runIdentity $ hsTypeToType kt t
 
-createInstAssocs kt decls = [ (ctc n,map ct (czas ca),map ct as,ctype t)| HsTypeDecl { hsDeclName = n, hsDeclTArgs = (ca:as), hsDeclType = t } <- decls ] where
+createInstAssocs kt decls = [ (ctc n,map ct (czas ca),map ct as,ctype t) | HsTypeDecl { hsDeclName = n, hsDeclTArgs = (ca:as), hsDeclType = t } <- decls ] where
     ctc n = let nn = toName TypeConstructor n in Tycon nn (kindOf nn kt)
     ct (HsTyVar n) = let nn = toName TypeVal n in tyvar nn (kindOf nn kt)
     czas ca = let (HsTyCon {},zas) = fromHsTypeApp ca in zas
@@ -273,12 +266,11 @@ instanceToTopDecls :: KindEnv -> ClassHierarchy -> HsDecl -> (([HsDecl],[Assump]
 instanceToTopDecls kt ch@(CH classHierarchy _) (HsInstDecl _ qualType methods)
     = unzip $ map (methodToTopDecls ch kt [] crecord qualType) $ methodGroups where
     methodGroups = groupEquations (filter (not . isHsPragmaProps) methods)
-    (_,(className,_)) = qtToClassHead kt qualType
+    (_,(className,_)) = chToClassHead kt qualType
     crecord = case Map.lookup className classHierarchy  of
         Nothing -> error $ "instanceToTopDecls: could not find class " ++ show className ++ "in class hierarchy"
         Just crecord -> crecord
     tsubst na vv v = applyTyvarMap [(na,vv)] v
-
 instanceToTopDecls kt ch@(CH classHierarchy _) (HsClassDecl _ chead methods)
    = unzip $ map (defaultMethodToTopDecls kt methodSigs chead) $ methodGroups where
    className = hsClassHead chead
@@ -287,16 +279,6 @@ instanceToTopDecls kt ch@(CH classHierarchy _) (HsClassDecl _ chead methods)
    methodSigs = case Map.lookup (toName ClassName className) classHierarchy  of
            Nothing -> error $ "defaultInstanceToTopDecls: could not find class " ++ show className ++ "in class hierarchy"
            Just sigs -> classAssumps sigs
-
---instanceToTopDecls kt ch@(CH classHierarchy _) cad@(HsClassAliasDecl {})
---   = unzip $ map (aliasDefaultMethodToTopDecls kt methodSigs aliasName) $ methodGroups where
---   aliasName = toName ClassName (hsDeclName cad)
---   methodGroups = groupEquations (filter (\x -> isHsPatBind x || isHsFunBind x) (hsDeclDecls cad))
---   methodSigs = case Map.lookup aliasName classHierarchy  of
---           Nothing -> error $ "aliasDefaultInstanceToTopDecls: could not find class "
---                              ++ show aliasName ++ "in class hierarchy"
---           Just sigs -> concatMap (classAssumps . findClassRecord ch) (classClasses sigs)
-
 instanceToTopDecls _ _ _ = mempty
 
 instanceName n t = toName Val ("Instance@",'i':show n ++ "." ++ show t)
@@ -309,17 +291,13 @@ methodToTopDecls ::
     -> KindEnv         -- ^ the kindenv
     -> [Pred]          -- ^ random extra predicates to add
     -> ClassRecord     -- ^ the class we are lifting methods from
-    -> HsQualType
+    -> HsClassHead
     -> (Name, HsDecl)
     -> (HsDecl,Assump)
 
---methodToTopDecls ch kt preds crecord@(ClassAliasRecord {}) qt meth@(methodName, methodDecls)
---   = methodToTopDecls ch kt preds (findClassRecord ch cls) qt meth
---     where Just cls = Map.lookup methodName (classMethodMap crecord)
-
 methodToTopDecls _  kt preds crecord qt (methodName, methodDecls)
    = (renamedMethodDecls,(newMethodName, instantiatedSig)) where
-    (cntxt,(className,[argType])) = qtToClassHead kt qt
+    (cntxt,(className,[argType])) = chToClassHead kt qt
     newMethodName = instanceName methodName (getTypeHead argType)
     sigFromClass = case [ s | (n, s) <- classAssumps crecord, n == methodName] of
         [x] -> x
@@ -329,7 +307,6 @@ methodToTopDecls _  kt preds crecord qt (methodName, methodDecls)
     renamedMethodDecls = renameOneDecl newMethodName methodDecls
 
 defaultMethodToTopDecls :: KindEnv -> [Assump] -> HsClassHead -> (Name, HsDecl) -> (HsDecl,Assump)
-
 defaultMethodToTopDecls kt methodSigs HsClassHead { .. } (methodName, methodDecls)
    = (renamedMethodDecls,(newMethodName,sigFromClass)) where
     --(HsTyApp (HsTyCon className) _) = classApp
@@ -471,8 +448,6 @@ makeClassHierarchy (CH ch _is) kt ds = ans where
 --                               }]
 
     f decl@(HsInstDecl {}) = hsInstDeclToInst kt decl >>= \insts -> do
-        -- TODO check for duplicates here?
-        --
         --crs <- flip mapM [ (cn,i) | i@Inst { instHead = _ :=> IsIn cn _} <- insts] $ \ (x,inst) -> case Map.lookup x ch of
         --    Just cr -> ensureNotDup (srcLoc decl) inst (classInsts cr) >> return [cr { classInsts = mempty }]
         --    Nothing -> return [] -- case Map.lookup x ans of

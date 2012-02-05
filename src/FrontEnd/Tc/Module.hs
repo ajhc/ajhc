@@ -122,7 +122,7 @@ getDataDesc d = g d where
     f HsDataDecl { hsDeclCons = cs } = return $ DatMany [ (hsConDeclName c, (length . hsConDeclArgs) c) | c <- cs]
     f _ = fail "getDataDesc: not a data declaration"
 
--- FIXME: Use an warnings+writer+error monad instead of IO.
+{-# NOINLINE tiModules #-}
 tiModules ::  HoTcInfo -> [ModInfo] -> IO (HoTcInfo,TiData)
 tiModules htc ms = do
     let importClassHierarchy = hoClassHierarchy htc
@@ -148,12 +148,13 @@ tiModules htc ms = do
 
     -- kind inference for all type constructors type variables and classes in the module
     let classAndDataDecls = filter (or' [isHsDataDecl, isHsNewTypeDecl, isHsClassDecl, isHsClassAliasDecl]) ds  -- rDataDecls ++ rNewTyDecls ++ rClassDecls
-    kindInfo <- kiDecls importKindEnv classAndDataDecls
+    kindInfo <- kiDecls importKindEnv ds -- classAndDataDecls
 
     when (dump FD.Kind) $
          do {putStrLn " \n ---- kind information ---- \n";
              putStrLn $ PPrint.render $ pprint kindInfo}
 
+    processIOErrors
     -- collect types for data constructors
 
     let localDConsEnv =  dataConsEnv (error "modName") kindInfo classAndDataDecls -- (rDataDecls ++ rNewTyDecls)

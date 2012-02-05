@@ -287,13 +287,16 @@ instance Rename HsDecl where
         hsClasses' <- rename hsClasses
         hsDecls' <- rename hsDecls
         return (HsClassAliasDecl srcLoc name' args' hsContext' hsClasses' hsDecls')
-    rename (HsInstDecl srcLoc hsQualType hsDecls) = do
+    rename (HsInstDecl srcLoc classHead hsDecls) = do
         withSrcLoc srcLoc $ do
-        updateWithN TypeVal hsQualType $ do
-        hsQualType' <- renameClassHead hsQualType
+        updateWithN TypeVal (hsClassHeadArgs classHead) $ do
+        classHead' <- rename classHead
+        --updateWithN TypeVal hsQualType $ do
+        --hsQualType' <- renameClassHead hsQualType
         hsDecls' <- rename $
-           map (qualifyInstMethod (getTypeClassModule hsQualType)) hsDecls
-        return (HsInstDecl srcLoc hsQualType' hsDecls')
+            hsDecls
+           --map (qualifyInstMethod (getTypeClassModule hsQualType)) hsDecls
+        return (HsInstDecl srcLoc classHead' hsDecls')
     rename (HsInfixDecl srcLoc assoc int hsNames) = do
         withSrcLoc srcLoc $ do
         hsNames' <- mapM renameValName hsNames

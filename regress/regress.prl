@@ -213,6 +213,10 @@ sub run_test {
             $result->{compile_status} = 'BAD';
             return;
         } else {
+            if(statf($r) eq 'INT') {
+                $result->{compile_status} = 'INT';
+                done();
+            }
             $result->{compile_status} = 'pass';
             return;
         }

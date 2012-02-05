@@ -326,7 +326,7 @@ topdecl :: { HsDecl }
                            ret = HsClassAliasDecl { hsDeclSrcLoc = $3, hsDeclName = $4, hsDeclTypeArgs = map HsTyVar $5, hsDeclContext = cxt, hsDeclClasses = clss, hsDeclDecls =$8 }
                          } in trace ("\n"++show ret++"\n") (return ret)
                       }
-      | 'instance' srcloc ctype optvaldefs
+      | 'instance' srcloc classhead optvaldefs
                       { HsInstDecl $2 $3 $4 }
       | 'deriving' 'instance' srcloc classhead
                       { HsDeclDeriving $3 $4 }

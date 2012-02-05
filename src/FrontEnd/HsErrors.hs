@@ -6,15 +6,12 @@ module FrontEnd.HsErrors(
     hsDeclLocal
     ) where
 
-import Control.Monad
-
 import FrontEnd.Class
 import FrontEnd.HsSyn
 import FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse
 import FrontEnd.Warning
 import Name.Name
-import Name.Names
 
 hsType :: (MonadSrcLoc m, MonadWarn m) => HsType -> m ()
 --hsType x@HsTyForall {} = do
@@ -69,7 +66,8 @@ hsDecl cntx decl = f cntx decl where
     f context decl@HsNewTypeDecl {} = warn (srcLoc decl) InvalidDecl $ "newtype declaration not allowed " ++ show context
 --    f TopLevel decl@HsClassDecl { hsDeclQualType = qt, hsDeclDecls = decls } = do args <- fetchQtArgs (srcLoc decl) qt; mapM_ (f (InClass args)) decls
     f TopLevel decl@HsClassDecl { hsDeclClassHead = ch, hsDeclDecls = decls } = do mapM_ (f (InClass (hsClassHeadArgs ch))) decls
-    f TopLevel decl@HsInstDecl { hsDeclQualType = qt, hsDeclDecls = decls } = do args <- fetchQtArgs (srcLoc decl) qt; mapM_ (f (InInstance args)) decls
+    f TopLevel decl@HsInstDecl { hsDeclClassHead = ch, hsDeclDecls = decls } = do mapM_ (f (InInstance (hsClassHeadArgs ch))) decls
+    --f TopLevel decl@HsInstDecl { hsDeclQualType = qt, hsDeclDecls = decls } = do args <- fetchQtArgs (srcLoc decl) qt; mapM_ (f (InInstance args)) decls
     f context decl@HsClassDecl {} = warn (srcLoc decl) InvalidDecl $ "class declaration not allowed " ++ show context
     f context decl@HsInstDecl {} = warn (srcLoc decl) InvalidDecl $ "instance declaration not allowed " ++ show context
 

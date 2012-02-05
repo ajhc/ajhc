@@ -131,7 +131,7 @@ renameHsDecl (HsClassDecl srcLoc hsQualType hsDecls) subTable = withSrcLoc srcLo
     hsDecls' <- renameHsDecls hsDecls subTable
     return (HsClassDecl srcLoc hsQualType' hsDecls')
 renameHsDecl (HsInstDecl srcLoc hsQualType hsDecls) subTable = withSrcLoc srcLoc $ do
-    hsQualType' <- renameHsQualType hsQualType subTable
+    hsQualType' <- renameHsClassHead hsQualType
     hsDecls' <- renameHsDecls hsDecls subTable
     return (HsInstDecl srcLoc hsQualType' hsDecls')
 renameHsDecl (HsInfixDecl srcLoc assoc int hsNames) subTable = withSrcLoc srcLoc $ do

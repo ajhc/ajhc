@@ -154,7 +154,8 @@ mgu (Kfun a b) (Kfun a' b') = do
     unify b b'
 mgu (KVar u) k = varBind u k
 mgu k (KVar u) = varBind u k
-mgu k1 k2 = addWarn UnificationError ("attempt to unify these two kinds: " ++ show k1 ++ " <-> " ++ show k2)
+mgu k1 k2 = addWarn UnificationError $
+    "kind unification error, attempt to unify (" ++ show k1 ++ ") with (" ++ show k2 ++ ")"
 
 varBind :: Kindvar -> Kind -> Ki ()
 varBind u k = do
@@ -245,6 +246,7 @@ printRule s
     | dump FD.KindSteps = liftIO $ putStrLn s
     | otherwise = return ()
 
+{-# NOINLINE kiDecls #-}
 kiDecls :: KindEnv -> [HsDecl] -> IO KindEnv
 kiDecls inputEnv classAndDataDecls = ans where
     ans = do
@@ -359,7 +361,10 @@ kiPred asst@(HsAsst n ns) = do
             unify k k'
     case Map.lookup (toName ClassName n) (kindEnvClasses env) of
         Nothing -> fail $ "unknown class: " ++ show asst
-        Just ks -> zipWithM_ f ks ns
+        Just ks -> do
+            when (length ks /= length ns) $
+                addWarn InvalidDecl ("Incorrect number of class parameters for " ++ show n)
+            zipWithM_ f ks ns
 kiPred (HsAsstEq a b) = do
     mv <- newKindVar KindSimple
     kiType  (KVar mv) a
@@ -368,13 +373,7 @@ kiPred (HsAsstEq a b) = do
 -- first pass over declarations adds classes to environment.
 kiInitClasses :: [HsDecl] -> Ki ()
 kiInitClasses ds = do
---    sequence_ [ f className [classArg] |  HsClassDecl _ (HsQualType _ (HsTyApp (HsTyCon className) (HsTyVar classArg))) _ <- ds]
---    sequence_ [ f (hsDeclName cad) [v | HsTyVar v <- hsDeclTypeArgs cad] | cad@(HsClassAliasDecl {}) <- ds ]
     mapM_ kiInitDecl ds
---    where
---    f className args = do
---        args <- mapM (lookupKind KindSimple . toName TypeVal) args
---        extendEnv mempty { kindEnvClasses = Map.singleton className args }
 kiInitDecl :: HsDecl -> Ki ()
 kiInitDecl d = withSrcLoc (srcLoc d) (f d) where
     f HsClassDecl { .. } = do
@@ -385,6 +384,9 @@ kiInitDecl d = withSrcLoc (srcLoc d) (f d) where
 
 kiDecl :: HsDecl -> Ki ()
 kiDecl d = withSrcLoc (srcLoc d) (f d) where
+    varLike HsTyVar {} = True
+    varLike HsTyExpKind { hsTyLType = Located _ t } = varLike t
+    varLike _ = False
     f HsTypeFamilyDecl { .. } = do
         kc <- lookupKind KindSimple (toName TypeConstructor hsDeclName)
         kiApps kc hsDeclTArgs (maybe kindStar hsKindToKind hsDeclHasKind)
@@ -411,9 +413,6 @@ kiDecl d = withSrcLoc (srcLoc d) (f d) where
         mapM_ kiPred ps
         kiType kindStar t
     f (HsClassDecl _sloc HsClassHead { .. } sigsAndDefaults) = do
-        let varLike HsTyVar {} = True
-            varLike HsTyExpKind { hsTyLType = Located _ t } = varLike t
-            varLike _ = False
         when (length hsClassHeadArgs /= 1) $
             addWarn UnsupportedFeature "Multi-parameter type classes not supported"
         unless (all varLike hsClassHeadArgs) $
@@ -431,7 +430,21 @@ kiDecl d = withSrcLoc (srcLoc d) (f d) where
         carg <- lookupKind KindSimple (toName TypeVal classArg)
         mapM_ (\n -> lookupKind KindSimple n >>= unify carg ) rn
         local (\e -> e { kiWhere = InClass }) $ mapM_ kiDecl sigsAndDefaults
-
+    f (HsInstDecl _ HsClassHead { .. } sigsAndDefaults) = do
+        let consLike (HsTyFun a b) = varLike a && varLike b
+            consLike (HsTyTuple ts) = all varLike ts
+            consLike t = case fromHsTypeApp t of
+                (HsTyCon {},as) -> all varLike as
+                _ -> False
+        unless (all consLike hsClassHeadArgs) $
+            addWarn InvalidDecl "Instance parameters must be of the form 'C v1 v2'"
+        mapM_ kiPred hsClassHeadContext
+        env <- getEnv
+        let ks = kindOfClass hsClassHead env
+        when (length ks /= length hsClassHeadArgs) $
+            addWarn InvalidDecl "Incorrect number of class parameters in instance head"
+        zipWithM_ kiType' ks hsClassHeadArgs
+    f _ = return ()
   --      HsQualType contxt (HsTyApp (HsTyCon _className) (HsTyVar classArg)) =  qualType
   --      ans = do
   --          carg <- lookupKind KindSimple (toName TypeVal classArg)
@@ -449,7 +462,10 @@ kiDecl d = withSrcLoc (srcLoc d) (f d) where
 --        f _ = Seq.empty
 --        typeFromSig :: HsDecl -> HsQualType
 --        typeFromSig (HsTypeSig _sloc _names qualType) = qualType
-    f _ = return ()
+
+fromHsTypeApp t = f t [] where
+    f (HsTyApp a b) rs = f a (b:rs)
+    f t rs = (t,rs)
 
 kiAlias context tyconName args condecl = do
     args <- mapM (lookupKind KindSimple . toName TypeVal) args

@@ -176,9 +176,9 @@ data HsDecl
         hsDeclDecls :: [HsDecl]
         }
     | HsInstDecl    {
-        hsDeclSrcLoc   :: SrcLoc,
-        hsDeclQualType :: HsQualType,
-        hsDeclDecls    :: [HsDecl]
+        hsDeclSrcLoc    :: SrcLoc,
+        hsDeclClassHead :: HsClassHead,
+        hsDeclDecls     :: [HsDecl]
         }
     | HsDefaultDecl SrcLoc HsType
     | HsTypeSig	 SrcLoc [HsName] HsQualType
