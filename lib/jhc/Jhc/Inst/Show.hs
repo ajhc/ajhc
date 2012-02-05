@@ -2,13 +2,14 @@
 
 module Jhc.Inst.Show() where
 
-import Jhc.Inst.Order
 import Data.Int
 import Data.Word
 import Jhc.Basics
+import Jhc.Inst.Order
 import Jhc.Num
 import Jhc.Order
 import Jhc.Show
+import Jhc.Type.C
 
 -- we convert them to Word or WordMax so the showIntAtBase specialization can occur.
 
@@ -55,7 +56,24 @@ instance Show Int64 where
     showsPrec p x = showsPrec p (fromIntegral x :: Integer)
 instance Show IntPtr where
     showsPrec p x = showsPrec p (fromIntegral x :: Integer)
+instance Show IntMax where
+    showsPrec p x = showsPrec p (fromIntegral x :: Integer)
 
+instance Show CSize where
+    showsPrec p x = showsPrec p (fromIntegral x :: Integer)
+instance Show CInt where
+    showsPrec p x = showsPrec p (fromIntegral x :: Integer)
+
+instance Show CChar where
+    showsPrec p x = showsPrec p (fromIntegral x :: Int)
+instance Show CSChar where
+    showsPrec p x = showsPrec p (fromIntegral x :: Int)
+instance Show CUChar where
+    showsPrec _ x = showWord (fromIntegral x :: Word)
+instance Show CUInt where
+    showsPrec _ x = showWord (fromIntegral x :: Word)
+instance Show CWchar where
+    showsPrec _ x = showWord (fromIntegral x :: Word)
 
 -- specialized base 10 only versions of show
 showWord :: Word -> String -> String

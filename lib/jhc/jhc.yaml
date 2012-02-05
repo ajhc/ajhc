@@ -58,6 +58,8 @@ Exposed-Modules:
         - Jhc.Type.C
         - Jhc.Type.Float
         - Jhc.Type.Word
+        - Jhc.Class.Num
+        - Jhc.Class.Ord
 
 #        - Jhc.Hole
 #        - Jhc.JumpPoint

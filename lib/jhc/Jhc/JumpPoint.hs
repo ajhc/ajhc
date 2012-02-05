@@ -10,7 +10,6 @@ import Jhc.Basics
 
 newtype JumpPoint = JumpPoint (Ptr ())
 
-
 -- | in order to be safe, the JumpPoint must not escape the handling function
 withJumpPoint__ :: (JumpPoint -> Bool -> IO a) -> IO a
 withJumpPoint__ action = do

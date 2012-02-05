@@ -1,6 +1,6 @@
 {-# OPTIONS_JHC -fm4 -fno-prelude -fffi #-}
-
 module Jhc.Order(
+    module Jhc.Class.Ord,
     Bool(..),
     Ordering(..),
     Eq(..),
@@ -9,12 +9,13 @@ module Jhc.Order(
     (||),
     not,
     otherwise
-    ) where
+) where
 
 import Jhc.Basics
 import Jhc.Prim.Bits
 import Jhc.Prim.Prim
-import Jhc.Type.Basic
+
+import Jhc.Class.Ord
 
 m4_include(Jhc/Order.m4)
 
@@ -22,38 +23,6 @@ deriving instance Eq Bool
 deriving instance Ord Bool
 deriving instance Eq Ordering
 deriving instance Ord Ordering
-
-infix  4  ==, /=, <, <=, >=, >
-
-class Eq a where
-    (==) :: a -> a -> Bool
-    (/=) :: a -> a -> Bool
-    x == y = case x /= y of
-        True -> False
-        False -> True
-    x /= y = case x == y of
-        True -> False
-        False -> True
-
-class  (Eq a) => Ord a  where
-    compare              :: a -> a -> Ordering
-    (<), (<=), (>=), (>) :: a -> a -> Bool
-    max, min             :: a -> a -> a
-
-    compare x y | x == y    = EQ
-                | x <= y    = LT
-                | otherwise = GT
-
-    x <= y  = compare x y /= GT
-    x <  y  = compare x y == LT
-    x >= y  = compare x y /= LT
-    x >  y  = compare x y == GT
-
-    -- Note that (min x y, max x y) = (x,y) or (y,x)
-    max x y | x <= y    =  y
-            | otherwise =  x
-    min x y | x <= y    =  x
-            | otherwise =  y
 
 instance Eq () where
     () == () = True

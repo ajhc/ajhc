@@ -5,7 +5,6 @@ import Jhc.IORef
 import Jhc.IO
 import Jhc.Monad
 
-
 newtype ACIO a = ACIO (IO a)
     deriving(Monad,Functor)
 
@@ -17,7 +16,6 @@ acioToIO (ACIO x) = x
 
 newIORefAC :: a -> ACIO (IORef a)
 newIORefAC a = unsafeIOToACIO (newIORef a)
-
 
 runOnce :: IO a -> ACIO (IO a)
 runOnce action = do
@@ -64,7 +62,6 @@ If you need to use arbitrary IO, a utility function 'runOnce' is provided.
 using it you can ensure arbitrary IO actions are run only once and the return
 values shared, however you must access the value inside the IO monad, thus
 ensuring program integrity. An example using a hypothetical GUI library is below.
-
 
     import Jhc.ACIO
 

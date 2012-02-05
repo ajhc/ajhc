@@ -26,7 +26,6 @@ newHole = IO (\world -> newHole__ world)
 errorHole :: Hole a
 errorHole = Hole undefined
 
-
 -- | it is an unchecked error to fill in the same hole more than once.
 fillHole :: Hole a -> a -> IO ()
 fillHole r v = IO (\world -> case fillHole__ r v world of

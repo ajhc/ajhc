@@ -5,8 +5,6 @@ import Jhc.Basics
 import Jhc.IO
 import Jhc.Int
 
-
-
 data MutArray__ :: * -> #
 data Array__ :: * -> #
 

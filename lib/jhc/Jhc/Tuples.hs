@@ -10,7 +10,6 @@ import Jhc.Order
 import Jhc.List
 import Jhc.Text.Read
 
-
 {- TUPGEN!
 
 instance (#Tup Eq #t) => Eq (#Tup #t) where
@@ -18,8 +17,6 @@ instance (#Tup Eq #t) => Eq (#Tup #t) where
     (#Tup #x) /= (#Tup #y) = or [#List #x /= #y]
 
 -}
-
-
 
 instance (Ord a, Ord b) => Ord (a,b) where
     compare (x,y) (a,b) = case compare x a of
@@ -45,9 +42,6 @@ instance (Ord a, Ord b, Ord c, Ord d) => Ord (a,b,c,d) where
 --instance (Eq a, Eq b) => Eq (a,b) where
 --    (x,y) == (a,b) = x == a && y == b
 
-
-
-
 instance  (Read a, Read b) => Read (a,b)  where
     readsPrec p       = readParen False
                             (\r -> [((x,y), w) | ("(",s) <- lex r,
@@ -65,8 +59,6 @@ instance  (Read a, Read b, Read c) => Read (a,b,c)  where
                                                  (",",w) <- lex v,
                                                  (z,p)   <- reads w,
                                                  (")",w) <- lex p ] )
-
-
 
 instance (Show a, Show b, Show c, Show d) => Show (a, b, c, d) where
     showsPrec _ (w,x,y,z) s = (showChar '(' . shows w . showChar ',' .
@@ -91,7 +83,6 @@ instance (Show a, Show b, Show c, Show d, Show e, Show f) => Show (a, b, c, d, e
                                                   shows z . showChar ',' .
                                                   shows a . showChar ')')
                                     s
-
 
 -- tupgen 2
 

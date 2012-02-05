@@ -10,7 +10,9 @@ import Jhc.Order
 import Jhc.Float
 import Jhc.Basics
 import Jhc.Inst.Order
-import Foreign.C.Types
+import Jhc.Inst.Enum
+import Prelude.Text
+import Jhc.Type.C
 
 m4_define(SIGNED,{{
 MkNumPrim($1,I)
@@ -47,5 +49,5 @@ UNSIGNED(CUChar)
 
 SIGNED(CSize)
 SIGNED(CInt)
-SIGNED(CUInt)
+UNSIGNED(CUInt)
 UNSIGNED(CWchar)

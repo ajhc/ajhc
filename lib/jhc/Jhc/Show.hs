@@ -37,7 +37,6 @@ showString       =  (++)
 showParen        :: Bool -> ShowS -> ShowS
 showParen b p    =  if b then showChar '(' . p . showChar ')' else p
 
-
 instance Show () where
     showsPrec _ () = showString "()"
 
@@ -53,11 +52,9 @@ instance (Show a, Show b, Show c) => Show (a, b, c) where
 instance Show a => Show [a]  where
     showsPrec p      = showList
 
-
 instance Show Bool where
     showsPrec d (False) = showString "False"
     showsPrec d (True) = showString "True"
-
 
 instance Show Ordering where
     showsPrec d (LT) = showString "LT"

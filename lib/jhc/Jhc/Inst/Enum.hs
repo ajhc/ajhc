@@ -10,6 +10,7 @@ import Jhc.Order
 import Jhc.IO(error)
 import Jhc.Basics
 import Jhc.Inst.Order
+import Jhc.Type.C
 
 m4_include(Jhc/Enum.m4)
 
@@ -43,6 +44,21 @@ BOUNDED(Int32)
 BOUNDED(Int64)
 BOUNDED(IntPtr)
 BOUNDED(IntMax)
+
+ENUMINST(CChar)
+BOUNDED(CChar)
+ENUMINST(CSChar)
+BOUNDED(CSChar)
+ENUMINST(CUChar)
+UBOUNDED(CUChar)
+ENUMINST(CSize)
+BOUNDED(CSize)
+ENUMINST(CInt)
+BOUNDED(CInt)
+ENUMINST(CUInt)
+UBOUNDED(CUInt)
+ENUMINST(CWchar)
+UBOUNDED(CWchar)
 
 instance Enum () where
     succ _      = error "Prelude.Enum.().succ: bad argument"

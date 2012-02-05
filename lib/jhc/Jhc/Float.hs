@@ -20,6 +20,7 @@ import Jhc.Num
 import Jhc.Order
 import Jhc.Prim.Bits
 import Jhc.Type.Float
+import Prelude.Text
 
 infixr 8  **
 

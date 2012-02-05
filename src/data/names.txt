@@ -93,8 +93,8 @@ Unit       Jhc.Prim.Prim.()
 Word       Jhc.Type.Word.Word
 
 ClassName:class:
-Eq              Jhc.Order.Eq
-Ord             Jhc.Order.Ord
+Eq              Jhc.Class.Ord.Eq
+Ord             Jhc.Class.Ord.Ord
 Enum            Jhc.Enum.Enum
 Bounded         Jhc.Enum.Bounded
 Show            Jhc.Show.Show
@@ -102,10 +102,10 @@ Read            Jhc.Text.Read.Read
 Ix              Data.Ix.Ix
 Functor         Jhc.Monad.Functor
 Monad           Jhc.Monad.Monad
-Num             Jhc.Num.Num
-Real            Jhc.Num.Real
-Integral	Jhc.Num.Integral
-Fractional	Jhc.Num.Fractional
+Num             Jhc.Class.Num.Num
+Real            Jhc.Class.Num.Real
+Integral	Jhc.Class.Num.Integral
+Fractional	Jhc.Class.Num.Fractional
 Floating	Jhc.Float.Floating
 RealFrac	Jhc.Float.RealFrac
 RealFloat	Jhc.Float.RealFloat
@@ -131,22 +131,22 @@ eqString         Jhc.String.eqString
 eqUnpackedString Jhc.String.eqUnpackedString
 error            Jhc.IO.error
 map              Jhc.Basics.map
-and              Jhc.Order.&&
+and              Jhc.Class.Ord.&&
 foldr            Jhc.Basics.foldr
 
 bind                 Jhc.Monad.>>=
 bind_                Jhc.Monad.>>
 fail                 Jhc.Monad.fail
 concatMap            Jhc.Basics.concatMap
-fromInteger          Jhc.Num.fromInteger
-fromInt              Jhc.Num.fromInt
-fromRational         Jhc.Num.fromRational
-negate               Jhc.Num.negate
-leq                  Jhc.Order.<=
-geq                  Jhc.Order.>=
-lt                   Jhc.Order.<
-gt                   Jhc.Order.>
-equals               Jhc.Order.==
+fromInteger          Jhc.Class.Num.fromInteger
+fromInt              Jhc.Class.Num.fromInt
+fromRational         Jhc.Class.Num.fromRational
+negate               Jhc.Class.Num.negate
+leq                  Jhc.Class.Ord.<=
+geq                  Jhc.Class.Ord.>=
+lt                   Jhc.Class.Ord.<
+gt                   Jhc.Class.Ord.>
+equals               Jhc.Class.Ord.==
 fromEnum             Jhc.Enum.fromEnum
 toEnum               Jhc.Enum.toEnum
 enumFrom             Jhc.Enum.enumFrom

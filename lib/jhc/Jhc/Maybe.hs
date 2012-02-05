@@ -40,7 +40,6 @@ maybe n f m = case m of
     Just x -> f x
     Nothing -> n
 
-
 -- either instances
 instance (Eq a,Eq b) => Eq (Either a b) where
     (Left aa) == (Left aa') = aa == aa'

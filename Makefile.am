@@ -207,6 +207,7 @@ hlint:
 
 ho-clean:
 	rm -f -- `find -name \*.ho -print`
+	rm -f -- `find ~/.jhc/cache -name \*.ho -print`
 hl-clean:
 	rm -f -- `find -name \*.hl -print`
 

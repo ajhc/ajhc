@@ -220,21 +220,20 @@ addInstanceToHierarchy :: Inst -> ClassHierarchy -> ClassHierarchy
 addInstanceToHierarchy inst@Inst { instHead = cntxt :=> IsIn className _ } (CH r i) =
     CH r (Map.insertWith Data.List.union className [inst] i)
 
+-- Kind inference has already been done so we don't need to check for kind
+-- errors here.
 hsInstDeclToInst :: Monad m => KindEnv -> HsDecl -> m [Inst]
 hsInstDeclToInst kt (HsInstDecl sloc qType decls)
-   | length classKind == length argTypeKind, and subsumptions
-        = return [emptyInstance { instSrcLoc = sloc, instDerived = False,
+    = return [emptyInstance { instSrcLoc = sloc, instDerived = False,
         instHead = cntxt :=> IsIn className convertedArgType, instAssocs = assocs }]
-   | otherwise = failSl sloc $ "hsInstDeclToInst: kind error, attempt to make\n" ++
-                      show convertedArgType ++ " (with kind " ++ show argTypeKind ++ ")\n" ++
-                      "an instance of class " ++ show className ++
-                      " (with kind " ++ show classKind ++ ") " ++ show subsumptions
+   where
+   (cntxt, (className, [convertedArgType])) = chToClassHead kt qType
+   assocs = [ (tc,as,bs,s) | (tc,as,bs,~(Just s)) <- createInstAssocs kt decls ]
+hsInstDeclToInst kt (HsDeclDeriving sloc qType)
+        = return [emptyInstance { instSrcLoc = sloc, instDerived = True,
+        instHead = cntxt :=> IsIn className convertedArgType }]
    where
    (cntxt, (className, cargs@[convertedArgType])) = chToClassHead kt qType
-   classKind = kindOfClass className kt
-   argTypeKind = map getType cargs
-   subsumptions = zipWith isSubsumedBy classKind argTypeKind
-   assocs = [ (tc,as,bs,s) | (tc,as,bs,~(Just s)) <- createInstAssocs kt decls ]
 hsInstDeclToInst _ _ = return []
 
 vtrace s v | False && verbose = trace s v
@@ -416,6 +415,8 @@ fromHsTyVar (HsTyVar v) = return v
 fromHsTyVar (HsTyExpKind (Located _ t) _) = fromHsTyVar t
 fromHsTyVar _ = fail "fromHsTyVar"
 
+-- We give all instance declarations the benefit of the doubt here, assuming
+-- they are correct. It is up to the typechecking pass to find any errors.
 makeClassHierarchy :: MonadWarn m => ClassHierarchy -> KindEnv -> [HsDecl] -> m ClassHierarchy
 makeClassHierarchy (CH ch _is) kt ds = mconcat `liftM` mapM f ds where
     f (HsClassDecl sl chead decls) = do
@@ -447,6 +448,8 @@ makeClassHierarchy (CH ch _is) kt ds = mconcat `liftM` mapM f ds where
 --                               }]
 
     f decl@(HsInstDecl {}) = hsInstDeclToInst kt decl >>= \insts -> do
+        return $ foldl (flip addInstanceToHierarchy) mempty insts
+    f decl@(HsDeclDeriving {}) = hsInstDeclToInst kt decl >>= \insts -> do
         return $ foldl (flip addInstanceToHierarchy) mempty insts
     f _ = return mempty
 

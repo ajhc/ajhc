@@ -6,6 +6,7 @@ import Jhc.Enum
 import Jhc.Order
 import Jhc.Basics
 import Jhc.Num
+import Jhc.Tuples
 import Jhc.IO
 
 class  Ord a => Ix a  where
