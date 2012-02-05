@@ -65,15 +65,6 @@ buildFieldMap ms = FieldMap ans' ans where
         ans = Map.fromList $ sortGroupUnderFG fst snd $ concat [ [ (y,(x,i)) |  y <- ys | i <- [0..] ]  | (x,ys) <-  allDefs ]
         ans' = Map.fromList $ concatMap modInfoConsArity ms
 
-{-
-buildFieldMap :: Ho -> [ModInfo] -> FieldMap
-buildFieldMap ho ms = (ans',ans) where
-        theDefs = [ (x,z) | (x,_,z) <- concat $ map modInfoDefs ms, nameType x == DataConstructor ]
-        allDefs = theDefs ++ [ (x,z) | (x,(_,z)) <- Map.toList (hoDefs $ hoExp ho), nameType x == DataConstructor ]
-        ans = Map.fromList $ sortGroupUnderFG fst snd $ concat [ [ (y,(x,i)) |  y <- ys | i <- [0..] ]  | (x,ys) <-  allDefs ]
-        ans' = Map.fromList $ concatMap modInfoConsArity ms ++ getConstructorArities (hoDataTable $ hoBuild ho)
--}
-
 processModule :: FieldMap -> ModInfo -> IO (ModInfo,[Warning])
 processModule defs m = do
     when (dump FD.Parsed) $ do
@@ -82,7 +73,7 @@ processModule defs m = do
             $ HsPretty.ppHsModule
                 $ modInfoHsModule m
     -- driftDerive only uses IO to print the derived instances.
-    zmod' <-  driftDerive (modInfoHsModule m)
+    zmod' <- driftDerive (modInfoHsModule m)
     let mod = desugarHsModule (zmod')
     let (mod',errs) = runWriter $ renameModule (modInfoOptions m) defs (modInfoImport m)  mod
     when (dump FD.Renamed) $ do
@@ -102,14 +93,6 @@ data DatDesc
     = DatEnum [Name]
     | DatMany [(Name,Int)]
     | DatNewT Name
-
-dtDataDesc :: Monad m => DataTable -> Name -> m DatDesc
-dtDataDesc dt n = maybe (fail "dtDataDesc") return $ do
-    c <- getConstructor n dt
-    let datEnum = conVirtual c >>= return . DatEnum
-        datNewT = do ErasedAlias <- return $ conAlias c; DataNormal [n] <- return $ conChildren c; return $ DatNewT n
-        datMany = do DataNormal ns <- return $ conChildren c ; return $ DatMany [ (n,-1) | n <- ns ]
-    datEnum `mplus` datNewT `mplus` datMany
 
 getDataDesc :: Monad m => HsDecl -> m (Name,DatDesc)
 getDataDesc d = g d where
@@ -133,11 +116,10 @@ tiModules htc ms = do
     let thisFixityMap = buildFixityMap (concat [ filter isHsInfixDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms])
     let fixityMap = thisFixityMap  `mappend` hoFixities htc
     thisTypeSynonyms <- declsToTypeSynonyms (hoTypeSynonyms htc) $ concat [ filter isHsTypeDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms]
---    putStrLn "Synonyms"
---    putStrLn $ HsPretty.render $ showSynonyms pprint thisTypeSynonyms
     let ts = thisTypeSynonyms `mappend` hoTypeSynonyms htc
-    -- 'expandTypeSyns' is in the Warning monad and doesn't require IO.
-    let f x = expandTypeSyns ts (modInfoHsModule x) >>= return . FrontEnd.Infix.infixHsModule fixityMap >>= \z -> return (modInfoHsModule_s ( z) x)
+    let f x = expandTypeSyns ts (modInfoHsModule x) >>=
+            return . FrontEnd.Infix.infixHsModule fixityMap >>=
+            \z -> return (modInfoHsModule_s ( z) x)
     ms <- mapM f ms
     processIOErrors
     let ds = concat [ hsModuleDecls $ modInfoHsModule m | m <- ms ]
@@ -147,7 +129,7 @@ tiModules htc ms = do
         putStrLn $ HsPretty.render (HsPretty.ppHsDecls ds)
 
     -- kind inference for all type constructors type variables and classes in the module
-    let classAndDataDecls = filter (or' [isHsDataDecl, isHsNewTypeDecl, isHsClassDecl, isHsClassAliasDecl]) ds  -- rDataDecls ++ rNewTyDecls ++ rClassDecls
+    let classAndDataDecls = filter (or' [isHsDataDecl, isHsNewTypeDecl, isHsClassDecl, isHsClassAliasDecl]) ds
     kindInfo <- kiDecls importKindEnv ds -- classAndDataDecls
 
     when (dump FD.Kind) $
@@ -155,36 +137,36 @@ tiModules htc ms = do
              putStrLn $ PPrint.render $ pprint kindInfo}
 
     processIOErrors
-    -- collect types for data constructors
 
-    let localDConsEnv =  dataConsEnv (error "modName") kindInfo classAndDataDecls -- (rDataDecls ++ rNewTyDecls)
-
+    let localDConsEnv = dataConsEnv kindInfo classAndDataDecls
     wdump FD.Dcons $ do
         putStr "\n ---- data constructor assumptions ---- \n"
-        mapM_ putStrLn [ show n ++  " :: " ++ prettyPrintType s |  (n,s) <- Map.toList localDConsEnv]
+        mapM_ putStrLn [ show n ++  " :: " ++ prettyPrintType s |
+            (n,s) <- Map.toList localDConsEnv]
 
-    --let globalDConsEnv = localDConsEnv `Map.union` importDConsEnv
+    cHierarchy <- makeClassHierarchy importClassHierarchy kindInfo ds
+    let smallClassHierarchy = foldr addInstanceToHierarchy cHierarchy dinsts where
+            derivingClauses = collectDeriving ds
+            dataInfo = Map.fromList $ concatMap getDataDesc ds
+            dinsts = concatMap g derivingClauses where
+                g r@(_,c,t) | c `elem` enumDerivableClasses,
+                    Just (DatEnum (_:_:_)) <- Map.lookup t dataInfo = [f r]
+                            | c `elem` enumDerivableClasses,
+                    t `elem` [tc_Bool, tc_Ordering, tc_IOErrorType, tc_IOMode] = [f r]
+                --g r@(_,c,t) | c `notElem` noNewtypeDerivable, Just (DatMany True [_]) <- Map.lookup t dataInfo = [f r]
+                g _ = []
+                f (sl,c,t) = emptyInstance { instSrcLoc = sl, instDerived = True, instHead = [] :=> IsIn c (TCon (Tycon t kindStar)) }
+    smallClassHierarchy <- checkForDuplicateInstaces importClassHierarchy smallClassHierarchy
 
-    let smallClassHierarchy = foldr addInstanceToHierarchy (makeClassHierarchy importClassHierarchy kindInfo ds) dinsts
-        cHierarchyWithInstances = scatterAliasInstances $ smallClassHierarchy `mappend` importClassHierarchy
-        derivingClauses = collectDeriving ds
-        dataInfo = Map.fromList $ concatMap getDataDesc ds
-        --dataTable = hoDataTable htc
-        dinsts = concatMap g derivingClauses where
-            g r@(_,c,t) | c `elem` enumDerivableClasses, Just (DatEnum (_:_:_)) <- Map.lookup t dataInfo = [f r]
-                        | c `elem` enumDerivableClasses, t `elem` [tc_Bool, tc_Ordering, tc_IOErrorType, tc_IOMode] = [f r]
-            --g r@(_,c,t) | c `notElem` noNewtypeDerivable, Just (DatMany True [_]) <- Map.lookup t dataInfo = [f r]
-            g _ = []
-            f (sl,c,t) = emptyInstance { instSrcLoc = sl, instDerived = True, instHead = [] :=> IsIn c (TCon (Tycon t kindStar)) }
+    let cHierarchyWithInstances = scatterAliasInstances $
+            smallClassHierarchy `mappend` importClassHierarchy
 
     when (dump FD.ClassSummary) $ do
         putStrLn "  ---- class summary ---- "
         printClassSummary cHierarchyWithInstances
-
     when (dump FD.Class) $
          do {putStrLn "  ---- class hierarchy ---- ";
              printClassHierarchy smallClassHierarchy}
-
     -- lift the instance methods up to top-level decls
     let cDefBinds = concat [ [ z | z <- ds] | HsClassDecl _ _ ds <- ds]
     let myClassAssumps = concat  [ classAssumps as | as <- classRecords cHierarchyWithInstances ]
@@ -294,4 +276,5 @@ tiModules htc ms = do
             tiProps        = pragmaProps,
             tiAllAssumptions = allAssumps
         }
+    processIOErrors
     return (hoEx,tiData)

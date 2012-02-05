@@ -82,6 +82,7 @@ processErrors' doDie ws = putErrLn "" >> mapM_ s (snub ws) >> when (die && doDie
 data WarnType
     = AmbiguousExport Module [Name]
     | AmbiguousName Name [Name]
+    | DuplicateInstances
     | InvalidDecl
     | MissingDep String
     | MissingModule Module
@@ -103,6 +104,7 @@ warnIsFatal w = f w where
     f AmbiguousExport {} = True
     f AmbiguousName {} = True
     f InvalidDecl {} = True
+    f DuplicateInstances {} = True
     f MissingDep {} = True
     f MissingModule {} = True
     f MultiplyDefined {} = True

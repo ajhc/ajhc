@@ -36,9 +36,10 @@ import FrontEnd.Tc.Type
 import Name.Name
 import Support.FreeVars
 
-dataConsEnv :: Module -> KindEnv -> [HsDecl] -> Map.Map Name Sigma
-dataConsEnv modName kt decls
-   = Map.unions $ map (dataDeclEnv modName kt) decls
+{-# NOINLINE dataConsEnv #-}
+dataConsEnv :: KindEnv -> [HsDecl] -> Map.Map Name Sigma
+dataConsEnv kt decls
+   = Map.unions $ map (dataDeclEnv (error "dataConsenvModName") kt) decls
 
 -- we should only apply this function to data decls and newtype decls
 -- howver the fall through case is just there for completeness

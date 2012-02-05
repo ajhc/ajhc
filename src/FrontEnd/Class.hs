@@ -8,6 +8,7 @@ module FrontEnd.Class(
     ClassType(..),
     instanceName,
     defaultInstanceName,
+    checkForDuplicateInstaces,
     printClassSummary,
     findClassInsts,
     findClassRecord,
@@ -31,6 +32,8 @@ import Data.Generics(mkQ,something)
 import Data.List(nub)
 import Debug.Trace
 import Text.PrettyPrint.HughesPJ(render,Doc())
+import Text.Printf
+import qualified Data.List
 import qualified Data.Map as Map
 import qualified Text.PrettyPrint.HughesPJ as PPrint
 
@@ -43,6 +46,7 @@ import FrontEnd.SrcLoc
 import FrontEnd.Tc.Kind
 import FrontEnd.Tc.Type
 import FrontEnd.Utils
+import FrontEnd.Warning
 import Maybe
 import Name.Name
 import Name.Names
@@ -135,7 +139,7 @@ instance Binary ClassHierarchy where
 instance Monoid ClassHierarchy where
     mempty = CH mempty mempty
     mappend (CH a b) (CH c d) =
-        CH (Map.union a c) (Map.unionWith (++) b d)
+        CH (Map.union a c) (Map.unionWith Data.List.union b d)
 
 classRecords :: ClassHierarchy -> [ClassRecord]
 classRecords (CH ch _) = Map.elems ch
@@ -209,14 +213,11 @@ printClassHierarchy (CH h is) = mapM_ printClassDetails $  Map.toList h where
     passoc (Assoc nk isData as kt) = text (if isData then "data" else "type") <+>
         pprint nk <+> hsep (map pprint as) <+> text "::" <+> pprint kt
 
-addOneInstanceToHierarchy :: ClassHierarchy -> Inst -> ClassHierarchy
-addOneInstanceToHierarchy (CH r i) inst@Inst { instHead = cntxt :=> IsIn className _ } =
-    CH r (Map.insertWith (++) className [inst] i)
-
+-- this does not check for duplicates, use checkForDuplicateInstaces after all
+-- instances have been added to do so.
 addInstanceToHierarchy :: Inst -> ClassHierarchy -> ClassHierarchy
 addInstanceToHierarchy inst@Inst { instHead = cntxt :=> IsIn className _ } (CH r i) =
-    CH r (Map.insertWith cd className [inst] i) where
-        cd [inst] cs = runIdentity $ ensureNotDup (instSrcLoc inst) inst cs
+    CH r (Map.insertWith Data.List.union className [inst] i)
 
 hsInstDeclToInst :: Monad m => KindEnv -> HsDecl -> m [Inst]
 hsInstDeclToInst kt (HsInstDecl sloc qType decls)
@@ -414,26 +415,23 @@ fromHsTyVar (HsTyVar v) = return v
 fromHsTyVar (HsTyExpKind (Located _ t) _) = fromHsTyVar t
 fromHsTyVar _ = fail "fromHsTyVar"
 
-makeClassHierarchy :: ClassHierarchy -> KindEnv -> [HsDecl] -> ClassHierarchy
-makeClassHierarchy (CH ch _is) kt ds = ans where
-    ans =  execWriter (mapM_ f ds) -- Map.fromListWith combineClassRecords [  (className x,x)| x <- execWriter (mapM_ f ds) ]
+makeClassHierarchy :: MonadWarn m => ClassHierarchy -> KindEnv -> [HsDecl] -> m ClassHierarchy
+makeClassHierarchy (CH ch _is) kt ds = mconcat `liftM` mapM f ds where
     f (HsClassDecl sl chead decls) = do
             let qualifiedMethodAssumps = concatMap (aHsTypeSigToAssumps kt . qualifyMethod newClassContext) (filter isHsTypeSig decls)
-                newClassContext = [HsAsst className [argName]] -- hsContextToContext [(className, argName)]                                                                                                                                                                   -- TODO
+                newClassContext = [HsAsst className args]
                 className = hsClassHead chead
-                [Just argName] = map fromHsTyVar (hsClassHeadArgs chead)
-            tell $ classHierarchyFromRecords [ClassRecord {
+                args = [ a | ~(Just a) <- map fromHsTyVar (hsClassHeadArgs chead) ]
+            return $ classHierarchyFromRecords [ClassRecord {
                 classArgs,
                 classAssocs,
                 classAlias = Nothing,
                 className = toName ClassName className,
                 classSrcLoc = sl,
-                classSupers = [ toName ClassName x | HsAsst x _ <- cntxt],
-                --classInsts = [ emptyInstance { instHead = i } | i@(_ :=> IsIn n _) <- [], nameName n == className],
+                classSupers = [ toName ClassName x | ~(HsAsst x _) <- cntxt],
                 classAssumps = qualifiedMethodAssumps }]
         where
         cntxt = hsClassHeadContext chead
-        --HsQualType cntxt tbody = t
         classAssocs = createClassAssocs kt decls
         (_,(_,classArgs')) = chToClassHead kt chead
         classArgs = [ v | ~(TVar v) <- classArgs' ]
@@ -448,13 +446,24 @@ makeClassHierarchy (CH ch _is) kt ds = ans where
 --                               }]
 
     f decl@(HsInstDecl {}) = hsInstDeclToInst kt decl >>= \insts -> do
-        --crs <- flip mapM [ (cn,i) | i@Inst { instHead = _ :=> IsIn cn _} <- insts] $ \ (x,inst) -> case Map.lookup x ch of
-        --    Just cr -> ensureNotDup (srcLoc decl) inst (classInsts cr) >> return [cr { classInsts = mempty }]
-        --    Nothing -> return [] -- case Map.lookup x ans of
-                -- Just _ -> return []
-               --  Nothing -> return [] -- failSl (srcLoc decl) "Invalid Instance"
-        tell $ foldl addOneInstanceToHierarchy mempty insts
-    f _ = return ()
+        return $ foldl (flip addInstanceToHierarchy) mempty insts
+    f _ = return mempty
+
+checkForDuplicateInstaces :: MonadWarn m
+    => ClassHierarchy    -- ^ imported class hierarchy
+    -> ClassHierarchy    -- ^ locally defined hierarchy
+    -> m ClassHierarchy  -- ^ possibly simplified local hierarchy
+checkForDuplicateInstaces iCh (CH ch is) = mapM_ f (Map.toList is) >> return (CH ch is) where
+    f (className,is) = do
+        let is' = findClassInsts iCh className ++ is
+            sgu = sortGroupUnderFG fst snd [ ((cn,getTypeHead tt), i) |
+                i@Inst { instSrcLoc = sl, instHead = _ :=> IsIn cn tt } <- is' ]
+        mapM_ g sgu
+    g (_,[_]) = return ()
+    g (_,sls) | all instDerived sls = return ()
+    g ((ch,th),sls) = warn (instSrcLoc $ head sls) DuplicateInstances $
+        printf "instance (%s (%s ..)) defined multiple times: %s"
+            (show ch) (show th) (show $ map instSrcLoc sls)
 
 ensureNotDup :: Monad m => SrcLoc -> Inst -> [Inst] -> m [Inst]
 ensureNotDup sl i is = f i is where

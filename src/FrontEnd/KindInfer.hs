@@ -387,6 +387,11 @@ kiDecl d = withSrcLoc (srcLoc d) (f d) where
     varLike HsTyVar {} = True
     varLike HsTyExpKind { hsTyLType = Located _ t } = varLike t
     varLike _ = False
+    consLike (HsTyFun a b) = varLike a && varLike b
+    consLike (HsTyTuple ts) = all varLike ts
+    consLike t = case fromHsTypeApp t of
+        (HsTyCon {},as) -> all varLike as
+        _ -> False
     f HsTypeFamilyDecl { .. } = do
         kc <- lookupKind KindSimple (toName TypeConstructor hsDeclName)
         kiApps kc hsDeclTArgs (maybe kindStar hsKindToKind hsDeclHasKind)
@@ -430,12 +435,10 @@ kiDecl d = withSrcLoc (srcLoc d) (f d) where
         carg <- lookupKind KindSimple (toName TypeVal classArg)
         mapM_ (\n -> lookupKind KindSimple n >>= unify carg ) rn
         local (\e -> e { kiWhere = InClass }) $ mapM_ kiDecl sigsAndDefaults
-    f (HsInstDecl _ HsClassHead { .. } sigsAndDefaults) = do
-        let consLike (HsTyFun a b) = varLike a && varLike b
-            consLike (HsTyTuple ts) = all varLike ts
-            consLike t = case fromHsTypeApp t of
-                (HsTyCon {},as) -> all varLike as
-                _ -> False
+    f HsDeclDeriving { hsDeclClassHead = ch } = checkInstance ch
+    f HsInstDecl { hsDeclClassHead = ch } = checkInstance ch
+    f _ = return ()
+    checkInstance HsClassHead { .. } = do
         unless (all consLike hsClassHeadArgs) $
             addWarn InvalidDecl "Instance parameters must be of the form 'C v1 v2'"
         mapM_ kiPred hsClassHeadContext
@@ -444,7 +447,6 @@ kiDecl d = withSrcLoc (srcLoc d) (f d) where
         when (length ks /= length hsClassHeadArgs) $
             addWarn InvalidDecl "Incorrect number of class parameters in instance head"
         zipWithM_ kiType' ks hsClassHeadArgs
-    f _ = return ()
   --      HsQualType contxt (HsTyApp (HsTyCon _className) (HsTyVar classArg)) =  qualType
   --      ans = do
   --          carg <- lookupKind KindSimple (toName TypeVal classArg)
