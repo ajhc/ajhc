@@ -31,6 +31,7 @@ import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.Generics(mkQ,something)
 import Data.List(nub)
+import Data.Maybe
 import Debug.Trace
 import Text.PrettyPrint.HughesPJ(render,Doc())
 import Text.Printf
@@ -48,16 +49,13 @@ import FrontEnd.Tc.Kind
 import FrontEnd.Tc.Type
 import FrontEnd.Utils
 import FrontEnd.Warning
-import Maybe
 import Name.Name
 import Name.Names
 import Options (verbose)
-import Support.CanType
 import Support.FreeVars
 import Support.MapBinaryInstance
 import Support.Tickle
 import Util.Gen
-import Util.HasSize
 import Util.Inst()
 
 type Assump = (Name,Sigma)
@@ -100,16 +98,6 @@ data ClassRecord = ClassRecord {
     classAssocs  :: [AssociatedType]
     } deriving (Show,Eq)
     {-! derive: Binary !-}
-
-newClassRecord c = ClassRecord {
-    className = c,
-    classSrcLoc = bogusASrcLoc,
-    classSupers = [],
-    classArgs = [],
-    classAssumps = [],
-    classAlias = Nothing,
-    classAssocs = []
-    }
 
 newtype InstanceEnv = InstanceEnv {
     instanceEnv :: Map.Map (Name,Name) ([Tyvar],[Tyvar],Type) }
@@ -158,11 +146,11 @@ showInst :: Inst -> String
 showInst = PPrint.render . pprint
 
 aHsTypeSigToAssumps :: KindEnv -> HsDecl -> [(Name,Type)]
-aHsTypeSigToAssumps kt sig@(HsTypeSig _ names qualType) = [ (toName Val n,typ) | n <- names] where
+aHsTypeSigToAssumps kt ~sig@(HsTypeSig _ names qualType) = [ (toName Val n,typ) | n <- names] where
     Identity typ = hsQualTypeToSigma kt qualType
 
 qualifyMethod :: [HsAsst] -> HsDecl -> HsDecl
-qualifyMethod [HsAsst c [n]] (HsTypeSig sloc names (HsQualType oc t))
+qualifyMethod ~[HsAsst c [n]] ~(HsTypeSig sloc names (HsQualType oc t))
     = HsTypeSig sloc names (HsQualType (HsAsst c [n']:oc) t) where
         Just n' = (something (mkQ mzero f)) t
         f (HsTyVar n') | hsNameToOrig n' == hsNameToOrig n = return n'
@@ -217,7 +205,7 @@ printClassHierarchy (CH h is) = mapM_ printClassDetails $  Map.toList h where
 -- this does not check for duplicates, use checkForDuplicateInstaces after all
 -- instances have been added to do so.
 addInstanceToHierarchy :: Inst -> ClassHierarchy -> ClassHierarchy
-addInstanceToHierarchy inst@Inst { instHead = cntxt :=> IsIn className _ } (CH r i) =
+addInstanceToHierarchy inst@Inst { instHead = cntxt :=> ~(IsIn className _) } (CH r i) =
     CH r (Map.insertWith Data.List.union className [inst] i)
 
 -- Kind inference has already been done so we don't need to check for kind
@@ -232,8 +220,7 @@ hsInstDeclToInst kt (HsInstDecl sloc qType decls)
 hsInstDeclToInst kt (HsDeclDeriving sloc qType)
         = return [emptyInstance { instSrcLoc = sloc, instDerived = True,
         instHead = cntxt :=> IsIn className convertedArgType }]
-   where
-   (cntxt, (className, cargs@[convertedArgType])) = chToClassHead kt qType
+   where (cntxt, (className, [convertedArgType])) = chToClassHead kt qType
 hsInstDeclToInst _ _ = return []
 
 vtrace s v | False && verbose = trace s v
@@ -271,7 +258,6 @@ instanceToTopDecls kt ch@(CH classHierarchy _) (HsInstDecl _ qualType methods)
     crecord = case Map.lookup className classHierarchy  of
         Nothing -> error $ "instanceToTopDecls: could not find class " ++ show className ++ "in class hierarchy"
         Just crecord -> crecord
-    tsubst na vv v = applyTyvarMap [(na,vv)] v
 instanceToTopDecls kt ch@(CH classHierarchy _) (HsClassDecl _ chead methods)
    = unzip $ map (defaultMethodToTopDecls kt methodSigs chead) $ methodGroups where
    className = hsClassHead chead
@@ -310,8 +296,6 @@ methodToTopDecls _  kt preds crecord qt (methodName, methodDecls)
 defaultMethodToTopDecls :: KindEnv -> [Assump] -> HsClassHead -> (Name, HsDecl) -> (HsDecl,Assump)
 defaultMethodToTopDecls kt methodSigs HsClassHead { .. } (methodName, methodDecls)
    = (renamedMethodDecls,(newMethodName,sigFromClass)) where
-    --(HsTyApp (HsTyCon className) _) = classApp
-    className = hsClassHead
     newMethodName = defaultInstanceName methodName
     sigFromClass = case [ s | (n, s) <- methodSigs, n == methodName] of
         [x] -> x
@@ -469,22 +453,12 @@ checkForDuplicateInstaces iCh (CH ch is) = mapM_ f (Map.toList is) >> return (CH
         printf "instance (%s (%s ..)) defined multiple times: %s"
             (show ch) (show th) (show $ map instSrcLoc sls)
 
-ensureNotDup :: Monad m => SrcLoc -> Inst -> [Inst] -> m [Inst]
-ensureNotDup sl i is = f i is where
-    f i (i':is') | instHead i == instHead i' = case instDerived i && instDerived i' of
-        True -> return is
-        False -> failSl sl $ "Duplicate Instance: " ++ show i ++ "\nPrevious instance declared at " ++ show (instSrcLoc i')
-    f i (_:is') = f i is'
-    f i [] = return $ i:is
-
 accLen :: Int -> [[a]] -> [(Int, [a])]
 accLen width [] = []
 accLen width (x:xs) = let newWidth = length x + width in (newWidth, x) : accLen newWidth xs
 
 groupStringsToWidth :: Int -> [String] -> [String]
-groupStringsToWidth width ss
-   = groupStringsToWidth' width (accLen 0 ss)
-   where
+groupStringsToWidth width ss = groupStringsToWidth' width (accLen 0 ss) where
    groupStringsToWidth' :: Int -> [(Int,String)] -> [String]
    groupStringsToWidth' width [] = []
    groupStringsToWidth' width xs

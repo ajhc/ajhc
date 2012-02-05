@@ -20,15 +20,13 @@ doModules :: HoTcInfo -> [HsModule] -> IO  (HoTcInfo,Tc.TiData)
 doModules htc ms  = do
     ms <- mapM modInfo ms
     when (dump FD.Defs) $ flip mapM_ ms $ \m -> do
-         putStrLn $ " ---- Definitions for" <+> show (modInfoName m) <+> "----";
-         mapM_ print ( modInfoDefs m)
-    ms <- determineExports [ (x,y,z) | (x,(y,z)) <- Map.toList $ hoDefs htc] (Map.toList $ hoExports htc) ms
+         putStrLn $ " ---- Definitions for" <+> show (modInfoName m) <+> "----"
+         mapM_ print (modInfoDefs m)
+    ms <- determineExports [ (x,y,z) |
+        (x,(y,z)) <- Map.toList $ hoDefs htc] (Map.toList $ hoExports htc) ms
     Tc.tiModules htc ms
 
 modInfo m = do
-    --opt <- case fileOptions (hsModuleOptions m) of
-    --    Just o -> return o
-    --    Nothing -> warn (srcLoc m) "unknown-option" ("Unknown OPTIONS in pragma module" <+> fromModule (hsModuleName m) <+>  show (hsModuleOptions m)) >> return options
     let (xs,ys) = collectDefsHsModule m
     return ModInfo {
         modInfoName = hsModuleName m,
@@ -37,5 +35,6 @@ modInfo m = do
         modInfoConsArity = ys,
         modInfoExport = error "modInfoExport",
         modInfoImport = error "modInfoImport",
+        modInfoReverseMap = error "modInfoReverseMap",
         modInfoOptions = hsModuleOpt m
         }

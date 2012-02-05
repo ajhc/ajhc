@@ -1,12 +1,12 @@
 {-# LANGUAGE RecursiveDo,NoMonoLocalBinds #-}
 -- | determine export\/imports for modules via fixpoint recursion
 
-module FrontEnd.Exports(determineExports,ModInfo(..),modInfoHsModule_s) where
+module FrontEnd.Exports(determineExports,ModInfo(..)) where
 
 import Control.Monad.Identity
-import Data.Monoid
 import Data.List
 import Data.Maybe
+import Data.Monoid
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -29,9 +29,9 @@ data ModInfo = ModInfo {
     modInfoExport :: [Name],
     modInfoImport :: [(Name,[Name])],
     modInfoHsModule :: HsModule,
+    modInfoReverseMap :: Map.Map Name Name,
     modInfoOptions :: Opt
     }
-   {-! derive: update !-}
 
 instance Eq ModInfo where
     a == b = modInfoName a == modInfoName b

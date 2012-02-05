@@ -53,7 +53,7 @@ newtype ScopeState = ScopeState {
 
 data Context
     = ContextTopLevel
-    | ContextInstance Name
+    | ContextInstance !Name
     | ContextLocal
     deriving(Eq)
 
@@ -77,14 +77,15 @@ addTopLevels  hsmod action = do
                 = let nn = hsName in (nn,nn):r
             | otherwise = let nn = toUnqualified hsName in (nn,hsName):(hsName,hsName):r
         f r z = let nn = qualifyName mod z in (z,nn):(nn,nn):r
-        z ns = mapM mult (filter (\x -> length x > 1) $ groupBy (\a b -> fst a == fst b) (sort ns))
-        mult xs@(~((n,sl):_)) = warn sl (MultiplyDefined n (snds xs)) (show n ++ " is defined multiple times: " ++ show xs)
+        z ns = mapM mult (filter (\x -> length x > 1) $
+            groupBy (\a b -> fst a == fst b) (sort ns))
+        mult xs@(~((n,sl):_)) = warn sl (MultiplyDefined n (snds xs))
+            (show n ++ " is defined multiple times: " ++ show xs)
     z cdefs
     let amb k x y | x == y = x
         amb k (Right n1) (Right n2) = Left (ambig k [n1,n2])
         amb _ _ l  = l
-
-    local ( \e -> e { envNameMap = Map.unionWithKey amb (Map.map Right $ Map.fromList nmap) (envNameMap e) }) action
+    local (\e -> e { envNameMap = Map.unionWithKey amb (Map.map Right $ Map.fromList nmap) (envNameMap e) }) action
 
 createSelectors sloc ds = mapM g ns where
     ds' :: [(Name,[(Name,HsBangType)])]
@@ -100,12 +101,11 @@ createSelectors sloc ds = mapM g ns where
 
 ambig x ys = "Ambiguous Name: " ++ show x ++ "\nCould refer to: " ++ tupled (map show ys)
 
-runRename :: MonadWarn m => (a -> RM a) -> Opt -> Module -> FieldMap -> [(Name,[Name])] -> a -> m a
-runRename doit opt mod fls ns m = mapM_ addWarning errors >> return renamedMod where
+runRename :: MonadWarn m => (a -> RM a) -> Opt -> Module -> FieldMap -> [(Name,[Name])] -> a -> m (a,Map.Map Name Name)
+runRename doit opt mod fls ns m = mapM_ addWarning errors >> return (renamedMod,reverseMap) where
     nameMap = fromList $ map f ns where
         f (x,[y]) = (x,Right y)
         f (x,ys)  = (x,Left $ ambig x ys)
-
     startState = ScopeState { unique = 1 }
     startEnv = Env {
         envModule      = mod,
@@ -114,18 +114,18 @@ runRename doit opt mod fls ns m = mapM_ addWarning errors >> return renamedMod w
         envFieldLabels = fls,
         envSrcLoc      = mempty
     }
-    (renamedMod, _, errors) = runRWS (unRM $ doit m) startEnv startState
+    (renamedMod, _, (reverseMap,errors)) = runRWS (unRM $ doit m) startEnv startState
 
 {-# NOINLINE renameModule #-}
-renameModule :: MonadWarn m => Opt -> FieldMap -> [(Name,[Name])] -> HsModule -> m HsModule
+renameModule :: MonadWarn m => Opt -> FieldMap -> [(Name,[Name])] -> HsModule -> m (HsModule, Map.Map Name Name)
 renameModule opt fls ns m = runRename renameDecls opt (hsModuleName m) fls ns m
 
 {-# NOINLINE renameStatement #-}
 renameStatement :: MonadWarn m => FieldMap -> [(Name,[Name])] ->  Module -> HsStmt -> m HsStmt
-renameStatement fls ns modName stmt = runRename rename options modName fls ns stmt
+renameStatement fls ns modName stmt = fst `liftM` runRename rename options modName fls ns stmt
 
 withSubTable :: SubTable -> RM a -> RM a
-withSubTable st action = local ( \e -> e { envNameMap = Map.map Right st `union` envNameMap e }) action
+withSubTable st action = local (\e -> e { envNameMap = Map.map Right st `union` envNameMap e }) action
 
 renameDecls :: HsModule -> RM HsModule
 renameDecls mod = do
@@ -156,35 +156,18 @@ expandTypeSigs ds =  (concatMap f ds) where
     f (HsTypeSig sl ns qt) =  [ HsTypeSig sl [n] qt | n <- ns]
     f d = return d
 
-getTypeClassModule :: HsQualType -> Maybe Module
-getTypeClassModule typ =
-   case hsQualTypeType typ of
-      HsTyApp cls arg -> getModule (hsTypeName cls)
-      _ -> error "instance must consist of a type class application"
+--getTypeClassModule :: HsQualType -> Maybe Module
+--getTypeClassModule typ =
+--   case hsQualTypeType typ of
+--      HsTyApp cls arg -> getModule (hsTypeName cls)
+--      _ -> error "instance must consist of a type class application"
+getTypeClassModule :: HsClassHead -> Maybe Module
+getTypeClassModule typ = getModule (hsClassHead typ)
 
 qualifyMethodName :: Maybe Module -> Name -> Name
 qualifyMethodName Nothing name = name
 qualifyMethodName (Just mod) name = qualifyName mod name
 
-{- |
-This renaming shall help accepting an instance declaration like
-
-> import qualified Custom
->
-> instance Custom.Class T where
->    methodA = ...
->    methodB = ...
-
-by translating it to
-
-> instance Custom.Class T where
->    Custom.methodA = ...
->    Custom.methodB = ...
-
-I don't know, whether this also works if you do
-
-> import qualified Custom hiding (methodA, methodB, )
--}
 qualifyInstMethod :: Maybe Module -> HsDecl -> HsDecl
 qualifyInstMethod moduleName decl = case decl of
     HsPatBind srcLoc HsPVar {hsPatName = name} rhs decls -> HsPatBind srcLoc
@@ -275,7 +258,6 @@ instance Rename HsDecl where
     rename (HsClassDecl srcLoc classHead hsDecls) = do
         withSrcLoc srcLoc $ do
         classHead' <- updateWithN TypeVal (hsClassHeadArgs classHead) $ rename classHead
-        --doesClassMakeSense hsQualType'
         hsDecls' <- rename hsDecls
         return (HsClassDecl srcLoc classHead' hsDecls')
     rename (HsClassAliasDecl srcLoc name args hsContext hsClasses hsDecls) = do
@@ -294,8 +276,8 @@ instance Rename HsDecl where
         --updateWithN TypeVal hsQualType $ do
         --hsQualType' <- renameClassHead hsQualType
         hsDecls' <- rename $
-            hsDecls
-           --map (qualifyInstMethod (getTypeClassModule hsQualType)) hsDecls
+            --hsDecls
+           map (qualifyInstMethod (getTypeClassModule classHead')) hsDecls
         return (HsInstDecl srcLoc classHead' hsDecls')
     rename (HsInfixDecl srcLoc assoc int hsNames) = do
         withSrcLoc srcLoc $ do
@@ -344,32 +326,6 @@ instance Rename HsRule where
         m <- getCurrentModule
         i <- newUniq
         return prules {  hsRuleUniq = (m,i), hsRuleFreeVars = fvs', hsRuleLeftExpr = e1', hsRuleRightExpr = e2' }
-
-doesClassMakeSense :: HsQualType -> RM ()
-doesClassMakeSense (HsQualType _ type_) = case type_ of
-    (HsTyApp (HsTyCon _) (HsTyVar _)) -> return ()
-    (HsTyApp (HsTyApp _ _) _)         -> failRename "Multiparameter typeclasses not supported"
-    (HsTyCon _)                       -> failRename "Typeclass with no parameters"
-    _                                 -> failRename $ "Invalid type in class declaration: "++show type_
-
-renameClassHead :: HsQualType -> RM HsQualType
-renameClassHead (HsQualType hsContext hsType) = do
-    ctx <- rename hsContext
-    typ <- case hsType of
-        HsTyApp (HsTyCon n) t -> do
-            n <- renameName $ toName ClassName n
-            t <- rename t
-            return (HsTyApp (HsTyCon n) t)
-        HsTyApp (HsTyApp _ _) _   -> do
-            failRename "Multiparameter typeclasses not supported"
-            rename hsType
-        HsTyCon {}  -> do
-            failRename "Typeclass with no parameters"
-            rename hsType
-        _   -> do
-            failRename $ "Invalid type in class declaration: " ++ show hsType
-            rename hsType
-    return (HsQualType ctx typ)
 
 instance Rename HsQualType where
     rename (HsQualType hsContext hsType) =
@@ -691,7 +647,9 @@ renameName hsName
 renameName hsName = do
     subTable <- asks envNameMap
     case mlookup hsName subTable of
-        Just (Right name) -> return name
+        Just (Right name) -> do
+            tell (Map.singleton name hsName,mempty)
+            return name
         Just (Left err) -> do
             sl <- getSrcLoc
             warn sl (UndefinedName hsName) err
@@ -825,8 +783,8 @@ getNamesAndASrcLocsFromHsStmt (HsLetStmt hsDecls) = concat $ map getNamesAndASrc
 -- RM Monad
 -----------
 
-newtype RM a = RM (RWS Env [Warning] ScopeState a)
-    deriving(Monad,Functor,MonadReader Env, MonadWriter [Warning], MonadState ScopeState)
+newtype RM a = RM (RWS Env (Map.Map Name Name,[Warning]) ScopeState a)
+    deriving(Monad,Functor,MonadReader Env, MonadWriter (Map.Map Name Name,[Warning]), MonadState ScopeState)
 
 unRM (RM x) = x
 
@@ -835,7 +793,7 @@ instance Applicative RM where
     (<*>) = ap
 
 instance MonadWarn RM where
-    addWarning w = tell [w]
+    addWarning w = tell (mempty,[w])
 
 instance UniqueProducer RM where
     newUniq = do

@@ -61,8 +61,10 @@ isGlobal _ = error "isGlobal"
 
 buildFieldMap :: [ModInfo] -> FieldMap
 buildFieldMap ms = FieldMap ans' ans where
-        allDefs = [ (x,z) | (x,_,z) <- concat $ map modInfoDefs ms, nameType x == DataConstructor ]
-        ans = Map.fromList $ sortGroupUnderFG fst snd $ concat [ [ (y,(x,i)) |  y <- ys | i <- [0..] ]  | (x,ys) <-  allDefs ]
+        allDefs = [ (x,z) | (x,_,z) <- concat $ map modInfoDefs ms,
+            nameType x == DataConstructor ]
+        ans = Map.fromList $ sortGroupUnderFG fst snd $ concat
+            [ [ (y,(x,i)) |  y <- ys | i <- [0..] ]  | (x,ys) <-  allDefs ]
         ans' = Map.fromList $ concatMap modInfoConsArity ms
 
 processModule :: FieldMap -> ModInfo -> IO (ModInfo,[Warning])
@@ -75,11 +77,12 @@ processModule defs m = do
     -- driftDerive only uses IO to print the derived instances.
     zmod' <- driftDerive (modInfoHsModule m)
     let mod = desugarHsModule (zmod')
-    let (mod',errs) = runWriter $ renameModule (modInfoOptions m) defs (modInfoImport m)  mod
+    let ((mod',rmap),errs) = runWriter $
+            renameModule (modInfoOptions m) defs (modInfoImport m)  mod
     when (dump FD.Renamed) $ do
         putStrLn " \n ---- renamed code ---- \n"
         putStrLn $ HsPretty.render $ HsPretty.ppHsModule $  mod'
-    return $ (modInfoHsModule_s mod' m,errs)
+    return $ (m { modInfoReverseMap = rmap, modInfoHsModule = mod' },errs)
 
 -- type check a set of mutually recursive modules.
 -- assume all dependencies are met in the
@@ -102,7 +105,8 @@ getDataDesc d = g d where
     f HsNewTypeDecl { hsDeclCon = (hsConDeclName -> cn)  } = return $ DatNewT cn
     f HsDataDecl { hsDeclCons = cs }
         | all null $ map hsConDeclArgs cs = return $ DatEnum (map hsConDeclName cs)
-    f HsDataDecl { hsDeclCons = cs } = return $ DatMany [ (hsConDeclName c, (length . hsConDeclArgs) c) | c <- cs]
+    f HsDataDecl { hsDeclCons = cs } = return $
+        DatMany [ (hsConDeclName c, (length . hsConDeclArgs) c) | c <- cs]
     f _ = fail "getDataDesc: not a data declaration"
 
 {-# NOINLINE tiModules #-}
@@ -113,13 +117,15 @@ tiModules htc ms = do
     let nfm = buildFieldMap ms `mappend` hoFieldMap htc
     mserrs <- mapM (processModule nfm) ms
     let ms = fsts mserrs
-    let thisFixityMap = buildFixityMap (concat [ filter isHsInfixDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms])
+    let thisFixityMap = buildFixityMap . concat $
+            [filter isHsInfixDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms]
     let fixityMap = thisFixityMap  `mappend` hoFixities htc
-    thisTypeSynonyms <- declsToTypeSynonyms (hoTypeSynonyms htc) $ concat [ filter isHsTypeDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms]
+    thisTypeSynonyms <- declsToTypeSynonyms (hoTypeSynonyms htc) $ concat
+        [ filter isHsTypeDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms]
     let ts = thisTypeSynonyms `mappend` hoTypeSynonyms htc
     let f x = expandTypeSyns ts (modInfoHsModule x) >>=
             return . FrontEnd.Infix.infixHsModule fixityMap >>=
-            \z -> return (modInfoHsModule_s ( z) x)
+            \z -> return x { modInfoHsModule = z }
     ms <- mapM f ms
     processIOErrors
     let ds = concat [ hsModuleDecls $ modInfoHsModule m | m <- ms ]
@@ -155,7 +161,11 @@ tiModules htc ms = do
                     t `elem` [tc_Bool, tc_Ordering, tc_IOErrorType, tc_IOMode] = [f r]
                 --g r@(_,c,t) | c `notElem` noNewtypeDerivable, Just (DatMany True [_]) <- Map.lookup t dataInfo = [f r]
                 g _ = []
-                f (sl,c,t) = emptyInstance { instSrcLoc = sl, instDerived = True, instHead = [] :=> IsIn c (TCon (Tycon t kindStar)) }
+                f (sl,c,t) = emptyInstance {
+                    instSrcLoc = sl,
+                    instDerived = True,
+                    instHead = [] :=> IsIn c (TCon (Tycon t kindStar))
+                    }
     smallClassHierarchy <- checkForDuplicateInstaces importClassHierarchy smallClassHierarchy
 
     let cHierarchyWithInstances = scatterAliasInstances $
@@ -169,11 +179,12 @@ tiModules htc ms = do
              printClassHierarchy smallClassHierarchy}
     -- lift the instance methods up to top-level decls
     let cDefBinds = concat [ [ z | z <- ds] | HsClassDecl _ _ ds <- ds]
-    let myClassAssumps = concat  [ classAssumps as | as <- classRecords cHierarchyWithInstances ]
-        instanceEnv   = Map.fromList instAssumps
+    let myClassAssumps = concat [ classAssumps as | as <- classRecords cHierarchyWithInstances ]
+        instanceEnv = Map.fromList instAssumps
         classDefs = snub (concatMap getDeclNames cDefBinds)
-        classEnv  = Map.fromList $ [ (x,y) | (x,y) <- myClassAssumps, x `elem` classDefs  ]
-        (liftedInstances,instAssumps) =  mconcatMap (instanceToTopDecls kindInfo cHierarchyWithInstances) ds -- rInstDecls
+        classEnv = Map.fromList $ [ (x,y) | (x,y) <- myClassAssumps, x `elem` classDefs  ]
+        (liftedInstances,instAssumps) = mconcatMap
+            (instanceToTopDecls kindInfo cHierarchyWithInstances) ds
 
     when (not (null liftedInstances) && (dump FD.Instance) ) $ do
         putStrLn "  ---- lifted instance declarations ---- "
@@ -213,12 +224,13 @@ tiModules htc ms = do
 
     when (dump FD.AllTypes) $ do
         putStrLn "  ---- all types ---- "
-        putStrLn $ PPrint.render $ pprintEnvMap (sigEnv `mappend` localDConsEnv `mappend` hoAssumps htc)
+        putStrLn $ PPrint.render $ pprintEnvMap
+            (sigEnv `mappend` localDConsEnv `mappend` hoAssumps htc)
 
     let moduleName = modInfoName tms
         (tms:_) = ms
     let tcInfo = tcInfoEmpty {
-        tcInfoEnv = hoAssumps htc `mappend` localDConsEnv, -- (importVarEnv `mappend` globalDConsEnv),
+        tcInfoEnv = hoAssumps htc `mappend` localDConsEnv,
         tcInfoSigEnv = sigEnv,
         tcInfoModName = moduleName,
         tcInfoKindInfo = kindInfo,
@@ -243,14 +255,16 @@ tiModules htc ms = do
 
     when (dump FD.Types) $ do
         putStrLn " ---- the types of identifiers ---- "
-        mapM_ putStrLn [ show n ++  " :: " ++ prettyPrintType s |  (n,s) <- Map.toList (if verbose2 then localVarEnv else trimEnv localVarEnv)]
+        mapM_ putStrLn [ show n ++  " :: " ++ prettyPrintType s |
+            (n,s) <- Map.toList (if verbose2 then localVarEnv else trimEnv localVarEnv)]
     when (dump FD.Types) $ do
         putStrLn " ---- the coersions of identifiers ---- "
         mapM_ putStrLn [ show n ++  " --> " ++ show s |  (n,s) <- Map.toList coercions]
 
     localVarEnv <- return $  localVarEnv `Map.union` noDefaultSigs
 
-    let pragmaProps = fromList $ Map.toList $ Map.fromListWith mappend [ (toName Name.Val x,fromList $ readProp w) |  HsPragmaProps _ w xs <- ds, x <- xs ]
+    let pragmaProps = fromList $ Map.toList $ Map.fromListWith mappend
+            [(toName Name.Val x,fromList $ readProp w) | HsPragmaProps _ w xs <- ds, x <- xs]
 
     let allAssumps = localDConsEnv `Map.union` localVarEnv
         allExports = Set.fromList (concatMap modInfoExport ms)
