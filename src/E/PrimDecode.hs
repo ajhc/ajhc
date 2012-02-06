@@ -42,6 +42,8 @@ hash = [] :-> BKind KHash
 starHash = [] :-> BKind KQuestQuest
 state = [] :-> BState
 utup ~([] :-> t1) ~([] :-> t2) = [] :-> BTup [t1,t2]
+utup1 ~([] :-> t1) = [] :-> BTup [t1]
+array = hash
 
 infixr 3 +>
 (+>) :: Typ -> Typ -> Typ
@@ -64,6 +66,12 @@ plainPrimMap = Map.fromList
     , "unbox"          ==> star +> hash
     , "constPeekByte"  ==> hash +> hash
     , "exitFailure__"  ==> hash +> hash
+    , "newArray__"     ==> hash +> star +> state +> utup state array
+    , "newBlankArray__"==> hash +> state +> utup state array
+    , "copyArray__"    ==> hash +> hash +> hash +> array +> array +> state +> state
+    , "readArray__"    ==> array +> hash +> state +> utup state star
+    , "writeArray__"   ==> array +> hash +> star +> state +> state
+    , "indexArray__"   ==> array +> hash +> utup1 star
     ] `Map.union` fmap (const (starHash +> starHash)) incDec
       `Map.union` fmap (const star) primBoundMap
 

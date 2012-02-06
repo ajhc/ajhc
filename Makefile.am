@@ -324,7 +324,7 @@ jhc-1.0.hl: lib/jhc/jhc.yaml lib/jhc/Jhc/Prim.hs lib/jhc/Jhc/IO.hs lib/jhc/Jhc/I
     lib/jhc/System/Mem.hs lib/jhc/Jhc/Type/Basic.hs lib/jhc/Prelude.hs lib/jhc/Jhc/Num.hs lib/jhc/Jhc/Text/Read.hs \
     lib/jhc/Jhc/Type/Ptr.hs lib/jhc/Foreign/C/Error.hs lib/jhc/Foreign/Storable.hs lib/jhc/Foreign/Ptr.hs lib/jhc/Jhc/Inst/Order.hs \
     lib/jhc/Jhc/Enum.hs lib/jhc/Jhc/Type/Handle.hs lib/jhc/Jhc/Tuples.hs lib/jhc/Jhc/String.hs lib/jhc/Prelude/Float.hs \
-    lib/jhc/Jhc/Type/C.hs lib/jhc/Jhc/Inst/PrimEnum.hs lib/jhc/Jhc/Inst/Show.hs lib/jhc/Jhc/Array.hs lib/jhc/Prelude/Text.hs \
+    lib/jhc/Jhc/Type/C.hs lib/jhc/Jhc/Inst/PrimEnum.hs lib/jhc/Jhc/Inst/Show.hs lib/jhc/Prelude/Text.hs \
     lib/jhc/Foreign/Marshal/Alloc.hs lib/jhc/Foreign/Marshal/Array.hs lib/jhc/Jhc/Options.hs lib/jhc/Prelude/CType.hs lib/jhc/Jhc/Monad.hs \
     lib/jhc/System/IO/Unsafe.hs lib/jhc/System/Mem/StableName.hs lib/jhc/Jhc/Inst/Read.hs lib/jhc/Jhc/Maybe.hs jhc-prim-1.0.hl
 jhc-prim-1.0.hl: lib/jhc-prim/jhc-prim.yaml lib/jhc-prim/Jhc/Prim/IO.hs lib/jhc-prim/Jhc/Prim/Prim.hs lib/jhc-prim/Jhc/Prim/Wrapper.hs lib/jhc-prim/Jhc/Prim/Bits.hs

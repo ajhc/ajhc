@@ -65,8 +65,6 @@ import qualified Stats
 unboxedMap :: [(Name,Ty)]
 unboxedMap = [
     (tc_State_,TyUnit),
-    (tc_Ref__,TyPtr tyINode),
-    (tc_Array__,TyPtr tyINode),
     (tc_MutArray__,TyPtr tyINode)
     ]
 
@@ -408,23 +406,11 @@ compile' cenv (tvr,as,e) = ans where
         f "newWorld__" [_] = do
             return $ Return []
         f "dependingOn" [e,_] = ce e
-        -- references
-        f "newRef__" [v,_] = do
-            let [v'] = args [v]
-            return $ Alloc { expValue = v', expCount = toUnVal (1::Int), expRegion = region_heap, expInfo = mempty }
-        f "readRef__" [r,_] = do
-            let [r'] = args [r]
-            --return $ Fetch (Index r' (toUnVal (0::Int)))
-            return $ BaseOp PeekVal [Index r' (toUnVal (0::Int))]
-        f "writeRef__" [r,v,_] = do
-            let [r',v'] = args [r,v]
-            return $ BaseOp PokeVal [r',v']
-
         -- arrays
-        f "newMutArray__" [v,def,_] = do
+        f "newArray__" [v,def,_] = do
             let [v',def'] = args [v,def]
             return $ Alloc { expValue = def', expCount = v', expRegion = region_heap, expInfo = mempty }
-        f "newBlankMutArray__" [v,_] = do
+        f "newBlankArray__" [v,_] = do
             let [v'] = args [v]
             return $ Alloc { expValue = ValUnknown TyINode, expCount = v', expRegion = region_heap, expInfo = mempty }
         f "readArray__" [r,o,_] = do
@@ -437,10 +423,6 @@ compile' cenv (tvr,as,e) = ans where
         f "writeArray__" [r,o,v,_] = do
             let [r',o',v'] = args [r,o,v]
             return $ BaseOp PokeVal [(Index r' o'),v']
-
-        f ft [v,_]  | ft `elem` ["unsafeFreezeArray__", "unsafeThawArray__"] = do
-            let [v'] = args [v]
-            return $ Return [v']
         f p xs = fail $ "Grin.FromE - Unknown primitive: " ++ show (p,xs)
 
     -- other primitives

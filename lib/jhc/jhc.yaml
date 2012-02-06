@@ -24,7 +24,6 @@ Exposed-Modules:
         - Foreign.Ptr
         - Foreign.Storable
         - Jhc.Addr
-        - Jhc.Array
         - Jhc.Basics
         - Jhc.Enum
         - Jhc.Float

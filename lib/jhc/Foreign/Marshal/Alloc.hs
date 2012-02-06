@@ -88,7 +88,6 @@ failWhenNULL' name addr = do
 --
 -- The memory may be deallocated using 'free' or 'finalizerFree' when
 -- no longer required.
---
 mallocBytes      :: Int -> IO (Ptr a)
 mallocBytes size  = _malloc (fromIntegral size) >>= failWhenNULL' "malloc"
 

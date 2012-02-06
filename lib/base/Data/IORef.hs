@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fno-prelude -funboxed-tuples -fffi #-}
+{-# OPTIONS_JHC -funboxed-values -fno-prelude -funboxed-tuples -fffi #-}
 module Data.IORef(
     IORef(),	      -- abstract, instance of: Eq
     newIORef,	      -- :: a -> IO (IORef a)
@@ -8,17 +8,17 @@ module Data.IORef(
     atomicModifyIORef,-- :: IORef a -> (a -> (a,b)) -> IO b
     ) where
 
+import Jhc.Prim.Array
 import Jhc.Basics
 import Jhc.Order
 import Jhc.IO
 import Jhc.Int
 
-data IORef a = IORef (Ref__ a)
-data Ref__ a :: #
+data IORef a = IORef (MutArray_ a)
 
-foreign import primitive newRef__   :: a -> UIO (Ref__ a)
-foreign import primitive readRef__  :: Ref__ a -> UIO a
-foreign import primitive writeRef__ :: Ref__ a -> a -> UIO_
+newRef__ a = newArray__ 1# a
+writeRef__ m v = writeArray__ m 0# v
+readRef__ m = readArray__ m 0#
 
 -- {-# NOINLINE newIORef #-}
 newIORef :: a -> IO (IORef a)
@@ -49,26 +49,3 @@ atomicModifyIORef (IORef r) f = fromUIO $ \w -> case readRef__ r w of
     (# w', a #) -> case f a of
         (a',b) -> case writeRef__ r a' w' of
             w'' -> (# w'', b #)
-{-
---newIORef v = IO $ \_ world -> case newRef__ v world of
---    (world',r) -> JustIO world' r
---readIORef r = IO $ \_ world -> case readRef__ r world of
---    (world',v) -> JustIO world' v
---writeIORef r v = IO $ \_ world -> case writeRef__ r v world of
---    world' -> JustIO world' ()
-{-# NOINLINE newIORef #-}
-newIORef :: a -> IO (IORef a)
-newIORef v = do
-    v' <- strictReturn v
-    return (IORef v')
-
-{-# NOINLINE readIORef #-}
-readIORef :: IORef a -> IO a
-readIORef r = do
-    --v <- strictReturn r
-    case r of
-        IORef r -> strictReturn r
--}
-
---foreign import primitive newRef__ :: forall s . a -> s -> (s,Ref s a)
---foreign import primitive readRef__ :: forall s . Ref s a -> s -> (s,a)

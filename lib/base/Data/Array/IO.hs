@@ -1,14 +1,14 @@
 {-# OPTIONS_JHC -fno-prelude -funboxed-tuples -fffi #-}
 module Data.Array.IO where
 
+import Jhc.Prim.Array
 import Data.Array
 import Data.Ix
-import Jhc.Array
 import Jhc.Basics
 import Jhc.IO
 import Jhc.Int
 
-data IOArray a b = IOA !a !a (MutArray__ b)
+data IOArray a b = IOA !a !a (MutArray_ b)
 
 newIOArray :: Ix a => (a,a) -> b -> IO (IOArray a b)
 newIOArray rng fill = fromUIO (newIOArray_ rng fill)
@@ -16,7 +16,7 @@ newIOArray rng fill = fromUIO (newIOArray_ rng fill)
 newIOArray_ :: Ix a => (a,a) -> b -> World__ -> (# World__, IOArray a b #)
 newIOArray_ rng@(l,h) fill w1 =
     case unboxInt (rangeSize rng) of
-      size__ -> case newMutArray__ size__ fill w1 of
+      size__ -> case newArray__ size__ fill w1 of
                   (# w2, arr #) -> (# w2, IOA l h arr #)
 
 boundsIOArray :: Ix a => IOArray a b -> IO (a,a)

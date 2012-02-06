@@ -1,28 +1,29 @@
 {-# OPTIONS_JHC -funboxed-tuples #-}
-module  Data.Array (
+module Data.Array (
     module Data.Ix,  -- export all of Ix
     Array(),
     array,
     listArray,
+    accumArray,
     (!),
     bounds,
     indices,
     elems,
     assocs,
-    accumArray,
     (//),
     accum,
     ixmap
     ) where
 
 import Data.Ix
-import Jhc.Array
+import Jhc.Basics
 import Jhc.Int
+import Jhc.Prim.Array
+import Jhc.Prim.IO
 
 infixl 9  !, //
 
-
-data Array a b = MkArray !a !a (Array__ b)
+data Array a b = MkArray !a !a (Array_ b)
 
 array       :: (Ix a) => (a,a) -> [(a,b)] -> Array a b
 array b@(s,e) ivs = case newArray (error "array: missing element") (rangeSize b) [(index b x,y) | (x,y) <- ivs] of
@@ -88,3 +89,16 @@ instance  (Ix a, Read a, Read b) => Read (Array a b)  where
 arrPrec :: Int
 arrPrec = 10
 
+foreign import primitive newWorld__ :: a -> World__
+
+newArray :: a -> Int -> [(Int,a)] -> Array_ a
+newArray init n xs = case unboxInt n of
+    n' -> case newWorld__ (init,n,xs) of
+     w -> case newArray__ n' init w of
+      (# w, arr #) -> let
+        f :: MutArray_ a -> World__ -> [(Int,a)] -> World__
+        f arr w [] = w
+        f arr w ((i,v):xs) = case unboxInt i of i' -> case writeArray__ arr i' v w of w -> f arr w xs
+            in case f arr w xs of w -> Array_ arr `worldDep_` w
+
+foreign import primitive "dependingOn" worldDep_ :: Array_ b -> World__ -> Array_ b

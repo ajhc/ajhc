@@ -5,7 +5,7 @@ Options: --noauto
 Hs-Source-Dir: .
 Exposed-Modules:
         - Jhc.Prim.Bits
-#        - Jhc.Prim.Words
+        - Jhc.Prim.Array
         - Jhc.Prim.IO
         - Jhc.Prim.Prim
         - Jhc.Prim.Wrapper
