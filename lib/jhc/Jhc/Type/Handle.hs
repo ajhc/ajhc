@@ -1,9 +1,7 @@
 module Jhc.Type.Handle where
 
--- CI import Jhc.Prim
 import Jhc.Basics
 import Jhc.Type.Ptr
--- CI import Jhc.Type.Basic
 import Jhc.Type.C
 
 data IOMode = ReadMode | WriteMode | AppendMode | ReadWriteMode

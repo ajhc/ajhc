@@ -103,9 +103,9 @@ Ix              Data.Ix.Ix
 Functor         Jhc.Monad.Functor
 Monad           Jhc.Monad.Monad
 Num             Jhc.Class.Num.Num
-Real            Jhc.Class.Num.Real
-Integral	Jhc.Class.Num.Integral
-Fractional	Jhc.Class.Num.Fractional
+Real            Jhc.Class.Real.Real
+Integral	Jhc.Class.Real.Integral
+Fractional	Jhc.Class.Real.Fractional
 Floating	Jhc.Float.Floating
 RealFrac	Jhc.Float.RealFrac
 RealFloat	Jhc.Float.RealFloat
@@ -140,7 +140,7 @@ fail                 Jhc.Monad.fail
 concatMap            Jhc.Basics.concatMap
 fromInteger          Jhc.Class.Num.fromInteger
 fromInt              Jhc.Class.Num.fromInt
-fromRational         Jhc.Class.Num.fromRational
+fromRational         Jhc.Class.Real.fromRational
 negate               Jhc.Class.Num.negate
 leq                  Jhc.Class.Ord.<=
 geq                  Jhc.Class.Ord.>=

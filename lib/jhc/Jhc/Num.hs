@@ -1,6 +1,7 @@
 module Jhc.Num(module Jhc.Num, module Jhc.Class.Num,Ratio(..)) where
 
 import Jhc.Class.Num
+import Jhc.Class.Real
 import Jhc.Class.Ord
 import Jhc.Type.Float
 import Jhc.Basics

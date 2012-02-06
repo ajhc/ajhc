@@ -12,12 +12,13 @@ import Jhc.List(length,notElem,take,elem)
 import Jhc.Monad
 import Jhc.Num
 import Jhc.Order
--- CI import Jhc.Prim.Bits
 import Jhc.Type.C
 import Numeric
 import Jhc.Numeric((^),(^^))
 import Prelude.Text
 import System.IO.Unsafe
+import Jhc.Class.Num
+import Jhc.Class.Real
 
 m4_define(INST,{{
 

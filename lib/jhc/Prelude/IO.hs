@@ -20,9 +20,7 @@ module Prelude.IO(
     userError
     ) where
 
---import Foreign.C.Types
 import Foreign.C.String
--- CI import Foreign.Ptr
 import Jhc.Addr
 import Jhc.Basics
 import Jhc.IO

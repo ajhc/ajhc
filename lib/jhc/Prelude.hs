@@ -66,12 +66,12 @@ module Prelude(
 import Jhc.Basics
 import Jhc.Float
 
--- CI import Jhc.Inst.Enum
--- CI import Jhc.Inst.Num
--- CI import Jhc.Inst.Order
--- CI import Jhc.Inst.Read
--- CI import Jhc.Inst.Show
--- CI import Jhc.Inst.Storable
+import Jhc.Inst.Enum()
+import Jhc.Inst.Num()
+import Jhc.Inst.Order()
+import Jhc.Inst.Read()
+import Jhc.Inst.Show()
+import Jhc.Inst.Storable()
 
 -- CI import Data.Ratio
 import Jhc.Enum
@@ -90,6 +90,9 @@ import Jhc.Order
 import Prelude.IO
 import Prelude.Text
 import qualified Data.Char as Char(isSpace,ord,chr)
+
+import Jhc.Class.Num
+import Jhc.Class.Real
 
 --infixr 9  .
 --infixr 8  ^, ^^, **

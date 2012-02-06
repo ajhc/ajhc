@@ -52,14 +52,11 @@ import Foreign.Storable		( Storable(poke) )
 import Foreign.C.Types    	( CSize )
 import Foreign.Marshal.Alloc 	( malloc, alloca )
 import Jhc.Basics
--- CI import Jhc.IO
--- CI import Jhc.List
 import Jhc.Monad
 import Jhc.Num
 import Jhc.Order
-import Jhc.Maybe
-import Jhc.Inst.Storable
-
+import Jhc.Inst.Storable()
+import Jhc.Type.Basic
 
 -- combined allocation and marshalling
 -- -----------------------------------
@@ -93,8 +90,6 @@ with val f  =
     res <- f ptr
     return res
 
-
-
 -- marshalling of Boolean values (non-zero corresponds to 'True')
 -- -----------------------------
 
@@ -108,7 +103,6 @@ fromBool True   = 1
 --
 toBool :: Num a => a -> Bool
 toBool  = (/= 0)
-
 
 -- marshalling of Maybe values
 -- ---------------------------
@@ -135,7 +129,6 @@ maybePeek                           :: (Ptr a -> IO b) -> Ptr a -> IO (Maybe b)
 maybePeek peek ptr | ptr == nullPtr  = return Nothing
 		   | otherwise       = do a <- peek ptr; return (Just a)
 
-
 -- marshalling lists of storable objects
 -- -------------------------------------
 
@@ -149,7 +142,6 @@ withMany :: (a -> (b -> res) -> res)  -- withXXX combinator for one object
 withMany _       []     f = f []
 withMany withFoo (x:xs) f = withFoo x $ \x' ->
 			      withMany withFoo xs (\xs' -> f (x':xs'))
-
 
 -- Haskellish interface to memcpy and memmove
 -- ------------------------------------------
@@ -166,7 +158,6 @@ copyBytes dest src size  = memcpy dest src (fromIntegral size)
 moveBytes               :: Ptr a -> Ptr a -> Int -> IO ()
 moveBytes dest src size  = memmove dest src (fromIntegral size)
 
-
 -- auxilliary routines
 -- -------------------
 
@@ -174,3 +165,8 @@ moveBytes dest src size  = memmove dest src (fromIntegral size)
 --
 foreign import ccall  "string.h memcpy" memcpy  :: Ptr a -> Ptr a -> CSize -> IO ()
 foreign import ccall  "string.h memmove" memmove :: Ptr a -> Ptr a -> CSize -> IO ()
+
+maybe :: b -> (a -> b) -> Maybe a -> b
+maybe n f m = case m of
+    Just x -> f x
+    Nothing -> n

@@ -5,7 +5,6 @@ import Jhc.Addr
 import Jhc.Basics
 import Jhc.IO
 import Jhc.Int
--- CI import Jhc.Prim.Bits
 
 m4_include(Foreign/Storable.m4)
 

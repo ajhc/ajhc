@@ -15,20 +15,15 @@ module Foreign.Ptr(
     freeHaskellFunPtr
     ) where
 
--- CI import Data.Word
--- CI import Foreign.Storable
 import Jhc.Addr
 import Jhc.Basics
+import Jhc.Class.Num
 import Jhc.IO
 import Jhc.Inst.Show
--- CI import Jhc.Monad
-import Jhc.Num
--- CI import Jhc.Order
--- CI import Jhc.Prim.Bits
 import Jhc.Show
 
 instance Show (Ptr a) where
-    showsPrec n x = showsPrec n (toInteger (ptrToWordPtr  x))
+    showsPrec n x = showsPrec n ((ptrToWordPtr  x))
 
 alignPtr :: Ptr a -> Int -> Ptr a
 alignPtr = error "alignPtr"

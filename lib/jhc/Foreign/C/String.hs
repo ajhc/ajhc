@@ -98,8 +98,6 @@ import Foreign.C.Types
 import Foreign.Ptr
 import Foreign.Storable
 
--- CI import Data.Word
-
 
 -----------------------------------------------------------------------------
 -- Strings

@@ -21,6 +21,8 @@ import Jhc.Text.Read
 -- CI import Data.Char
 import Prelude.CType(isDigit,isOctDigit,isHexDigit,digitToInt,intToDigit)
 import Prelude.Text
+import Jhc.Class.Num
+import Jhc.Class.Real
 
 -- This converts a rational to a floating.  This should be used in the
 -- Fractional instances of Float and Double.

@@ -11,11 +11,8 @@ module Jhc.Order(
     otherwise
 ) where
 
-import Jhc.Basics
--- CI import Jhc.Prim.Bits
--- CI import Jhc.Prim.Prim
-
 import Jhc.Class.Ord
+import Jhc.Basics
 
 m4_include(Jhc/Order.m4)
 

@@ -1,6 +1,5 @@
 module Jhc.Class.Ord where
 
--- CI import Jhc.Type.Basic
 import Jhc.Prim.Prim
 
 infix  4  ==, /=, <, <=, >=, >
@@ -15,7 +14,7 @@ class Eq a where
         True -> False
         False -> True
 
-class  (Eq a) => Ord a  where
+class (Eq a) => Ord a where
     compare              :: a -> a -> Ordering
     (<), (<=), (>=), (>) :: a -> a -> Bool
     max, min             :: a -> a -> a

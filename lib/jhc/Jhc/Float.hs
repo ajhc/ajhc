@@ -8,19 +8,16 @@ module Jhc.Float(
     RealFrac(..),
     RealFloat(..),
     rationalToDouble
-    )
-    where
+    ) where
 
 import Jhc.Basics
 import Jhc.Enum
-import Jhc.IO(error)
 import Jhc.Inst.Num
--- CI import Jhc.Int
-import Jhc.Num
+import Jhc.Class.Ord
 import Jhc.Order
--- CI import Jhc.Prim.Bits
 import Jhc.Type.Float
--- CI import Prelude.Text
+import Jhc.Class.Num
+import Jhc.Class.Real
 
 infixr 8  **
 
@@ -205,7 +202,6 @@ foreign import primitive "FLt" flt$2  :: $2 -> $2 -> Bool
 foreign import primitive "FLte" flte$2 :: $2 -> $2 -> Bool
 foreign import primitive "FGt" fgt$2 :: $2 -> $2 -> Bool
 foreign import primitive "FGte" fgte$2 :: $2 -> $2 -> Bool
-
 )
 
 NUMINSTANCE(Float,Float32_)

@@ -1,7 +1,6 @@
 module Jhc.Type.Basic(module Jhc.Type.Basic, module Jhc.Type.Word)  where
 
 import Jhc.Prim.Prim
--- CI import Jhc.Prim.Bits
 import Jhc.Type.Word
 
 type String = [Char]
@@ -13,7 +12,6 @@ data Either a b = Left a | Right b
 data Char = Char Char_
 data Integer = Integer BitsMax_
 
---type Bool__ = Bits16_
 type Bool__ = Bool_
 type Int__  = Bits32_
 type Char__ = Bits32_

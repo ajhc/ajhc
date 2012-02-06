@@ -90,7 +90,6 @@ module Foreign.C.Error (
 
 
 import Foreign.C.String
--- CI import Foreign.C.Types
 import Foreign.Ptr
 import Foreign.Storable
 import Jhc.Basics
@@ -101,7 +100,6 @@ import Jhc.Monad
 import Jhc.Num
 import Jhc.Order
 import Jhc.Type.C
--- CI import System.IO.Unsafe		( unsafePerformIO )
 
 
 

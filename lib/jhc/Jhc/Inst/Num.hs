@@ -3,16 +3,17 @@ module Jhc.Inst.Num() where
 
 m4_include(Jhc/Num.m4)
 
--- CI import Data.Word
--- CI import Data.Int
 import Jhc.Num
 import Jhc.Order
 import Jhc.Float
 import Jhc.Basics
--- CI import Jhc.Inst.Order
 import Jhc.Inst.Enum
 import Prelude.Text
 import Jhc.Type.C
+import Jhc.Type.Basic
+import Jhc.Class.Num
+import Jhc.Class.Ord
+import Jhc.Class.Real
 
 m4_define(SIGNED,{{
 MkNumPrim($1,I)

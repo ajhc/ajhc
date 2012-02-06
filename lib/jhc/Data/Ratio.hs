@@ -8,9 +8,11 @@ import Jhc.IO
 import Jhc.Num
 import Jhc.Numeric
 import Jhc.Order
--- CI import Jhc.Type.Basic
 import Prelude.Float()
 import Prelude.Text
+import Jhc.Type.Basic
+import Jhc.Class.Num
+import Jhc.Class.Real
 
 infixl 7  %
 

@@ -9,13 +9,14 @@ module Prelude.Text (
 import Jhc.Basics
 import Jhc.Type.Float
 import Jhc.IO
-import Jhc.Maybe
+--import Jhc.Maybe
 import Jhc.Monad
 import Jhc.Num
 import Jhc.Order
 import Jhc.Show
 import Jhc.Text.Read
 import Prelude.IO
+import Jhc.Type.Basic
 
 import Data.Char(isSpace, isAlpha, isDigit, isAlphaNum,
                  showLitChar, readLitChar, lexLitChar)

@@ -10,18 +10,18 @@ instance Enum $1 where
     enumFrom c        = [c .. maxBound]
     enumFromThen c c' = last `seq` [c, c' .. last]
                       where last | c' < c    = minBound
-                                 | otherwise = maxBound
+                                 | True      = maxBound
     enumFromTo x y = f x where
         f x | x > y = []
-            | otherwise = x:f (x + 1)
+            | True  = x:f (x + 1)
     enumFromThenTo x y z | y >= x = inc `seq` z `seq` f x where
         inc = y - x
         f x | x <= z = x:f (x + inc)
-            | otherwise = []
+            | True   = []
     enumFromThenTo x y z  = dec `seq` z `seq` f x where
         dec = x - y
         f x | x >= z = x:f (x - dec)
-            | otherwise = []
+            | True   = []
 
 foreign import primitive "increment" increment$1 :: $1 -> $1
 foreign import primitive "decrement" decrement$1 :: $1 -> $1

@@ -60,6 +60,6 @@ Exposed-Modules:
         - Jhc.Type.Word
         - Jhc.Class.Num
         - Jhc.Class.Ord
-
+        - Jhc.Class.Real
 #        - Jhc.Hole
 #        - Jhc.JumpPoint

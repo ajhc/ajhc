@@ -1,17 +1,19 @@
 {-# OPTIONS_JHC -fno-prelude #-}
-
 module Jhc.Inst.Show() where
 
-import Data.Int
-import Data.Word
 import Jhc.Basics
+import Jhc.Class.Num
+import Jhc.Class.Ord
+import Jhc.Class.Real
 import Jhc.Inst.Order
-import Jhc.Num
-import Jhc.Order
 import Jhc.Show
+import Jhc.Type.Basic
 import Jhc.Type.C
 
 -- we convert them to Word or WordMax so the showIntAtBase specialization can occur.
+
+fromIntegral   :: (Integral a, Num b) => a -> b
+fromIntegral x =  fromInteger (toInteger x)
 
 instance Show Word where
     showsPrec _ x = showWord x
@@ -38,13 +40,13 @@ instance Show Int where
     showsPrec p x
         | p `seq` x `seq` False = undefined
         | x < 0 = showParen (p > 6) (showChar '-' . showWord (fromIntegral $ negate x :: Word))
-        | otherwise = showWord (fromIntegral x :: Word)
+        | True = showWord (fromIntegral x :: Word)
 
 instance Show Integer where
     showsPrec p x
         | p `seq` x `seq` False = undefined
         | x < 0 = showParen (p > 6) (showChar '-' . showWordMax (fromIntegral $ negate x :: WordMax))
-        | otherwise = showWordMax (fromIntegral x :: WordMax)
+        | True = showWordMax (fromIntegral x :: WordMax)
 
 instance Show Int8 where
     showsPrec p x = showsPrec p (fromIntegral x :: Int)

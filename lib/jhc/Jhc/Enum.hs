@@ -5,10 +5,6 @@ module Jhc.Enum(Enum(..),Bounded(..)) where
 import Jhc.Basics
 import Jhc.Inst.PrimEnum()
 import Jhc.Int
---import Jhc.Prim.Bits
--- CI import Jhc.Prim.Prim
--- CI import Jhc.Type.Basic
--- CI import Jhc.Type.Word
 
 m4_include(Jhc/Enum.m4)
 

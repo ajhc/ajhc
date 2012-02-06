@@ -1,15 +1,12 @@
 {-# OPTIONS_JHC -fno-prelude -fffi -funboxed-values -fm4 #-}
-
 module Jhc.Inst.Enum() where
 
--- CI import Data.Word
--- CI import Data.Int
 import Jhc.Enum
-import Jhc.Num
-import Jhc.Order
+import Jhc.Class.Num
+import Jhc.Class.Real
+import Jhc.Class.Ord
 import Jhc.IO(error)
 import Jhc.Basics
--- CI import Jhc.Inst.Order
 import Jhc.Type.C
 
 m4_include(Jhc/Enum.m4)
@@ -65,7 +62,7 @@ instance Enum () where
     pred _      = error "Prelude.Enum.().pred: bad argument"
 
     toEnum x | x == 0 = ()
-             | otherwise    = error "Prelude.Enum.().toEnum: bad argument"
+             | True    = error "Prelude.Enum.().toEnum: bad argument"
 
     fromEnum () = 0
     enumFrom () 	= [()]
