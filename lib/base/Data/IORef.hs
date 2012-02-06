@@ -10,9 +10,7 @@ module Data.IORef(
 
 import Jhc.Prim.Array
 import Jhc.Basics
-import Jhc.Order
 import Jhc.IO
-import Jhc.Int
 
 data IORef a = IORef (MutArray_ a)
 

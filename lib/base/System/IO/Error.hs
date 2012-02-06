@@ -8,8 +8,6 @@ module System.IO.Error (
     userErrorType,  ioError,  catch,  try
   ) where
 
-import Data.Maybe
-import Jhc.IO
 import Jhc.Type.Handle
 
 -- | The construct 'try' @comp@ exposes IO errors which occur within a

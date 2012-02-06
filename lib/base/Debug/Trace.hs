@@ -19,7 +19,6 @@ module Debug.Trace (
         traceShow
   ) where
 
-import Prelude
 import System.IO.Unsafe
 import System.IO (hPutStrLn,stderr)
 

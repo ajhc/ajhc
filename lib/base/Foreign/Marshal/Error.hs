@@ -23,13 +23,10 @@ module Foreign.Marshal.Error (
   throwIfNull,   -- ::                String        -> IO (Ptr a) -> IO (Ptr a)
 
   -- Discard return value
-  --
   void           -- IO a -> IO ()
 ) where
 
 import Foreign.Ptr
-import Prelude.IO
-
 
 -- exported functions
 -- ------------------

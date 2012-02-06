@@ -10,7 +10,6 @@ module Foreign.StablePtr(
 
 import Jhc.Addr
 import Jhc.Basics
-import Jhc.IO
 import Jhc.Monad
 
 newtype StablePtr a = StablePtr (Ptr ())

@@ -16,7 +16,6 @@ module Data.Array (
     ) where
 
 import Data.Ix
-import Jhc.Basics
 import Jhc.Int
 import Jhc.Prim.Array
 import Jhc.Prim.IO

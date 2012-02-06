@@ -2,11 +2,7 @@
 module System.Cmd ( system ) where
 
 import Foreign.C.String
-import Foreign.Ptr
-import Foreign.Storable
-import Foreign.Marshal.Alloc
 import Foreign.C.Types
-import qualified Jhc.Options
 import System.Exit ( ExitCode(..) )
 
 system      :: String -> IO ExitCode

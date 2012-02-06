@@ -5,9 +5,6 @@ module Data.Bits where
 import Jhc.Num
 import Jhc.Order
 import Jhc.Basics
-import Jhc.Int
-import Data.Word
-import Data.Int
 
 m4_include(Data/Bits.m4)
 

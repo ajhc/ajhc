@@ -6,8 +6,6 @@ module Control.Monad (
     unless,  liftM,  liftM2,  liftM3,  liftM4,  liftM5,  ap
     ) where
 
-import Jhc.Basics
-
 class Monad m => MonadPlus m where
     mzero :: m a
     mplus :: m a -> m a -> m a

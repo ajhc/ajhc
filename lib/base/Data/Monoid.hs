@@ -36,12 +36,11 @@ module Data.Monoid (
         Last(..)
   ) where
 
-import Prelude
 
 {-
 -- just for testing
-import Data.Maybe
-import Test.QuickCheck
+-- CI import Data.Maybe
+-- CI import Test.QuickCheck
 -- -}
 
 -- ---------------------------------------------------------------------------
@@ -198,7 +197,6 @@ instance Monoid a => Monoid (Maybe a) where
   Nothing `mappend` m = m
   m `mappend` Nothing = m
   Just m1 `mappend` Just m2 = Just (m1 `mappend` m2)
-
 
 -- | Maybe monoid returning the leftmost non-Nothing value.
 newtype First a = First { getFirst :: Maybe a }

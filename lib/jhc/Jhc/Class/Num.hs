@@ -22,5 +22,5 @@ class  (Eq a, Show a) => Num a  where
     fromInt i = fromInteger (int2integer i)
     fromInteger x = fromInt (integer2int x)
 
-foreign import "I2I" integer2int :: Integer -> Int
-foreign import "I2I" int2integer :: Int -> Integer
+foreign import primitive "I2I" integer2int :: Integer -> Int
+foreign import primitive "I2I" int2integer :: Int -> Integer

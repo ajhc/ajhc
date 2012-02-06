@@ -2,9 +2,7 @@
 module Data.Array.IO where
 
 import Jhc.Prim.Array
-import Data.Array
 import Data.Ix
-import Jhc.Basics
 import Jhc.IO
 import Jhc.Int
 

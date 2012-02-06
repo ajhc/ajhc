@@ -13,8 +13,6 @@
 
 module Control.Monad.Instances (Functor(..),Monad(..)) where
 
-import Prelude
-
 instance Functor ((->) r) where
         fmap = (.)
 

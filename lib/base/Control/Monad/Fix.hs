@@ -22,7 +22,6 @@ module Control.Monad.Fix (
         fix     -- :: (a -> a) -> a
   ) where
 
-import Prelude
 import Control.Monad.Instances ()
 import Data.Function (fix)
 import Jhc.IO

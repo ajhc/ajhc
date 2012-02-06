@@ -9,8 +9,6 @@ module System.Directory (
     getModificationTime ) where
 
 import Foreign
-import Foreign.C.Error
-import Foreign.C.String
 import Foreign.C
 
 import System.Time

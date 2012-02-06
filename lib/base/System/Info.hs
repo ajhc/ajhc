@@ -2,7 +2,6 @@
 module System.Info(compilerName,compilerVersion,os,arch) where
 
 import Foreign.C.String
-import System.IO.Unsafe
 import Foreign
 import Data.Version ( Version(..) )
 

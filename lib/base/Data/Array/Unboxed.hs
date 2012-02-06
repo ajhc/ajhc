@@ -3,7 +3,6 @@ module Data.Array.Unboxed where
 import Data.Ix
 import System.IO.Unsafe
 import Foreign.Storable
-import Foreign.Marshal.Alloc
 import Foreign.ForeignPtr
 
 infixl 9  !, //

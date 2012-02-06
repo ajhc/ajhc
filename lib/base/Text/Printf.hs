@@ -17,7 +17,6 @@ module Text.Printf(
    PrintfType, HPrintfType, PrintfArg, IsChar
 ) where
 
-import Prelude hiding(toInt)
 import Data.Char
 import Numeric(showEFloat, showFFloat, showGFloat)
 import System.IO

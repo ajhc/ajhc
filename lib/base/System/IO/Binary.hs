@@ -1,7 +1,6 @@
 {-# OPTIONS_JHC -fffi -funboxed-values #-}
 module System.IO.Binary(readBinaryFile,putWord8,getWord8) where
 
-import Data.Word
 import Jhc.IO
 import Foreign.C.Types
 import Foreign.C.String
@@ -34,7 +33,6 @@ foreign import ccall "stdio.h fclose" c_fclose :: Ptr () -> IO CInt
 foreign import ccall "stdio.h putchar_unlocked" c_putchar :: Int -> IO Int
 foreign import ccall "stdio.h getchar_unlocked" c_getchar :: IO Int
 
-
 putWord8 :: Word8 -> IO ()
 putWord8 w = c_putchar (fromIntegral w) >> return ()
 
@@ -44,4 +42,3 @@ getWord8 = do
     case c of
         -1 -> fail "EOF"
         _ -> return $ fromIntegral c
-
