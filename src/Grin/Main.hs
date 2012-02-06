@@ -81,7 +81,7 @@ compileGrinToC grin = do
     let (cg,rls) = FG2.compileGrin grin
         fn = outputName ++ lup "executable_extension"
         lup k = maybe "" id $ Map.lookup k (optInis options)
-    cf <- case (optOutName options,optMode options) of
+    cf <- case (optOutName options,optStop options) of
             (Just fn,StopC) -> return fn
             _ | dump FD.C -> return (fn ++ "_code.c")
               | otherwise -> fileInTempDir ("main_code.c") (\_ -> return ())
@@ -91,7 +91,7 @@ compileGrinToC grin = do
         globalvar n c = LBS.fromString $ "char " ++ n ++ "[] = \"" ++ c ++ "\";"
     putProgressLn ("Writing " ++ show cf)
     LBS.writeFile cf $ LBS.intercalate (LBS.fromString "\n") [globalvar "jhc_c_compile" comm, globalvar "jhc_command" argstring,globalvar "jhc_version" sversion,LBS.empty,cg]
-    when (optMode options == StopC) $
+    when (optStop options == StopC) $
         exitSuccess
     putProgressLn ("Running: " ++ comm)
     r <- System.system comm

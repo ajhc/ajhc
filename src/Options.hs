@@ -4,6 +4,7 @@ module Options(
     Opt(..),
     options,
     Mode(..),
+    StopCondition(..),
     putVerbose,
     putVerboseLn,
     putProgress,
@@ -142,16 +143,20 @@ data Mode = BuildHl FilePath         -- ^ Build the specified hl-file given a de
           | VersionCtx               -- ^ Print version context and die.
           | ShowHelp                 -- ^ Show help message and die.
           | ShowConfig               -- ^ Show configuration info.
-          | StopError String         -- ^ error
-          | StopParse                -- ^ Just parse and rename modules then exit
-          | StopTypeCheck            -- ^ Stop after type checking
-          | CompileHo                -- ^ Compile ho
-          | StopC                    -- ^ Stop after producing C code.
           | CompileExe               -- ^ Compile executable
           | ShowHo String            -- ^ Show ho-file.
           | ListLibraries            -- ^ List libraries
           | PrintHscOptions          -- ^ Print options for hsc2hs
           | Preprocess               -- ^ Filter through preprocessor
+            deriving(Eq)
+
+data StopCondition
+    = StopError String         -- ^ error
+    | StopParse                -- ^ Just parse and rename modules then exit
+    | StopTypeCheck            -- ^ Stop after type checking
+    | StopC                    -- ^ Stop after producing C code.
+    | CompileHo                -- ^ Compile ho
+    | StopNot                  -- ^ Don't stop believing.
             deriving(Eq)
 
 data Opt = Opt {
@@ -168,6 +173,7 @@ data Opt = Opt {
     optIncs        ::  [String],
     optDefs        ::  [String],
     optExtensions  ::  [String],
+    optStop        ::  StopCondition,
     optWorkDir     ::  Maybe FilePath,
     optAnnotate    ::  Maybe FilePath,
     optDeps        ::  Maybe FilePath,
@@ -203,6 +209,7 @@ emptyOpt = Opt {
     optIncs        = [],
     optDefs        = [],
     optExtensions  = [],
+    optStop        = StopNot,
     optDump        = [],
     optStale       = [],
     optStmts       = [],
@@ -244,12 +251,12 @@ theoptions =
     , Option ['I'] []                  (ReqArg (optIncs_u . idu) "DIR")       "add to preprocessor include path"
     , Option ['D'] []                  (ReqArg (optDefs_u . (:)) "NAME=VALUE") "add new definitions to set in preprocessor"
     , Option []    ["optc"]            (ReqArg (optCCargs_u . idu) "option") "extra options to pass to c compiler"
-    , Option ['c'] []                  (NoArg  (optMode_s CompileHo))        "just compile the modules, caching the results."
-    , Option ['C'] []                  (NoArg  (optMode_s StopC))            "compile to C code"
+    , Option ['c'] []                  (NoArg  (optStop_s CompileHo))        "just compile the modules, caching the results."
+    , Option ['C'] []                  (NoArg  (optStop_s StopC))            "compile to C code"
     , Option ['E'] []                  (NoArg  (optMode_s Preprocess))       "preprocess the input and print result to stdout"
     , Option ['k'] ["keepgoing"]       (NoArg  (optKeepGoing_s True))        "keep going on errors"
     , Option []    ["cross"]           (NoArg  (optCross_s True))            "enable cross-compilation, choose target with the -m flag"
-    , Option []    ["stop"]            (ReqArg (optMode_s . stop) "parse/typecheck/c")  "stop after the given pass, parse/typecheck/c"
+    , Option []    ["stop"]            (ReqArg (optStop_s . stop) "parse/typecheck/c")  "stop after the given pass, parse/typecheck/c"
     , Option []    ["width"]           (ReqArg (optColumns_s . read) "COLUMNS") "width of screen for debugging output"
     , Option []    ["main"]            (ReqArg (optMainFunc_s . Just . (,) False) "Main.main")  "main entry point"
     , Option ['m'] ["arch"]            (ReqArg (optArch_u . idu ) "arch")      "target architecture options"
@@ -333,10 +340,12 @@ processOptions = do
     let (o,ns,rc) = getOpt Permute theoptions argv
     o <- return (foldl (flip ($)) emptyOpt o)
     when (rc /= []) $ putErrLn (concat rc ++ helpUsage) >> exitWith exitCodeUsage
+    case optStop o of
+        StopError s -> putErrLn "bad option passed to --stop should be one of parse, deps, typecheck, or c" >> exitWith exitCodeUsage
+        _ -> return ()
     case optMode o of
         ShowHelp    -> doShowHelp
         ShowConfig  -> doShowConfig
-        StopError s -> putErrLn "bad option passed to --stop should be one of parse, deps, typecheck, or c" >> exitWith exitCodeUsage
         Version     -> putStrLn versionString >> exitSuccess
         VersionCtx  -> putStrLn (versionString ++ BS.toString versionContext) >> exitSuccess
         PrintHscOptions -> do

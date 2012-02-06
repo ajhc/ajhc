@@ -393,12 +393,12 @@ parseFiles options targets elibs need ifunc func = do
     (ksm,chash,cug) <- loadModules options targets (snub $
         if optNoAuto options then optHls options ++ elibs else optAutoLoads options ++ optHls options ++ elibs) need
     cnode <- processCug cug chash
-    when (optMode options == StopParse) exitSuccess
+    when (optStop options == StopParse) exitSuccess
     performGC
     putProgressLn "Typechecking..."
     typeCheckGraph options cnode
     if isJust (optAnnotate options) then exitSuccess else do
-    when (optMode options  == StopTypeCheck) exitSuccess
+    when (optStop options  == StopTypeCheck) exitSuccess
     performGC
     putProgressLn "Compiling..."
     cho <- compileCompNode ifunc func ksm cnode

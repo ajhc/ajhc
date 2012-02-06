@@ -67,7 +67,7 @@ processFiles cs = f cs (optMainFunc options) where
         _                   -> Left $ toModule f
 
 processCollectedHo cho = do
-    if optMode options == CompileHo then return () else do
+    if optStop options == CompileHo then return () else do
     putProgressLn "Collected Compilation..."
 
     when (dump FD.ClassSummary) $ do
