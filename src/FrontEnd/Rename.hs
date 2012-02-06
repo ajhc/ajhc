@@ -47,9 +47,7 @@ instance Monoid FieldMap where
 
 type SubTable = Map.Map Name Name
 
-newtype ScopeState = ScopeState {
-    unique         :: Int
-    }
+newtype ScopeState = ScopeState Int
 
 data Context
     = ContextTopLevel
@@ -106,7 +104,7 @@ runRename doit opt mod fls ns m = mapM_ addWarning errors >> return (renamedMod,
     nameMap = fromList $ map f ns where
         f (x,[y]) = (x,Right y)
         f (x,ys)  = (x,Left $ ambig x ys)
-    startState = ScopeState { unique = 1 }
+    startState = ScopeState 1
     startEnv = Env {
         envModule      = mod,
         envNameMap     = nameMap,
@@ -156,27 +154,20 @@ expandTypeSigs ds =  (concatMap f ds) where
     f (HsTypeSig sl ns qt) =  [ HsTypeSig sl [n] qt | n <- ns]
     f d = return d
 
---getTypeClassModule :: HsQualType -> Maybe Module
---getTypeClassModule typ =
---   case hsQualTypeType typ of
---      HsTyApp cls arg -> getModule (hsTypeName cls)
---      _ -> error "instance must consist of a type class application"
 getTypeClassModule :: HsClassHead -> Maybe Module
 getTypeClassModule typ = getModule (hsClassHead typ)
 
-qualifyMethodName :: Maybe Module -> Name -> Name
-qualifyMethodName Nothing name = name
-qualifyMethodName (Just mod) name = qualifyName mod name
+qualifyMethodName :: Module -> Name -> Name
+qualifyMethodName mod name = quoteName . toName Val $ qualifyName mod name
 
-qualifyInstMethod :: Maybe Module -> HsDecl -> HsDecl
-qualifyInstMethod moduleName decl = case decl of
-    HsPatBind srcLoc HsPVar {hsPatName = name} rhs decls -> HsPatBind srcLoc
-            (HsPVar {hsPatName = qualifyMethodName moduleName name})
-            rhs decls
-    HsFunBind matches -> HsFunBind $ map
-            (\(m@HsMatch { .. }) -> m { hsMatchName = qualifyMethodName moduleName hsMatchName })
-            matches
-    _ -> decl
+qualifyInstMethod :: Maybe Module -> HsDecl -> RM HsDecl
+qualifyInstMethod Nothing decl = rename decl
+qualifyInstMethod (Just moduleName) decl = case decl of
+    HsPatBind srcLoc HsPVar {hsPatName = name} rhs decls -> 
+        rename $ HsPatBind srcLoc (HsPVar {hsPatName = qualifyMethodName moduleName name}) rhs decls
+    HsFunBind matches -> rename $ HsFunBind (map f matches) where
+        f m@HsMatch { hsMatchName } = m { hsMatchName = qualifyMethodName moduleName hsMatchName } 
+    _ -> rename decl
 
 renameHsDecls :: Context -> [HsDecl] -> RM [HsDecl]
 renameHsDecls c ds = f ds where
@@ -273,11 +264,7 @@ instance Rename HsDecl where
         withSrcLoc srcLoc $ do
         updateWithN TypeVal (hsClassHeadArgs classHead) $ do
         classHead' <- rename classHead
-        --updateWithN TypeVal hsQualType $ do
-        --hsQualType' <- renameClassHead hsQualType
-        hsDecls' <- rename $
-            --hsDecls
-           map (qualifyInstMethod (getTypeClassModule classHead')) hsDecls
+        hsDecls' <- mapM (qualifyInstMethod (getTypeClassModule classHead')) hsDecls
         return (HsInstDecl srcLoc classHead' hsDecls')
     rename (HsInfixDecl srcLoc assoc int hsNames) = do
         withSrcLoc srcLoc $ do
@@ -635,12 +622,10 @@ renameValName hsName = renameName (fromValishHsName hsName)
 renameTypeName :: Name -> RM Name
 renameTypeName hsName = renameName (fromTypishHsName hsName)
 
--- This looks up a replacement name in the subtable.
--- Regardless of whether the name is found, if it's not qualified
--- it will be qualified with the current module's prefix.
 renameName :: Name -> RM Name
 -- a few hard coded cases
 renameName hsName
+    | Just n <- fromQuotedName hsName = return n
     | hsName `elem` [tc_Arrow,dc_Unit,tc_Unit] = return hsName
     | (nt,Just m,i) <- nameParts hsName, '@':_ <- show m = return $ toName nt (m, i)
     | Just _ <- V.fromTupname hsName = return hsName
@@ -651,13 +636,11 @@ renameName hsName = do
             tell (Map.singleton name hsName,mempty)
             return name
         Just (Left err) -> do
-            sl <- getSrcLoc
-            warn sl (UndefinedName hsName) err
+            addWarn (UndefinedName hsName) err
             return hsName
         Nothing -> do
-            sl <- getSrcLoc
             let err = "Unknown name: " ++ show hsName
-            warn sl (UndefinedName hsName) err
+            addWarn (UndefinedName hsName) err
             return hsName
 
 clobberedName :: Name -> RM Name
@@ -702,7 +685,8 @@ instance (UpdateTable a, UpdateTable b) => UpdateTable (a,b) where
     getNames (a,b) = getNames a ++ getNames b
 
 instance UpdateTable Name where
-    getNames x = [x]
+    getNames x | nameType x == QuotedName = []
+               | otherwise = [x]
 
 instance UpdateTable HsDecl where
     getNames hsDecl = fsts $ getNamesAndASrcLocsFromHsDecl hsDecl
@@ -797,8 +781,8 @@ instance MonadWarn RM where
 
 instance UniqueProducer RM where
     newUniq = do
-        u <- gets unique
-        modify (\s -> s {unique = unique s + 1})
+        ScopeState u <- get
+        modify (\(ScopeState s) -> ScopeState (1 + s))
         return u
 
 getCurrentModule :: RM Module

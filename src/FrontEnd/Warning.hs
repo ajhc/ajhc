@@ -114,7 +114,6 @@ warnIsFatal w = f w where
     f UndefinedName {} = True
     f UnificationError {} = True
     f UnknownDeriving {} = True
-    f UnknownOption {} = True
     f UnsupportedFeature {} = True
     f _ = False
 

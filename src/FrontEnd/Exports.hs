@@ -23,14 +23,14 @@ import Util.Relation as R
 import Util.SetLike as SL
 
 data ModInfo = ModInfo {
-    modInfoName :: Module,
-    modInfoDefs :: [(Name,SrcLoc,[Name])],
-    modInfoConsArity :: [(Name,Int)],
-    modInfoExport :: [Name],
-    modInfoImport :: [(Name,[Name])],
-    modInfoHsModule :: HsModule,
+    modInfoName       :: Module,
+    modInfoDefs       :: [(Name,SrcLoc,[Name])],
+    modInfoConsArity  :: [(Name,Int)],
+    modInfoExport     :: [Name],
+    modInfoImport     :: [(Name,[Name])],
+    modInfoHsModule   :: HsModule,
     modInfoReverseMap :: Map.Map Name Name,
-    modInfoOptions :: Opt
+    modInfoOptions    :: Opt
     }
 
 instance Eq ModInfo where
@@ -62,11 +62,11 @@ determineExports defs ae ms = do
     ms <- determineExports' ds ae ms
     let g m = do
             when (dump FD.Imports) $ do
-                putStrLn $ " -- Imports: " ++  show (modInfoName m)
-                putStr $ unlines  (map show $ sort (modInfoImport m))
+                putStrLn $ " -- Imports: " ++ show (modInfoName m)
+                putStr $ unlines  (sort $ map show (modInfoImport m))
             when (dump FD.Exports) $ do
-                putStrLn $ " -- Exports: " ++  show (modInfoName m)
-                mapM_ putStrLn (sort [ show (nameType n) ++ " " ++ show n |  n <- modInfoExport m])
+                putStrLn $ " -- Exports: " ++ show (modInfoName m)
+                mapM_ putStrLn (sort [ show (nameType n) ++ " " ++ show n | n <- modInfoExport m])
     mapM_ g ms
     processIOErrors
     return ms

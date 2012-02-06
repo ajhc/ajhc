@@ -63,8 +63,8 @@ testAtom = do
 --strings = [ "foo", "foobar", "baz", "", "bob"]
 strings =  ["h","n\206^um\198(","\186","yOw\246$\187x#",";\221x<n","\201\209\236\213J\244\233","\189eW\176v\175\209"]
 
-appendPS :: PackedString -> PackedString
-appendPS = mconcat
+appendPS :: PackedString -> PackedString -> PackedString
+appendPS = mappend
 
 testPackedString = do
     putStrLn "Testing PackedString"
@@ -95,16 +95,18 @@ testName = do
         prop_acc t a b = nn a && nn b ==> let
             n = toName t (a::String,b::String)
             un = toUnqualified n
-            in  nameType n == t && getModule n == Just (Module a) && getModule un == Nothing && show un == b && show n == (a ++ "." ++ b)
+            in  nameType n == t && getModule n == Just (toModule a) && getModule un == Nothing && show un == b && show n == (a ++ "." ++ b)
     qc "name.tofrom" $ \t a b -> nn a && nn b ==> fromName (toName t (a::String,b::String)) == (t,(a,b))
-    qc "name.nameparts" $ \t a b -> maybe True nn a && nn b ==> nameParts (toName t (a,b)) == (t,a,b)
-    qc "name.nameparts2" $ \t a b -> nn a  && nn b ==> nameParts (toName t (a,b)) == (t,Just a,b)
+    qc "name.nameparts" $ \t a b -> nn b ==> nameParts (toName t (a,b)) == (t,a,b)
+    qc "name.nameparts2" $ \t a b ->  nn b ==> nameParts (toName t (a,b)) == (t,Just a,b)
     qc "name.toUnqualified" $ \t a b -> nn a && nn b ==> toUnqualified (toName t (a,b)) == toName t b
-    qc "name.getModule" $ \ t a b -> nn a && nn b ==> getModule (toName t (a,b)) == Just (Module a)
+    qc "name.getModule" $ \ t a b -> nn a && nn b ==> getModule (toName t (a,b)) == Just (toModule a)
     qc "name.getModule2" $ \ t b -> nn b ==> getModule (toName t b) == Nothing
-    qc "name.getIdent" $ \t a b -> maybe True nn a && nn b ==> getIdent (toName t (a,b)) == b
-    qc "name.setModule" $ \t a b c -> maybe True nn a && nn b && nn c ==> setModule (Module c) (toName t (a,b)) == toName t (c,b)
+    qc "name.getIdent" $ \t a b ->  nn b ==> getIdent (toName t (a :: Maybe Module,b)) == b
+    qc "name.setModule" $ \t a b c ->  nn b && nn c ==> setModule (toModule c) (toName t (a :: Maybe Module,b)) == toName t (c,b)
     qc "name.show" $ \ t a b -> nn a && nn b ==> show (toName t (a,b)) == a ++ "." ++ b
+    qc "name.quote" $ \ t a b -> nn a && nn b ==> let n = toName t (a,b) in fromQuotedName (quoteName n) == Just n
+    qc "name.noquote" $ \ t a b -> (nn b && (t /= QuotedName)) ==> fromQuotedName (toName t (a :: Maybe Module,b)) == Nothing
     qc "name.acc" prop_acc
     qc "name.tup" $ \n -> n >= 0 ==> fromUnboxedNameTuple (unboxedNameTuple RawType n) == Just n
     qc "name.overlap" $ \t -> (isTypeNamespace t,isValNamespace t) /= (True,True)
@@ -169,7 +171,6 @@ testBinary = do
     if (z /= t) then fail "Info Test Failed" else return ()
 
 
-
 instance Arbitrary NameType where
     arbitrary = oneof $ map return [ TypeConstructor .. ]
 
@@ -179,6 +180,12 @@ instance Arbitrary Info.Types.Property where
 instance Arbitrary Properties where
     arbitrary = fromList `fmap` arbitrary
 
-instance Arbitrary Char where
-    arbitrary     = Test.QuickCheck.choose ('\32', '\128')
-    coarbitrary c = variant (fromEnum c `rem` 4)
+instance Arbitrary Module where
+    arbitrary = g `fmap` arbitrary where
+        g xs = f (filter (';' /=) xs)
+        f "" = f "X"
+        f s = toModule s
+
+--instance Arbitrary Char where
+--    arbitrary     = Test.QuickCheck.choose ('\32', '\128')
+--    coarbitrary c = variant (fromEnum c `rem` 4)

@@ -1,7 +1,12 @@
 INC= -i -i../drift_processed -i../src
 GHCOPTS= -fallow-overlapping-instances -fallow-undecidable-instances -fglasgow-exts \
 	 -XBangPatterns $(INC) -XTypeFamilies -XViewPatterns -XRecordWildCards \
-	 -O -package QuickCheck -ignore-package lang  -optc-std=c99 -optc-g
+	 -O -package QuickCheck -ignore-package lang  -optc-std=c99 -optc-g \
+	-XTypeFamilies -XViewPatterns -XUndecidableInstances -XOverlappingInstances \
+	-XRecordWildCards -XRecursiveDo -XTupleSections -XParallelListComp \
+	-XGeneralizedNewtypeDeriving -XScopedTypeVariables -XFlexibleInstances \
+	-XTypeSynonymInstances -XMultiParamTypeClasses -XDeriveDataTypeable \
+	-fglasgow-exts -XNoMonoLocalBinds -XNamedFieldPuns
 
 HC= ghc
 

@@ -25,6 +25,8 @@ module Name.Name(
     primModule,
     qualifyName,
     setModule,
+    quoteName,
+    fromQuotedName,
     toModule,
     toUnqualified
     ) where
@@ -39,6 +41,10 @@ import Doc.PPrint
 import GenUtil
 import StringTable.Atom
 
+-------------
+-- Name types
+-------------
+
 data NameType
     = TypeConstructor
     | DataConstructor
@@ -49,10 +55,8 @@ data NameType
     | FieldLabel
     | RawType
     | UnknownType
+    | QuotedName
     deriving(Ord,Eq,Enum,Read,Show)
-
-newtype Name = Name Atom
-    deriving(Ord,Eq,Typeable,Binary,Data,ToAtom,FromAtom)
 
 isTypeNamespace TypeConstructor = True
 isTypeNamespace ClassName = True
@@ -63,28 +67,25 @@ isValNamespace DataConstructor = True
 isValNamespace Val = True
 isValNamespace _ = False
 
+-----------------
+-- name definiton
+-----------------
+
+newtype Name = Name Atom
+    deriving(Ord,Eq,Typeable,Binary,Data,ToAtom,FromAtom)
+
 isConstructorLike n =  isUpper x || x `elem` ":("  || xs == "->" || xs == "[]" where
     (_,_,xs@(x:_)) = nameParts n
---isConstructorLike [] = error "isConstructorLike: empty"
 
 fromTypishHsName, fromValishHsName :: Name -> Name
 fromTypishHsName name
+    | nameType name == QuotedName = name
     | isConstructorLike name = toName TypeConstructor name
     | otherwise = toName TypeVal name
 fromValishHsName name
+    | nameType name == QuotedName = name
     | isConstructorLike name = toName DataConstructor name
     | otherwise = toName Val name
-{-
-fromTypishHsName, fromValishHsName :: HsName -> Name
-fromTypishHsName name
-    | isUpper x || x `elem` ":(" = toName TypeConstructor name
-    | otherwise = toName TypeVal name
-    where (x:_) = (hsIdentString . hsNameIdent  $ name)
-fromValishHsName name
-    | isUpper x || x `elem` ":(" = toName DataConstructor name
-    | otherwise = toName Val name
-    where (x:_) = (hsIdentString . hsNameIdent  $ name)
-    -}
 
 createName :: NameType -> Module -> String -> Name
 createName _ (Module "") i = error $ "createName: empty module " ++ i
@@ -110,12 +111,6 @@ instance ToName (Module,String) where
     fromName n = case nameParts n of
             (nt,Just m,i) -> (nt,(m,i))
             (nt,Nothing,i) -> (nt,(Module "",i))
-
---instance ToName (Maybe String,String) where
---    toName nt (Just m,i) = createName nt m i
---    toName nt (Nothing,i) = createUName nt i
---    fromName n = case nameParts n of
---        (nt,a,b) -> (nt,(a,b))
 
 instance ToName (Maybe Module,String) where
     toName nt (Just m,i) = createName nt m i
@@ -165,14 +160,10 @@ parseName t name = toName t (intercalate "." ms, intercalate "." (ns ++ [last sn
     validMod _ = False
 
 nameType :: Name -> NameType
-nameType (Name a) = toEnum $ fromIntegral ( a `unsafeByteIndex` 0)  - ord '1'
+nameType (Name a) = toEnum $ fromIntegral ( a `unsafeByteIndex` 0) - ord '1'
 
 nameName :: Name -> Name
 nameName n = n
---nameName (Name a) = f $ tail (fromAtom a) where
---    f (';':xs) = UnQual $ HsIdent xs
---    f xs | (a,_:b) <- span (/= ';') xs  = Qual (Module a) (HsIdent b)
---    f _ = error $ "invalid Name: " ++ (show $ (fromAtom a :: String))
 
 nameParts :: Name -> (NameType,Maybe Module,String)
 nameParts n@(Name a) = f $ tail (fromAtom a) where
@@ -182,6 +173,7 @@ nameParts n@(Name a) = f $ tail (fromAtom a) where
 
 instance Show Name where
     showsPrec _ n = case nameParts n of
+        (QuotedName,Nothing,b) -> showChar '`' . showString b
         (_,Just a,b) -> shows a . showChar '.' . showString b
         (_,Nothing,b) -> showString b
 
@@ -196,21 +188,28 @@ mapName' :: (Maybe Module -> Maybe Module) -> (String -> String) -> Name -> Name
 mapName' f g n = case nameParts n of
     (nt,m,i) -> toName nt (f m,g i)
 
-mainModule = Module "Main@"
-primModule = Module "Prim@"
-preludeModule = Module "Prelude"
-
-toModule :: String -> Module
-toModule s = Module $ toAtom s
-
 ffiExportName :: FfiExport -> Name
 ffiExportName (FfiExport cn _ cc _ _) = toName Val (Module "FE@", show cc ++ "." ++ cn)
+type Class = Name
+
+-------------
+-- Quoting
+-------------
+
+quoteName :: Name -> Name
+quoteName (Name n) = createUName QuotedName (fromAtom n)
+fromQuotedName :: Name -> Maybe Name
+fromQuotedName n = case nameParts n of
+    (QuotedName,Nothing,s) -> Just $ Name (toAtom s)
+    _ -> Nothing
+
+--------------
+-- Modules
+--------------
 
 newtype Module = Module Atom
   deriving(Eq,Data,Typeable,ToAtom,FromAtom)
 
--- useful synonym
-type Class = Name
 
 instance Ord Module where
     compare x y = show x `compare` show y
@@ -219,3 +218,11 @@ instance Show Module where
     showsPrec _ (Module n) = shows n
 
 fromModule (Module s) = fromAtom s
+
+mainModule = Module "Main@"
+primModule = Module "Prim@"
+preludeModule = Module "Prelude"
+
+toModule :: String -> Module
+toModule s = Module $ toAtom s
+
