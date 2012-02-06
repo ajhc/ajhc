@@ -46,7 +46,7 @@ import FrontEnd.Infix
 import FrontEnd.ParseMonad
 import FrontEnd.SrcLoc
 import FrontEnd.Unlit
-import FrontEnd.Warning(err,processIOErrors,WarnType(..))
+import FrontEnd.Warning(warn,processIOErrors,WarnType(..))
 import Ho.Binary
 import Ho.Collected()
 import Ho.Library
@@ -95,11 +95,11 @@ import qualified Util.Graph as G
 
 type LibraryName = PackedString
 
-findFirstFile :: String -> [(FilePath,a)] -> IO (LBS.ByteString,FilePath,a)
-findFirstFile err [] = FrontEnd.Warning.err (MissingDep err) ("Module not found: " ++ err) >> fail ("Module not found: " ++ err)
-findFirstFile err ((x,a):xs) = flip catch (\e -> findFirstFile err xs) $ do
+findFirstFile :: [FilePath] -> IO (LBS.ByteString,FilePath)
+findFirstFile [] = fail "findFirstFile: file not found"
+findFirstFile (x:xs) = flip catch (\e -> findFirstFile xs) $ do
     bs <- LBS.readFile x
-    return (bs,x,a)
+    return (bs,x)
 
 data ModDone
     = ModNotFound
@@ -108,7 +108,7 @@ data ModDone
 
 data Done = Done {
     hoCache         :: Maybe FilePath,
-    knownSourceMap  :: Map.Map SourceHash (Module,[Module]),
+    knownSourceMap  :: Map.Map SourceHash (Module,[(Module,SrcLoc)]),
     validSources    :: Set.Set SourceHash,
     loadedLibraries :: Map.Map LibraryName Library,
     hosEncountered  :: Map.Map HoHash     (FilePath,HoHeader,HoIDeps,Ho),
@@ -138,7 +138,7 @@ findHoFile done_ref fp mm sh = do
         case hohHash hoh `Map.lookup` hosEncountered done of
             Just (fn,_,_,a) -> return (True,fn)
             Nothing -> do
-                modifyIORef done_ref (knownSourceMap_u $ mappend (hoIDeps hidep))
+                modifyIORef done_ref (knownSourceMap_u $ (`mappend` (hoIDeps hidep)))
                 modifyIORef done_ref (validSources_u $ Set.union (Set.fromList . map snd $ hoDepends hidep))
                 modifyIORef done_ref (hosEncountered_u $ Map.insert (hohHash hoh) (honame,hoh,hidep,ho))
                 return (True,honame)
@@ -146,16 +146,17 @@ findHoFile done_ref fp mm sh = do
 onErr :: IO a -> IO b -> (b -> IO a) -> IO a
 onErr err good cont = join $ catch (good >>= return . cont) (\_ -> return err)
 
-fetchSource :: Opt -> IORef Done -> [FilePath] -> Maybe Module -> IO Module
+fetchSource :: Opt -> IORef Done -> [FilePath] -> Maybe (Module,SrcLoc) -> IO Module
 fetchSource _ _ [] _ = fail "No files to load"
 fetchSource modOpt done_ref fs mm = do
-    let mod = maybe (head fs) show mm
-        killMod = case mm of
+    let killMod = case mm of
             Nothing -> fail $ "Could not load file: " ++ show fs
-            Just m -> modifyIORef done_ref (modEncountered_u $ Map.insert m ModNotFound) >> return m
-    onErr killMod (findFirstFile mod [ (f,undefined) | f <- fs]) $ \ (lbs,fn,_) -> do
+            Just (m,sloc) -> do
+                warn sloc (MissingModule m) $ printf "Module '%s' not found." (show m)
+                modifyIORef done_ref (modEncountered_u $ Map.insert m ModNotFound) >> return m
+    onErr killMod (findFirstFile fs) $ \ (lbs,fn) -> do
     let hash = MD5.md5lazy $ (LBSU.fromString version) `mappend` lbs
-    (foundho,mho) <- findHoFile done_ref fn mm hash
+    (foundho,mho) <- findHoFile done_ref fn (fmap fst mm) hash
     done <- readIORef done_ref
     (mod,m,ds) <- case mlookup hash (knownSourceMap done) of
         Just (m,ds) -> return (Left lbs,m,ds)
@@ -168,7 +169,7 @@ fetchSource modOpt done_ref fs mm = do
                 Just _ -> return (Left lbs,m,ds)
                 _ -> return (Right hmod,m,ds)
     case mm of
-        Just m' | m /= m' -> do
+        Just (m',_) | m /= m' -> do
             putErrLn $ "Skipping file" <+> fn <+> "because its module declaration of" <+> show m <+> "does not equal the expected" <+> show m'
             killMod
         _ -> do
@@ -184,13 +185,13 @@ fetchSource modOpt done_ref fs mm = do
             mapM_ (resolveDeps modOpt done_ref) ds
             return m
 
-resolveDeps :: Opt -> IORef Done -> Module -> IO ()
-resolveDeps modOpt done_ref m = do
+resolveDeps :: Opt -> IORef Done -> (Module,SrcLoc) -> IO ()
+resolveDeps modOpt done_ref (m,sloc) = do
     done <- readIORef done_ref
     case m `mlookup` modEncountered done of
-        Just (ModLibrary False _ lib) | not ("jhc-prim-" `isPrefixOf` libName lib)  -> putErrDie $ printf  "ERROR: Attempt to import module '%s' which is a member of the library '%s'." (show m) (libName lib)
+        Just (ModLibrary False _ lib) | not ("jhc-prim-" `isPrefixOf` libName lib) -> putErrDie $ printf  "ERROR: Attempt to import module '%s' which is a member of the library '%s'.\nPerhaps you need to add '-p%s' to the command line?" (show m) (libName lib) (libName lib)
         Just _ -> return ()
-        Nothing -> fetchSource modOpt done_ref (map fst $ searchPaths modOpt (show m)) (Just m) >> return ()
+        Nothing -> fetchSource modOpt done_ref (map fst $ searchPaths modOpt (show m)) (Just (m,sloc)) >> return ()
 
 type LibInfo = (Map.Map Module ModuleGroup, Map.Map ModuleGroup [ModuleGroup], Set.Set Module,Map.Map ModuleGroup HoBuild,Map.Map ModuleGroup HoTcInfo)
 
@@ -225,9 +226,9 @@ dumpDeps targets memap cug = case optDeps options of
         writeFile fp (showYAML yaml)
 
 collectDeps memap cs = mconcatMap f [ cu | (_,(_,cu)) <- cs] where
-    f (CompSources ss) = mconcat [ (Map.singleton (sourceModName s) (sourceFP s),Map.singleton (sourceModName s) (sourceDeps s),mempty) | s <- map sourceInfo ss ]
+    f (CompSources ss) = mconcat [ (Map.singleton (sourceModName s) (sourceFP s),Map.singleton (sourceModName s) (fsts $ sourceDeps s),mempty) | s <- map sourceInfo ss ]
     f (CompLibrary _ lib) = (mempty,mempty,Map.singleton (libHash lib) (libFileName lib))
-    f (CompHo _hoh idep _ho) =  (Map.fromList [ (sourceModName $ sourceInfo src, sourceFP $ sourceInfo src) | s <- fsts ss, Just (Found src) <- [Map.lookup s memap] ],Map.fromList [ mms | s <- snds ss, Just mms <- [Map.lookup s (hoIDeps idep)] ],mempty) where
+    f (CompHo _hoh idep _ho) = (Map.fromList [ (sourceModName $ sourceInfo src, sourceFP $ sourceInfo src) | s <- fsts ss, Just (Found src) <- [Map.lookup s memap] ],Map.fromList [ (mms,fsts mms') | s <- snds ss, Just (mms,mms') <- [Map.lookup s (hoIDeps idep)] ],mempty) where
         ss = [ s | s <- hoDepends idep ]
     f _ = mempty
 
@@ -245,7 +246,7 @@ instance Show CompUnit where
 
 data SourceInfo = SI {
     sourceHash :: SourceHash,
-    sourceDeps :: [Module],
+    sourceDeps :: [(Module,SrcLoc)],
     sourceFP :: FilePath,
     sourceModName :: Module,
     sourceHoName :: FilePath
@@ -291,7 +292,7 @@ instance ProvidesModules SourceCode where
 
 toCompUnitGraph :: Done -> [Module] -> IO (HoHash,CompUnitGraph)
 toCompUnitGraph done roots = do
-    let fs m = map inject $ maybe (error $ "can't find deps for: " ++ show m) snd (Map.lookup m (knownSourceMap done))
+    let fs m = map inject $ maybe (error $ "can't find deps for: " ++ show m) (fsts . snd) (Map.lookup m (knownSourceMap done))
         fs' m libr = fromMaybe (error $ "can't find deps for: " ++ show m) (Map.lookup m (hoModuleDeps $ libHoLib libr))
         foundMods = [ ((m,Left (sourceHash $ sourceInfo sc)),fs (sourceHash $ sourceInfo sc)) | (m,Found sc) <- Map.toList (modEncountered done)]
         foundMods' = Map.elems $ Map.fromList [ (mg,((mg,Right lib),fs' mg lib)) | (_,ModLibrary _ mg lib) <- Map.toList (modEncountered done)]
@@ -391,7 +392,8 @@ parseFiles
 parseFiles options targets elibs need ifunc func = do
     putProgressLn "Finding Dependencies..."
     (ksm,chash,cug) <- loadModules options targets (snub $
-        if optNoAuto options then optHls options ++ elibs else optAutoLoads options ++ optHls options ++ elibs) need
+        if optNoAuto options then optHls options ++ elibs else
+            optAutoLoads options ++ optHls options ++ elibs) bogusASrcLoc need
     cnode <- processCug cug chash
     when (optStop options == StopParse) exitSuccess
     performGC
@@ -409,9 +411,10 @@ loadModules
     :: Opt                      -- ^ Options to use when parsing files
     -> [FilePath]               -- ^ targets
     -> [String]                 -- ^ libraries to load
-    -> [Either Module String]   -- ^ a list of modules or filenames
-    -> IO (Map.Map SourceHash (Module,[Module]),HoHash,CompUnitGraph)  -- ^ the resulting acyclic graph of compilation units
-loadModules modOpt targets libs need = do
+    -> SrcLoc                   -- ^ where these files are requsted from
+    -> [Either Module FilePath] -- ^ a list of modules or filenames
+    -> IO (Map.Map SourceHash (Module,[(Module,SrcLoc)]),HoHash,CompUnitGraph)  -- ^ the resulting acyclic graph of compilation units
+loadModules modOpt targets libs sloc need = do
     theCache <- findHoCache
     case theCache of
         Just s -> putProgressLn $ printf "Using Ho Cache: '%s'" s
@@ -444,7 +447,7 @@ loadModules modOpt targets libs need = do
             putErrDie "\n"
     ms1 <- forM (rights need) $ \fn -> do
         fetchSource modOpt done_ref [fn] Nothing
-    forM_ (lefts need) $ resolveDeps modOpt done_ref
+    forM_ (map (,sloc) $ lefts need) $ resolveDeps modOpt done_ref
     processIOErrors
     done <- readIORef done_ref
     let needed = (ms1 ++ lefts need)
@@ -532,7 +535,7 @@ typeCheckGraph modOpt cn = do
                                         let ann = LBSU.fromString $ unlines [
                                                 "{- --ANNOTATE--",
                                                 "Module: " ++ show (sourceModName si),
-                                                "Deps: " ++ show (sort $ sourceDeps si),
+                                                "Deps: " ++ show (sort $ fsts $ sourceDeps si),
                                                 "Siblings: " ++ show mods,
                                                 "-}"]
                                         LBS.writeFile (fp ++ "/" ++ show (hsModuleName mod) ++ ".hs") (ann `LBS.append` lbs')
@@ -551,7 +554,7 @@ typeCheckGraph modOpt cn = do
 
 compileCompNode :: (CollectedHo -> Ho -> IO CollectedHo)                 -- ^ Process initial ho loaded from file
                 -> (CollectedHo -> Ho -> TiData  -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
-                -> Map.Map SourceHash (Module,[Module])
+                -> Map.Map SourceHash (Module,[(Module,SrcLoc)])
                 -> CompNode
                 -> IO CollectedHo
 compileCompNode ifunc func ksm cn = do
@@ -595,7 +598,7 @@ compileCompNode ifunc func ksm cn = do
                         showProgress (snds modules)
                         let (mgName:_) = sort $ map (hsModuleName . snd) modules
                         (cho',newHo) <- func cho mempty { hoModuleGroup = mgName, hoTcInfo = htc } tidata
-                        modifyIORef ksm_r (Map.union $ Map.fromList [ (h,(hsModuleName mod,hsModuleRequires mod)) | (h,mod) <- modules])
+                        modifyIORef ksm_r (Map.union $ Map.fromList [ (h,(hsModuleName mod, hsModuleRequires mod)) | (h,mod) <- modules])
                         ksm <- readIORef ksm_r
                         let hoh = HoHeader {
                                      hohVersion = error "hohVersion",
@@ -605,7 +608,7 @@ compileCompNode ifunc func ksm cn = do
                                      hohLibDeps   = Map.toList (choLibDeps cho')
                                      }
                             idep = HoIDeps {
-                                    hoIDeps =    ksm,
+                                    hoIDeps      = ksm,
                                     hoDepends    = [ (hsModuleName mod,h) | (h,mod) <- modules],
                                     hoModDepends = hdep,
                                     hoModuleGroupNeeds = ldep
@@ -616,11 +619,9 @@ compileCompNode ifunc func ksm cn = do
                     CompSources _ -> error "sources still exist!?"
     f cn
 
---hsModuleRequires x = snub (Module "Jhc.Prim":ans) where
-hsModuleRequires x = snub (toModule "Jhc.Prim.Prim":ans) where
---hsModuleRequires x = snub ans where
+hsModuleRequires x = snub ((toModule "Jhc.Prim.Prim",bogusASrcLoc):ans) where
     noPrelude = FO.Prelude `Set.notMember` optFOptsSet (hsModuleOpt x)
-    ans = (if noPrelude then id else (preludeModule:)) [  hsImportDeclModule y | y <- hsModuleImports x]
+    ans = (if noPrelude then id else ((preludeModule,bogusASrcLoc):)) [  (hsImportDeclModule y,hsImportDeclSrcLoc y) | y <- hsModuleImports x]
 
 searchPaths :: Opt -> String -> [(String,String)]
 searchPaths modOpt m = ans where

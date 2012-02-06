@@ -88,7 +88,7 @@ data HoHeader = HoHeader {
 -- against or depend on anything but other libraries.
 data HoIDeps = HoIDeps {
     -- * modules depended on indexed by a hash of the source.
-    hoIDeps :: Map.Map SourceHash (Module,[Module]),
+    hoIDeps :: Map.Map SourceHash (Module,[(Module,SrcLoc)]),
     -- * Haskell Source files depended on
     hoDepends    :: [(Module,SourceHash)],
     -- * Other objects depended on to be considered up to date.

@@ -4,11 +4,10 @@ module Jhc.Inst.Order() where
 
 m4_include(Jhc/Order.m4)
 
-import Data.Word
-import Data.Int
 import Jhc.Order
 import Jhc.Prim
-import Foreign.C.Types
+import Jhc.Type.Word
+import Jhc.Type.C
 
 INST_EQORDER(Int8,,Int8,)
 INST_EQORDER(Int16,,Int16,)

@@ -1,8 +1,6 @@
 module Jhc.Type.C where
 
-import Data.Word
-import Data.Int
-
+import Jhc.Type.Word
 import Jhc.Type.Float
 
 -- | Haskell representation for @errno@ values.

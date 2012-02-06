@@ -12,9 +12,7 @@ Hidden-Modules:
         - Jhc.Inst.Storable
 Exposed-Modules:
         - Data.Char
-        - Data.Int
         - Data.Ratio
-        - Data.Word
         - Foreign.C.Error
         - Foreign.C.String
         - Foreign.C.Types
@@ -42,7 +40,6 @@ Exposed-Modules:
         - Jhc.Text.Read
         - Jhc.Tuples
         - Numeric
-        - Prelude
         - Prelude.CType
         - Prelude.Float
         - Prelude.IO
