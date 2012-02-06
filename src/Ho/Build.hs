@@ -75,22 +75,25 @@ import qualified Util.Graph as G
 -- JHDR - header info, contains a list of modules contained and dependencies that need to be checked to read the file
 -- LIBR - only present if this is a library, contains library metainfo
 -- IDEP - immutable import information, needed to tell if ho files are up to date
--- LINK - redirect to another file for systems without symlinks
+-- LINK - redirect to another file for file systems without symlinks
 -- DEFS - definitions type checking information
 -- CORE - compiled core and associated data
 -- LDEF - library map of module group name to DEFS
 -- LCOR - library map of module group name to CORE
 -- GRIN - compiled grin code
+-- FILE - Extra file, such as embedded c code.
 
 {-
- - We separate the data into various chunks for logical layout as well as the important property that
- - each chunk is individually compressed and accessable. What this means is
- - that we can skip chunks we don't need. for instance, during the final link
- - we have no need of the haskell type checking information, we are only
- - interested in the compiled code, so we can jump directly to it. If we relied on straight
- - serialization, we would have to parse all preceding information just to discard it right away.
- - We also lay them out so that we can generate error messages quickly. for instance, we can determine
- - if a symbol is undefined quickly, before it has to load the typechecking data.
+ - We separate the data into various chunks for logical layout as well as the
+ - important property that each chunk is individually compressed and accessable.
+ - What this means is that we can skip chunks we don't need. for instance,
+ - during the final link we have no need of the haskell type checking
+ - information, we are only interested in the compiled code, so we can jump
+ - directly to it. If we relied on straight serialization, we would have to
+ - parse all preceding information just to discard it right away.  We also lay
+ - them out so that we can generate error messages quickly. for instance, we can
+ - determine if a symbol is undefined quickly, before it has to load the
+ - typechecking data.
  -}
 
 type LibraryName = PackedString

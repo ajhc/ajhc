@@ -58,7 +58,7 @@ delete $ENV{JHC_CACHE};
 delete $ENV{JHC_LIBRARY_PATH};
 
 @opts = (@opts, (map { "-f$_" } @fopts), (map { "-m$_" } @mopts));
-@opts = (@opts, '--no-ho', '--stop', 'typecheck') if $opt_tc;
+@opts = (@opts, '--no-cache', '--stop', 'typecheck') if $opt_tc;
 
 my @cond;
 my @ncond;
@@ -370,7 +370,7 @@ regress [options] [conditions]
    -p            profile JHC (requires jhcp to have been built)
 
    --rts         extra GHC RTS flags for JHC
-   --clean       build .ho files for tests from scratch
+   --clean       start with fresh cache for test
    --win         cross compile to windows and test with wine
 
 =head1 DESCRIPTION

@@ -2,7 +2,10 @@ module Main(main) where
 
 import Control.Exception
 import Control.Monad.Identity
+import Data.Char
 import Prelude
+import System.Directory
+import System.FilePath as FP
 import System.IO
 import qualified Data.ByteString.Lazy as LBS
 
@@ -42,11 +45,21 @@ main = wrapMain $ do
         BuildHl hl    -> darg >> buildLibrary processInitialHo processDecls hl
         ListLibraries -> listLibraries
         ShowHo ho     -> dumpHoFile ho
+        PurgeCache    -> purgeCache
         Preprocess    -> forM_ (optArgs o) $ \fn -> do
             lbs <- LBS.readFile fn
             res <- preprocessHs options fn lbs
             LBS.putStr res
         _               -> darg >> processFiles (optArgs o)
+
+-- we are very careful to only delete cache files.
+purgeCache = do
+    Just hc <- findHoCache
+    ds <- getDirectoryContents hc
+    let cacheFile fn = case map toLower (reverse fn) of
+            'o':'h':'.':fs -> length fs == 26 && all isAlphaNum fs
+            _ -> False
+    forM_ ds $ \fn -> when (cacheFile fn) (removeFile (hc </> fn))
 
 processFiles :: [String] -> IO ()
 processFiles cs = f cs (optMainFunc options) where

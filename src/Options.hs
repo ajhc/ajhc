@@ -147,6 +147,7 @@ data Mode = BuildHl FilePath         -- ^ Build the specified hl-file given a de
           | ShowHo String            -- ^ Show ho-file.
           | ListLibraries            -- ^ List libraries
           | PrintHscOptions          -- ^ Print options for hsc2hs
+          | PurgeCache               -- ^ Purge the cache
           | Preprocess               -- ^ Filter through preprocessor
             deriving(Eq)
 
@@ -241,10 +242,11 @@ theoptions =
     , Option []    ["version-context"] (NoArg  (optMode_s VersionCtx))       "print version context info and exit"
     , Option []    ["help"]            (NoArg  (optMode_s ShowHelp))         "print help information and exit"
     , Option []    ["info"]            (NoArg  (optMode_s ShowConfig))       "show compiler configuration information and exit"
+    , Option []    ["purge-cache"]     (NoArg  (optMode_s PurgeCache))       "clean out jhc compilation cache"
     , Option ['v'] ["verbose"]         (NoArg  (optVerbose_u (+1)))          "chatty output on stderr"
     , Option ['z'] []                  (NoArg  (optStatLevel_u (+1)))        "Increase verbosity of statistics"
-    , Option ['d'] []                  (ReqArg (optDump_u . (:))        "[no-]flag")  "dump specified data during compilation"
-    , Option ['f'] []                  (ReqArg (optFOpts_u . (:))       "[no-]flag") "set or clear compilation options"
+    , Option ['d'] []                  (ReqArg (optDump_u . (:))  "[no-]flag") "dump specified data during compilation"
+    , Option ['f'] []                  (ReqArg (optFOpts_u . (:)) "[no-]flag") "set or clear compilation options"
     , Option ['X'] []                  (ReqArg (optExtensions_u . (:))  "ExtensionName") "enable the given language extension"
     , Option ['o'] ["output"]          (ReqArg (optOutName_s . Just) "FILE") "output to FILE"
     , Option ['i'] ["include"]         (ReqArg (optIncdirs_u . idu) "DIR")   "where to look for source files"
@@ -256,7 +258,7 @@ theoptions =
     , Option ['E'] []                  (NoArg  (optMode_s Preprocess))       "preprocess the input and print result to stdout"
     , Option ['k'] ["keepgoing"]       (NoArg  (optKeepGoing_s True))        "keep going on errors"
     , Option []    ["cross"]           (NoArg  (optCross_s True))            "enable cross-compilation, choose target with the -m flag"
-    , Option []    ["stop"]            (ReqArg (optStop_s . stop) "parse/typecheck/c")  "stop after the given pass, parse/typecheck/c"
+    , Option []    ["stop"]            (ReqArg (optStop_s . stop) "parse/typecheck/c") "stop after the given pass, parse/typecheck/c"
     , Option []    ["width"]           (ReqArg (optColumns_s . read) "COLUMNS") "width of screen for debugging output"
     , Option []    ["main"]            (ReqArg (optMainFunc_s . Just . (,) False) "Main.main")  "main entry point"
     , Option ['m'] ["arch"]            (ReqArg (optArch_u . idu ) "arch")      "target architecture options"
@@ -270,12 +272,12 @@ theoptions =
     , Option []    ["annotate-source"] (ReqArg (optAnnotate_s . Just) "<dir>") "Write preprocessed and annotated source code to the directory specified"
     , Option []    ["deps"]            (ReqArg (optDeps_s . Just) "<file.yaml>") "Write dependency information to file specified"
     , Option []    ["interactive"]     (NoArg  (optMode_s Interactive))      "run interactivly                                                             ( for debugging only)"
-    , Option []    ["ignore-ho"]       (NoArg  (optIgnoreHo_s True))         "Ignore existing haskell object files"
-    , Option []    ["nowrite-ho"]      (NoArg  (optNoWriteHo_s True))        "Do not write new haskell object files"
-    , Option []    ["no-ho"]           (NoArg  (optNoWriteHo_s True . optIgnoreHo_s True)) "same as --ignore-ho and --nowrite-ho"
-    , Option []    ["ho-cache"]        (ReqArg (optHoCache_s . Just ) "JHC_CACHE")  "Use a global cache located in the directory passed as an argument."
-    , Option []    ["ho-dir"]          (ReqArg (optHoDir_s . Just ) "<dir>")    "Where to place and look for ho files"
-    , Option []    ["stale"]           (ReqArg (optStale_u . idu) "Module")     "Treat these modules as stale, even if a ho file is present"
+    , Option []    ["ignore-cache"]    (NoArg  (optIgnoreHo_s True))         "Ignore existing compilation cache entries."
+    , Option []    ["readonly-cache"]  (NoArg  (optNoWriteHo_s True))        "Do not write new information to the compilation cache."
+    , Option []    ["no-cache"]        (NoArg  (optNoWriteHo_s True . optIgnoreHo_s True)) "Do not use or update the cache."
+    , Option []    ["cache-dir"]       (ReqArg (optHoCache_s . Just ) "JHC_CACHE")  "Use a global cache located in the directory passed as an argument."
+--    , Option []    ["ho-dir"]          (ReqArg (optHoDir_s . Just ) "<dir>")    "Where to place and look for ho files"
+    , Option []    ["stale"]           (ReqArg (optStale_u . idu) "Module")  "Treat these modules as stale, even if they exist in the cache"
     , Option []    ["list-libraries"]  (NoArg  (optMode_s ListLibraries))    "List of installed libraries"
     , Option []    ["tdir"]            (ReqArg (optWorkDir_s . Just) "dir/") "specify the directory where all intermediate files/dumps will be placed."
 --    , Option []    ["print-hsc-options"] (NoArg (optMode_s PrintHscOptions)) "print options to pass to hsc2hs"
