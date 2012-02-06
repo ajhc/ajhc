@@ -1,18 +1,18 @@
 {-# OPTIONS_JHC -fm4 -fno-prelude -fffi -funboxed-tuples -funboxed-values #-}
 module Jhc.Inst.Storable() where
 
-import Data.Int
-import Data.Word
-import Jhc.Type.Word
+-- CI import Data.Int
+-- CI import Data.Word
+-- CI import Jhc.Type.Word
 import Jhc.Type.C
 import Foreign.Storable
 import Jhc.Addr
 import Jhc.Basics
 import Jhc.Float
 import Jhc.IO
-import Jhc.Int
-import Jhc.Prim
-import Jhc.Prim.Bits
+-- CI import Jhc.Int
+-- CI import Jhc.Prim
+-- CI import Jhc.Prim.Bits
 
 m4_include(Foreign/Storable.m4)
 

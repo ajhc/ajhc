@@ -6,7 +6,7 @@ import Jhc.Int
 import Jhc.List
 import Jhc.Num
 import Jhc.Order
-import Jhc.Type.Basic
+-- CI import Jhc.Type.Basic
 import Prelude.CType
 
 type  ReadS a  = String -> [(a,String)]

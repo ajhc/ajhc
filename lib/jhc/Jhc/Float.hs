@@ -15,12 +15,12 @@ import Jhc.Basics
 import Jhc.Enum
 import Jhc.IO(error)
 import Jhc.Inst.Num
-import Jhc.Int
+-- CI import Jhc.Int
 import Jhc.Num
 import Jhc.Order
-import Jhc.Prim.Bits
+-- CI import Jhc.Prim.Bits
 import Jhc.Type.Float
-import Prelude.Text
+-- CI import Prelude.Text
 
 infixr 8  **
 

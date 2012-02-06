@@ -13,8 +13,8 @@ module Data.Char (
 
 import Jhc.Basics
 import Jhc.Enum
-import Jhc.IO
-import Jhc.Inst.Show
+-- CI import Jhc.IO
+-- CI import Jhc.Inst.Show
 import Jhc.List
 import Jhc.Num
 import Jhc.Order

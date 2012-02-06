@@ -12,8 +12,8 @@ module Jhc.Addr(
 import Jhc.Basics
 import Jhc.Int
 import Jhc.Order
-import Jhc.Prim
-import Jhc.Prim.Bits
+-- CI import Jhc.Prim
+-- CI import Jhc.Prim.Bits
 import Jhc.Type.Ptr
 
 m4_include(Jhc/Order.m4)

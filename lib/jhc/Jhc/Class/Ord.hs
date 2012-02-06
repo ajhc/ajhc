@@ -1,6 +1,6 @@
 module Jhc.Class.Ord where
 
-import Jhc.Type.Basic
+-- CI import Jhc.Type.Basic
 import Jhc.Prim.Prim
 
 infix  4  ==, /=, <, <=, >=, >

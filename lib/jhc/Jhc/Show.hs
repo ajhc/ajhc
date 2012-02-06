@@ -2,7 +2,7 @@
 module Jhc.Show where
 
 import Jhc.Int
-import Jhc.Order
+-- CI import Jhc.Order
 import Jhc.Basics
 
 type  ShowS    = String -> String

@@ -29,12 +29,12 @@ module Jhc.IO(
     unsafePerformIO'
     ) where
 
-import Foreign.C.Types
+-- CI import Foreign.C.Types
 import Jhc.Basics
-import Jhc.Order
+-- CI import Jhc.Order
 import Jhc.Prim
-import Jhc.Prim.IO
-import Jhc.Type.Basic
+-- CI import Jhc.Prim.IO
+-- CI import Jhc.Type.Basic
 import Jhc.Type.Handle
 import qualified Jhc.Options
 

@@ -2,14 +2,14 @@
 
 module Jhc.Inst.Enum() where
 
-import Data.Word
-import Data.Int
+-- CI import Data.Word
+-- CI import Data.Int
 import Jhc.Enum
 import Jhc.Num
 import Jhc.Order
 import Jhc.IO(error)
 import Jhc.Basics
-import Jhc.Inst.Order
+-- CI import Jhc.Inst.Order
 import Jhc.Type.C
 
 m4_include(Jhc/Enum.m4)

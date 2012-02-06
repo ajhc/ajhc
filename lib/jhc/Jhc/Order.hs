@@ -12,8 +12,8 @@ module Jhc.Order(
 ) where
 
 import Jhc.Basics
-import Jhc.Prim.Bits
-import Jhc.Prim.Prim
+-- CI import Jhc.Prim.Bits
+-- CI import Jhc.Prim.Prim
 
 import Jhc.Class.Ord
 

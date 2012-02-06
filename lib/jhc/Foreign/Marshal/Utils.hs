@@ -52,8 +52,8 @@ import Foreign.Storable		( Storable(poke) )
 import Foreign.C.Types    	( CSize )
 import Foreign.Marshal.Alloc 	( malloc, alloca )
 import Jhc.Basics
-import Jhc.IO
-import Jhc.List
+-- CI import Jhc.IO
+-- CI import Jhc.List
 import Jhc.Monad
 import Jhc.Num
 import Jhc.Order

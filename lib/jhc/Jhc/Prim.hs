@@ -2,9 +2,9 @@
 module Jhc.Prim(module Jhc.Prim.Bits, module Jhc.Prim, module Jhc.Prim.Prim, module Jhc.Prim.IO, module Jhc.Prim.Type.Basic, module Jhc.Prim.Type.Word) where
 
 import Jhc.Prim.Bits
-import Jhc.String
+-- CI import Jhc.String
 import Jhc.Prim.IO
-import Jhc.Type.Word
+-- CI import Jhc.Type.Word
 
 -- | this is wrapped around arbitrary expressions and just evaluates them to whnf
 foreign import primitive "seq" runRaw :: a -> World__ -> World__

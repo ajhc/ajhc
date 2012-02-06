@@ -8,7 +8,7 @@ module Numeric(fromRat,
                readFloat, lexDigits) where
 
 import Data.Ratio  ( (%), numerator, denominator )
-import Data.Word
+-- CI import Data.Word
 import Jhc.Basics
 import Jhc.Enum
 import Jhc.Float
@@ -18,7 +18,7 @@ import Jhc.Num
 import Jhc.Numeric
 import Jhc.Order
 import Jhc.Text.Read
-import Data.Char
+-- CI import Data.Char
 import Prelude.CType(isDigit,isOctDigit,isHexDigit,digitToInt,intToDigit)
 import Prelude.Text
 

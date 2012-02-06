@@ -16,15 +16,15 @@ module Jhc.Handle(
 
 import Foreign.C.Error
 import Foreign.C.String
-import Foreign.C.Types
+-- CI import Foreign.C.Types
 import Foreign.Marshal.Utils
-import Foreign.Ptr
+-- CI import Foreign.Ptr
 import Foreign.Storable
 import Jhc.Addr
 import Jhc.Basics
 import Jhc.Enum
-import Jhc.IO
-import Jhc.Maybe
+-- CI import Jhc.IO
+-- CI import Jhc.Maybe
 import Jhc.Monad
 import Jhc.Type.Handle
 import Jhc.Order

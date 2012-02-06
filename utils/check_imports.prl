@@ -1,0 +1,62 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use YAML;
+use Getopt::Std;
+
+$ARGV[0] || die "no yaml file specified";
+
+my $count = 0;
+
+sub build_attempt {
+    my $r = system "./jhc -L. --build-hl $ARGV[0] --deps tmp/deps$$.yaml --stop typecheck";
+    #my $r = system "./jhc -L. --build-hl $ARGV[0] --deps tmp/deps$$.yaml";
+    if (!$r) {
+        if(++$count == 5) {
+            my $r = system "./jhc -L. --build-hl $ARGV[0] --deps tmp/deps$$.yaml";
+            $count = 0;
+        }
+    }
+    return !$r;
+}
+
+build_attempt || die "unable to build initial hl";
+my $y = YAML::LoadFile("tmp/deps$$.yaml") or die "can't load tmp/deps$$.yaml file";
+
+my @deps = values %{$y->{ModuleSource}};
+
+foreach my $fn (@deps) {
+    print "processing $fn\n";
+    open my $fh, "<$fn" or die "$!: $fn";
+    my @lines = <$fh>;
+    close $fh or die "$!: close $fn";
+    my @imports = grep { !/\(\)/ } grep { /^import / } @lines;
+    next unless @imports;
+    foreach my $i (@imports) {
+        my $s = $i;
+        chomp $s;
+        print " trying $s\n";
+        open my $fh, ">$fn.deptest" or die "$!: $fn.deptest";
+        foreach (@lines) {
+            if ($_ eq $i) {
+                $_ = "-- CI $i";
+            }
+            print $fh $_;
+        }
+        close $fh or die "$!: close $fn.deptest";
+        rename "$fn.deptest", $fn or die "$!: rename $fn.deptest, $fn";
+        if (!build_attempt()) {
+            open my $fh, ">$fn.deptest" or die "$!: $fn.deptest";
+            foreach (@lines) {
+                if ($_ eq "-- CI $i") {
+                    $_ = $i;
+                }
+                print $fh $_;
+            }
+            close $fh or die "$!: close $fn.deptest";
+            rename "$fn.deptest", $fn or die "$!: rename $fn.deptest, $fn";
+        }
+    }
+}

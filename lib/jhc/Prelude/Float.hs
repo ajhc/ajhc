@@ -12,7 +12,7 @@ import Jhc.List(length,notElem,take,elem)
 import Jhc.Monad
 import Jhc.Num
 import Jhc.Order
-import Jhc.Prim.Bits
+-- CI import Jhc.Prim.Bits
 import Jhc.Type.C
 import Numeric
 import Jhc.Numeric((^),(^^))

@@ -3,13 +3,13 @@ module Jhc.Inst.Num() where
 
 m4_include(Jhc/Num.m4)
 
-import Data.Word
-import Data.Int
+-- CI import Data.Word
+-- CI import Data.Int
 import Jhc.Num
 import Jhc.Order
 import Jhc.Float
 import Jhc.Basics
-import Jhc.Inst.Order
+-- CI import Jhc.Inst.Order
 import Jhc.Inst.Enum
 import Prelude.Text
 import Jhc.Type.C

@@ -15,16 +15,16 @@ module Foreign.Ptr(
     freeHaskellFunPtr
     ) where
 
-import Data.Word
-import Foreign.Storable
+-- CI import Data.Word
+-- CI import Foreign.Storable
 import Jhc.Addr
 import Jhc.Basics
 import Jhc.IO
 import Jhc.Inst.Show
-import Jhc.Monad
+-- CI import Jhc.Monad
 import Jhc.Num
-import Jhc.Order
-import Jhc.Prim.Bits
+-- CI import Jhc.Order
+-- CI import Jhc.Prim.Bits
 import Jhc.Show
 
 instance Show (Ptr a) where

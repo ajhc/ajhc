@@ -3,7 +3,7 @@ module Jhc.Numeric where
 import Jhc.IO
 import Jhc.Num
 import Jhc.Type.Basic
-import Jhc.Type.Float
+-- CI import Jhc.Type.Float
 import Jhc.Float
 import Jhc.Order
 

@@ -98,7 +98,7 @@ import Foreign.C.Types
 import Foreign.Ptr
 import Foreign.Storable
 
-import Data.Word
+-- CI import Data.Word
 
 
 -----------------------------------------------------------------------------

@@ -8,7 +8,7 @@ import Jhc.IO
 import Jhc.Num
 import Jhc.Numeric
 import Jhc.Order
-import Jhc.Type.Basic
+-- CI import Jhc.Type.Basic
 import Prelude.Float()
 import Prelude.Text
 

@@ -66,14 +66,14 @@ module Prelude(
 import Jhc.Basics
 import Jhc.Float
 
-import Jhc.Inst.Enum
-import Jhc.Inst.Num
-import Jhc.Inst.Order
-import Jhc.Inst.Read
-import Jhc.Inst.Show
-import Jhc.Inst.Storable
+-- CI import Jhc.Inst.Enum
+-- CI import Jhc.Inst.Num
+-- CI import Jhc.Inst.Order
+-- CI import Jhc.Inst.Read
+-- CI import Jhc.Inst.Show
+-- CI import Jhc.Inst.Storable
 
-import Data.Ratio
+-- CI import Data.Ratio
 import Jhc.Enum
 import Jhc.IO
 import Jhc.List
@@ -82,11 +82,11 @@ import Jhc.Monad
 import Jhc.Num
 import Jhc.Numeric
 import Jhc.Order
-import Jhc.Show
-import Jhc.Tuples
-import Jhc.Type.Basic
-import Jhc.Type.Word(Int)
-import Prelude.Float
+-- CI import Jhc.Show
+-- CI import Jhc.Tuples
+-- CI import Jhc.Type.Basic
+-- CI import Jhc.Type.Word(Int)
+-- CI import Prelude.Float
 import Prelude.IO
 import Prelude.Text
 import qualified Data.Char as Char(isSpace,ord,chr)

@@ -22,7 +22,7 @@ module Prelude.IO(
 
 --import Foreign.C.Types
 import Foreign.C.String
-import Foreign.Ptr
+-- CI import Foreign.Ptr
 import Jhc.Addr
 import Jhc.Basics
 import Jhc.IO

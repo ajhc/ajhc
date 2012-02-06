@@ -10,7 +10,7 @@ module Jhc.String(
 
 import Jhc.Type.Basic
 import Jhc.Prim.Prim
-import Jhc.Prim.Bits
+-- CI import Jhc.Prim.Bits
 
 {-# VCONSTRUCTOR unpackString #-}
 {-# NOINLINE unpackString #-}
