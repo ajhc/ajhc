@@ -163,10 +163,10 @@ qualifyMethodName mod name = quoteName . toName Val $ qualifyName mod name
 qualifyInstMethod :: Maybe Module -> HsDecl -> RM HsDecl
 qualifyInstMethod Nothing decl = rename decl
 qualifyInstMethod (Just moduleName) decl = case decl of
-    HsPatBind srcLoc HsPVar {hsPatName = name} rhs decls -> 
+    HsPatBind srcLoc HsPVar {hsPatName = name} rhs decls ->
         rename $ HsPatBind srcLoc (HsPVar {hsPatName = qualifyMethodName moduleName name}) rhs decls
     HsFunBind matches -> rename $ HsFunBind (map f matches) where
-        f m@HsMatch { hsMatchName } = m { hsMatchName = qualifyMethodName moduleName hsMatchName } 
+        f m@HsMatch { hsMatchName } = m { hsMatchName = qualifyMethodName moduleName hsMatchName }
     _ -> rename decl
 
 renameHsDecls :: Context -> [HsDecl] -> RM [HsDecl]
@@ -731,10 +731,7 @@ collectDefsHsModule m = (\ (x,y) -> (Seq.toList x,Seq.toList y)) $ execWriter (m
             cs' = concatMap (namesHsConDecl' toName) cs
     f (HsNewTypeDecl sl _ n _ c _) = do tellF $ (toName TypeConstructor n,sl,snub [ x |(x,_,_) <- cs']): cs' ; zup [c] where
         cs' = namesHsConDecl' toName c
-    f cd@(HsClassDecl sl _ ds) = tellF $ (toName ClassName z,sl,snub $ fsts cs):[ (n,a,[]) | (n,a) <- cs]  where
-        z = case maybeGetDeclName cd of
-            Just x | nameType x == ClassName -> x
-            _ -> error "not a class name"
+    f cd@(HsClassDecl sl ch ds) = tellF $ (toName ClassName $ hsClassHead ch,sl,snub $ fsts cs):[ (n,a,[]) | (n,a) <- cs]  where
         cs = (mconcatMap (namesHsDeclTS' toName) ds)
     f cad@(HsClassAliasDecl { hsDeclSrcLoc = sl, hsDeclName = n, hsDeclDecls = ds })
            = tellF $ (toName Name.ClassName n,sl,snub $ fsts cs):[ (n,a,[]) | (n,a) <- cs]

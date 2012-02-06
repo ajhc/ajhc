@@ -359,8 +359,10 @@ kiPred asst@(HsAsst n ns) = do
     let f k n = do
             k' <- lookupKind KindAny (toName TypeVal n)
             unify k k'
-    case Map.lookup (toName ClassName n) (kindEnvClasses env) of
-        Nothing -> fail $ "unknown class: " ++ show asst
+    case Map.lookup n (kindEnvClasses env) of
+        Nothing -> do
+                addWarn (UndefinedName n) ("Incorrect number of class parameters for " ++ show asst)
+--        ,fail $ "unknown class: " ++ show asst
         Just ks -> do
             when (length ks /= length ns) $
                 addWarn InvalidDecl ("Incorrect number of class parameters for " ++ show n)
@@ -505,7 +507,8 @@ kindOf name KindEnv { kindEnv = env } = case Map.lookup name env of
 kindOfClass :: Name -> KindEnv -> [Kind]
 kindOfClass name KindEnv { kindEnvClasses = cs } = case Map.lookup name cs of
         --Nothing -> Star
-        Nothing -> error $ "kindOf: could not find kind of class : " ++ show (nameType name,name)
+        --Nothing -> error $ "kindOf: could not find kind of class : " ++ show (nameType name,name)
+        Nothing -> [] -- error $ "kindOf: could not find kind of class : " ++ show (nameType name,name)
         Just k -> k
 
 ----------------------

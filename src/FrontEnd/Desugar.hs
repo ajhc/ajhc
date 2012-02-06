@@ -113,7 +113,8 @@ getPatSelFuns :: SrcLoc -> HsPat -> [(HsName, (HsExp))]
 getPatSelFuns sloc pat = [(varName, HsParen (HsLambda sloc [HsPVar newPatVarName] (kase (replaceVarNamesInPat varName pat)))) | varName <- getNamesFromHsPat pat] where
     kase p =  HsCase (HsVar newPatVarName) [a1, a2 ] where
        a1 =  HsAlt sloc p (HsUnGuardedRhs (HsVar newPatVarName)) []
-       a2 =  HsAlt sloc HsPWildCard (HsUnGuardedRhs (HsApp (HsVar (toName Val ("error"::String))) (HsLit $ HsString $ show sloc ++ " failed pattern match"))) []
+       a2 =  HsAlt sloc HsPWildCard (HsUnGuardedRhs (HsError { hsExpSrcLoc = sloc, hsExpErrorType = HsErrorPatternFailure, hsExpString = show sloc ++ " failed pattern match" })) []
+       --a2 =  HsAlt sloc HsPWildCard (HsUnGuardedRhs (HsApp (HsVar (toName Val ("error"::String))) (HsLit $ HsString $ show sloc ++ " failed pattern match"))) []
 
 -- replaces all occurrences of a name with a new variable
 -- and every other name with underscore

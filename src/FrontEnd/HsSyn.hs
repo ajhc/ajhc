@@ -360,7 +360,13 @@ hsParen x@HsTuple {} = x
 hsParen x@HsUnboxedTuple {} = x
 hsParen x = HsParen x
 
-data HsErrorType = HsErrorPatternFailure | HsErrorSource | HsErrorFieldSelect | HsErrorUnderscore | HsErrorUninitializedField | HsErrorRecordUpdate
+data HsErrorType
+    = HsErrorPatternFailure
+    | HsErrorSource
+    | HsErrorFieldSelect
+    | HsErrorUnderscore
+    | HsErrorUninitializedField
+    | HsErrorRecordUpdate
  deriving(Eq,Show)
 
 type LHsExp = Located HsExp
