@@ -10,8 +10,6 @@ import Jhc.Numeric
 import Jhc.Order
 import Prelude.Float()
 import Prelude.Text
-import Jhc.Type.Basic
-import Jhc.Class.Num
 import Jhc.Class.Real
 
 infixl 7  %

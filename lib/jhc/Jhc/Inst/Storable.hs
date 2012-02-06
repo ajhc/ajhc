@@ -7,10 +7,6 @@ import Jhc.Addr
 import Jhc.Basics
 import Jhc.Float
 import Jhc.IO
-import Jhc.Type.Word
--- CI import Jhc.Int
--- CI import Jhc.Prim
--- CI import Jhc.Prim.Bits
 
 m4_include(Foreign/Storable.m4)
 

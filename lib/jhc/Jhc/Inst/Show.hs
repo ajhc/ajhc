@@ -5,9 +5,7 @@ import Jhc.Basics
 import Jhc.Class.Num
 import Jhc.Class.Ord
 import Jhc.Class.Real
-import Jhc.Inst.Order
 import Jhc.Show
-import Jhc.Type.Basic
 import Jhc.Type.C
 
 -- we convert them to Word or WordMax so the showIntAtBase specialization can occur.

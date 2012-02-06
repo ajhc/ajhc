@@ -8,7 +8,6 @@ module Numeric(fromRat,
                readFloat, lexDigits) where
 
 import Data.Ratio  ( (%), numerator, denominator )
--- CI import Data.Word
 import Jhc.Basics
 import Jhc.Enum
 import Jhc.Float
@@ -18,10 +17,8 @@ import Jhc.Num
 import Jhc.Numeric
 import Jhc.Order
 import Jhc.Text.Read
--- CI import Data.Char
 import Prelude.CType(isDigit,isOctDigit,isHexDigit,digitToInt,intToDigit)
 import Prelude.Text
-import Jhc.Class.Num
 import Jhc.Class.Real
 
 -- This converts a rational to a floating.  This should be used in the

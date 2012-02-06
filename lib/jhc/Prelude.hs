@@ -72,8 +72,8 @@ import Jhc.Inst.Order()
 import Jhc.Inst.Read()
 import Jhc.Inst.Show()
 import Jhc.Inst.Storable()
+import Jhc.Tuples()
 
--- CI import Data.Ratio
 import Jhc.Enum
 import Jhc.IO
 import Jhc.List
@@ -82,16 +82,10 @@ import Jhc.Monad
 import Jhc.Num
 import Jhc.Numeric
 import Jhc.Order
--- CI import Jhc.Show
--- CI import Jhc.Tuples
--- CI import Jhc.Type.Basic
--- CI import Jhc.Type.Word(Int)
--- CI import Prelude.Float
 import Prelude.IO
 import Prelude.Text
 import qualified Data.Char as Char(isSpace,ord,chr)
 
-import Jhc.Class.Num
 import Jhc.Class.Real
 
 --infixr 9  .

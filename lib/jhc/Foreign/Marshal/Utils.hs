@@ -56,7 +56,6 @@ import Jhc.Monad
 import Jhc.Num
 import Jhc.Order
 import Jhc.Inst.Storable()
-import Jhc.Type.Basic
 
 -- combined allocation and marshalling
 -- -----------------------------------

@@ -17,8 +17,6 @@ module Foreign.Marshal.Alloc (
 ) where
 
 import Foreign.C.Types
-import Foreign.Marshal.Utils
-import Foreign.Ptr
 import Foreign.Storable
 import Jhc.Addr
 import Jhc.Basics
@@ -27,8 +25,6 @@ import Jhc.Int(unboxInt)
 import Jhc.Monad
 import Jhc.Num
 import Jhc.Order
-import Jhc.Prim
-import Prelude.IO
 import qualified Jhc.Options as JO
 
 -- TODO handle exceptions

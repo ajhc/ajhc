@@ -7,7 +7,6 @@ import Foreign.Ptr
 import Foreign.Storable
 import Jhc.Basics
 import Jhc.Float
-import Jhc.IO(error)
 import Jhc.List(length,notElem,take,elem)
 import Jhc.Monad
 import Jhc.Num
@@ -17,7 +16,6 @@ import Numeric
 import Jhc.Numeric((^),(^^))
 import Prelude.Text
 import System.IO.Unsafe
-import Jhc.Class.Num
 import Jhc.Class.Real
 
 m4_define(INST,{{

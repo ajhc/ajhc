@@ -11,12 +11,12 @@ module Data.Complex(
     )  where
 
 import Jhc.Num
+import Jhc.Class.Real
 
 infix  6  :+
 
 -- the standard says this should have a RealFloat constraint, but that is silly.
 data  Complex a = !a :+ !a  deriving (Eq,Read,Show)
-
 
 realPart, imagPart :: (RealFloat a) => Complex a -> a
 realPart (x:+y)  =  x
@@ -43,7 +43,6 @@ magnitude (x:+y) =  scaleFloat k
 phase :: (RealFloat a) => Complex a -> a
 phase (0 :+ 0) = 0
 phase (x :+ y) = atan2 y x
-
 
 instance  (RealFloat a) => Num (Complex a)  where
     (x:+y) + (x':+y') =  (x+x') :+ (y+y')

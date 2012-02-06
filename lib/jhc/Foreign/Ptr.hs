@@ -17,7 +17,6 @@ module Foreign.Ptr(
 
 import Jhc.Addr
 import Jhc.Basics
-import Jhc.Class.Num
 import Jhc.IO
 import Jhc.Inst.Show
 import Jhc.Show

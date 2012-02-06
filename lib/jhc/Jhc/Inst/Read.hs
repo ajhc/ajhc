@@ -3,10 +3,7 @@
 module Jhc.Inst.Read() where
 
 import Prelude.Text
-import Data.Int
 import Jhc.Basics
-import Data.Word
-import Jhc.Order
 import Jhc.Float
 import Prelude.Float
 import Jhc.Num

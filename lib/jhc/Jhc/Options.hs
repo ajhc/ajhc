@@ -15,8 +15,6 @@ module Jhc.Options(
 import Jhc.Basics
 import Jhc.Enum
 import Jhc.Order
-import Jhc.Prim
-import Jhc.Prim.Bits
 
 data Target = Grin | GhcHs | DotNet | Java
     deriving(Eq,Ord,Enum)

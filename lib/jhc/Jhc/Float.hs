@@ -13,7 +13,6 @@ module Jhc.Float(
 import Jhc.Basics
 import Jhc.Enum
 import Jhc.Inst.Num
-import Jhc.Class.Ord
 import Jhc.Order
 import Jhc.Type.Float
 import Jhc.Class.Num

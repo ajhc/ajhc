@@ -30,6 +30,7 @@ module System.Random
 import Data.Char ( isSpace, chr, ord )
 import Foreign.Ptr
 import Foreign.Storable
+import Jhc.Class.Real
 import Jhc.Num
 import Numeric
 

@@ -3,11 +3,8 @@ module Jhc.Numeric where
 import Jhc.IO
 import Jhc.Num
 import Jhc.Type.Basic
-import Jhc.Float
 import Jhc.Order
 import Jhc.Type.Float
-
-import Jhc.Class.Num
 import Jhc.Class.Real
 
 infixr 8  ^, ^^
