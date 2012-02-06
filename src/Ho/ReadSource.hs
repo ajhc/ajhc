@@ -100,7 +100,8 @@ parseHsSource options fp@(FP.splitExtension -> (base,".hsc")) _ = do
     tdir <- getTempDir
     (cc,cflags) <- fetchCompilerFlags
     let incFlags = [ "-I" ++ d | d <- optIncdirs options ++ optIncs options]
-    let hscargs =   [fp, "-o", tdir </> out] ++ incFlags ++ concatMap (\x -> ["-C",x]) cflags ++ ["-c", cc]
+        defFlags = [ "-D" ++ d | d <- optDefs options ]
+    let hscargs =   [fp, "-o", tdir </> out] ++ defFlags ++ incFlags ++ concatMap (\x -> ["-C",x]) cflags ++ ["-c", cc]
     when verbose $
         print ("hsc2hs",hscargs)
     rawSystem "hsc2hs" hscargs

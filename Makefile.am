@@ -357,6 +357,8 @@ filepath-1.2.0.0.hl: lib/ext/filepath.cabal jhc-1.0.hl base-1.0.hl
 	perl utils/build_extlibs.prl $<
 deepseq-1.1.0.2.hl: lib/ext/deepseq.cabal jhc-1.0.hl base-1.0.hl applicative-1.0.hl containers-0.3.0.0.hl
 	perl utils/build_extlibs.prl $<
+bytestring-0.9.2.0.hl: lib/ext/bytestring.yaml base-1.0.hl
+	perl utils/build_extlibs.prl $<
 
 JHC_EXT_LIBS = containers-0.3.0.0.hl Diff-0.1.2.hl html-1.0.1.2.hl HUnit-1.2.2.1.hl parsec-2.1.0.1.hl \
     pretty-1.0.1.1.hl QuickCheck-1.2.0.0.hl safe-0.2.hl smallcheck-0.4.hl \
