@@ -55,6 +55,7 @@ import Ho.Type
 import Name.Name
 import Options
 import PackedString(PackedString,packString,unpackPS)
+import Support.TempDir
 import Util.FilterInput
 import Util.Gen
 import Util.SetLike
@@ -441,6 +442,9 @@ loadModules modOpt targets libs sloc need = do
     modifyIORef done_ref (modEncountered_u $ Map.union (modEnc True explicitModMap))
     modifyIORef done_ref (modEncountered_u $ Map.union (modEnc False implicitModMap))
 
+    forM_ (concatMap libExtraFiles (es ++ is)) $ \ef -> do
+        fileInTempDir ("cbits/" ++ unpackPS (extraFileName ef)) $ \fn -> BS.writeFile fn (extraFileData ef)
+
     done <- readIORef done_ref
     forM_ (Map.elems $ loadedLibraries done) $ \ lib -> do
         let libsBad = filter (\ (p,h) -> fmap (libHash) (Map.lookup p (loadedLibraries done)) /= Just h) (hohLibDeps $ libHoHeader lib)
@@ -652,7 +656,7 @@ buildLibrary :: (CollectedHo -> Ho -> IO CollectedHo)
              -> IO ()
 buildLibrary ifunc func = ans where
     ans fp = do
-        (desc,name,vers,hmods,emods, modOpts) <- parse fp
+        (desc,name,vers,hmods,emods,modOpts,sources) <- parse fp
         vers <- runReadP parseVersion vers
         let allMods = emodSet `Set.union` hmodSet
             emodSet = Set.fromList emods
@@ -704,7 +708,9 @@ buildLibrary ifunc func = ans where
                 hoModuleDeps = mdeps
                 }
         putProgressLn $ "Writing Library: " ++ outName
-        recordHlFile Library { libHoHeader = hoh, libHoLib =  libr, libTcMap = ldef, libBuildMap = lcor, libFileName = outName }
+        efs <- mapM fetchExtraFile sources
+        recordHlFile Library { libHoHeader = hoh, libHoLib =  libr, libTcMap = ldef,
+            libBuildMap = lcor, libFileName = outName, libExtraFiles = efs }
     -- parse library description file
     parse fp = do
         putProgressLn $ "Creating library from description file: " ++ show fp
@@ -732,7 +738,13 @@ buildLibrary ifunc func = ans where
             print (flags,optFOptsSet modOpts)
         let hmods = map toModule $ snub $ mfield "hidden-modules"
             emods = map toModule $ snub $ mfield "exposed-modules"
-        return (Map.toList dsing,name,vers,hmods,emods, modOpts)
+            sources = map (FP.takeDirectory fp FP.</>) $ snub $ mfield "c-sources" ++ mfield "include-sources"
+        return (Map.toList dsing,name,vers,hmods,emods,modOpts,sources)
+
+fetchExtraFile fp = do
+    c <- BS.readFile fp
+    return ExtraFile { extraFileName = packString (FP.takeFileName fp),
+                       extraFileData = c }
 
 ------------------------------------
 -- dumping contents of a ho file

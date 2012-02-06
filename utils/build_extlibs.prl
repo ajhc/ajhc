@@ -42,7 +42,7 @@ foreach my $fn (@ARGV) {
     next unless $name;
     next unless $version;
 
-    $options = "$options --deps tmp/$name-$version.yaml" if $opt_d;
+    $options = "$options --deps tmp/$name-$version-deps.yaml" if $opt_d;
 
     print("$name-$version.hl\n"),next if $opt_l;
 
@@ -55,7 +55,8 @@ foreach my $fn (@ARGV) {
     mysystem "tar -zxv --directory $tmpdir -f $tmpdir/$name-$version.tar.gz" and die "$!: tar";
     my $src = -d "$tmpdir/$name-$version/src" ? "/src" : "";
     mysystem "patch -d $tmpdir/$name-$version -p1 < $patch" if -e $patch;
-    mysystem("./jhc $options " . ($ENV{JHC_TEST} || "") . " --build-hl $fn -L- -L. -i- '-i$tmpdir/$name-$version$src'") and die "$!: jhc";
+    mysystem("cp '$fn' '$tmpdir/$name-$version'");
+    $fn =~ s/.*\///;
+    mysystem("./jhc $options " . ($ENV{JHC_TEST} || "") .
+        " --build-hl '$tmpdir/$name-$version/$fn' -L- -L. -i- '-i$tmpdir/$name-$version$src'") and die "$!: jhc";
 }
-
-

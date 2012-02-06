@@ -1,0 +1,17 @@
+Name:                bytestring
+Version:             0.9.2.0
+Synopsis:            Fast, packed, strict and lazy byte arrays with a list interface
+Options: '-DMIN_VERSION_base(x,y,z)=0'
+exposed-modules:
+       - Data.ByteString
+       - Data.ByteString.Char8
+       - Data.ByteString.Unsafe
+       - Data.ByteString.Internal
+       - Data.ByteString.Lazy
+       - Data.ByteString.Lazy.Char8
+       - Data.ByteString.Lazy.Internal
+       - Data.ByteString.Fusion
+extensions:        [ CPP, ForeignFunctionInterface, NamedFieldPuns ]
+hs-source-dir:     .
+c-sources:         cbits/fpstring.c
+include-sources:   include/fpstring.h

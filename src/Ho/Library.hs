@@ -218,6 +218,8 @@ list_fields = Set.fromList $ [
     "include-dirs",
     "extensions",
     "options",
+    "c-sources",
+    "include-sources",
     "build-depends"
     ] ++ map fst alias_fields
       ++ map snd alias_fields

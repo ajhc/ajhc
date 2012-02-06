@@ -1,6 +1,7 @@
 module Ho.Type where
 
 import Data.Monoid
+import qualified Data.ByteString as BS
 import qualified Data.Map as Map
 
 import Data.Version
@@ -31,6 +32,7 @@ cff_defs  = chunkType "DEFS"
 cff_lcor  = chunkType "LCOR"
 cff_ldef  = chunkType "LDEF"
 cff_idep  = chunkType "IDEP"
+cff_file  = chunkType "FILE"
 
 -- A SourceHash is the hash of a specific file, it is associated with a
 -- specific 'Module' that said file implements.
@@ -110,6 +112,7 @@ data Library = Library {
     libHoLib :: HoLib,
     libTcMap :: (Map.Map ModuleGroup HoTcInfo),
     libBuildMap :: (Map.Map ModuleGroup HoBuild),
+    libExtraFiles :: [ExtraFile],
     libFileName :: FilePath
     }
 
@@ -147,6 +150,11 @@ data Ho = Ho {
 instance Monoid Ho where
     mempty = Ho (error "unknown module group") mempty mempty
     mappend ha hb = Ho (hoModuleGroup ha) (hoTcInfo ha `mappend` hoTcInfo hb) (hoBuild ha `mappend` hoBuild hb)
+
+data ExtraFile = ExtraFile {
+    extraFileName :: PackedString,
+    extraFileData :: BS.ByteString
+    }
 
 {-
 instance Monoid Ho where

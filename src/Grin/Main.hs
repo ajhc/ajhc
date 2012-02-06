@@ -2,10 +2,12 @@ module Grin.Main(compileToGrin) where
 
 import Control.Monad
 import Data.Monoid(mappend)
+import System.Directory
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Lazy.UTF8 as LBS
 import qualified Data.Map as Map
 import qualified System
+import qualified System.FilePath as FP
 
 import Grin.DeadCode
 import Grin.Devolve(twiddleGrin,devolveTransform)
@@ -87,10 +89,15 @@ compileGrinToC grin = do
               | otherwise -> fileInTempDir ("main_code.c") (\_ -> return ())
     (argstring,sversion) <- getArgString
     (cc,args) <- fetchCompilerFlags
-    let comm = shellQuote $ [cc] ++ ["-o", fn, cf] ++ args ++ (map ("-l" ++) rls)
+    tdir <- getTempDir
+    ds <- catch (getDirectoryContents (tdir FP.</> "cbits")) (\_ -> return [])
+    let extraCFiles = ["-I" ++ tdir ++ "/cbits" ] ++ [ tdir FP.</> "cbits" FP.</> fn | fn@(reverse -> 'c':'.':_) <- ds ] 
+    let comm = shellQuote $ [cc] ++ ["-o", fn, cf] ++ args ++ (map ("-l" ++) rls) ++ extraCFiles
         globalvar n c = LBS.fromString $ "char " ++ n ++ "[] = \"" ++ c ++ "\";"
     putProgressLn ("Writing " ++ show cf)
-    LBS.writeFile cf $ LBS.intercalate (LBS.fromString "\n") [globalvar "jhc_c_compile" comm, globalvar "jhc_command" argstring,globalvar "jhc_version" sversion,LBS.empty,cg]
+    LBS.writeFile cf $ LBS.intercalate (LBS.fromString "\n") [
+        globalvar "jhc_c_compile" comm, globalvar "jhc_command" argstring,
+        globalvar "jhc_version" sversion,LBS.empty,cg]
     when (optStop options == StopC) $
         exitSuccess
     putProgressLn ("Running: " ++ comm)

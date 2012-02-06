@@ -1,0 +1,22 @@
+Only in bytestring-0.9.2.0.jhc: bytestring.yaml
+diff -ru bytestring-0.9.2.0/Data/ByteString.hs bytestring-0.9.2.0.jhc/Data/ByteString.hs
+--- bytestring-0.9.2.0/Data/ByteString.hs	2011-08-25 05:19:31.000000000 -0700
++++ bytestring-0.9.2.0.jhc/Data/ByteString.hs	2012-02-06 04:48:48.116356373 -0800
+@@ -243,7 +243,7 @@
+ -- hGetBuf and hPutBuf not available in yhc or nhc
+ import System.IO                (stdin,stdout,hClose,hFileSize
+                                 ,hGetBuf,hPutBuf,openBinaryFile
+-                                ,IOMode(..))
++                                ,IOMode(..),Handle,hWaitForInput)
+ import System.IO.Error          (mkIOError, illegalOperationErrorType)
+ 
+ import Data.Monoid              (Monoid, mempty, mappend, mconcat)
+@@ -1910,7 +1910,7 @@
+   bytesWritten <- withForeignPtr ps $ \p-> hPutBufNonBlocking h (p `plusPtr` s) l
+   return $! drop bytesWritten bs
+ #else
+-hPutNonBlocking :: Handle -> B.ByteString -> IO Int
++hPutNonBlocking :: Handle -> ByteString -> IO ByteString
+ hPutNonBlocking h bs = hPut h bs >> return empty
+ #endif
+ 

@@ -36,7 +36,7 @@ readHFile fn = do
 
 readHoFile :: FilePath -> IO (HoHeader,HoIDeps,Ho)
 readHoFile fn = do
-    (_fn',hoh,fc) <- readHFile fn
+    (_fn,hoh,fc) <- readHFile fn
     let Left modGroup = hohName hoh
     return (hoh,fc cff_idep,Ho { hoModuleGroup = modGroup, hoTcInfo = fc cff_defs, hoBuild = fc cff_core})
 
@@ -90,11 +90,12 @@ recordHlFile
     -> IO ()
 recordHlFile l = do
     --let theho =  mapHoBodies eraseE ho
-    let cfflbs = mkCFFfile cff_magic [
+    let cfflbs = mkCFFfile cff_magic $ [
             (cff_jhdr, compress $ encode (libHoHeader l) { hohVersion = current_version }),
             (cff_libr, compress $ encode $ libHoLib l),
             (cff_ldef, compress $ encode $ libTcMap l),
-            (cff_lcor, compress $ encode $ libBuildMap l)]
+            (cff_lcor, compress $ encode $ libBuildMap l),
+            (cff_file, compress $ encode $ libExtraFiles l)]
     let tfp = libFileName l ++ ".tmp"
     LBS.writeFile tfp cfflbs
     rename tfp $ libFileName l
@@ -102,7 +103,15 @@ recordHlFile l = do
 readHlFile :: FilePath -> IO Library
 readHlFile fn = do
     (_fn',hoh,fc) <- readHFile fn
-    return Library { libHoHeader = hoh, libHoLib =  fc cff_libr, libTcMap = fc cff_ldef, libBuildMap = fc cff_lcor, libFileName = fn }
+    return Library { libHoHeader = hoh, libHoLib =  fc cff_libr,
+        libTcMap = fc cff_ldef, libBuildMap = fc cff_lcor,
+        libFileName = fn, libExtraFiles = fc cff_file }
+
+instance Binary ExtraFile where
+    put (ExtraFile a b) = put (a,b)
+    get = do
+        (x,y) <- get
+        return $ ExtraFile x y
 
 instance Binary FieldMap where
     put (FieldMap ac ad) = do

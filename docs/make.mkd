@@ -105,4 +105,11 @@ Include-Dirs
 The directories are interpreted relative to the directory that contains the
 yaml file.
 
+C-Sources
+: C files that should be linked into programs that utilize this library.
+
+Include-Sources
+: files that should be made available for inclusion when compiling the
+generated C code but don't need to be linked into the executable.
+
 example library files can be seen in lib/jhc/jhc.yaml and lib/base/base.yaml
