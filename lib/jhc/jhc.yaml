@@ -11,7 +11,6 @@ Hidden-Modules:
         - Jhc.Inst.Show
         - Jhc.Inst.Storable
 Exposed-Modules:
-        - Data.Char
         - Data.Ratio
         - Foreign.C.Error
         - Foreign.C.String

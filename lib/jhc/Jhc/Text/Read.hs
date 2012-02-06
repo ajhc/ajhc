@@ -162,3 +162,41 @@ readDec, readOct, readHex :: (Integral a) => ReadS a
 readDec = readInt 10 isDigit    digitToInt
 readOct = readInt  8 isOctDigit digitToInt
 readHex = readInt 16 isHexDigit digitToInt
+
+-- Text functions
+readLitChar          :: ReadS Char
+readLitChar ('\\':s) =  readEsc s
+readLitChar (c:s)    =  [(c,s)]
+
+readEsc          :: ReadS Char
+readEsc ('a':s)  = [('\a',s)]
+readEsc ('b':s)  = [('\b',s)]
+readEsc ('f':s)  = [('\f',s)]
+readEsc ('n':s)  = [('\n',s)]
+readEsc ('r':s)  = [('\r',s)]
+readEsc ('t':s)  = [('\t',s)]
+readEsc ('v':s)  = [('\v',s)]
+readEsc ('\\':s) = [('\\',s)]
+readEsc ('"':s)  = [('"',s)]
+readEsc ('\'':s) = [('\'',s)]
+readEsc ('^':(c:s)) | c >= '@' && c <= '_'
+                 = [(chr (ord c - ord '@'), s)]
+readEsc s@(d:_) | isDigit d
+                 = [(chr n, t) | (n,t) <- readDec s]
+readEsc ('o':s)  = [(chr n, t) | (n,t) <- readOct s]
+readEsc ('x':s)  = [(chr n, t) | (n,t) <- readHex s]
+readEsc s@(c:_) | isUpper c
+                 = let table = ('\DEL', "DEL") : zip chars asciiTab
+                   in case [(c,s') | (c, mne) <- table,
+                                     ([],s') <- [match mne s]]
+                      of (pr:_) -> [pr]
+                         []     -> []
+readEsc _        = []
+
+chars = f '\NUL' where
+    f x = x:f (chr $ ord x + 1)
+
+match                         :: (Eq a) => [a] -> [a] -> ([a],[a])
+match (x:xs) (y:ys) | x == y  =  match xs ys
+match xs     ys               =  (xs,ys)
+

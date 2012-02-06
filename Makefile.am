@@ -320,7 +320,7 @@ jhc-1.0.hl: lib/jhc/jhc.yaml lib/jhc/Jhc/Prim.hs lib/jhc/Jhc/IO.hs lib/jhc/Jhc/I
     lib/jhc/Prelude/IO.hs lib/jhc/Jhc/Order.hs lib/jhc/System/C/Stdio.hs  \
     lib/jhc/Foreign/C/String.hs lib/jhc/Jhc/Show.hs lib/jhc/Jhc/Handle.hs lib/jhc/Jhc/Addr.hs lib/jhc/Numeric.hs \
     lib/jhc/Jhc/Float.hs lib/jhc/Jhc/Inst/Storable.hs lib/jhc/Jhc/Inst/Num.hs lib/jhc/Foreign/C/Types.hs lib/jhc/Data/Ratio.hs \
-    lib/jhc/Data/Char.hs lib/jhc/Jhc/List.hs lib/jhc/Jhc/Type/Float.hs lib/jhc/Foreign/Marshal/Utils.hs lib/jhc/Jhc/Basics.hs \
+    lib/jhc/Jhc/List.hs lib/jhc/Jhc/Type/Float.hs lib/jhc/Foreign/Marshal/Utils.hs lib/jhc/Jhc/Basics.hs \
     lib/jhc/System/Mem.hs lib/jhc/Jhc/Type/Basic.hs lib/jhc/Jhc/Num.hs lib/jhc/Jhc/Text/Read.hs \
     lib/jhc/Jhc/Type/Ptr.hs lib/jhc/Foreign/C/Error.hs lib/jhc/Foreign/Storable.hs lib/jhc/Foreign/Ptr.hs lib/jhc/Jhc/Inst/Order.hs \
     lib/jhc/Jhc/Enum.hs lib/jhc/Jhc/Type/Handle.hs lib/jhc/Jhc/Tuples.hs lib/jhc/Jhc/String.hs lib/jhc/Prelude/Float.hs \

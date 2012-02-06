@@ -6,7 +6,6 @@ The darcs repository is located at <http://repetae.net/repos/jhc>, you can also
 [browse the repository](http://repetae.net/dw/darcsweb.cgi?r=jhc;a=summary) via
 darcsweb.
 
-
 Getting the source
 ------------------
 
@@ -41,21 +40,14 @@ If the dependencies are installed properly, the following will produce a working
     autoreconf -i
     ./configure
 
-Now you can begin to build jhc, in order to do so, switch to the jhc directory and do:
+Now you can begin to build jhc and the standard libraries, in order to do so, switch to the jhc directory and do:
 
     make jhc
 
-after jhc has finished building, you can create the standard libraries via
+jhc can now be tested via the following command to build HelloWorld with the freshly built libraries in the current directory.
+
+    ./jhc -L- -L. examples/HelloWorld.hs -o HelloWorld
+
+External libraries described in lib/ext can be built with the following
 
     make libs
-
-jhc can now be tested via
-
-    make HelloWorld
-
-however, during development, it is sometimes easier to use the raw haskell source of
-the libraries directly. in order to do that, you can run jhc with the following
-options when run in the development tree.
-
-    ./jhc --noauto -ilib/base -ilib/jhc -ilib/haskell98 examples/HelloWorld.hs -o helloworld
-

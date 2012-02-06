@@ -4,7 +4,7 @@ module Prelude.Text (
     Read(readsPrec, readList),
     Show(showsPrec, show, showList),
     reads, shows, read, lex,
-    showChar, showString, readParen, showParen,readIO,readLn ) where
+    showChar, showString, readParen, showParen,readIO,readLn,showLitChar ) where
 
 import Jhc.Basics
 import Jhc.Type.Float
@@ -14,9 +14,9 @@ import Jhc.Num
 import Jhc.Show
 import Jhc.Text.Read
 import Prelude.IO
-
-import Data.Char(isSpace, isAlpha, isDigit, isAlphaNum,
-                 showLitChar, readLitChar, lexLitChar)
+import Prelude.CType
+import Jhc.Order
+import Jhc.List
 
 import Numeric(showSigned, showInt, readSigned, readDec, showFloat,
                readFloat, lexDigits)
@@ -101,3 +101,23 @@ instance Read Ordering where
 --	       [((Just aa) , rest) | ("Just" , inp) <- lex inp ,
 --		(aa , rest) <- readsPrec 10 inp])
 --	      input
+
+showLitChar               :: Char -> ShowS
+showLitChar c | c > '\DEL' =  showChar '\\' .
+                              protectEsc isDigit (shows (ord c))
+showLitChar '\DEL'         =  showString "\\DEL"
+showLitChar '\\'           =  showString "\\\\"
+showLitChar c | c >= ' '   =  showChar c
+showLitChar '\a'           =  showString "\\a"
+showLitChar '\b'           =  showString "\\b"
+showLitChar '\f'           =  showString "\\f"
+showLitChar '\n'           =  showString "\\n"
+showLitChar '\r'           =  showString "\\r"
+showLitChar '\t'           =  showString "\\t"
+showLitChar '\v'           =  showString "\\v"
+showLitChar '\SO'          =  protectEsc (== 'H') (showString "\\SO")
+showLitChar c              =  showString ('\\' : (asciiTab!!ord c))
+
+protectEsc p f             = f . cont
+                             where cont s@(c:_) | p c = "\\&" ++ s
+                                   cont s             = s

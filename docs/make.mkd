@@ -11,9 +11,9 @@ it to an executable named 'hello'.
 
 Jhc searches for modules in its search path, which defaults to the current
 directory. Modules are searched for based on their names. For instance, the
-module Data.Foo will be searched for in 'Data/Foo.hs'. As an extension, jhc will
-also search for 'Data.Foo.hs'. The search path may be modifed with the '-i'
-command line option, or by setting the 'JHC_PATH' environment variable.
+module Data.Foo will be searched for in 'Data/Foo.hs' and 'Data.Foo.hs'.
+The search path may be modifed with the '-i' command line option, or by
+setting the 'JHC_PATH' environment variable.
 
 # Using Libraries
 
@@ -30,6 +30,9 @@ use it.
 
     ; jhc -p mylibrary MyProgram.hs -o myprogram
 
+You can list all available libraries by passing the --list-libraries option to jhc. If
+you include '-v' for verbose output, you will get detailed information about the
+libraries in a YAML format suitable for processing by external tools.
 
 # Environment Variables
 
@@ -45,24 +48,61 @@ JHC_LIBRARY_PATH
 : This specifies the path to search for libraries.
 
 JHC_CACHE
-: This specified the directory jhc will use to cache values. having a valid cache is essential for jhc performance. It defaults to ~/.jhc/cache.
+: This specified the directory jhc will use to cache values. having a valid
+cache is essential for jhc performance. It defaults to ~/.jhc/cache.
 
 # Building Haskell Libraries
 
 Libraries are built by passing jhc a file describing the library via the
---build-hl option. The file format is a simplified version of the cabal format.
-The name of the generated file will be basename-version.hl.
+--build-hl option. The library file format is a stadard YAML file.
 
-    ; jhc --build-hl mylibrary.cabal
+    ; jhc --build-hl mylibrary.yaml
 
 ## Library File Format
 
-The library file is a simple list of key value pairs seperated by colon. The fields that jhc cares about are
+The library file is a YAML document, jhc will recognize several fields and
+ignore unknown ones.
 
-    Name: The Name of your library
-    Version: The Version of your library
-    Exposed-Modules: Comma Seperated list of modules to be included in the library and made availabe to users of the library
-    Hidden-Modules: Comma Seperated list of modules that will be used by the library internally, but not be made available outside it.
+Name
+: The name of your library
 
-Other fields are stored as-is inside of the generated hl file and can be seen with jhc --show-ho file.hl.
+Version
+: The version of your library, The version number is used to differentiate
+different versions of the library passed to the '-p' command line option but is
+not otherwise special to jhc.
 
+Exposed-Modules
+: A list of modules to be included in the library and exposed to users of the
+library as its public interface. This may include modules that are part of
+another library, they will be re-exported by the current library.
+
+Hidden-Modules
+: A list of modules that the library may use internally but that should not be
+exposed to the user. Jhc may optimize based on this information. If this list
+is not exhaustive jhc will still build your library, but it will print out a
+warning.
+
+Extensions
+: A list of extensions which should be enabled during compilation of this
+module. When possible, jhc will match ghc extensions to their closest jhc
+counterparts.
+
+Options
+: Extra command line options to jhc for this library build.
+
+Build-Depends
+: libraries to include, in the same format as passed to the '-p' command line
+option
+
+Hs-Source-Dirs
+: Directory to search for Haskell source files in, this differs from the '-i'
+command line option in that the directory in this field is relative to the
+directory the library description .yaml file is located while the '-i' option
+is always relative to the current working directory.
+
+Include-Dirs
+: directories to be included in the preprocessor search path as if via '-I'.
+The directories are interpreted relative to the directory that contains the
+yaml file.
+
+example library files can be seen in lib/jhc/jhc.yaml and lib/base/base.yaml

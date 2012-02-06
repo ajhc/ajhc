@@ -224,6 +224,7 @@ list_fields = Set.fromList $ [
 
 alias_fields = [
    ("other-modules","hidden-modules"),
+   ("exported-modules","exposed-modules"),
    ("hs-source-dir","hs-source-dirs")
    ]
 

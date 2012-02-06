@@ -84,7 +84,8 @@ import Jhc.Numeric
 import Jhc.Order
 import Prelude.IO
 import Prelude.Text
-import qualified Data.Char as Char(isSpace,ord,chr)
+import qualified Prelude.CType as Char
+--import qualified Data.Char as Char(isSpace,ord,chr)
 
 import Jhc.Class.Real
 
