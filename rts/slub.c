@@ -117,8 +117,6 @@ s_new_megablock(struct s_arena *arena)
 
 /* block allocator */
 
-static unsigned block_threshold = 8;
-
 static struct s_block *
 get_free_block(gc_t gc, struct s_arena *arena) {
         arena->block_used++;

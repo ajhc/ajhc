@@ -47,7 +47,6 @@ module Foreign.Marshal.Array (
   advancePtr,     -- :: Storable a => Ptr a -> Int -> Ptr a
 ) where
 
-
 import Foreign.Marshal.Alloc
 import Foreign.Marshal.Utils
 import Foreign.Ptr
@@ -103,7 +102,6 @@ reallocArray  = doRealloc undefined
 reallocArray0          :: Storable a => Ptr a -> Int -> IO (Ptr a)
 reallocArray0 ptr size  = reallocArray ptr (size + 1)
 
-
 -- |Convert an array of given length into a Haskell list.  This version
 -- traverses the array backwards using an accumulating parameter,
 -- which uses constant stack space.  The previous version using mapM
@@ -126,7 +124,6 @@ peekArray0 marker ptr  = do
 -- finding the length
 -- ------------------
 
-
 -- |Write the list elements consecutive into memory
 --
 --pokeArray :: Storable a => Ptr a -> [a] -> IO ()
@@ -141,7 +138,6 @@ pokeArray' :: Storable a => Ptr a -> [a] -> IO Int
 pokeArray' ptr vals =  etaIO $ f 0 vals where
     f n [] | n `seq` True = return n
     f n (x:xs) = pokeElemOff ptr n x >> f (n + 1) xs
-
 
 -- |Write the list elements consecutive into memory and terminate them with the
 -- given marker element
@@ -207,7 +203,6 @@ withArrayLen0 marker vals f  = etaIO $
   where
     len = length vals
 
-
 -- copying (argument order: destination, source)
 -- -------
 
@@ -229,7 +224,6 @@ moveArray  = doMove undefined
     doMove                     :: Storable a' => a' -> Ptr a' -> Ptr a' -> Int -> IO ()
     doMove dummy dest src size  = moveBytes dest src (size * sizeOf dummy)
 
-
 -- finding the length
 -- ------------------
 
@@ -241,7 +235,6 @@ lengthArray0 marker ptr | ptr `seq` True  = etaIO $ loop 0
     loop i | i `seq` True = do
         val <- peekElemOff ptr i
         if val == marker then return i else loop (i+1)
-
 
 -- indexing
 -- --------

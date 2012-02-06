@@ -1,2 +1,2 @@
-jhc_flags: --stop typecheck --stale Main --no-ho
+jhc_flags: --stop typecheck --stale Main --no-cache
 run: no

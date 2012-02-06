@@ -198,7 +198,7 @@ gc_perform_gc(gc_t gc)
                         number_gcs,
                         number_allocs,
                         (unsigned)arena->block_used,
-                        block_threshold,
+                        (unsigned)arena->block_threshold,
                         number_stack,
                         number_ptr,
                         number_redirects,
