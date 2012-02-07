@@ -1,29 +1,4 @@
 #if _JHC_GC == _JHC_GC_JGC
-/*
- * Singly-linked List definitions.
- */
-#define	SLIST_HEAD(name, type)						\
-struct name {								\
-	struct type *slh_first;	/* first element */			\
-}
-#define	SLIST_ENTRY(type)						\
-struct {								\
-	struct type *sle_next;	/* next element */			\
-}
-#define	SLIST_INIT(head) do {						\
-	(head)->slh_first = NULL;					\
-} while (/*CONSTCOND*/0)
-#define	SLIST_INSERT_HEAD(head, elm, field) do {			\
-	(elm)->field.sle_next = (head)->slh_first;			\
-	(head)->slh_first = (elm);					\
-} while (/*CONSTCOND*/0)
-#define	SLIST_REMOVE_HEAD(head, field) do {				\
-	(head)->slh_first = (head)->slh_first->field.sle_next;		\
-} while (/*CONSTCOND*/0)
-#define	SLIST_FIRST(head)	((head)->slh_first)
-#define	SLIST_NEXT(elm, field)	((elm)->field.sle_next)
-#define	SLIST_FOREACH(var, head, field)					\
-	for((var) = (head)->slh_first; (var); (var) = (var)->field.sle_next)
 
 #define BLOCK_SIZE     (1UL << 12)
 #define MEGABLOCK_SIZE (1UL << 20)

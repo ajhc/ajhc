@@ -3,6 +3,7 @@ module Grin.Main(compileToGrin) where
 import Control.Monad
 import Data.Monoid(mappend)
 import System.Directory
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Lazy.UTF8 as LBS
 import qualified Data.Map as Map
@@ -22,6 +23,7 @@ import Grin.Show
 import Grin.StorageAnalysis
 import Ho.ReadSource
 import Options
+import RawFiles
 import Support.TempDir
 import Support.Transform
 import Util.Gen
@@ -89,9 +91,14 @@ compileGrinToC grin = do
               | otherwise -> fileInTempDir ("main_code.c") (\_ -> return ())
     (argstring,sversion) <- getArgString
     (cc,args) <- fetchCompilerFlags
+    forM_ [("rts/rts_constants.h",rts_constants_h),("rts/stableptr.c",stableptr_c),
+           ("sys/queue.h",queue_h),("HsFFI.h",hsffi_h),("rts/wsize.h",wsize_h),
+           ("rts/bitarray.h",bitarray_h)] $ \ (fn,bs) -> do
+        fileInTempDir fn $ flip BS.writeFile bs
+
     tdir <- getTempDir
     ds <- catch (getDirectoryContents (tdir FP.</> "cbits")) (\_ -> return [])
-    let extraCFiles = ["-I" ++ tdir ++ "/cbits" ] ++ [ tdir FP.</> "cbits" FP.</> fn | fn@(reverse -> 'c':'.':_) <- ds ]
+    let extraCFiles = ["-I" ++ tdir ++ "/cbits", "-I" ++ tdir ] ++ [ tdir FP.</> "cbits" FP.</> fn | fn@(reverse -> 'c':'.':_) <- ds ]
     let comm = shellQuote $ [cc] ++ ["-o", fn, cf] ++ args ++ (map ("-l" ++) rls) ++ extraCFiles
         globalvar n c = LBS.fromString $ "char " ++ n ++ "[] = \"" ++ c ++ "\";"
     putProgressLn ("Writing " ++ show cf)

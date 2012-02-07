@@ -99,12 +99,13 @@ uninstall-hook:
 
 UTILS = utils/op_process.prl utils/opt_sets.prl utils/gen_props.prl utils/op_names.prl utils/op_raw.prl
 
-RAWFILES = src/data/ViaGhc.hs ChangeLog \
-	   src/data/shortchange.txt src/data/prelude.m4 src/data/targets.ini
+RAWFILES = src/data/ViaGhc.hs ChangeLog src/data/shortchange.txt src/data/prelude.m4 \
+	   src/data/targets.ini rts/rts_constants.h rts/stableptr.c rts/queue.h src/data/HsFFI.h \
+           rts/wsize.h rts/bitarray.h
 
-RTSFILES = src/data/HsFFI.h rts/wsize.h rts/jhc_rts_header.h rts/jhc_jgc.h \
-	   rts/debug.c rts/jhc_rts_alloc.c rts/jhc_rts.c rts/profile.c rts/jhc_rts2.c rts/bitarray.h \
-	   rts/slub.c rts/jhc_jgc.c  rts/lib_cbits.c
+RTSFILES = rts/jhc_rts_header.h rts/jhc_jgc.h \
+	   rts/debug.c rts/jhc_rts_alloc.c rts/jhc_rts.c rts/profile.c rts/jhc_rts2.c \
+	   rts/slub.c rts/jhc_jgc.c rts/lib_cbits.c
 
 DRIFTFILES = drift_processed/C/FFI.hs drift_processed/C/FromGrin2.hs drift_processed/Cmm/Op.hs drift_processed/C/Prims.hs drift_processed/DataConstructors.hs \
    drift_processed/DerivingDrift/StandardRules.hs drift_processed/E/CPR.hs drift_processed/E/Demand.hs drift_processed/E/LambdaLift.hs \

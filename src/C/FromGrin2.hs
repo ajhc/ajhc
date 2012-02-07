@@ -7,7 +7,10 @@ import Data.Char
 import Data.List
 import Data.Maybe
 import Data.Monoid
+import System.FilePath
 import Text.PrettyPrint.HughesPJ(nest,($$),fsep)
+import qualified Data.ByteString.Lazy as LBS
+import qualified Data.ByteString.UTF8 as BS
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as P
@@ -33,8 +36,6 @@ import Util.Gen
 import Util.SetLike
 import Util.UniqueMonad
 import qualified Cmm.Op as Op
-import qualified Data.ByteString.Lazy as LBS
-import qualified Data.ByteString.UTF8 as BS
 import qualified FlagOpts as FO
 
 ---------------
@@ -132,6 +133,7 @@ compileGrin grin = (LBS.fromChunks code, snub (reqLibraries req))  where
     ans = vcat [
         vcat includes,
         vcat jgcs,
+        vcat cincludes,
         text "",
         enum_tag_t,
         header,
@@ -145,7 +147,8 @@ compileGrin grin = (LBS.fromChunks code, snub (reqLibraries req))  where
     jgcs | fopts FO.Jgc = [ text "static struct s_cache *" <> tshow (nodeCacheName m) <> char ';' | (m,_) <- Set.toList wAllocs]
          | otherwise = empty
     nh_stuff = text "static const void * const nh_stuff[] = {" $$ fsep (punctuate (char ',') (cafnames ++ constnames ++ [text "NULL"]))  $$ text "};"
-    includes =  map include (snub $ reqIncludes req)
+    includes = map include (filter ((".h" ==) . takeExtension) $ snub $ reqIncludes req)
+    cincludes = map include (filter ((".c" ==) . takeExtension) $ snub $ reqIncludes req)
     include fn = text "#include <" <> text fn <> text ">"
     (header,body) = generateC (function (name "jhc_hs_init") voidType [] [] icaches:Map.elems fm) (Map.elems sm)
     icaches :: Statement

@@ -25,6 +25,11 @@
 #include <malloc.h>
 #endif
 
+#include "HsFFI.h"
+#include "rts/wsize.h"
+#include "rts/bitarray.h"
+#include "sys/queue.h"
+
 // #define our options
 
 #define _JHC_GC_NONE   0
