@@ -9,6 +9,7 @@ MutArray__ Jhc.Prim.Array.MutArray_
 List       Jhc.Prim.Prim.[]
 Char       Jhc.Type.Basic.Char
 IO         Jhc.Prim.IO.IO
+ST         Jhc.Prim.IO.ST
 ACIO       Jhc.Prim.IO.ACIO
 State_     Jhc.Prim.IO.State_
 RealWorld  Jhc.Prim.IO.RealWorld

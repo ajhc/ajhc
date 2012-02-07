@@ -276,7 +276,7 @@ new_cache(struct s_arena *arena, unsigned short size, unsigned short num_ptrs)
         sc->arena = arena;
         sc->pi.size = size;
         sc->pi.num_ptrs = num_ptrs;
-        sc->pi.flags = FLAG_NONE;
+        sc->pi.flags = 0;
         size_t excess = BLOCK_SIZE - sizeof(struct s_block);
         sc->num_entries = (8*excess) / (8*sizeof(uintptr_t)*size + 1) - 1;
         //sc->num_entries = (8*excess) / (8*size*sizeof(uintptr_t) + 1);

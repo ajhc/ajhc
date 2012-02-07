@@ -156,7 +156,8 @@ short_names = [
       tc_CClock,   tc_Integer, tc_Int,     tc_Int8,    tc_Int16,   tc_Int32,
       tc_Int64,    tc_IntMax,  tc_IntPtr,  tc_Word,    tc_Word8,   tc_Word16,
       tc_Word32,   tc_Word64,  tc_WordMax, tc_WordPtr, tc_Addr_,   tc_FunAddr_,
-      tc_Char_,    dc_Boolzh,  dc_Char,    dc_Int,     dc_Integer, dc_Word ]
+      tc_Char_,    dc_Boolzh,  dc_Char,    dc_Int,     dc_Integer, dc_Word,
+      tc_ST,       tc_Bang_]
 
 shortName = Map.fromList [ (x, toUnqualified x) | x <- short_names]
 

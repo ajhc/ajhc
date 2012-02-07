@@ -91,7 +91,7 @@ compileGrinToC grin = do
     (cc,args) <- fetchCompilerFlags
     tdir <- getTempDir
     ds <- catch (getDirectoryContents (tdir FP.</> "cbits")) (\_ -> return [])
-    let extraCFiles = ["-I" ++ tdir ++ "/cbits" ] ++ [ tdir FP.</> "cbits" FP.</> fn | fn@(reverse -> 'c':'.':_) <- ds ] 
+    let extraCFiles = ["-I" ++ tdir ++ "/cbits" ] ++ [ tdir FP.</> "cbits" FP.</> fn | fn@(reverse -> 'c':'.':_) <- ds ]
     let comm = shellQuote $ [cc] ++ ["-o", fn, cf] ++ args ++ (map ("-l" ++) rls) ++ extraCFiles
         globalvar n c = LBS.fromString $ "char " ++ n ++ "[] = \"" ++ c ++ "\";"
     putProgressLn ("Writing " ++ show cf)

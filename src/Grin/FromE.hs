@@ -426,9 +426,9 @@ compile' cenv (tvr,as,e) = ans where
             return $ BaseOp PokeVal [(Index r' o'),v']
         -- rts
         f "toBang_" (args -> [x]) = do
-            return $ gEval x
+            return $ if getType x == tyDNode then Return [x] else gEval x
         f "fromBang_" [x] = do
-            return (BaseOp Demote $ args [x])
+            return $ Return (args [x]) -- (BaseOp Demote $ args [x])
         f "mallocHeapWords" [w,_] = do
             let [c] = args [w]
             v <- newPrimVar (TyPtr (TyPrim Op.bits_ptr))
@@ -568,6 +568,9 @@ compile' cenv (tvr,as,e) = ans where
     -- | cc evaluates something in lazy context, returning a pointer to a node which when evaluated will produce the strict result.
     -- it is an invarient that evaling (cc e) produces the same value as (ce e)
     cc (EPrim don [e,_] _) | don == p_dependingOn  = cc e
+    cc (EPrim (APrim (PrimPrim "fromBang_") _) (args -> [e]) _) = return $ if getType e == tyDNode then demote e else Return [e] -- $ demote e
+--        e <- ce e
+--        return $ e :>>= [v] :-> demote v
     cc e | Just _ <- literal e = error "unboxed literal in lazy context"
     cc e | Just z <- constant e = return (Return $ keepIts [z])
     cc e | Just [z] <- con e = return $ bool (isLifted e) istore dstore z -- BaseOp (StoreNode (not $ isLifted e)) [z] -- if isLifted e then Store z else Return [z]

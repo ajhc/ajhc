@@ -238,7 +238,7 @@ unbox dataTable e vn wtd = eCase e [Alt (litCons { litName = cna, litArgs = [tvr
     tvra = tVr vn sta
     Just (ExtTypeBoxed cna sta _) = lookupExtTypeInfo dataTable te
 
-createFunc :: UniqueProducer m => DataTable -> [E] -> ([TVr] -> (E -> E,E)) -> m E
+createFunc :: Monad t =>  DataTable -> [E] -> ([TVr] -> (E -> E,E)) -> Ce t E
 createFunc dataTable es ee = do
     xs <- flip mapM es $ \te -> do
         eti <- lookupExtTypeInfo dataTable te
@@ -363,7 +363,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
         }
     Identity funcs = T.mapM (return . EVar . toTVr assumps dataTable) sFuncNames
     Ce ans = do
-        nds <- mapM cDecl hsDecls
+        nds <- mapM cDecl' hsDecls
         return (map anninst $ concat nds)
     doNegate e = eAp (eAp (func_negate funcs) (getType e)) e
     anninst (a,b,c)
@@ -400,8 +400,9 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
     -- ccallHelper returns a function expression to perform the call, when given the arguments
     ccallHelper :: Monad m => ([ExtType] -> ExtType -> Bool -> [E] -> E -> E) -> E -> Ce m E
     ccallHelper myPrim ty = do
-        let (ts,rt) = argTypes' ty
-            (isIO,rt') =  extractIO' rt
+        let --(ts,rt) = argTypes' ty
+          --  (isIO,rt') =  extractIO' rt
+            (ts,isIO,rt') = extractIO' ty
         es <- newVars [ t |  t <- ts, not (sortKindLike t) ]
         pt <- lookupExtTypeInfo dataTable rt'
         cts <- mapM (lookupExtTypeInfo dataTable) (filter (not . sortKindLike) ts)
@@ -440,12 +441,13 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
                 let rttIO' = ltTuple' [tWorld__, rt']
                 case isIO of
                     False -> cFun $ \rs -> (,) id $ (prim False [ EVar t | t <- rs ] rt')
-                    True -> cFun $ \rs -> (,) (ELam tvrWorld) $
-                                eCaseTup' (prim True (EVar tvrWorld:[EVar t | t <- rs ]) rttIO')
-                                          [tvrWorld2,rtVar]
-                                          (eJustIO (EVar tvrWorld2) (EVar rtVar))
+                    True -> cFun $ \rs -> (,) (ELam tvrWorld) $ (prim True (EVar tvrWorld:[EVar t | t <- rs ]) rttIO')
+                                --eCaseTup' (prim True (EVar tvrWorld:[EVar t | t <- rs ]) rttIO')
+                                --          [tvrWorld2,rtVar]
+                                --          (eJustIO (EVar tvrWorld2) (EVar rtVar))
 
-    cDecl :: Monad m => HsDecl -> Ce m [(Name,TVr,E)]
+    cDecl,cDecl' :: Monad m => HsDecl -> Ce m [(Name,TVr,E)]
+    cDecl' d = withSrcLoc (srcLoc d) $ cDecl d
     cDecl (HsForeignDecl sLoc (FfiSpec (Import cn req) _ Primitive) n _) = do
         let name      = toName Name.Val n
         (var,ty,lamt) <- convertValue name
@@ -493,8 +495,9 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
 
     cDecl (HsForeignDecl _ (FfiSpec (Import rcn _) _ DotNet) n _) = do
         (var,ty,lamt) <- convertValue (toName Name.Val n)
-        let (ts,rt) = argTypes' ty
-            (isIO,rt') = extractIO' rt
+        let --(ts,rt) = argTypes' ty
+            --(isIO,rt') = extractIO' rt
+            (ts,isIO,rt') = extractIO' ty
         es <- newVars [ t |  t <- ts, not (sortKindLike t) ]
         pt <- lookupExtTypeInfo dataTable rt'
         [tvrWorld, tvrWorld2] <- newVars [tWorld__,tWorld__]
@@ -524,8 +527,9 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
         tn <- convertVar (toName Name.Val n)
 
         (var,ty,lamt) <- convertValue name
-        let (argTys,retTy') = argTypes' ty
-            (isIO,retTy) = extractIO' retTy'
+        let --(argTys,retTy') = argTypes' ty
+            --(isIO,retTy) = extractIO' retTy'
+            (argTys,isIO,retTy) = extractIO' ty
 
         --retCTy <- if retTy == tUnit
          --         then return unboxedTyUnit

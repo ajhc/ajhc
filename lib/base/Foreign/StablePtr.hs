@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fno-prelude -fffi #-}
+{-# OPTIONS_JHC -fno-prelude -fffi -funboxed-tuples #-}
 module Foreign.StablePtr(
     StablePtr(),
     castStablePtrToPtr,
@@ -8,41 +8,35 @@ module Foreign.StablePtr(
     freeStablePtr
     ) where
 
-import Jhc.Addr
+import Jhc.Prim.Rts
+import Jhc.IO
+import Jhc.Type.Ptr
 import Jhc.Basics
-import Jhc.Monad
 
-newtype StablePtr a = StablePtr (Ptr ())
-data PlaceHolder
+data StablePtr a
 
 castPtrToStablePtr :: Ptr () -> StablePtr a
-castPtrToStablePtr p = StablePtr p
+castPtrToStablePtr (Ptr (Addr_ p)) = fromBang_ (bangFromRaw p)
 
 castStablePtrToPtr :: StablePtr a -> Ptr ()
-castStablePtrToPtr (StablePtr p) = p
-
+castStablePtrToPtr p = Ptr (Addr_ (bangToRaw (toBang_ p)))
 
 freeStablePtr :: StablePtr a -> IO ()
-freeStablePtr _ = return ()
+freeStablePtr p = c_freeStablePtr (toBang_ p)
 
+-- | newStablePtr will seq its argument to get rid of nasty GC issues and be
+-- compatible with FFI calling conventions, if this is an issue, you can put an
+-- extra box around it.
 newStablePtr :: a -> IO (StablePtr a)
 newStablePtr x = do
-    ptr <- ref_ptr (unsafeCoerce x)
-    return (StablePtr ptr)
+    fromUIO $ \w -> case c_newStablePtr (toBang_ x) w of
+        (# w', s #) -> (# w', fromBang_ s #)
 
 deRefStablePtr :: StablePtr a -> IO a
-deRefStablePtr (StablePtr x) = do
-    v <- deref_ptr x
-    return (unsafeCoerce v)
+deRefStablePtr x = do
+    fromUIO $ \w -> case c_derefStablePtr (toBang_ x) w of
+        (# w', s #) -> (# w', fromBang_ s #)
 
-deref_ptr = undefined
-ref_ptr = undefined
-unsafeCoerce = undefined
-
-{-
-
-foreign import primitive deref_ptr :: Ptr () -> IO PlaceHolder
-foreign import primitive ref_ptr   :: PlaceHolder -> IO (Ptr ())
-
-foreign import primitive unsafeCoerce :: a -> b
--}
+foreign import ccall unsafe "rts/stableptr.c c_freeStablePtr"  c_freeStablePtr   :: Bang_ (StablePtr a) -> IO ()
+foreign import ccall unsafe "rts/stableptr.c c_newStablePtr"   c_newStablePtr    :: Bang_ a -> UIO (Bang_ (StablePtr a))
+foreign import ccall unsafe "rts/stableptr.c c_derefStablePtr" c_derefStablePtr :: Bang_ (StablePtr a) -> UIO (Bang_ a)

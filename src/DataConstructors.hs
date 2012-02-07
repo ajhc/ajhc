@@ -377,10 +377,17 @@ extractIO e = f e where
     f (ELit LitCons { litAliasFor = Just af, litArgs = as }) = f (foldl eAp af as)
     f _ = fail "extractIO: not an IO type"
 
-extractIO' :: E -> (Bool,E)
-extractIO' e = case extractIO e of
-    Just x -> (True,x)
-    Nothing -> (False,e)
+-- extract IO or an unboxed version of it, (ST, World -> (# Wold, a #))
+extractIO' :: E -> ([E],Bool,E)
+extractIO' e = f e [] where
+    f (ELit LitCons { litName = c, litArgs = [x] }) rs | c == tc_IO  = (reverse rs, True,x)
+    f (ELit LitCons { litName = c, litArgs = [_,x] }) rs | c == tc_ST  = (reverse rs, True,x)
+    f (expandAlias -> Just t) rs = f t rs
+    f (fromPi -> (fromUnboxedTuple -> Just [s',x],[getType -> s''])) rs
+        | isState_ s' && isState_ s'' = (reverse rs, True,x)
+    f (EPi v e) rs = f e (getType v:rs)
+    f e rs = (reverse rs, False,e)
+--    f (fromPi -> (getType -> s',[getType -> s''])) | isState_ s' && isState_ s'' = (True,tUnit)
 
 data ExtTypeInfo
     = ExtTypeVoid                  -- maps to 'void'
@@ -415,6 +422,10 @@ lookupExtTypeInfo dataTable oe = f oe where
           Just (ExtTypeRaw et) <- lookupExtTypeInfo dataTable st = return $ ExtTypeBoxed cn st et
     g e | Just e' <- followAlias dataTable e = f e'
         | otherwise = fail $ "lookupExtTypeInfo: " ++ show (oe,e)
+
+expandAlias :: Monad m => E -> m E
+expandAlias (ELit LitCons { litAliasFor = Just af, litArgs = as }) = return (foldl eAp af as)
+expandAlias  _ = fail "expandAlias: not alias"
 
 followAlias :: Monad m => DataTable -> E -> m E
 followAlias _ (ELit LitCons { litAliasFor = Just af, litArgs = as }) = return (foldl eAp af as)
@@ -874,7 +885,8 @@ rawExtTypeMap = Map.fromList [
     (rt_float32,   "float"),
     (rt_float64,   "double"),
     (rt_float80,   "long double"),
-    (rt_float128,  "__float128")
+    (rt_float128,  "__float128"),
+    (tc_Bang_,     "wptr_t")
     ]
 
 -- which C types these convert to in FFI specifications for
@@ -923,12 +935,12 @@ typeTable = Map.fromList [
     (tc_CULong,   "unsigned long"),
     (tc_CULLong,  "unsigned long long"),
 
-
     (tc_CWchar,   "wchar_t"),
     (tc_CWint,    "wint_t"),
     (tc_CTime,    "time_t"),
     (tc_CClock,   "clock_t"),
     (tc_CSize,    "size_t"),
     (tc_Unit,     "void"),
-    (tc_State_,   "void")
+    (tc_State_,   "void"),
+    (tc_Bang_,    "wptr_t")  -- internal rts type
     ]
