@@ -438,8 +438,8 @@ convertBody (Error s t) = do
             v <- g t
             return (jerr & creturn v)
 
-convertBody (BaseOp (StoreNode b)  [n@NodeC {}])  = newNode region_heap (bool b wptr_t sptr_t) n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
-convertBody (BaseOp (StoreNode b)  [n@NodeC {},region]) = newNode region (bool b wptr_t sptr_t) n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
+convertBody (BaseOp (StoreNode b) [n@NodeC {}]) = newNode region_heap (bool b wptr_t sptr_t) n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
+convertBody (BaseOp (StoreNode b) [n@NodeC {},region]) = newNode region (bool b wptr_t sptr_t) n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
 
 convertBody (e :>>= [(Var vn _)] :-> e') | vn == v0 = do
     ss <- localTodo TodoNothing (convertBody e)
@@ -478,16 +478,14 @@ convertBody (BaseOp PokeVal [base,z])  = do
     base <- convertVal base
     z' <- convertVal z
     return $ indexArray base (constant $ number 0) =* z'
---convertBody (Update (Index base off) z) | getType base == TyPtr tyINode = do
---    base <- convertVal base
---    off <- convertVal off
---    z' <- convertVal z
---    return $ indexArray base off =* z'
 convertBody (BaseOp PeekVal [Index base off]) | getType base == TyPtr tyINode = do
     base <- convertVal base
     off <- convertVal off
     simpleRet (indexArray base off)
-
+convertBody (BaseOp (Coerce ty) [v])  = do
+    v <- convertVal v
+    ty <- convertType ty
+    simpleRet $ cast ty v
 convertBody (GcRoots vs b) = do
     vs <- mapM convertVal vs
     b' <- convertBody b
@@ -604,6 +602,18 @@ convertExp Alloc { expValue = v, expCount = c, expRegion = r } | r == region_hea
             i <- newVar (basicType "int")
             return $ forLoop i (expressionRaw "0") c' $ indexArray tmp i =* v'
     return (malloc `mappend` fill, tmp)
+convertExp Alloc { expValue = v, expCount = c, expRegion = r } |
+    r == region_atomic_heap, TyPrim Op.bits_ptr == getType v  = do
+        v' <- convertVal v
+        c' <- convertVal c
+        tmp <- newVar (ptrType uintptr_t)
+        let malloc = tmp =* jhc_malloc_atomic (operator "*" (sizeof uintptr_t) c')
+        fill <- case v of
+            ValUnknown _ -> return mempty
+            _ -> do
+                i <- newVar (basicType "int")
+                return $ forLoop i (expressionRaw "0") c' $ indexArray tmp i =* v'
+        return (malloc `mappend` fill, tmp)
 
 convertExp e = return (err (show e),err "nothing")
 
@@ -895,6 +905,10 @@ gc_roots vs   = case length vs of
     lvs -> functionCall (name "gc_frame0") (v_gc:constant (number (fromIntegral lvs)):vs)
 gc_end        = functionCall (name "gc_end") []
 tbsize sz = functionCall (name "TO_BLOCKS") [sz]
+
+jhc_malloc_atomic sz | fopts FO.Jgc = functionCall (name "gc_alloc") [v_gc,nullPtr, tbsize sz, toExpression (0::Int)]
+                     | otherwise = jhc_malloc nullPtr (0::Int) sz
+
 jhc_malloc ntn nptrs sz | fopts FO.Jgc = functionCall (name "gc_alloc") [v_gc,ntn, tbsize sz, toExpression nptrs]
 --    | fopts FO.Jgc =  functionCall (name "gc_alloc") [v_gc,tbsize sz, toExpression nptrs]
 jhc_malloc _ 0 sz = functionCall (name "jhc_malloc_atomic") [sz]
@@ -936,6 +950,7 @@ nodeFuncName :: Atom -> Name
 nodeFuncName a = toName (fromAtom a)
 
 sptr_t  = basicGCType "sptr_t"
+uintptr_t = basicGCType "uintptr_t"
 fptr_t  = basicGCType "fptr_t"
 wptr_t  = basicGCType "wptr_t"
 gc_t    = basicGCType "gc_t"

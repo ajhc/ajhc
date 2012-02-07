@@ -8,6 +8,7 @@ module Grin.Val(
     cInt,
     convertName,
     region_heap,
+    region_atomic_heap,
     region_stack,
     region_block
     ) where
@@ -32,6 +33,8 @@ tn_unit  = convertName dc_Unit
 
 -- This allocates data on the heap.
 region_heap  = Item (toAtom "heap") TyRegion
+-- This allocates data on the atomic heap.
+region_atomic_heap  = Item (toAtom "atomicHeap") TyRegion
 -- This allocates data in the innermost enclosing region, including implicit regions.
 region_block = Item (toAtom "block") TyRegion
 -- This allocates data on the stack, generally equivalent to 'block' for most back ends.

@@ -12,6 +12,7 @@ import Foreign.Marshal.Alloc
 import Foreign.Marshal.Array
 import Foreign.Ptr
 import Foreign.Storable
+import Jhc.IO
 
 newtype ForeignPtr a = FP (Ptr a)
     deriving(Eq,Ord)
@@ -58,9 +59,9 @@ unsafeForeignPtrToPtr :: ForeignPtr a -> Ptr a
 unsafeForeignPtrToPtr (FP x) = x
 
 touchForeignPtr :: ForeignPtr a -> IO ()
-touchForeignPtr _ = return ()
+touchForeignPtr x = fromUIO_ (touch_ x)
 
---foreign import primitive "touch_" :: ForeignPtr a ->
+foreign import primitive touch_ :: ForeignPtr a -> UIO_
 
 castForeignPtr :: ForeignPtr a -> ForeignPtr b
 castForeignPtr (FP x) = FP $ castPtr x

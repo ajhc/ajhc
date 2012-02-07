@@ -65,7 +65,8 @@ import qualified Stats
 unboxedMap :: [(Name,Ty)]
 unboxedMap = [
     (tc_State_,TyUnit),
-    (tc_MutArray__,TyPtr tyINode)
+    (tc_MutArray__,TyPtr tyINode),
+    (tc_Bang_,tyDNode)
     ]
 
 newtype C a = C (ReaderT LEnv IO a)
@@ -423,6 +424,16 @@ compile' cenv (tvr,as,e) = ans where
         f "writeArray__" [r,o,v,_] = do
             let [r',o',v'] = args [r,o,v]
             return $ BaseOp PokeVal [(Index r' o'),v']
+        -- rts
+        f "toBang_" (args -> [x]) = do
+            return $ gEval x
+        f "fromBang_" [x] = do
+            return (BaseOp Demote $ args [x])
+        f "mallocHeapWords" [w,_] = do
+            let [c] = args [w]
+            v <- newPrimVar (TyPtr (TyPrim Op.bits_ptr))
+            return $ Alloc { expValue = ValUnknown (TyPrim Op.bits_ptr),
+                expCount = c, expRegion = region_atomic_heap, expInfo = mempty } :>>= [v] :-> BaseOp (Coerce tyDNode) [v]
         f p xs = fail $ "Grin.FromE - Unknown primitive: " ++ show (p,xs)
 
     -- other primitives

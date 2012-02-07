@@ -72,6 +72,7 @@ prettyExp vl (Return vs) = vl <> keyword "return" <+> tupled (map prettyVal vs)
 prettyExp vl (Error "" _) = vl <> prim "exitFailure"
 prettyExp vl (Error s _) = vl <> keyword "error" <+> tshow s
 prettyExp vl (BaseOp Eval [v]) = vl <> keyword "eval" <+> prettyVal v
+prettyExp vl (BaseOp Coerce {} [v]) = vl <> keyword "coerce" <+> prettyVal v
 prettyExp vl (BaseOp Apply {} vs) = vl <> keyword "apply" <+> hsep (map prettyVal vs)
 prettyExp vl (App a vs _)  = vl <> func (fromAtom a) <+> hsep (map prettyVal vs)
 prettyExp vl Prim { expPrimitive = APrim (Op (Op.BinOp bo _ _) _) _, expArgs = [x,y] } | Just (op,_) <- Op.binopInfix bo = vl <> prettyVal x <+> operator op <+> prettyVal y

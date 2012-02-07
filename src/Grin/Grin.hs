@@ -104,6 +104,7 @@ data BaseOp
     | PokeVal               -- write a value to a pointed to location
     | Consume               -- consume a value, depending on the back end this may be used to free memory
     | GcTouch               -- touch a value, forcing the GC to hold onto it.
+    | Coerce Ty             -- coerce one type to another, danger zone. This is for reflection/rts and not for integral conversions.
     | GcPush                -- push some pointers onto the GC stack, returning registers representing the values on the stack
     | NewRegister           -- create a new register
     | ReadRegister          -- read a register
@@ -449,6 +450,7 @@ instance CanType Exp where
     getType App { expType = t } = t
     getType (BaseOp Overwrite _) = []
     getType (BaseOp GcTouch _) = []
+    getType (BaseOp (Coerce t) _) = [t]
     getType (BaseOp Redirect _) = []
     getType (BaseOp Promote _) = [TyNode]
     getType (BaseOp Demote _) = [TyINode]
