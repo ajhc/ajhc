@@ -3,6 +3,7 @@ TypeConstructor:tc:
 IOErrorType  Jhc.Type.Handle.IOErrorType
 IOMode       Jhc.Type.Handle.IOMode
 
+Bang_      Jhc.Prim.Rts.Bang_
 Arrow      Jhc.Prim.Prim.->
 MutArray__ Jhc.Prim.Array.MutArray_
 List       Jhc.Prim.Prim.[]

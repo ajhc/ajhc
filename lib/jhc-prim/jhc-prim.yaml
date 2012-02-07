@@ -4,8 +4,9 @@ Extensions: [ ForeignFunctionInterface, NoImplicitPrelude, UnboxedTuples, Unboxe
 Options: --noauto
 Hs-Source-Dir: .
 Exposed-Modules:
-        - Jhc.Prim.Bits
         - Jhc.Prim.Array
+        - Jhc.Prim.Bits
         - Jhc.Prim.IO
         - Jhc.Prim.Prim
+        - Jhc.Prim.Rts
         - Jhc.Prim.Wrapper

@@ -44,6 +44,7 @@ state = [] :-> BState
 utup ~([] :-> t1) ~([] :-> t2) = [] :-> BTup [t1,t2]
 utup1 ~([] :-> t1) = [] :-> BTup [t1]
 array = hash
+bang = hash
 
 infixr 3 +>
 (+>) :: Typ -> Typ -> Typ
@@ -64,14 +65,22 @@ plainPrimMap = Map.fromList
     , "one"            ==> starHash
     , "box"            ==> hash +> star
     , "unbox"          ==> star +> hash
-    , "constPeekByte"  ==> hash +> hash
     , "exitFailure__"  ==> hash +> hash
+    , "constPeekByte"  ==> hash +> hash
+    -- array operations
     , "newArray__"     ==> hash +> star +> state +> utup state array
     , "newBlankArray__"==> hash +> state +> utup state array
     , "copyArray__"    ==> hash +> hash +> hash +> array +> array +> state +> state
     , "readArray__"    ==> array +> hash +> state +> utup state star
     , "writeArray__"   ==> array +> hash +> star +> state +> state
     , "indexArray__"   ==> array +> hash +> utup1 star
+    -- accessing the rts directly
+    , "toBang_"        ==> star +> bang
+    , "fromBang_"      ==> bang +> star
+    , "isWHNF"         ==> star +> hash
+    , "isInHeap"       ==> bang +> hash
+    , "bangPtr"        ==> bang +> hash
+    , "bangBits"       ==> bang +> hash
     ] `Map.union` fmap (const (starHash +> starHash)) incDec
       `Map.union` fmap (const star) primBoundMap
 
