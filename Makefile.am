@@ -61,17 +61,27 @@ GHCOPTS= $(HSOPTS) -XBangPatterns -O @GHCFLAGS@ $(GHCDEBUGOPTS) $(GHCINC) $(PACK
 JHC_LIBS = jhc-1.0.hl base-1.0.hl haskell98-1.0.hl applicative-1.0.hl flat-foreign-1.0.hl jhc-prim-1.0.hl
 
 EXTRA_DIST = src/data rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
-             lib/jhc lib/base lib/haskell98 lib/flat-foreign $(JHC_LIBS) $(JHC_EXT_LIBS) \
+             lib/jhc lib/jhc-prim lib/base lib/haskell98 lib/flat-foreign $(JHC_LIBS) $(JHC_EXT_LIBS) \
 	     src/StringTable/StringTable_cbits.c src/StringTable/StringTable_cbits.h src/cbits/md5sum.c jhc.1 \
 	     src/StringTable/Atom.hsc jhc.spec src/cbits/lookup3.c \
 	     manual.html lib/applicative examples/HelloWorld.hs examples/Calendar.hs \
-	     src/FlagOpts.flags src/FlagDump.flags lib/ext
+	     examples/Primes.hs src/FlagOpts.flags src/FlagDump.flags lib/ext
+
+dist-hook: $(BUILT_SOURCES)
+	if test -f _darcs; then \
+		rm -f $(srcdir)/ChangeLog $(srcdir)/src/data/shortchange.txt; \
+		$(MAKE) ChangeLog src/data/shortchange.txt src/RawFiles.hs;   \
+		cp -f $(srcdir)/ChangeLog $(destdir)/ChangeLog; \
+		cp -f $(srcdir)/src/data/shortchange.txt $(destdir)/src/data/shortchange.txt; \
+		cp -f $(srcdir)/src/RawFiles.hs $(destdir)/src/RawFiles.hs; \
+	fi
 
 # we recreate the manual and man page here just to ensure they are up to date
-dist-hook: man manual
-	cp $(srcdir)/manual.html $(distdir)/manual.html
-	cp $(srcdir)/jhc.1 $(distdir)/jhc.1
-	find $(distdir) \( -name _darcs -o -name \*.ho \) -print | xargs rm -rf --
+#dist-hook: man manual $(BUILT_SOURCES)
+#	cp $(srcdir)/manual.html $(distdir)/manual.html
+#	cp $(srcdir)/jhc.1 $(distdir)/jhc.1
+
+       #find $(distdir) \( -name _darcs -o -name \*.ho \) -print | xargs rm -rf --
 
 all-local: $(JHC_LIBS)
 
@@ -99,9 +109,9 @@ uninstall-hook:
 
 UTILS = utils/op_process.prl utils/opt_sets.prl utils/gen_props.prl utils/op_names.prl utils/op_raw.prl
 
-RAWFILES = src/data/ViaGhc.hs ChangeLog src/data/shortchange.txt src/data/prelude.m4 \
+RAWFILES = src/data/ViaGhc.hs src/data/prelude.m4 \
 	   src/data/targets.ini rts/rts_constants.h rts/stableptr.c rts/queue.h src/data/HsFFI.h \
-           rts/wsize.h rts/bitarray.h
+           rts/wsize.h rts/bitarray.h ChangeLog src/data/shortchange.txt 
 
 RTSFILES = rts/jhc_rts_header.h rts/jhc_jgc.h \
 	   rts/debug.c rts/jhc_rts_alloc.c rts/jhc_rts.c rts/profile.c rts/jhc_rts2.c \
@@ -144,10 +154,10 @@ HSBOOT= src/DataConstructors.hs-boot src/FrontEnd/Tc/Class.hs-boot src/Grin/Grin
 	mkdir -p `echo $@ | sed -e 's@/[^/]*$$@@'`
 	$(HSC2HS) $(MY_CINCLUDES) -o $@ $<
 
-%.hs: %.flags  utils/opt_sets.prl
+%.hs: %.flags utils/opt_sets.prl
 	perl $(srcdir)/utils/opt_sets.prl -n $< $< > $@
 
-%.mkd: %.flags  utils/opt_sets.prl
+%.mkd: %.flags utils/opt_sets.prl
 	perl $(srcdir)/utils/opt_sets.prl -f f -m -n $< $< > $@
 
 src/Info/Properties.hs: src/data/props.txt utils/gen_props.prl
@@ -156,18 +166,18 @@ src/Info/Properties.hs: src/data/props.txt utils/gen_props.prl
 src/Name/Prim.hs: utils/op_names.prl src/data/names.txt
 	perl $< > $@ || rm -f $@
 
-src/RawFiles.hs: utils/op_raw.prl $(RAWFILES)
-	perl $< $(basename $@) $(RAWFILES) > $@
+src/RawFiles.hs: $(RAWFILES)
+	perl $(srcdir)/utils/op_raw.prl $(basename $@) $^ > $@
 
-src/RtsFiles.hs: utils/op_raw.prl $(RTSFILES)
-	perl $< -c $(basename $@) $(RTSFILES) > $@
+src/RtsFiles.hs: $(RTSFILES)
+	perl $(srcdir)/utils/op_raw.prl -c $(basename $@) $^ > $@
 
 src/FrontEnd/HsParser.hs: src/FrontEnd/HsParser.y
 	happy -a -g -c $< -o $@
 
 .SECONDARY: _darcs/hashed_inventory src/data/shortchange.txt
 
-ChangeLog: _darcs/hashed_inventory
+ChangeLog:
 	darcs changes --from-tag . > $@
 
 src/data/shortchange.txt: ChangeLog
@@ -184,7 +194,7 @@ bin-dist: jhc
 	gzip -f -- $(BINDISTDIR).tar
 	rm -rf -- $(BINDISTDIR)
 
-.INTERMEDIATE: deps.txt jhc_man.mkd  options.mkd
+.INTERMEDIATE: deps.txt jhc_man.mkd options.mkd
 .DELETE_ON_ERROR: deps.txt depend.make ChangeLog data/shortchange.txt manual.mkd jhc_man.mkd options.mkd
 
 deps.txt:
@@ -217,7 +227,7 @@ clean-local:
 
 MAINTAINERCLEANFILES= $(BUILT_SOURCES) $(DRIFTFILES)
 
-CLEANFILES= $(JHC_LIBS) $(JHC_EXT_LIBS)
+CLEANFILES= $(JHC_LIBS) $(JHC_EXT_LIBS) HelloWorld Primes src/StringTable/Atom.hs src/RawFiles.hs
 
 LIB_OPTIONS=$(RTSOPTS) $(JHC_TEST)  -L- -L.
 
@@ -254,25 +264,27 @@ flat-foreign-1.0.hl: lib/flat-foreign/flat-foreign.cabal base-1.0.hl
 publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/index.shtml docs/jhc.shtml manual.html docs/manual.css
 	cp -- $^ /home/john/public_html/computer/jhc
 
-manual.mkd: utils/stitch.prl $(JHC_MANUAL_FILES)
-	perl utils/stitch.prl $(JHC_MANUAL_FILES) > $@
+manual.mkd: $(JHC_MANUAL_FILES)
+	perl $(srcdir)/utils/stitch.prl $^ > $@
 
 manual: manual.mkd
 	pandoc $< --toc -s -f markdown -t html -s -c manual.css -o $@.html
 
-jhc_man.mkd: utils/stitch.prl docs/man_header.mkd $(JHC_MANUAL_FILES)
-	perl utils/stitch.prl -h docs/man_header.mkd -c Using,Options $(JHC_MANUAL_FILES) > jhc_man.mkd
+$(firstword $(JHC_MANUAL_FILES)): utils/stitch.prl docs/man_header.mkd
+	touch $@
+
+jhc_man.mkd: $(JHC_MANUAL_FILES)
+	perl $(srcdir)/utils/stitch.prl -h $(srcdir)/docs/man_header.mkd -c Using,Options $^ > $@
+
 
 man: jhc_man.mkd
-	pandoc jhc_man.mkd -s -f markdown -t man -s  -o jhc.1
+	pandoc $< -s -f markdown -t man -s  -o jhc.1
 
-options.mkd: jhc
+options.mkd: src/Options.hs | jhc
 	echo "{-@Options 1" > $@
 	./jhc --help | sed -e 's/^/    /'  >> $@
 
 fix-whitespace:
-#	#find src -not \( -name .svn -prune -o -name .git -prune \) -type f -print0 | xargs -0 sed -i  -E 's/[[:space:]]*$$//'
-#	#find lib -not \( -name .svn -prune -o -name .git -prune \) -type f -print0 | xargs -0 sed -i  -E 's/[[:space:]]*$$//'
 	find src -not \( -name .svn -prune -o -name .git -prune \) -type f -print0 | xargs -0 sed -i  -E 's/[ 	]*$$//'
 	find lib -not \( -name .svn -prune -o -name .git -prune \) -type f -print0 | xargs -0 sed -i  -E 's/[ 	]*$$//'
 
@@ -288,8 +300,10 @@ libs: $(JHC_LIBS) $(JHC_EXT_LIBS)
 show_elibs: lib/ext/*.cabal  lib/ext/*.yaml
 	-perl utils/build_extlibs.prl -l $^
 
-%: examples/%.hs jhc
-	./jhc -L- -L. $(JHC_TEST) $< -o $@ 2>&1 | tee $@.log
+%: examples/%.hs jhc base-1.0.hl haskell98-1.0.hl
+	./jhc -L- -L$(srcdir) -L. --no-cache $(JHC_TEST) $< -o $@ # 2>&1 | tee $@.log
+
+TESTS=HelloWorld Primes
 
 ## autogenerated dependencies
 
@@ -365,6 +379,6 @@ JHC_EXT_LIBS = containers-0.3.0.0.hl Diff-0.1.2.hl html-1.0.1.2.hl HUnit-1.2.2.1
     pretty-1.0.1.1.hl QuickCheck-1.2.0.0.hl safe-0.2.hl smallcheck-0.4.hl \
     xhtml-3000.2.0.1.hl transformers-0.2.1.0.hl filepath-1.2.0.0.hl deepseq-1.1.0.2.hl
 
-JHC_MANUAL_FILES = options.mkd docs/make.mkd docs/dependency_format.mkd docs/pragmas.mkd docs/differences.mkd \
+JHC_MANUAL_FILES = docs/make.mkd options.mkd docs/dependency_format.mkd docs/pragmas.mkd docs/differences.mkd \
 	docs/unboxed.mkd rts/jhc_rts2.c src/FlagOpts.mkd src/FlagDump.mkd src/E/PrimOpt.hs \
 	drift_processed/E/TypeCheck.hs drift_processed/Options.hs

@@ -4,7 +4,6 @@ use strict;
 
 use Getopt::Std;
 
-
 our $opt_c;
 getopts('c');
 
@@ -56,12 +55,14 @@ while (@ARGV) {
     $nn =~ s/^.*\///;
     $nn =~ s/\W/_/g;
 
-    open F, "<:utf8", $fn;
+    open F, "<:utf8", $fn or die "$!: $fn";
 
     $fn =~ s{/}{\\/}g;
-    print "-- | Generated from $fn on " . `date`;
+    print "-- | Generated from $fn\n";
     header($nn);
     while (<F>) { line; }
+
+    close F or die "$!: close $fn";
 
     print "\"#\n\n";
 }
