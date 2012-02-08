@@ -1,0 +1,70 @@
+I am happy to announce jhc 0.8.0
+
+There have been A lot of major changes in jhc with this release.
+
+ - http://repetae.net/computer/jhc
+
+- A brand new and sanified library description file format. Now it is a true
+  YAML file. The previous quasi-cabal files are supported but deprecated.
+
+- new standard library 'bytestring' :)
+
+- jhc can now embed C code and header files directly into hl libraries. The
+  code will automatically be unpacked and linked when needed transparently.
+  This allows 'bytestring' to carry around its fpsstring.c low level
+  implementaton for instance without having to coordinate the install of C
+  headers/code along with the jhc haskell library.
+
+- the library description files now can affect pretty much any aspect of
+  compilation, so it is much easier to make a self-contained build or for tools
+  like configure/cabal to interface to jhc. They just need to spit out an
+  appropriate yaml file rather than care about passing the right options to jhc
+  in addition to creating a description file. See the user manual for the set
+  of fields that can be set.
+
+- jhc now understands ghc-style LANGUAGE pragmas and -X options and will
+  translate them into the appropriate jhc extensions as needed.
+
+- jhc transparently handles '.hsc' files (assuming you have hsc2hs installed).
+  It even does the right thing when cross compiliing and will use the target
+  architectures types rather than the hosts.
+
+- the bang patterns extension has been implemented.
+
+- the primtive libraries have been re-done, now there is a truely absolutely
+  minimal jhc-prim library that is everything that must exist for jhc to work
+  but brinsg in no code on its own. Everything else is implemented in user
+  replaceable normal haskell code.
+
+  Want to create a varient of haskell that has 16 bit Ints, ASCII 8 bit Chars
+  and pervasively uses null terminated C style strings? just create a base-tiny
+  library and link it against jhc-prim.
+
+- The standalone deriving extension has been partially implemented, this
+  greatly improves the ability to re-arrange the libraries logically.
+
+- Better haskell 2010 compatibility.
+
+- Haskell object files and the --ho-dir have been fully removed in favor of
+  pervasive use of the code cache. This allows jhc to cache compilation results
+  with finer granularity than individual files would allow. Command line
+  options have been renamed accordingly, we have --cache-dir, --no-cache,
+  --readonly-cache and --ignore-cache to modify jhcs behavior with respect to
+  the cache. Additionally a --purge-cache option has been added.
+
+- rather than trying to stuff everything in a monolithic .c file, jhc now
+  builds a tree containing all the source needed to compile the final
+  executable or shared library. This will help people porting jhc to new
+  architectures and allows the embedding of c code in the haskell libraries.
+
+- Many programs typecheked in the past that were in fact, invalid. most now
+  fail properly with an informative message.
+
+- pulled in most of the ghc typechecking regression tests.
+
+- internal class representation completely re-worked.
+
+- unboxed characters now supported, with the obvious syntax.
+
+
+     John
