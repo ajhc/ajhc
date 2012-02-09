@@ -38,11 +38,15 @@ CChar      Jhc.Type.C.CChar
 CSChar     Jhc.Type.C.CSChar
 CUChar     Jhc.Type.C.CUChar
 
-CInt      Jhc.Type.C.CInt
-CUInt     Jhc.Type.C.CUInt
-CTime     Jhc.Type.C.CTime
-CSize     Jhc.Type.C.CSize
-CClock    Jhc.Type.C.CClock
+CInt       Jhc.Type.C.CInt
+CUInt      Jhc.Type.C.CUInt
+CTime      Jhc.Type.C.CTime
+CSize      Jhc.Type.C.CSize
+CClock     Jhc.Type.C.CClock
+CFile      Jhc.Type.C.CFile
+CJmpBuf    Jhc.Type.C.CJmpBuf
+CFpos      Jhc.Type.C.CFpos
+CSigAtomic Jhc.Type.C.CSigAtomic
 
 Integer   Jhc.Type.Basic.Integer
 

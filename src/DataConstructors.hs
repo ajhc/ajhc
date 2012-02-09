@@ -400,10 +400,17 @@ extTypeInfoExtType ExtTypeVoid = "void"
 
 lookupExtTypeInfo :: Monad m => DataTable -> E -> m ExtTypeInfo
 lookupExtTypeInfo dataTable oe = f oe where
+    f :: Monad m => E -> m ExtTypeInfo
     -- handle the void context ones first
     f e@(ELit LitCons { litName = c }) | c == tc_Unit || c == tc_State_ = return ExtTypeVoid
     -- if the constructor is in the external type map, replace its external
     -- type with the one in the map
+    f e@(ELit LitCons { litName = c, litArgs = [ta] }) | c == tc_Ptr = do
+        ExtTypeBoxed b t _ <- g e  -- we know a pointer is a boxed BitsPtr
+        case f ta of
+            Just (ExtTypeBoxed _ _ et) -> return $ ExtTypeBoxed b t (et ++ "*")
+            Just (ExtTypeRaw et) -> return $ ExtTypeBoxed b t (et ++ "*")
+            _ -> return $ ExtTypeBoxed b t "HsPtr"
     f e@(ELit LitCons { litName = c }) | Just et <- Map.lookup c typeTable = do
         res <- g e
         return $ case res of
@@ -886,6 +893,10 @@ rawExtTypeMap = Map.fromList [
     (rt_float64,   "double"),
     (rt_float80,   "long double"),
     (rt_float128,  "__float128"),
+    (tc_CFile,      "FILE"),
+    (tc_CJmpBuf,    "jmp_buf"),
+    (tc_CFpos,      "fpos_t"),
+    (tc_CSigAtomic, "sigatomic_t"),
     (tc_Bang_,     "wptr_t")
     ]
 
@@ -935,12 +946,12 @@ typeTable = Map.fromList [
     (tc_CULong,   "unsigned long"),
     (tc_CULLong,  "unsigned long long"),
 
-    (tc_CWchar,   "wchar_t"),
-    (tc_CWint,    "wint_t"),
-    (tc_CTime,    "time_t"),
-    (tc_CClock,   "clock_t"),
-    (tc_CSize,    "size_t"),
-    (tc_Unit,     "void"),
-    (tc_State_,   "void"),
-    (tc_Bang_,    "wptr_t")  -- internal rts type
+    (tc_CWchar,     "wchar_t"),
+    (tc_CWint,      "wint_t"),
+    (tc_CTime,      "time_t"),
+    (tc_CClock,     "clock_t"),
+    (tc_CSize,      "size_t"),
+    (tc_Unit,       "void"),
+    (tc_State_,     "void"),
+    (tc_Bang_,      "wptr_t")  -- internal rts type
     ]
