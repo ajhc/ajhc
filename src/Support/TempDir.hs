@@ -1,4 +1,4 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
+{-# LANGUAGE ForeignFunctionInterface,ViewPatterns,RecordWildCards #-}
 -- Various routines for dealing with temporary directories and files.
 module Support.TempDir(
     getTempDir,
@@ -69,7 +69,9 @@ addAtExit action = do
     writeIORef tdRef td { tempDirAtExit = action:tempDirAtExit td }
 
 createTempFile :: FilePath -> IO (FilePath, Handle)
-createTempFile fp = do
+createTempFile (FP.normalise -> fp) = do
+    unless (filePathSafe fp) $
+        fail $ "createTempFile: unsafe path " ++ fp
     dir <- getTempDir
     (fp,h) <- openBinaryTempFile dir (if null fp then "temp.tmp" else fp)
     putLog $ printf "Created temporary file '%s'" fp

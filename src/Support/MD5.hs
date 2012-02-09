@@ -1,5 +1,7 @@
 {-# OPTIONS -funbox-strict-fields  -O2 #-}
-module Support.MD5(Hash(),emptyHash,md5,md5file,md5lazy,md5show32,md5Bytes,md5String,md5Handle,hashToBytes) where
+module Support.MD5(
+    Hash(), emptyHash, md5,md5file,md5lazy,md5lazyIO,
+    md5show32,md5Bytes,md5String,md5Handle,hashToBytes) where
 
 import Control.Monad
 import Data.Binary
@@ -20,7 +22,10 @@ md5 bs = unsafePerformIO $ allocaBytes 16 $ \digest -> do
         readDigest digest
 
 md5lazy :: LBS.ByteString -> Hash
-md5lazy lbs = unsafePerformIO $ do
+md5lazy lbs = unsafePerformIO $ md5lazyIO lbs
+
+md5lazyIO :: LBS.ByteString -> IO Hash
+md5lazyIO lbs = do
     allocaBytes (fromIntegral $ get_md5_statesize) $ \msp -> do
         let ms = MState msp
         md5_init ms
