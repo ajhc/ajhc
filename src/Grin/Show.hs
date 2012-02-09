@@ -75,9 +75,9 @@ prettyExp vl (BaseOp Eval [v]) = vl <> keyword "eval" <+> prettyVal v
 prettyExp vl (BaseOp Coerce {} [v]) = vl <> keyword "coerce" <+> prettyVal v
 prettyExp vl (BaseOp Apply {} vs) = vl <> keyword "apply" <+> hsep (map prettyVal vs)
 prettyExp vl (App a vs _)  = vl <> func (fromAtom a) <+> hsep (map prettyVal vs)
-prettyExp vl Prim { expPrimitive = APrim (Op (Op.BinOp bo _ _) _) _, expArgs = [x,y] } | Just (op,_) <- Op.binopInfix bo = vl <> prettyVal x <+> operator op <+> prettyVal y
-prettyExp vl Prim { expPrimitive = APrim (Op (Op.BinOp bo _ _) _) _, expArgs = [x,y] } = vl <> prettyVal x <+> char '`' <> tshow bo <> char '`' <+> prettyVal y
-prettyExp vl Prim { expPrimitive = APrim (Peek t) _, expArgs = [v] }  = vl <> prim (show t) <> char '[' <> prettyVal v <> char ']'
+prettyExp vl Prim { expPrimitive = (Op (Op.BinOp bo _ _) _), expArgs = [x,y] } | Just (op,_) <- Op.binopInfix bo = vl <> prettyVal x <+> operator op <+> prettyVal y
+prettyExp vl Prim { expPrimitive = (Op (Op.BinOp bo _ _) _), expArgs = [x,y] } = vl <> prettyVal x <+> char '`' <> tshow bo <> char '`' <+> prettyVal y
+prettyExp vl Prim { expPrimitive = (Peek t), expArgs = [v] }  = vl <> prim (show t) <> char '[' <> prettyVal v <> char ']'
 prettyExp vl Prim { expPrimitive = ap, expArgs = vs } = vl <> prim (pprint ap) <+> hsep (map prettyVal vs)
 prettyExp vl (GcRoots vs b) = vl <> keyword "withRoots" <> tupled (map prettyVal vs) <$> indent 2 (prettyExp empty b)
 prettyExp vl (BaseOp Overwrite [x,y]) = vl <> keyword "overwrite" <+> prettyVal x <+> prettyVal y
@@ -134,8 +134,8 @@ prettyVal Unit = text "()"
 prettyVal (Item a  ty) = tshow a <> text "::" <> tshow ty
 prettyVal (ValPrim aprim args ty) = f aprim args where
     f aprim [] = pprint aprim <> text "::" <> tshow ty
-    f (APrim (Op (Op.BinOp bo _ _) _) _) [x,y] | Just (op,prec) <- Op.binopInfix bo = parens (pprintPrec prec x <+> text op <+> pprintPrec prec y)
-    f (APrim (Op (Op.BinOp bo _ _) _) _) [x,y] =  parens $ pprintPrec 1 x <+> char '`' <> tshow bo <> char '`' <+> pprintPrec 1 y
+    f ((Op (Op.BinOp bo _ _) _)) [x,y] | Just (op,prec) <- Op.binopInfix bo = parens (pprintPrec prec x <+> text op <+> pprintPrec prec y)
+    f ((Op (Op.BinOp bo _ _) _)) [x,y] =  parens $ pprintPrec 1 x <+> char '`' <> tshow bo <> char '`' <+> pprintPrec 1 y
     f aprim xs = pprint aprim <> tupled (map prettyVal xs) <> text "::" <> tshow ty
 
 instance DocLike d => PPrint d Var where

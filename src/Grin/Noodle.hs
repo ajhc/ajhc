@@ -169,7 +169,7 @@ isOmittable (BaseOp GcPush _) = True  -- omittable because if we don't use the r
 isOmittable (BaseOp (StoreNode _) _) = True
 isOmittable Alloc {} = True
 isOmittable (Return {}) = True
-isOmittable Prim { expPrimitive = aprim } = aprimIsCheap aprim
+isOmittable Prim { expPrimitive = aprim } = primIsCheap aprim
 isOmittable (Case x ds) = all isOmittable [ e | _ :-> e <- ds ]
 isOmittable Let { expBody = x } = isOmittable x
 isOmittable (e1 :>>= _ :-> e2) = isOmittable e1 && isOmittable e2

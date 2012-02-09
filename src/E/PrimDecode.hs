@@ -106,7 +106,7 @@ pairWith f xs ys = g xs ys [] where
     g (x:xs) (y:ys) rs = g xs ys (f x y:rs)
     g _ _ _ = Nothing
 
-ePrim prim as t = EPrim (APrim prim mempty) as t
+ePrim prim as t = EPrim prim as t
 
 processPrim :: MonadWarn m
     => DataTable
@@ -117,7 +117,7 @@ processPrim :: MonadWarn m
     -> Requires   -- ^ c requires
     -> m E        -- ^ result
 processPrim dataTable srcLoc pName args rType req = ans where
-    passThrough = EPrim (APrim (PrimPrim pName) req) args rType
+    passThrough = EPrim (PrimPrim pName) args rType
     ans = checkOp binOpMap doBinOp $ checkOp unOpMap (doUnOp Op.UnOp) $
         checkOp convOpMap (doUnOp Op.ConvOp) primCheckOther
     checkOp table yesMatch noMatch = case Map.lookup pName table of
@@ -167,10 +167,10 @@ processPrim dataTable srcLoc pName args rType req = ans where
     primPrefix (preType "minBound." -> Just c) _ = primInfo c c PrimMinBound
     primPrefix (preType "umaxBound." -> Just c) _ = primInfo c c PrimUMaxBound
     primPrefix (getPrefix "options_" -> Just c) _ =
-        return (ePrim (CConst (packString $ "JHC_" ++ c)) [] rType)
+        return (ePrim (CConst req (packString $ "JHC_" ++ c)) [] rType)
     primPrefix (getPrefix "const." -> Just c) _ = checkType' star $ do
         Just ret <- return $ boxResult dataTable rType $ \tr str ->
-            ePrim (CConst $ packString c) [] str
+            ePrim (CConst req $ packString c) [] str
         return ret
     primPrefix (getPrefix "error." -> Just c) _ = return (EError c rType)
     primPrefix _ _ = primUnknown

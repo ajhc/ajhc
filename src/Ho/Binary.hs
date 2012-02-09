@@ -19,7 +19,7 @@ import Support.CFF
 import Support.MapBinaryInstance
 
 current_version :: Int
-current_version = 9
+current_version = 10
 
 readHFile :: FilePath -> IO (FilePath,HoHeader,forall a . Binary a => ChunkType -> a)
 readHFile fn = do

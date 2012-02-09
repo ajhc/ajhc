@@ -198,7 +198,7 @@ findSpeculatable grin = ans where
     isSpeculatable (BaseOp Demote _) = True
     isSpeculatable (x :>>= _ :-> y) = isSpeculatable x && isSpeculatable y
     isSpeculatable (Case e as) = all isSpeculatable [ e | _ :-> e <- as]
-    isSpeculatable Prim { expPrimitive = APrim p _ } = primIsConstant p
+    isSpeculatable Prim { expPrimitive = p } = primIsConstant p
     isSpeculatable _ = False
 
 demote x = BaseOp Demote [x]

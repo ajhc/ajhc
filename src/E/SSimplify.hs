@@ -544,10 +544,10 @@ simplifyDs prog sopts dsIn = ans where
             [(t,e)] | worthStricting e, Just (Demand.S _) <- Info.lookup (tvrInfo t), not (getProperty prop_CYCLIC t) -> do
                 mtick $ "E.Simplify.strictness.let-to-case/{" ++ pprint t
                 return $ eStrictLet t e e'
-            [(t,ec@ECase { eCaseScrutinee = sc@(EPrim (APrim p _) _ _), eCaseAlts = [], eCaseDefault = Just def })] | primEagerSafe p && not (getProperty prop_CYCLIC t) -> do
+            [(t,ec@ECase { eCaseScrutinee = sc@(EPrim p _ _), eCaseAlts = [], eCaseDefault = Just def })] | primEagerSafe p && not (getProperty prop_CYCLIC t) -> do
                 mtick $ "E.Simplify.strictness.cheap-eagerness.def/{" ++ pprint t
                 return $ caseUpdate ec { eCaseDefault = Just $ ELetRec [(t,def)] e', eCaseType = getType e' }
-            [(t,ec@ECase { eCaseScrutinee = sc@(EPrim (APrim p _) _ _), eCaseAlts = [Alt c def], eCaseDefault = Nothing })] | primEagerSafe p && not (getProperty prop_CYCLIC t) -> do
+            [(t,ec@ECase { eCaseScrutinee = sc@(EPrim p _ _), eCaseAlts = [Alt c def], eCaseDefault = Nothing })] | primEagerSafe p && not (getProperty prop_CYCLIC t) -> do
                 mtick $ "E.Simplify.strictness.cheap-eagerness.con/{" ++ pprint t
                 return $ caseUpdate ec { eCaseAlts = [Alt c (ELetRec [(t,def)] e')], eCaseType = getType e' }
             _ -> do
@@ -739,7 +739,7 @@ simplifyDs prog sopts dsIn = ans where
     isOmittable _ ELit {} = True
     isOmittable _ EPi {} = True
     isOmittable _ ELam {} = True
-    isOmittable _ (EPrim (APrim p _) _ _) = primIsConstant p
+    isOmittable _ (EPrim p _ _) = primIsConstant p
     isOmittable inb (EVar v) = case mlookup (tvrIdent v) (envInScope inb) of
         Just IsBoundTo { bindingE = e } | not (isEVar e) -> isOmittable inb e
         Just (NotAmong _) -> True

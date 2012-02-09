@@ -400,7 +400,7 @@ compile' cenv (tvr,as,e) = ans where
     ce e | Just [z@NodeC {}] <- con e = return (dstore z)
     ce e | Just z <- con e = return (Return z)
 
-    ce (EPrim ap@(APrim (PrimPrim prim) _) as _) = f prim as where
+    ce (EPrim ap@(PrimPrim prim) as _) = f prim as where
         f "touch_" xs = do
             return $ BaseOp GcTouch (args $ init xs)
         -- artificial dependencies
@@ -437,21 +437,23 @@ compile' cenv (tvr,as,e) = ans where
         f p xs = fail $ "Grin.FromE - Unknown primitive: " ++ show (p,xs)
 
     -- other primitives
-    ce (EPrim ap@(APrim p _) xs ty) = do
+    ce (EPrim ap xs ty) = do
         let prim = ap
             xs' = keepIts $ args xs
             ty' = toTypes TyNode ty
 
-        case p of
+        case ap of
             PrimTypeInfo {} -> return $ Prim ap xs' ty'
-            Func True fn as "void" -> return $ Prim ap xs' ty'
-            Func True fn as r      -> return $ Prim ap xs' ty'
-            Func False _ as r | Just _ <- toCmmTy ty ->  do
-                return $ Prim ap xs' ty'
-            IFunc True _ _ ->
-                return $ Prim ap xs' ty'
-            IFunc False _ _ | Just _ <- toCmmTy ty ->
-                return $ Prim ap xs' ty'
+            Func {} -> return $ Prim ap xs' ty'
+            IFunc {} -> return $ Prim ap xs' ty'
+            --Func True fn as "void" -> return $ Prim ap xs' ty'
+            --Func True fn as r      -> return $ Prim ap xs' ty'
+            --Func False _ as r | Just _ <- toCmmTy ty ->  do
+            --    return $ Prim ap xs' ty'
+            --IFunc True _ _ ->
+            --    return $ Prim ap xs' ty'
+            --IFunc False _ _ | Just _ <- toCmmTy ty ->
+            --    return $ Prim ap xs' ty'
             Peek pt' | [addr] <- xs -> do
                 return $ Prim ap (args [addr]) ty'
             Peek pt' -> do
@@ -568,7 +570,7 @@ compile' cenv (tvr,as,e) = ans where
     -- | cc evaluates something in lazy context, returning a pointer to a node which when evaluated will produce the strict result.
     -- it is an invarient that evaling (cc e) produces the same value as (ce e)
     cc (EPrim don [e,_] _) | don == p_dependingOn  = cc e
-    cc (EPrim (APrim (PrimPrim "fromBang_") _) (args -> [e]) _) = return $ if getType e == tyDNode then demote e else Return [e] -- $ demote e
+    cc (EPrim (PrimPrim "fromBang_") (args -> [e]) _) = return $ if getType e == tyDNode then demote e else Return [e] -- $ demote e
 --        e <- ce e
 --        return $ e :>>= [v] :-> demote v
     cc e | Just _ <- literal e = error "unboxed literal in lazy context"
@@ -719,9 +721,9 @@ literal :: Monad m =>  E -> m [Val]
 literal (ELit LitCons { litName = n, litArgs = xs })  |  Just xs <- mapM literal xs, Just _ <- fromUnboxedNameTuple n = return (keepIts $ concat xs)
 literal (ELit (LitInt i ty)) | Just ptype <- toCmmTy ty = return $ [Lit i (TyPrim ptype)]
 literal (ELit (LitInt i (ELit (LitCons { litArgs = [], litAliasFor = Just af }))))  = literal $ ELit (LitInt i af)
-literal (EPrim aprim@(APrim p _) xs ty) | Just ptype <- toCmmTy ty, primIsConstant p = do
+literal (EPrim prim xs ty) | Just ptype <- toCmmTy ty, primIsConstant prim = do
     xs <- mapM literal xs
-    return $ [ValPrim aprim (concat xs) (TyPrim ptype)]
+    return $ [ValPrim prim (concat xs) (TyPrim ptype)]
 literal _ = fail "not a literal term"
 
 bool b x y = if b then x else y

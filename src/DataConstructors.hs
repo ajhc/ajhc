@@ -284,27 +284,6 @@ primitiveConstructor name = emptyConstructor {
     conChildren = DataPrimitive
     }
 
-primitiveTable = []
-{-
-primitiveTable = concatMap f allCTypes  where
-    f (dc,tc,rt) = [typeCons,dataCons] where
-        dataCons = emptyConstructor {
-            conName = dc,
-            conType = tipe,
-            conOrigSlots = [SlotNormal rt],
-            conExpr = ELam (tVr va1 rt) (ELit (litCons { litName = dc, litArgs = [EVar (tVr va1 rt)], litType = tipe })),
-            conInhabits = tc
-           }
-        typeCons = emptyConstructor {
-            conName = tc,
-            conType = eStar,
-            conExpr = tipe,
-            conInhabits = s_Star,
-            conChildren = DataNormal [dc]
-           }
-        tipe = ELit (litCons { litName = tc, litArgs = [], litType = eStar })
-        -}
-
 typesCompatable :: forall m . Monad m => DataTable -> E -> E -> m ()
 typesCompatable dataTable a b = f etherealIds a b where
         f :: [Id] -> E -> E -> m ()
@@ -433,7 +412,7 @@ lookupExtTypeInfo dataTable oe = f Set.empty oe where
           Just (ExtTypeRaw et) <- lookupExtTypeInfo dataTable st = return $ ExtTypeBoxed cn st et
     g seen e@(ELit LitCons { litName = n }) | Just e' <- followAlias dataTable e,
         n `Set.notMember` seen = f (Set.insert n seen) e'
-        | otherwise = fail $ "lookupExtTypeInfo: " ++ show (oe,e)
+    g _ e = fail $ "lookupExtTypeInfo: " ++ show (oe,e)
 
 expandAlias :: Monad m => E -> m E
 expandAlias (ELit LitCons { litAliasFor = Just af, litArgs = as }) = return (foldl eAp af as)
@@ -448,7 +427,7 @@ followAliases _dataTable e = f e where
     f (ELit LitCons { litAliasFor = Just af, litArgs = as }) = f (foldl eAp af as)
     f e = e
 
-dataTablePrims = DataTable $ Map.fromList ([ (conName x,x) | x <- tarrow:primitiveTable ])
+dataTablePrims = DataTable $ Map.fromList ([ (conName x,x) | x <- [tarrow] ])
 
 deriveClasses :: IdMap Comb -> DataTable -> [(SrcLoc,Name,Name)] -> [(TVr,E)]
 deriveClasses cmap dt@(DataTable mp) ctd = concatMap f ctd where
@@ -519,7 +498,7 @@ deriveClasses cmap dt@(DataTable mp) ctd = concatMap f ctd where
         mkCmpFunc fname op = (iv_eq,ib_eq) where
             ib_eq = unbox (eStrictLet b3 (oper_IIB op (EVar i1) (EVar i2)) (ELit (litCons { litName = dc_Boolzh, litArgs = [EVar b3], litType = tBool })))
             iv_eq = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName fname (nameName $ conName c), tvrType = getType ib_eq }
-    oper_IIB op a b = EPrim (APrim (Op (Op.BinOp op Op.bits16 Op.bits16) Op.bits16) mempty) [a,b] tBoolzh
+    oper_IIB op a b = EPrim (Op (Op.BinOp op Op.bits16 Op.bits16) Op.bits16) [a,b] tBoolzh
 
 create_integralCast conv c1 t1 c2 t2 e t = eCase e [Alt (litCons { litName = c1, litArgs = [tvra], litType = te }) cc] Unknown  where
     te = getType e
@@ -530,7 +509,7 @@ create_integralCast conv c1 t1 c2 t2 e t = eCase e [Alt (litCons { litName = c1,
     tvra =  tVr va2 t1
     tvrb =  tVr va3 t2
     cc = if n1 == n2 then ELit (litCons { litName = c2, litArgs = [EVar tvra], litType = t }) else
-        eStrictLet  tvrb (EPrim (APrim (Op (Op.ConvOp conv n1') n2') mempty) [EVar tvra] t2)  (ELit (litCons { litName = c2, litArgs = [EVar tvrb], litType = t }))
+        eStrictLet  tvrb (EPrim (Op (Op.ConvOp conv n1') n2') [EVar tvra] t2)  (ELit (litCons { litName = c2, litArgs = [EVar tvrb], litType = t }))
 
 nameToOpTy n = do RawType <- return $ nameType n; Op.readTy (show n)
 

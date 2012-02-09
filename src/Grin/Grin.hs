@@ -122,7 +122,7 @@ data Exp =
     | App       { expFunction  :: Atom,
                   expArgs :: [Val],
                   expType :: [Ty] }                                       -- ^ Application of functions and builtins
-    | Prim      { expPrimitive :: APrim,
+    | Prim      { expPrimitive :: Prim,
                   expArgs :: [Val],
                   expType :: [Ty] }                                       -- ^ Primitive operation
     | Case      { expValue :: Val, expAlts :: [Lam] }                     -- ^ Case statement
@@ -163,7 +163,7 @@ data Val =
     | Lit !Number Ty          -- ^ Literal
     | Var !Var Ty             -- ^ Variable
     | Unit                    -- ^ Empty value used as placeholder
-    | ValPrim APrim [Val] Ty  -- ^ Primitive value
+    | ValPrim Prim [Val] Ty   -- ^ Primitive value
     | Index Val Val           -- ^ A pointer incremented some number of values (Index v 0) == v
     | Item Atom Ty            -- ^ Specific named thing. function, global, region, etc..
     | ValUnknown Ty           -- ^ Unknown or unimportant value

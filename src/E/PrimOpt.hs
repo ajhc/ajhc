@@ -5,7 +5,6 @@ import Control.Monad.Fix()
 
 import C.Prims
 import Cmm.OpEval
-import Data.Monoid
 import Doc.DocLike
 import Doc.PPrint
 import E.E
@@ -79,7 +78,7 @@ C-- Primitive
 -- | this creates a string representing the type of primitive optimization was
 -- performed for bookkeeping purposes
 
-primConv cop t1 t2 e rt = EPrim (APrim (Op (Op.ConvOp cop t1) t2) mempty) [e] rt
+primConv cop t1 t2 e rt = EPrim (Op (Op.ConvOp cop t1) t2) [e] rt
 
 performPrimOpt (ELit lc@LitCons { litArgs = xs }) = do
     xs' <- mapM performPrimOpt xs
@@ -89,7 +88,7 @@ performPrimOpt (EPrim ap xs t) = do
     primOpt' (EPrim ap xs' t)
 performPrimOpt e = return e
 
-primOpt' e@(EPrim (APrim s _) xs t) = do
+primOpt' e@(EPrim s xs t) = do
     let primopt (Op (Op.BinOp bop t1 t2) tr) [e1,e2] rt =
             binOp bop t1 t2 tr e1 e2 rt
         primopt (Op (Op.ConvOp cop t1) t2) [ELit (LitInt n t)] rt =
@@ -123,16 +122,16 @@ instance Expression E E where
     caseEquals scrut (n,t) e1 e2 = eCase scrut [Alt (LitInt n t) e1 ] e2
     toExpression n t = (ELit (LitInt n t))
     createBinOp bop t1 t2 tr e1 e2 str =
-                EPrim (APrim Op { primCOp = Op.BinOp bop t1 t2,
-                                  primRetTy = tr } mempty) [e1, e2] str
+                EPrim Op { primCOp = Op.BinOp bop t1 t2,
+                                  primRetTy = tr } [e1, e2] str
     createUnOp bop t1 tr e1 str =
-                EPrim (APrim Op { primCOp = Op.UnOp bop t1,
-                                  primRetTy = tr } mempty) [e1] str
-    fromBinOp (EPrim (APrim Op { primCOp = Op.BinOp bop t1 t2,
-                                 primRetTy = tr } mempty) [e1, e2] str) =
+                EPrim Op { primCOp = Op.UnOp bop t1,
+                                  primRetTy = tr } [e1] str
+    fromBinOp (EPrim Op { primCOp = Op.BinOp bop t1 t2,
+                                 primRetTy = tr } [e1, e2] str) =
                                      Just (bop,t1,t2,tr,e1,e2,str)
     fromBinOp _ = Nothing
-    fromUnOp (EPrim (APrim Op {
+    fromUnOp (EPrim Op {
         primCOp = Op.UnOp bop t1,
-        primRetTy = tr } mempty) [e1] str) = Just (bop,t1,tr,e1,str)
+        primRetTy = tr } [e1] str) = Just (bop,t1,tr,e1,str)
     fromUnOp _ = Nothing

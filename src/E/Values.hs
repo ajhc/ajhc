@@ -188,7 +188,7 @@ isFullyConst (ELit LitCons { litArgs = [] }) = True
 isFullyConst (ELit LitCons { litArgs = xs }) = all isFullyConst xs
 isFullyConst ELit {} = True
 isFullyConst (EPi (TVr { tvrType = t }) x) =  isFullyConst t && isFullyConst x
-isFullyConst (EPrim (APrim p _) as _) = primIsConstant p && all isFullyConst as
+isFullyConst (EPrim p as _) = primIsConstant p && all isFullyConst as
 isFullyConst _ = False
 
 -- | whether a value may be used as an argument to an application, literal, or primitive
@@ -224,7 +224,7 @@ isCheap ELit {} = True
 isCheap EPi {} = True
 isCheap ELam {} = True -- should exclude values dropped at compile time
 isCheap x | isAtomic x = True
-isCheap (EPrim p _ _) = aprimIsCheap p
+isCheap (EPrim p _ _) = primIsCheap p
 isCheap ec@ECase {} = isCheap (eCaseScrutinee ec) && all isCheap (caseBodies ec)
 isCheap e | (EVar v,xs) <- fromAp e, Just (Arity n b) <- Info.lookup (tvrInfo v) =
         (length xs < n)  -- Partial applications are cheap
@@ -252,8 +252,8 @@ isUnboxed e = getType e == eHash
 
 safeToDup ec@ECase {}
     | EVar _ <- eCaseScrutinee ec = all safeToDup (caseBodies ec)
-    | EPrim p _ _ <- eCaseScrutinee ec, aprimIsCheap p = all safeToDup (caseBodies ec)
-safeToDup (EPrim p _ _) = aprimIsCheap p
+    | EPrim p _ _ <- eCaseScrutinee ec, primIsCheap p = all safeToDup (caseBodies ec)
+safeToDup (EPrim p _ _) = primIsCheap p
 safeToDup e = whnfOrBot e || isELam e || isEPi e
 
 eToPat e = f e where

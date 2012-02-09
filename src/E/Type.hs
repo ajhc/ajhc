@@ -139,7 +139,7 @@ data E = EAp E E
     | ESort ESort
     | ELit !(Lit E E)
     | ELetRec { eDefs :: [(TVr, E)], eBody :: E }
-    | EPrim APrim [E] E
+    | EPrim Prim [E] E
     | EError String E
     | ECase {
        eCaseScrutinee :: E,

@@ -442,7 +442,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
         (var,ty,lamt)  <- convertValue name
         let (_ts,rt)   = argTypes' ty
             expr x     = return [(name,setProperty prop_INLINE var,lamt x)]
-            prim       = APrim (AddrOf $ packString rcn) req
+            prim       = (AddrOf req $ packString rcn)
         -- this needs to be a boxed value since we can't have top-level
         -- unboxed values yet.
         ffiTypeInfo [] rt $ \eti -> do
@@ -457,7 +457,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
         (var,ty,lamt) <- convertValue name
         result <- ccallHelper
                      (\cts crt io args rt ->
-                      EPrim (APrim (Func io (packString rcn) cts crt) req) args rt)
+                      EPrim (Func req (packString rcn) cts crt) args rt)
                      ty
         return [(name,setProperty prop_INLINE var,lamt result)]
     cDecl (HsForeignDecl _ (FfiSpec Dynamic _ CCall) n _) = do
@@ -469,7 +469,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
 
         result <- ccallHelper
                      (\cts crt io args rt ->
-                      EPrim (APrim (IFunc io (tail cts) crt) (Requires [] [])) args rt)
+                      EPrim (IFunc mempty (tail cts) crt) args rt)
                      ty
         return [(name,setProperty prop_INLINE var,lamt result)]
 
@@ -483,7 +483,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
         [tvrWorld, tvrWorld2] <- newVars [tWorld__,tWorld__]
         dnet <- parseDotNetFFI rcn
         let cFun = createFunc (map tvrType es)
-            prim rs rtt = EPrim (APrim dnet { primIOLike = isIO } mempty)
+            prim rs rtt = EPrim dnet
         result <- case (isIO,pt) of
             (True,ExtTypeVoid) -> cFun $ \rs -> (,) (ELam tvrWorld) $
                         eStrictLet tvrWorld2 (prim rs "void" (EVar tvrWorld:[EVar t | t <- rs ]) tWorld__) (eJustIO (EVar tvrWorld2) vUnit)
@@ -602,7 +602,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
     cExpr (HsAsPat n' (HsCon n)) = return $ constructionExpression dataTable (toName DataConstructor n) rt where
         t' = getAssump n'
         (_,rt) = argTypes' (tipe t')
-    cExpr (HsLit (HsStringPrim s)) = return $ EPrim (APrim (PrimString (packString s)) mempty) [] r_bits_ptr_
+    cExpr (HsLit (HsStringPrim s)) = return $ EPrim (PrimString (packString s)) [] r_bits_ptr_
     cExpr (HsLit (HsString s)) = return $ E.Values.toE s
     cExpr (HsAsPat n' (HsLit (HsIntPrim i))) = ans where
         t' = getAssump n'
@@ -943,7 +943,7 @@ convertMatches bs ms err = do
     match bs ms err
 
 packupString :: String -> (E,Bool)
-packupString s | all (\c -> c > '\NUL' && c <= '\xff') s = (EPrim (APrim (PrimString (packString s)) mempty) [] r_bits_ptr_,True)
+packupString s | all (\c -> c > '\NUL' && c <= '\xff') s = (EPrim (PrimString (packString s)) [] r_bits_ptr_,True)
 packupString s = (toE s,False)
 
 actuallySpecializeE :: Monad m

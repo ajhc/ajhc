@@ -264,13 +264,13 @@ convertVal v = cvc v where
                 (_,i) <- newConst cpr h
                 return $ f_PROMOTE (variable (name $  'c':show i ))
 
-    cv (ValPrim (APrim p _) [x] (TyPrim opty)) = do
+    cv (ValPrim p [x] (TyPrim opty)) = do
         x' <- convertVal x
         case p of
             Op (Op.UnOp n ta) r -> primUnOp n ta r x'
             Op (Op.ConvOp n ta) r -> return $ castFunc n ta r x'
             x -> return $ err ("convertVal: " ++ show x)
-    cv (ValPrim (APrim p _) [x,y] _) = do
+    cv (ValPrim p [x,y] _) = do
         x' <- convertVal x
         y' <- convertVal y
         case p of
@@ -560,8 +560,8 @@ mgc = if fopts FO.Jgc then (v_gc:) else id
 mgct = if fopts FO.Jgc then ((name "gc",gc_t):) else id
 
 convertExp :: Exp -> C (Statement,Expression)
-convertExp (Prim p vs ty) | APrim _ req <- p  =  do
-    tell mempty { wRequires = req }
+convertExp (Prim p vs ty) =  do
+    tell mempty { wRequires = primReqs p }
     e <- convertPrim p vs ty
     return (mempty,e)
 
@@ -651,22 +651,22 @@ convertConst v = return (f v) where
     f (Lit i (TyPrim Op.TyBool)) = return $ toExpression (i /= 0)
     f (Lit i (TyPrim (Op.TyBits _ Op.HintFloat))) = return (constant $ floating (realToFrac i))
     f (Lit i _) = return (constant $ number (fromIntegral i))
-    f (ValPrim (APrim p _) [] ty) = case p of
-        CConst s -> return $ expressionRaw $ unpackPS s
-        AddrOf t -> do rt <- convertType ty; return . cast rt $ expressionRaw ('&':unpackPS t)
+    f (ValPrim p [] ty) = case p of
+        CConst _ s -> return $ expressionRaw $ unpackPS s
+        AddrOf _ t -> do rt <- convertType ty; return . cast rt $ expressionRaw ('&':unpackPS t)
         PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimSizeOf } -> return $ expressionRaw ("sizeof(" ++ tyToC Op.HintUnsigned arg ++ ")")
         PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimMinBound } -> return $ expressionRaw ("prim_minbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
         PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimMaxBound } -> return $ expressionRaw ("prim_maxbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
         PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimUMaxBound } -> return $ expressionRaw ("prim_umaxbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
         PrimString s -> return $ cast (basicType "uintptr_t") (expressionRaw (show s))
         x -> return $ err (show x)
-    f (ValPrim (APrim p _) [x] (TyPrim opty)) = do
+    f (ValPrim p [x] (TyPrim opty)) = do
         x' <- f x
         case p of
             Op (Op.UnOp n ta) r -> primUnOp n ta r x'
             Op (Op.ConvOp n ta) r -> return $ castFunc n ta r x'
             x -> return $ err (show x)
-    f (ValPrim (APrim p _) [x,y] _) = do
+    f (ValPrim p [x,y] _) = do
         x' <- f x
         y' <- f y
         case p of
@@ -676,28 +676,28 @@ convertConst v = return (f v) where
 
 --convertPrim p vs = return (mempty,err $ show p)
 convertPrim p vs ty
-    | APrim (CConst s) _ <- p = do
+    | (CConst _ s) <- p = do
         return $ expressionRaw $ unpackPS s
-    | APrim Op {} _ <- p = do
+    | Op {} <- p = do
         let [rt] = ty
-        convertVal (ValPrim (p) vs rt)
-    | APrim (Func _ n as r) _ <- p = do
+        convertVal (ValPrim p vs rt)
+    | (Func _ n as r) <- p = do
         vs' <- mapM convertVal vs
         rt <- convertTypes ty
         return $ cast (rt) (functionCall (name $ unpackPS n) [ cast (basicType' t) v | v <- vs' | t <- as ])
-    | APrim (IFunc _ as r) _ <- p = do
+    | (IFunc _ as r) <- p = do
         v':vs' <- mapM convertVal vs
         rt <- convertTypes ty
         let fn = cast (funPtrType (basicType' r) (map basicType' as)) v'
         return $ cast (rt) (indirectFunctionCall fn [ cast (basicType' t) v | v <- vs' | t <- as ])
-    | APrim (Peek t) _ <- p, [v] <- vs = do
+    | (Peek t) <- p, [v] <- vs = do
         v' <- convertVal v
         return $ expressionRaw ("*((" <> (opTyToC' t) <+> "*)" <> (parens $ renderG v') <> char ')')
-    | APrim (Poke t) _ <- p, [v,x] <- vs = do
+    | (Poke t) <- p, [v,x] <- vs = do
         v' <- convertVal v
         x' <- convertVal x
         return $ expressionRaw ("*((" <> (opTyToC' t) <+> "*)" <> (parens $ renderG v') <> text ") = " <> renderG x')
-    | APrim (AddrOf t) _ <- p, [] <- vs = do
+    | (AddrOf _ t) <- p, [] <- vs = do
         rt <- convertTypes ty
         return . cast rt $ expressionRaw ('&':unpackPS t)
     | otherwise = return $ err ("prim: " ++ show (p,vs))

@@ -45,23 +45,34 @@ data DotNetPrim = DotNetField | DotNetCtor | DotNetMethod
     deriving(Typeable, Eq, Ord, Show)
     {-! derive: Binary !-}
 
+primReqs p = f p where
+    f CConst {} = primRequires p
+    f Func {} = primRequires p
+    f IFunc {} = primRequires p
+    f AddrOf {} = primRequires p
+    f _ = mempty
+
 data Prim =
     PrimPrim Atom          -- Special primitive implemented in the compiler somehow.
     | CConst {
+        primRequires :: Requires,
         primConst :: !PackedString
         }  -- C code which evaluates to a constant
     | Func {
-        funcIOLike :: {-# UNPACK #-} !Bool,
+        primRequires :: Requires,
         funcName :: !PackedString,
         primArgTypes :: [ExtType],
         primRetType :: ExtType
         }   -- function call with C calling convention
     | IFunc {
-        funcIOLike :: {-# UNPACK #-} !Bool,
+        primRequires :: Requires,
         primArgTypes :: [ExtType],
         primRetType :: ExtType
         } -- indirect function call with C calling convention
-    | AddrOf !PackedString         -- address of linker name
+    | AddrOf {
+        primRequires :: Requires,
+        primConst :: !PackedString         -- address of linker name
+        }
     | Peek { primArgTy :: Op.Ty }  -- read value from memory
     | Poke { primArgTy :: Op.Ty }  -- write value to memory
     | PrimTypeInfo {
@@ -111,8 +122,6 @@ primIsCheap PrimTypeInfo {} = True
 primIsCheap Op { primCOp = op } = Op.isCheap op
 primIsCheap _ = False
 
-aprimIsCheap (APrim p _) = primIsCheap p
-
 -- | whether a primitive represents a constant expression (assuming all its arguments are constant)
 -- TODO needs grin support
 primIsConstant :: Prim -> Bool
@@ -136,31 +145,26 @@ primEagerSafe _ = False
 parsePrimString s = do
     ws@(_:_) <- return $ words s
     let v = case last ws of
-            '&':s -> AddrOf (packString s)
-            s -> Func False (packString s) [] ""
-    let f opt@('-':'l':_) = Requires [] [opt]
+            '&':s -> AddrOf { primConst = (packString s), primRequires = reqs }
+            s -> Func { funcName = (packString s), primArgTypes = [], primRetType = "" }
+        f opt@('-':'l':_) = Requires [] [opt]
         f s = Requires [s] []
-    return (APrim v (mconcat (map f (init ws))))
+        reqs = (mconcat (map f (init ws)))
+    return v
 
-primPrim s = APrim (PrimPrim $ toAtom s) mempty
+primPrim s = PrimPrim $ toAtom s
 
-data APrim = APrim Prim Requires
-    deriving(Typeable,  Eq, Ord)
-    {-! derive: Binary !-}
-
-instance Show APrim where
-    showsPrec n (APrim p r) | r == mempty = showsPrec n p
-    showsPrec n (APrim p r) = showsPrec n p . shows r
-
-instance PPrint d Prim  => PPrint d APrim where
-    pprintAssoc a n (APrim p _) = pprintAssoc a n p
+instance DocLike d => PPrint d ExtType where
+    pprint t = tshow t
+--instance DocLike d => PPrint d PackedString where
+--    pprint t = text $ unpackPS t
 
 instance DocLike d => PPrint d Prim where
     pprint (PrimPrim t) = text (fromAtom t)
-    pprint (CConst s) = parens (text $ unpackPS s)
-    pprint (Func _ s xs r) = parens (tshow r) <> text (unpackPS s) <> tupled (map tshow xs)
-    pprint (IFunc _ xs r) = parens (tshow r) <> parens (char '*') <> tupled (map tshow xs)
-    pprint (AddrOf s) = char '&' <> text (unpackPS s)
+    pprint (CConst _ s) = parens (text $ unpackPS s)
+    pprint Func { .. } = parens (tshow primRetType) <> text (unpackPS funcName) <> tupled (map pprint primArgTypes)
+    pprint IFunc { .. } = parens (tshow primRetType) <> parens (char '*') <> tupled (map pprint primArgTypes)
+    pprint (AddrOf _ s) = char '&' <> text (unpackPS s)
     pprint (PrimString s) = tshow s <> char '#'
     pprint (Peek t) = char '*' <> tshow t
     pprint (Poke t) = char '=' <> tshow t
