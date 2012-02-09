@@ -10,6 +10,7 @@ import PackedString
 import StringTable.Atom
 import qualified Cmm.Op as Op
 
+{-
 data PrimTypeType = PrimTypeIntegral | PrimTypeFloating | PrimTypePointer | PrimTypeVoid
     deriving(Show,Eq,Ord)
 
@@ -20,6 +21,7 @@ data PrimType = PrimType {
     primTypeIsSigned :: {-# UNPACK #-} !Bool,
     primTypeSizeOf :: {-# UNPACK #-} !Int
     } deriving(Show)
+-}
 
 type ExtType = String
 

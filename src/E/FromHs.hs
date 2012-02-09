@@ -7,10 +7,12 @@ module E.FromHs(
     ) where
 
 import Char
+import Control.Monad.Error
 import Control.Monad.Identity
 import Control.Monad.RWS
 import List(isPrefixOf,nub)
 import Prelude
+import Text.Printf
 import qualified Data.Map as Map
 import qualified Data.Traversable as T
 import qualified Text.PrettyPrint.HughesPJ as PPrint
@@ -238,10 +240,11 @@ unbox dataTable e vn wtd = eCase e [Alt (litCons { litName = cna, litArgs = [tvr
     tvra = tVr vn sta
     Just (ExtTypeBoxed cna sta _) = lookupExtTypeInfo dataTable te
 
-createFunc :: Monad t =>  DataTable -> [E] -> ([TVr] -> (E -> E,E)) -> Ce t E
-createFunc dataTable es ee = do
+createFunc :: [E] -> ([TVr] -> (E -> E,E)) -> C E
+createFunc es ee = do
+    dataTable <- getDataTable
     xs <- flip mapM es $ \te -> do
-        eti <- lookupExtTypeInfo dataTable te
+        eti <- ffiTypeInfo ExtTypeVoid te return
         [n] <- newVars [te]
         case eti of
             ExtTypeVoid -> fail "createFunc: attempt to pass a void argument"
@@ -291,8 +294,8 @@ convertRules mod tiData classHierarchy assumps dataTable hsDecls = ans where
         let e2 = atomizeAp mempty False dataTable e2'
         return (hsRuleIsMeta pr,hsRuleString pr,( snds (cs' ++ ts) ),eval $ smt $ sma e1,e2)
 
-convertE :: MonadWarn m => TiData -> ClassHierarchy -> Map.Map Name Type
-    -> DataTable -> SrcLoc -> HsExp -> m E
+convertE :: TiData -> ClassHierarchy -> Map.Map Name Type
+    -> DataTable -> SrcLoc -> HsExp -> IO E
 convertE tiData classHierarchy assumps dataTable srcLoc exp = do
     [(_,_,e)] <- convertDecls tiData mempty classHierarchy assumps dataTable
         [HsPatBind srcLoc (HsPVar v_silly) (HsUnGuardedRhs exp) []]
@@ -309,28 +312,28 @@ data CeEnv = CeEnv {
     ceDataTable :: DataTable
     }
 
-newtype Ce t a = Ce (RWST CeEnv [Warning] Int t a)
-    deriving(Monad,Functor,MonadTrans,MonadIO,MonadReader CeEnv,MonadState Int)
+newtype C a = Ce (RWST CeEnv [Warning] Int IO a)
+    deriving(Monad,Functor,MonadIO,MonadReader CeEnv,MonadState Int,MonadError IOError)
 
-instance Monad t => MonadWarn (Ce t) where
+instance MonadWarn C where
     addWarning w = Ce $ tell [w]
 
-instance Monad t => MonadSrcLoc (Ce t) where
+instance MonadSrcLoc C where
     getSrcLoc = asks ceSrcLoc
 
-instance Monad t => MonadSetSrcLoc (Ce t) where
+instance MonadSetSrcLoc C where
     withSrcLoc sl = local (\ce -> ce { ceSrcLoc = sl })
 
-instance Monad m => UniqueProducer (Ce m) where
+instance UniqueProducer C where
     newUniq = do
         i <- get
         put $! (i + 1)
         return i
 
-instance Monad m => DataTableMonad (Ce m) where
+instance DataTableMonad C where
     getDataTable = asks ceDataTable
 
-applyCoersion :: Monad m => CoerceTerm -> E -> Ce m E
+applyCoersion :: CoerceTerm -> E -> C E
 applyCoersion CTId e = return e
 applyCoersion ct e = etaReduce `liftM` f ct e where
     f CTId e = return e
@@ -345,9 +348,9 @@ applyCoersion ct e = etaReduce `liftM` f ct e where
         return (eLam y fgy)
 
 {-# NOINLINE convertDecls #-}
-convertDecls :: MonadWarn m => TiData -> IdMap Properties
+convertDecls :: TiData -> IdMap Properties
     -> ClassHierarchy -> Map.Map Name Type -> DataTable
-    -> [HsDecl] -> m [(Name,TVr,E)]
+    -> [HsDecl] -> IO [(Name,TVr,E)]
 convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
     res = do
         (a,ws) <- evalRWST ans ceEnv 2
@@ -370,9 +373,9 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
         | "Instance@" `isPrefixOf` show a = (a,setProperty prop_INSTANCE b, deNewtype dataTable c)
         | otherwise = (a,b, deNewtype dataTable c)
 
-    marshallToC :: UniqueProducer m => DataTable -> E -> E -> m E
-    marshallToC dataTable e te = do
-        eti <- lookupExtTypeInfo dataTable te
+    --marshallToC ::oducer m => E -> E -> m E
+    marshallToC e te = do
+        ffiTypeInfo Unknown te $ \eti -> do
         case eti of
             ExtTypeBoxed cna sta _ -> do
                 [tvra] <- newVars [sta]
@@ -383,9 +386,9 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
             ExtTypeRaw _ -> return e
             ExtTypeVoid -> fail "marshallToC: trying to marshall void"
 
-    marshallFromC :: Monad m => DataTable -> E -> E -> m E
-    marshallFromC dataTable ce te = do
-        eti <- lookupExtTypeInfo dataTable te
+    --marshallFromC :: Monad m =>  E -> E -> m E
+    marshallFromC ce te = do
+        ffiTypeInfo Unknown te $ \eti -> do
         case eti of
             ExtTypeBoxed cna _ _ -> return $ ELit (litCons { litName = cna, litArgs = [ce], litType = te })
             ExtTypeRaw _ -> return ce
@@ -398,16 +401,14 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
     -- (d) the real return type
     -- (e) the arguments themselves
     -- ccallHelper returns a function expression to perform the call, when given the arguments
-    ccallHelper :: Monad m => ([ExtType] -> ExtType -> Bool -> [E] -> E -> E) -> E -> Ce m E
+    ccallHelper :: ([ExtType] -> ExtType -> Bool -> [E] -> E -> E) -> E -> C E
     ccallHelper myPrim ty = do
-        let --(ts,rt) = argTypes' ty
-          --  (isIO,rt') =  extractIO' rt
-            (ts,isIO,rt') = extractIO' ty
+        let (ts,isIO,rt') = extractIO' ty
         es <- newVars [ t |  t <- ts, not (sortKindLike t) ]
-        pt <- lookupExtTypeInfo dataTable rt'
-        cts <- mapM (lookupExtTypeInfo dataTable) (filter (not . sortKindLike) ts)
+        ffiTypeInfo Unknown rt' $ \pt -> do
+        cts <- forM  (filter (not . sortKindLike) ts) $ \t -> do ffiTypeInfo ExtTypeVoid t $ return
         [tvrWorld, tvrWorld2] <- newVars [tWorld__,tWorld__]
-        let cFun = createFunc dataTable (map tvrType es)
+        let cFun = createFunc (map tvrType es)
             prim = myPrim (map extTypeInfoExtType cts) (extTypeInfoExtType pt)
         case (isIO,pt) of
             (True,ExtTypeVoid) -> cFun $ \rs -> (,) (ELam tvrWorld) $
@@ -446,8 +447,8 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
                                 --          [tvrWorld2,rtVar]
                                 --          (eJustIO (EVar tvrWorld2) (EVar rtVar))
 
-    cDecl,cDecl' :: Monad m => HsDecl -> Ce m [(Name,TVr,E)]
-    cDecl' d = withSrcLoc (srcLoc d) $ cDecl d
+    cDecl,cDecl' :: HsDecl -> C [(Name,TVr,E)]
+    cDecl' d = withSrcLoc (srcLoc d) $ catchError (cDecl d) (\(_ :: IOError) -> return [])
     cDecl (HsForeignDecl sLoc (FfiSpec (Import cn req) _ Primitive) n _) = do
         let name      = toName Name.Val n
         (var,ty,lamt) <- convertValue name
@@ -465,7 +466,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
             prim       = APrim (AddrOf $ packString rcn) req
         -- this needs to be a boxed value since we can't have top-level
         -- unboxed values yet.
-        eti <- lookupExtTypeInfo dataTable rt
+        ffiTypeInfo [] rt $ \eti -> do
         case eti of
             ExtTypeBoxed cn st _ -> do
                 [uvar] <- newVars [st]
@@ -499,10 +500,10 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
             --(isIO,rt') = extractIO' rt
             (ts,isIO,rt') = extractIO' ty
         es <- newVars [ t |  t <- ts, not (sortKindLike t) ]
-        pt <- lookupExtTypeInfo dataTable rt'
+        ffiTypeInfo [] rt' $ \pt -> do
         [tvrWorld, tvrWorld2] <- newVars [tWorld__,tWorld__]
         dnet <- parseDotNetFFI rcn
-        let cFun = createFunc dataTable (map tvrType es)
+        let cFun = createFunc (map tvrType es)
             prim rs rtt = EPrim (APrim dnet { primIOLike = isIO } mempty)
         result <- case (isIO,pt) of
             (True,ExtTypeVoid) -> cFun $ \rs -> (,) (ELam tvrWorld) $
@@ -536,32 +537,28 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
          --         else liftM (\(_, _, x) -> rawType x) $ lookupCType' dataTable retTy
 
         aets <- forM argTys $ \ty -> do
-            eti <- lookupExtTypeInfo dataTable ty
+            ffiTypeInfo (Unknown,undefined,undefined) ty $ \eti -> do
+--            eti <- lookupExtTypeInfo dataTable ty
             ty' <- case eti of
                 ExtTypeVoid -> fail "attempt to foreign export function with void argument"
                 ExtTypeRaw _ -> do return ty
                 ExtTypeBoxed _ ty' _  -> do return ty'
             [v] <- newVars [ty']
-            e <- marshallFromC dataTable (EVar v) ty
+            e <- marshallFromC (EVar v) ty
             return (e,v,ty')
 
         let argEs   = [ e | (e,_,_) <- aets ]
             argTvrs = [ v | (_,v,_) <- aets ]
             argCTys = [ t | (_,_,t) <- aets ]
---        argCTys <- mapM (liftM (\(_,st,_) -> st) . lookupCType' dataTable) argTys
-
- --       argTvrs <- newVars argCTys
---        argEs <- sequence [(marshallFromC dataTable (EVar v) et) | v <- argTvrs | et <- argTys]
-
         fe <- actuallySpecializeE (EVar tn) ty
         let inner = foldl EAp fe argEs
 
         retE <- case isIO of
-                  False -> marshallToC dataTable inner retTy
+                  False -> marshallToC inner retTy
                   True -> do [world_, world__, ret] <- newVars [tWorld__, tWorld__, retTy]
                              retMarshall <- if retTy == tUnit
                                             then return (ELit (unboxedTuple []))
-                                            else marshallToC dataTable (EVar ret) retTy
+                                            else marshallToC (EVar ret) retTy
                              return (eLam world_ (eCaseTup' (eAp inner (EVar world_))
                                                             [world__, ret]
                                                             (ELit (unboxedTuple [EVar world__, retMarshall]))))
@@ -622,7 +619,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
         return [(name,var,lamt $ z ms )]
     cDecl cd@(HsClassDecl {}) = cClassDecl cd
     cDecl _ = return []
-    cExpr :: Monad m => HsExp -> Ce m E
+    cExpr :: HsExp -> C E
     cExpr (HsAsPat n' (HsCon n)) = return $ constructionExpression dataTable (toName DataConstructor n) rt where
         t' = getAssump n'
         (_,rt) = argTypes' (tipe t')
@@ -706,7 +703,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
         e <- cExpr e
         hsLetE dl e
 
-    cMatchs :: Monad m => [E] -> [([HsPat],HsRhs,[HsDecl])] -> E -> Ce m E
+    cMatchs :: [E] -> [([HsPat],HsRhs,[HsDecl])] -> E -> C E
     cMatchs bs ms els = do
         pg <- processGuards ms
         convertMatches bs pg els
@@ -805,11 +802,10 @@ patVar p t = do
     return (p,nv)
     -}
 
-tidyPat ::
-    Monad m
-    => HsPat
+tidyPat
+    :: HsPat
     -> E
-    -> Ce m (HsPat,E -> E)
+    -> C (HsPat,E -> E)
 tidyPat p b = f p where
     f HsPWildCard = return (HsPWildCard,id)
     f (HsPVar n) | isTypePlaceholder n = return (HsPWildCard,id)
@@ -851,22 +847,20 @@ varify b = do
     [bv] <- newVars [getType b]
     return (eLet bv b,EVar bv)
 
-tidyHeads ::
-    Monad m
-    => E
+tidyHeads
+    :: E
     -> [([HsPat],E->E)]  -- [(pats,else -> value)]
-    -> Ce m [(HsPat,[HsPat],E->E)]  -- pulls the head off of each pattern, tidying it up perhaps
+    -> C [(HsPat,[HsPat],E->E)]  -- pulls the head off of each pattern, tidying it up perhaps
 tidyHeads b ps = mapM f ps where
     f (~(p:ps),fe) = do
         (p',fe') <- tidyPat p b
         return (p',ps,fe' . fe)
 
-convertMatches ::
-    Monad m
-    => [E]               -- input expressions we are matching against.
+convertMatches
+    :: [E]               -- input expressions we are matching against.
     -> [([HsPat],E->E)]  -- [(pats,else -> value)]
     -> E                 -- else, what to do if nothing matches
-    -> Ce m E
+    -> C E
 convertMatches bs ms err = do
     assumps <- asks ceAssumps
     dataTable <- getDataTable
@@ -877,7 +871,7 @@ convertMatches bs ms err = do
         isJoinPoint (EAp (EVar x) _) | getProperty prop_JOINPOINT x = True
         isJoinPoint _ = False
 
-        match :: Monad m => [E] -> [([HsPat],E->E)] -> E -> Ce m E
+        match :: [E] -> [([HsPat],E->E)] -> E -> C E
         -- when we run out of arguments, we should run out of patterns. simply fold the transformers.
         match  [] ps err = return $ foldr f err ps where f (~[],fe) err = fe err
         -- when we are out of patterns, return the error term
@@ -1030,3 +1024,12 @@ deNewtype dataTable e = removeNewtypes dataTable (f e) where
     f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (LitCons { litName = n, litArgs = [v], litType = t }) z):_) } | alias == RecursiveAlias = f $ eLet v (prim_unsafeCoerce e (getType v)) z where
         Identity Constructor { conAlias = alias } = getConstructor n dataTable
     f e = runIdentity $ emapE (return . f) e
+
+ffiTypeInfo bad t cont = do
+    dataTable <- getDataTable
+    case lookupExtTypeInfo dataTable t of
+        Just r -> cont r
+        Nothing -> do
+            sl <- getSrcLoc
+            liftIO $ warn sl InvalidFFIType $ printf "Type '%s' cannot be used in a foreign declaration" (pprint t :: String)
+            return bad

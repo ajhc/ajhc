@@ -124,6 +124,7 @@ processDecls cho ho' tiData = withStackStatus "processDecls" $  do
         theProps = fromList [ (toId x,y) | (x,y) <- Map.toList $ tiProps tiData]
     ds' <- convertDecls tiData theProps
         (hoClassHierarchy $ hoTcInfo ho') allAssumps  fullDataTable decls
+    processIOErrors
     let ds = classInstances ++ [ (v,lc) | (n,v,lc) <- ds', v `notElem` fsts classInstances ]
     -- Build rules from instances, specializations, and user specified rules and catalysts
     let augmentedClassHierarchy = hoClassHierarchy (hoTcInfo ho) `augmentClassHierarchy` hoClassHierarchy (hoTcInfo ho')

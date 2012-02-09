@@ -13,7 +13,7 @@ import Data.Typeable
 
 type CName    = String
 
-data CallConv = CCall | StdCall | Primitive | DotNet deriving(Eq,Ord,Show)
+data CallConv = CCall | StdCall | CApi | Primitive | DotNet deriving(Eq,Ord,Show)
     {-! derive: Binary !-}
 
 data Safety = Safe | Unsafe deriving(Eq,Ord,Show)

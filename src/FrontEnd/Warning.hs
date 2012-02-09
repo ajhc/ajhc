@@ -87,6 +87,7 @@ data WarnType
     | MissingDep String
     | MissingModule Module
     | MultiplyDefined Name [SrcLoc]
+    | InvalidFFIType
     | OccursCheck
     | PrimitiveBadType
     | PrimitiveUnknown Atom
@@ -104,6 +105,7 @@ warnIsFatal w = f w where
     f AmbiguousExport {} = True
     f AmbiguousName {} = True
     f InvalidDecl {} = True
+    f InvalidFFIType {} = True
     f DuplicateInstances {} = True
     f MissingDep {} = True
     f MissingModule {} = True

@@ -402,6 +402,7 @@ doForeign srcLoc names ms qt = ans where
         g _ cc ("safe":rs) = g Safe cc rs
         g _ cc ("unsafe":rs) = g Unsafe cc rs
         g s _  ("ccall":rs)  = g s CCall rs
+        g s _  ("capi":rs)  = g s CCall rs
         g s _  ("stdcall":rs) = g s StdCall rs
         g s c  [] = (s,c)
         g _ _ rs = error $ "FrontEnd.ParseUtils: unknown foreign flags " ++ show rs
