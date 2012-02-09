@@ -252,7 +252,7 @@ fromHsTypeApp t = f t [] where
 
 instanceToTopDecls :: KindEnv -> ClassHierarchy -> HsDecl -> (([HsDecl],[Assump]))
 instanceToTopDecls kt ch@(CH classHierarchy _) (HsInstDecl _ qualType methods)
-    = unzip $ map (methodToTopDecls ch kt [] crecord qualType) $ methodGroups where
+    = unzip $ concatMap (methodToTopDecls kt [] crecord qualType) $ methodGroups where
     methodGroups = groupEquations (filter (not . isHsPragmaProps) methods)
     (_,(className,_)) = chToClassHead kt qualType
     crecord = case Map.lookup className classHierarchy  of
@@ -273,25 +273,23 @@ defaultInstanceName n = toName Val ("Instance@",'i':show n ++ ".default")
 aliasDefaultInstanceName :: Name -> Class -> Name
 aliasDefaultInstanceName n ca = toName Val ("Instance@",'i':show n ++ ".default."++show ca)
 
-methodToTopDecls ::
-    ClassHierarchy
-    -> KindEnv         -- ^ the kindenv
+methodToTopDecls :: Monad m
+    => KindEnv         -- ^ the kindenv
     -> [Pred]          -- ^ random extra predicates to add
     -> ClassRecord     -- ^ the class we are lifting methods from
     -> HsClassHead
     -> (Name, HsDecl)
-    -> (HsDecl,Assump)
-
-methodToTopDecls _  kt preds crecord qt (methodName, methodDecls)
-   = (renamedMethodDecls,(newMethodName, instantiatedSig)) where
-    (cntxt,(className,[argType])) = chToClassHead kt qt
-    newMethodName = instanceName methodName (getTypeHead argType)
-    sigFromClass = case [ s | (n, s) <- classAssumps crecord, n == methodName] of
-        [x] -> x
-        _ -> error $ "sigFromClass: " ++ (pprint className <+> pprint (classAssumps crecord))
-                                      ++ " " ++ show  methodName
-    instantiatedSig = newMethodSig' kt methodName (preds ++ cntxt) sigFromClass argType
-    renamedMethodDecls = renameOneDecl newMethodName methodDecls
+    -> m (HsDecl,Assump)
+methodToTopDecls kt preds crecord qt (methodName, methodDecls) = do
+    let (cntxt,(className,[argType])) = chToClassHead kt qt
+	newMethodName = instanceName methodName (getTypeHead argType)
+    sigFromClass <- case [ s | (n, s) <- classAssumps crecord, n == methodName] of
+	    [x] -> return x
+	    _ -> fail $ "sigFromClass: " ++ (pprint className <+> pprint (classAssumps crecord))
+					  ++ " " ++ show  methodName
+    let instantiatedSig = newMethodSig' kt methodName (preds ++ cntxt) sigFromClass argType
+	renamedMethodDecls = renameOneDecl newMethodName methodDecls
+    return (renamedMethodDecls,(newMethodName, instantiatedSig))
 
 defaultMethodToTopDecls :: KindEnv -> [Assump] -> HsClassHead -> (Name, HsDecl) -> (HsDecl,Assump)
 defaultMethodToTopDecls kt methodSigs HsClassHead { .. } (methodName, methodDecls)

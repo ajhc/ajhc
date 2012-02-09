@@ -4,6 +4,7 @@ import Control.Monad.Reader
 import Control.Monad.Writer
 import Data.Graph(stronglyConnComp, SCC(..))
 import System.IO(hPutStr,stderr)
+import Text.Printf
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as P
@@ -22,7 +23,9 @@ import FrontEnd.Tc.Kind
 import FrontEnd.Tc.Monad hiding(listenPreds)
 import FrontEnd.Tc.Type
 import FrontEnd.Tc.Unify
+import FrontEnd.Utils
 import FrontEnd.Utils(getDeclName)
+import FrontEnd.Warning
 import GenUtil
 import Name.Name
 import Name.Names
@@ -622,7 +625,17 @@ tcMiscDecl d = withContext (locMsg (srcLoc d) "in the declaration" "") $ f d whe
             listenPreds $ sc `subsumes` t
             addRule RuleSpec { ruleUniq = hsDeclUniq spec, ruleName = nn, ruleType = t, ruleSuper = hsDeclBool spec }
             return [spec]
-    f i@HsInstDecl {} = tcClassHead (hsDeclClassHead i)
+    f HsInstDecl { .. } = do
+	tcClassHead hsDeclClassHead
+        ch <- getClassHierarchy
+        let as = asksClassRecord ch (hsClassHead hsDeclClassHead) classAssumps
+	forM_ hsDeclDecls $ \d -> do
+	    case maybeGetDeclName d of
+		Just n -> when (n `notElem` fsts as) $ do
+		    addWarn InvalidDecl $ printf "Cannot declare '%s' in instance because it is not a method of class '%s'" (show n) (show $ hsClassHead hsDeclClassHead)
+		Nothing -> return ()
+	return []
+
     f i@HsDeclDeriving {} = tcClassHead (hsDeclClassHead i)
     f (HsPragmaRules rs) = do
         rs' <- mapM tcRule rs
