@@ -58,6 +58,7 @@ data BinOp
     | Shra   -- ^ shift right arithmetic
     | Rotl
     | Rotr
+
     -- floating
     | FAdd
     | FSub
@@ -109,6 +110,14 @@ data UnOp
     | Log
     | Exp
     | Sqrt
+    -- exotic bit operations
+    | Bswap  -- ^ Switch the order of the bytes in a word
+    | Ffs    -- ^ Returns one plus the index of the least
+             --   significant 1-bit of x, 0 if x is zero.
+    | Clz    -- ^ number of leading (from MSB) zeros, undefined if zero
+    | Ctz    -- ^ number of trailing (from LSB) zeros, undefined if zero.
+    | Popcount -- ^ number of bits set to 1 in word
+    | Parity   -- ^ number of bits set to 1 mod 2
     deriving(Eq,Show,Ord,Read,Enum,Bounded)
     {-! derive: Binary !-}
 
