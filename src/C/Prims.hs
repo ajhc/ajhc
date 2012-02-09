@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module C.Prims where
 
 import Data.Binary
@@ -10,6 +11,7 @@ import PackedString
 import StringTable.Atom
 import qualified Cmm.Op as Op
 
+import GHC.Exts
 {-
 data PrimTypeType = PrimTypeIntegral | PrimTypeFloating | PrimTypePointer | PrimTypeVoid
     deriving(Show,Eq,Ord)
@@ -23,7 +25,11 @@ data PrimType = PrimType {
     } deriving(Show)
 -}
 
-type ExtType = String
+newtype ExtType = ExtType PackedString
+    deriving(Binary,IsString,Eq,Ord)
+
+instance Show ExtType where
+    show (ExtType p) = unpackPS p
 
 instance Show Requires where
     show (Requires [] []) = "()"
@@ -41,7 +47,9 @@ data DotNetPrim = DotNetField | DotNetCtor | DotNetMethod
 
 data Prim =
     PrimPrim Atom          -- Special primitive implemented in the compiler somehow.
-    | CConst { primConst :: !PackedString }  -- C code which evaluates to a constant
+    | CConst {
+        primConst :: !PackedString
+        }  -- C code which evaluates to a constant
     | Func {
         funcIOLike :: {-# UNPACK #-} !Bool,
         funcName :: !PackedString,
@@ -53,7 +61,7 @@ data Prim =
         primArgTypes :: [ExtType],
         primRetType :: ExtType
         } -- indirect function call with C calling convention
-    | AddrOf !PackedString          -- address of linker name
+    | AddrOf !PackedString         -- address of linker name
     | Peek { primArgTy :: Op.Ty }  -- read value from memory
     | Poke { primArgTy :: Op.Ty }  -- write value to memory
     | PrimTypeInfo {
@@ -150,8 +158,8 @@ instance PPrint d Prim  => PPrint d APrim where
 instance DocLike d => PPrint d Prim where
     pprint (PrimPrim t) = text (fromAtom t)
     pprint (CConst s) = parens (text $ unpackPS s)
-    pprint (Func _ s xs r) = parens (text r) <> text (unpackPS s) <> tupled (map text xs)
-    pprint (IFunc _ xs r) = parens (text r) <> parens (char '*') <> tupled (map text xs)
+    pprint (Func _ s xs r) = parens (tshow r) <> text (unpackPS s) <> tupled (map tshow xs)
+    pprint (IFunc _ xs r) = parens (tshow r) <> parens (char '*') <> tupled (map tshow xs)
     pprint (AddrOf s) = char '&' <> text (unpackPS s)
     pprint (PrimString s) = tshow s <> char '#'
     pprint (Peek t) = char '*' <> tshow t

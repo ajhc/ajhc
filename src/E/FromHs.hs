@@ -373,27 +373,6 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
         | "Instance@" `isPrefixOf` show a = (a,setProperty prop_INSTANCE b, deNewtype dataTable c)
         | otherwise = (a,b, deNewtype dataTable c)
 
-    --marshallToC ::oducer m => E -> E -> m E
-    marshallToC e te = do
-        ffiTypeInfo Unknown te $ \eti -> do
-        case eti of
-            ExtTypeBoxed cna sta _ -> do
-                [tvra] <- newVars [sta]
-                return $ eCase e
-                               [Alt (litCons { litName = cna, litArgs = [tvra], litType = te })
-                                    (EVar tvra)]
-                               Unknown
-            ExtTypeRaw _ -> return e
-            ExtTypeVoid -> fail "marshallToC: trying to marshall void"
-
-    --marshallFromC :: Monad m =>  E -> E -> m E
-    marshallFromC ce te = do
-        ffiTypeInfo Unknown te $ \eti -> do
-        case eti of
-            ExtTypeBoxed cna _ _ -> return $ ELit (litCons { litName = cna, litArgs = [ce], litType = te })
-            ExtTypeRaw _ -> return ce
-            ExtTypeVoid -> fail "marshallFromC: trying to marshall void"
-
     -- first argument builds the actual call primitive, given
     -- (a) the C argtypes
     -- (b) the C return type
@@ -1033,3 +1012,21 @@ ffiTypeInfo bad t cont = do
             sl <- getSrcLoc
             liftIO $ warn sl InvalidFFIType $ printf "Type '%s' cannot be used in a foreign declaration" (pprint t :: String)
             return bad
+
+marshallToC e te = do
+    ffiTypeInfo Unknown te $ \eti -> do
+    case eti of
+        ExtTypeBoxed cna sta _ -> do
+            [tvra] <- newVars [sta]
+            return $ eCase e
+                           [Alt (litCons { litName = cna, litArgs = [tvra], litType = te })
+                                (EVar tvra)]
+                           Unknown
+        ExtTypeRaw _ -> return e
+        ExtTypeVoid -> fail "marshallToC: trying to marshall void"
+marshallFromC ce te = do
+    ffiTypeInfo Unknown te $ \eti -> do
+    case eti of
+        ExtTypeBoxed cna _ _ -> return $ ELit (litCons { litName = cna, litArgs = [ce], litType = te })
+        ExtTypeRaw _ -> return ce
+        ExtTypeVoid -> fail "marshallFromC: trying to marshall void"

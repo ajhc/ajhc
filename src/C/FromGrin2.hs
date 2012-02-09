@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards,ViewPatterns  #-}
 module C.FromGrin2(compileGrin) where
 
@@ -200,11 +201,11 @@ convertFunc ffie (n,as :-> body) = do
         mstub <- case ffie of
                 Nothing -> return []
                 Just ~(FfiExport cn Safe CCall argTys retTy) -> do
-                    newVars <- mapM (liftM (name . show) . newVar . basicType) argTys
+                    newVars <- mapM (liftM (name . show) . newVar . basicType') argTys
 
                     let fnname2 = name cn
-                        as2 = zip (newVars) (map basicType argTys)
-                        fr2 = basicType retTy
+                        as2 = zip (newVars) (map basicType' argTys)
+                        fr2 = basicType' retTy
 
                     return [function fnname2 fr2 as2 [Public]
                                      (creturn $ cast fr2 $ functionCall fnname $ (if fopts FO.Jgc then (variable (name "saved_gc"):) else id) $
@@ -683,12 +684,12 @@ convertPrim p vs ty
     | APrim (Func _ n as r) _ <- p = do
         vs' <- mapM convertVal vs
         rt <- convertTypes ty
-        return $ cast (rt) (functionCall (name $ unpackPS n) [ cast (basicType t) v | v <- vs' | t <- as ])
+        return $ cast (rt) (functionCall (name $ unpackPS n) [ cast (basicType' t) v | v <- vs' | t <- as ])
     | APrim (IFunc _ as r) _ <- p = do
         v':vs' <- mapM convertVal vs
         rt <- convertTypes ty
-        let fn = cast (funPtrType (basicType r) (map basicType as)) v'
-        return $ cast (rt) (indirectFunctionCall fn [ cast (basicType t) v | v <- vs' | t <- as ])
+        let fn = cast (funPtrType (basicType' r) (map basicType' as)) v'
+        return $ cast (rt) (indirectFunctionCall fn [ cast (basicType' t) v | v <- vs' | t <- as ])
     | APrim (Peek t) _ <- p, [v] <- vs = do
         v' <- convertVal v
         return $ expressionRaw ("*((" <> (opTyToC' t) <+> "*)" <> (parens $ renderG v') <> char ')')
@@ -976,3 +977,6 @@ nodeStructName a = toName ('s':fromAtom a)
 nodeCacheName a = toName ('c':fromAtom a)
 
 bool b x y = if b then x else y
+
+basicType' :: ExtType -> Type
+basicType' b = basicType (show b)

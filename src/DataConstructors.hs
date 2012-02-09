@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module DataConstructors(
     AliasType(..),
     boxPrimitive,
@@ -47,6 +48,7 @@ import Data.Maybe
 import Data.Monoid hiding(getProduct)
 import List(sortBy)
 import qualified Data.Map as Map hiding(map)
+import qualified Data.Set as Set hiding(map)
 
 import C.Prims
 import Data.Binary
@@ -71,6 +73,7 @@ import Name.Id
 import Name.Name as Name
 import Name.Names
 import Name.VConsts
+import PackedString
 import Support.CanType
 import Support.FreeVars
 import Support.MapBinaryInstance
@@ -340,14 +343,15 @@ typesCompatable dataTable a b = f etherealIds a b where
 extractPrimitive :: Monad m => DataTable -> E -> m (E,(ExtType,E))
 extractPrimitive dataTable e = case followAliases dataTable (getType e) of
     st@(ELit LitCons { litName = c, litArgs = [], litType = t })
-        | t == eHash -> return (e,(show c,st))
+        | t == eHash -> return (e,(ExtType (packString $show c),st))
         | otherwise -> do
             Constructor { conChildren = DataNormal [cn] }  <- getConstructor c dataTable
             Constructor { conOrigSlots = [SlotNormal st] } <- getConstructor cn dataTable
             (ELit LitCons { litName = n, litArgs = []}) <- return $ followAliases dataTable st
             let tvra = tVr vn st
                 (vn:_) = newIds (freeIds e)
-            return (eCase e  [Alt (litCons { litName = cn, litArgs = [tvra], litType = (getType e) }) (EVar tvra)] Unknown,(show n,st))
+            return (eCase e  [Alt (litCons { litName = cn, litArgs = [tvra],
+                litType = (getType e) }) (EVar tvra)] Unknown,(ExtType (packString $ show n),st))
     e' -> fail $ "extractPrimitive: " ++ show (e,e')
 
 boxPrimitive ::
@@ -358,7 +362,7 @@ boxPrimitive ::
     -> m (E,(ExtType,E))
 boxPrimitive dataTable e et = case followAliases dataTable et of
     st@(ELit LitCons { litName = c, litArgs = [], litType = t })
-        | t == eHash -> return (e,(show c,st))
+        | t == eHash -> return (e,(ExtType . packString $ show c,st))
         | otherwise -> do
             Constructor { conChildren = DataNormal [cn] }  <- getConstructor c dataTable
             Constructor { conOrigSlots = [SlotNormal st] } <- getConstructor cn dataTable
@@ -366,9 +370,9 @@ boxPrimitive dataTable e et = case followAliases dataTable et of
             let tvra = tVr vn st
                 (vn:_) = newIds (freeVars (e,et))
             if isManifestAtomic e then
-                return $ (ELit litCons { litName = cn, litArgs = [e], litType = et },(show n,st))
+                return $ (ELit litCons { litName = cn, litArgs = [e], litType = et },(ExtType . packString $ show n,st))
              else
-                return $ (eStrictLet tvra e $ ELit litCons { litName = cn, litArgs = [EVar tvra], litType = et },(show n,st))
+                return $ (eStrictLet tvra e $ ELit litCons { litName = cn, litArgs = [EVar tvra], litType = et },(ExtType . packString $ show n,st))
     e' -> fail $ "boxPrimitive: " ++ show (e,e')
 
 extractIO :: Monad m => E -> m E
@@ -399,35 +403,36 @@ extTypeInfoExtType (ExtTypeBoxed _ _ et) = et
 extTypeInfoExtType ExtTypeVoid = "void"
 
 lookupExtTypeInfo :: Monad m => DataTable -> E -> m ExtTypeInfo
-lookupExtTypeInfo dataTable oe = f oe where
-    f :: Monad m => E -> m ExtTypeInfo
+lookupExtTypeInfo dataTable oe = f Set.empty oe where
+    f :: Monad m => Set.Set Name -> E -> m ExtTypeInfo
     -- handle the void context ones first
-    f e@(ELit LitCons { litName = c }) | c == tc_Unit || c == tc_State_ = return ExtTypeVoid
+    f _ e@(ELit LitCons { litName = c }) | c == tc_Unit || c == tc_State_ = return ExtTypeVoid
     -- if the constructor is in the external type map, replace its external
     -- type with the one in the map
-    f e@(ELit LitCons { litName = c, litArgs = [ta] }) | c == tc_Ptr = do
-        ExtTypeBoxed b t _ <- g e  -- we know a pointer is a boxed BitsPtr
-        case f ta of
-            Just (ExtTypeBoxed _ _ et) -> return $ ExtTypeBoxed b t (et ++ "*")
-            Just (ExtTypeRaw et) -> return $ ExtTypeBoxed b t (et ++ "*")
+    f seen e@(ELit LitCons { litName = c, litArgs = [ta] }) | c == tc_Ptr = do
+        ExtTypeBoxed b t _ <- g seen e  -- we know a pointer is a boxed BitsPtr
+        case f seen ta of
+            Just (ExtTypeBoxed _ _ (ExtType et)) -> return $ ExtTypeBoxed b t (ExtType $ et `mappend` "*")
+            Just (ExtTypeRaw (ExtType et)) -> return $ ExtTypeBoxed b t (ExtType $ et `mappend` "*")
             _ -> return $ ExtTypeBoxed b t "HsPtr"
-    f e@(ELit LitCons { litName = c }) | Just et <- Map.lookup c typeTable = do
-        res <- g e
+    f seen e@(ELit LitCons { litName = c }) | Just et <- Map.lookup c typeTable = do
+        res <- g seen e
         return $ case res of
             ExtTypeRaw _ -> ExtTypeRaw et
             ExtTypeBoxed b t _ -> ExtTypeBoxed b t et
             ExtTypeVoid -> ExtTypeVoid
-    f e = g e
+    f seen e = g seen e
     -- if we are a raw type, we can be foreigned
-    g (ELit LitCons { litName = c })
+    g _ (ELit LitCons { litName = c })
         | Just et <- Map.lookup c rawExtTypeMap = return (ExtTypeRaw et)
     -- if we are a single constructor data type with a single foreignable unboxed
     -- slot, we are foreiginable
-    g (ELit LitCons { litName = c, litAliasFor = Nothing })
+    g _ (ELit LitCons { litName = c, litAliasFor = Nothing })
         | Just Constructor { conChildren = DataNormal [cn] }  <- getConstructor c dataTable,
           Just Constructor { conOrigSlots = [SlotNormal st] } <- getConstructor cn dataTable,
           Just (ExtTypeRaw et) <- lookupExtTypeInfo dataTable st = return $ ExtTypeBoxed cn st et
-    g e | Just e' <- followAlias dataTable e = f e'
+    g seen e@(ELit LitCons { litName = n }) | Just e' <- followAlias dataTable e,
+        n `Set.notMember` seen = f (Set.insert n seen) e'
         | otherwise = fail $ "lookupExtTypeInfo: " ++ show (oe,e)
 
 expandAlias :: Monad m => E -> m E

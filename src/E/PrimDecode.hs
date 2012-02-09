@@ -226,17 +226,15 @@ boxResult dataTable t fn = mdo
         (res,(ta,sta)) <- boxPrimitive dataTable (fn (stringToOpTy ta) sta) t
 	return res
 
-stringToOpTy :: String -> Ty
-stringToOpTy s = case readTy s of
-    Just t -> t
-    _ -> error $ printf "stringToOpTy(%s)" s
+stringToOpTy :: ExtType -> Ty
+stringToOpTy s = stringToOpTy' "" s
 
-stringToOpTy' :: String -> String -> Ty
-stringToOpTy' x s = case readTy s of
+stringToOpTy' :: String -> ExtType -> Ty
+stringToOpTy' x (show -> s) = case readTy s of
     Just t -> t
     _ -> error $ printf "stringToOpTy(%s): '%s'" x s
 
-stot :: Show a => a -> Int -> String -> Ty
+stot :: Show a => a -> Int -> ExtType -> Ty
 stot op n s = stringToOpTy' (show op ++ show n) s
 
 unbox :: DataTable -> E -> Id -> (TVr -> E) -> E
