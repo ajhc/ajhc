@@ -1,22 +1,17 @@
-{-# OPTIONS_JHC -fno-prelude -fffi -fm4  #-}
+{-# OPTIONS_JHC -fno-prelude -fffi -fm4  -funboxed-tuples #-}
 
 module Prelude.Float(readDouble,doubleToDigits,doubleToRational) where
 
-import Foreign.Marshal.Alloc
-import Foreign.Ptr
-import Foreign.Storable
 import Jhc.Basics
+import Jhc.Class.Real
 import Jhc.Float
 import Jhc.List(length,notElem,take,elem)
-import Jhc.Monad
 import Jhc.Num
+import Jhc.Numeric((^),(^^))
 import Jhc.Order
 import Jhc.Type.C
 import Numeric
-import Jhc.Numeric((^),(^^))
 import Prelude.Text
-import System.IO.Unsafe
-import Jhc.Class.Real
 
 m4_define(INST,{{
 
@@ -103,7 +98,7 @@ foreign import ccall "math.h isinf" c_isinfinite$3 :: $1 -> CInt
 foreign import ccall "math.h signbit" c_signbit$3 :: $1 -> CInt
 
 foreign import ccall "math.h ldexp$3"  c_ldexp$3 :: $1 -> CInt -> $1
-foreign import ccall "math.h frexp$3"  c_frexp$3 :: $1 -> Ptr CInt -> IO $1
+foreign import ccall "math.h frexp$3"  c_frexp$3 :: $1 -> (# $1, CInt #)
 
 }})
 
@@ -135,17 +130,13 @@ instance RealFloat Float where
     isIEEE _ = True
 
     scaleFloat k x = c_ldexpf x (fromInt k)
-    decodeFloatf x = unsafePerformIO $ alloca $ \ptr -> do
-        x' <- c_frexpf x ptr
-        exp <- peek ptr
-        return (x', fromIntegral exp)
+    decodeFloatf x = case c_frexpf x of
+        (# x', exp #) -> (x', fromIntegral exp)
 
     encodeFloat i e = c_ldexpf (fromInteger i) (fromInt e)
-    decodeFloat x = unsafePerformIO $ alloca $ \ptr -> do
-        x' <- c_frexp (floatToDouble x) ptr
-        exp <- peek ptr
-        let x'' =  c_ldexp x' (fromInt $ floatDigits x)
-        return (double2integer x'', fromIntegral exp  - floatDigits x)
+    decodeFloat x = case c_frexpf x of
+        (# x', exp #) -> let x'' =  c_ldexp (floatToDouble x') (fromInt $ floatDigits x) in
+            (double2integer x'', fromIntegral exp  - floatDigits x)
 
     atan2 = atan2Float
 
@@ -163,17 +154,13 @@ instance RealFloat Double where
     isNegativeZero x = x == 0 && c_signbit x /= 0
     isIEEE _ = True
     scaleFloat k x = c_ldexp x (fromInt k)
-    decodeFloatf x = unsafePerformIO $ alloca $ \ptr -> do
-        x' <- c_frexp x ptr
-        exp <- peek ptr
-        return (x', fromIntegral exp)
+    decodeFloatf x = case c_frexp x of
+        (# x', exp #) -> (x', fromIntegral exp)
 
     encodeFloat i e =  c_ldexp (integer2double i) (fromInt e)
-    decodeFloat x = unsafePerformIO $ alloca $ \ptr -> do
-        x' <- c_frexp x ptr
-        exp <- peek ptr
-        let x'' = c_ldexp x' (fromInt $ floatDigits x)
-        return (double2integer x'', fromIntegral exp  - floatDigits x)
+    decodeFloat x = case c_frexp x of
+        (# x', exp #) -> let x'' = c_ldexp x' (fromInt $ floatDigits x) in
+            (double2integer x'', fromIntegral exp  - floatDigits x)
 
     atan2 = atan2Double
 

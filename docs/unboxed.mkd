@@ -6,6 +6,28 @@ Modules in jhc are searched for based on their name as in other Haskell
 compilers. However in addition to searching for 'Data/Foo.hs' for the module
 'Data.Foo', jhc will also search for 'Data.Foo.hs'.
 
+# foreign imports with multiple return values.
+
+foreign C imports may return multiple values. To indicate this is the case, use
+an unboxed tuple as the return value. The first return value will be the value
+the function directly returns, the rest will be passed as pointers at the end
+of the functions argument list. Only pure (non IO) functions may return multiple values.
+
+~~~~
+-- frexp has C prototype
+-- double frexp(double x, int *exp);
+-- so it would normally have an import like so, requiring the IO module and
+-- Storable to call what is otherwise a pure function.
+
+foreign import ccall "math.h frexp"  c_frexp :: Double -> Ptr CInt -> IO Double
+
+-- This extension allows it to be declared as so
+foreign import ccall "math.h frexp"  c_frexp2 :: Double -> (# Double, CInt #)
+
+-- The second return value is added as the last 'exp' parameter then read out
+-- of the allocated memory. The contents of the memory passed into the function
+-- is undefined.
+~~~~
 
 # Standalone deriving
 
@@ -28,16 +50,16 @@ existential data types in a similar fashion to ghc.
 Unboxed values in jhc are specified in a similar fashion to GHC however the
 lexical syntax is not changed to allow # in identifiers. # is still used in
 the syntax for various unboxed constructs, but normal Haskell rules apply to
-other Haskell values. The convention is to suffix such types with '_' to
+haskell identifiers. The convention is to suffix such types with '_' to
 indicate their status as unboxed. All unboxed values other than unboxed tuples
-are enabled by the -funboxed-value flag. For compatibility with GHC, the 
+are enabled by the -funboxed-value flag. For compatibility with GHC, the
 MagicHash extension name also turns on unboxed-values.
 
 ## Unboxed Tuples
 
 Jhc supports unboxed tuples with the same syntax as GHC, (# 2, 4 #) is an
 unboxed tuple of two numbers. Unboxed tuples are enabled with -funboxed-tuples.
-Unboxed tuples are kind-polymorphic, able to hold both boxed and unboxed values. 
+Unboxed tuples are kind-polymorphic, able to hold both boxed and unboxed values.
 (but not another unboxed tuple)
 
 ## Unboxed Strings
@@ -48,7 +70,7 @@ have types 'BitsPtr_'.
 
 ## Unboxed Characters
 
-Unboxed characters can be expressed by putting a hash after a normal character 
+Unboxed characters can be expressed by putting a hash after a normal character
 literal. Unboxed characters are of type Char_ which is a newtype of Bits32_ and
 defined in Jhc.Prim.Bits
 
@@ -70,5 +92,5 @@ Any C-- primitive may be imported as well as a variety of utility routines. the 
 import mechanism is 'smart' in that it will dig through newtypes and take care of boxing/unboxing
 values as needed. So you can import a primitive on Char and it will take care of boxing the
 value up in the 'Char' constructor as well as the Char_ newtype for Bits32_, ultimately choosing
-the right Bits32_ primitive. imported primitives are normal haskell declarations so may be 
+the right Bits32_ primitive. imported primitives are normal haskell declarations so may be
 exported/imported from modules or passed as higher order functions like normal.

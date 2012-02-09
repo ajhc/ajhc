@@ -605,8 +605,7 @@ convertExp (BaseOp Overwrite [v@(Var vv _),tn@(NodeC t as)]) | getType v == TyIN
 convertExp Alloc { expValue = v, expCount = c, expRegion = r } | r == region_heap, TyINode == getType v  = do
     v' <- convertVal v
     c' <- convertVal c
-    tmp <- newVar (ptrType sptr_t)
-    let malloc = tmp =* jhc_malloc_ptrs  (operator "*" (sizeof sptr_t) c')
+    (malloc,tmp) <- jhc_malloc_ptrs  (operator "*" (sizeof sptr_t) c') =:: ptrType sptr_t
     fill <- case v of
         ValUnknown _ -> return mempty
         _ -> do
@@ -617,8 +616,7 @@ convertExp Alloc { expValue = v, expCount = c, expRegion = r } |
     r == region_atomic_heap, TyPrim Op.bits_ptr == getType v  = do
         v' <- convertVal v
         c' <- convertVal c
-        tmp <- newVar (ptrType uintptr_t)
-        let malloc = tmp =* jhc_malloc_atomic (operator "*" (sizeof uintptr_t) c')
+        (malloc,tmp) <- jhc_malloc_atomic (operator "*" (sizeof uintptr_t) c') =:: ptrType uintptr_t
         fill <- case v of
             ValUnknown _ -> return mempty
             _ -> do
@@ -696,11 +694,6 @@ convertPrim p vs ty
         vs' <- mapM convertVal vs
         rt <- convertTypes ty
         return $ cast rt (functionCall (name $ unpackPS n) [ cast (basicType' t) v | v <- vs' | t <- as ])
-    | (Func _ n as r rs) <- p = do
-        vs' <- mapM convertVal vs
-        rt <- convertTypes ty
-        ras <- mapM (newVar . basicType') rs
-        return $ cast rt (functionCall (name $ unpackPS n) ([ cast (basicType' t) v | v <- vs' | t <- as ] ++ map reference ras))
     | (IFunc _ as r) <- p = do
         v':vs' <- mapM convertVal vs
         rt <- convertTypes ty
@@ -993,6 +986,8 @@ nodeStructName a = toName ('s':fromAtom a)
 nodeCacheName a = toName ('c':fromAtom a)
 
 bool b x y = if b then x else y
+
+x =:: y = newTmpVar y x
 
 basicType' :: ExtType -> Type
 basicType' b = basicType (show b)
