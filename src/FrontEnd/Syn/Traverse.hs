@@ -173,6 +173,7 @@ traverseHsType f HsTyExpKind { .. } = do
     return HsTyExpKind { .. }
 traverseHsType f (HsTyEq a b) = return HsTyEq `ap` f a `ap` f b
 traverseHsType f (HsTyStrictType a b ) = return HsTyStrictType `ap` return a `ap` T.mapM f b
+traverseHsType _ HsTyAssoc = return HsTyAssoc
 
 doQual :: Monad m => (a -> HsQualType -> b) -> (HsType -> m HsType) -> a -> HsQualType -> m b
 doQual hsTyForall f vs qt = do

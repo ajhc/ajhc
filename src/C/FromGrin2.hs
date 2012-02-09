@@ -560,6 +560,13 @@ mgc = if fopts FO.Jgc then (v_gc:) else id
 mgct = if fopts FO.Jgc then ((name "gc",gc_t):) else id
 
 convertExp :: Exp -> C (Statement,Expression)
+convertExp (Prim (Func _ n as r rs@(_:_)) vs ty) = do
+        vs' <- mapM convertVal vs
+        rt <- mapM convertType ty
+        let rrs = map basicType' (r:rs)
+        ras <- mapM (newVar . basicType') rs
+        (stmt,rv) <- basicType' r `newTmpVar` (functionCall (name $ unpackPS n) ([ cast (basicType' t) v | v <- vs' | t <- as ] ++ map reference ras))
+        return $ (stmt, structAnon (zip (rv:ras) rt))
 convertExp (Prim p vs ty) =  do
     tell mempty { wRequires = primReqs p }
     e <- convertPrim p vs ty
@@ -654,10 +661,14 @@ convertConst v = return (f v) where
     f (ValPrim p [] ty) = case p of
         CConst _ s -> return $ expressionRaw $ unpackPS s
         AddrOf _ t -> do rt <- convertType ty; return . cast rt $ expressionRaw ('&':unpackPS t)
-        PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimSizeOf } -> return $ expressionRaw ("sizeof(" ++ tyToC Op.HintUnsigned arg ++ ")")
-        PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimMinBound } -> return $ expressionRaw ("prim_minbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
-        PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimMaxBound } -> return $ expressionRaw ("prim_maxbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
-        PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimUMaxBound } -> return $ expressionRaw ("prim_umaxbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
+        PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimSizeOf } -> 
+            return $ expressionRaw ("sizeof(" ++ tyToC Op.HintUnsigned arg ++ ")")
+        PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimMinBound } -> 
+            return $ expressionRaw ("prim_minbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
+        PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimMaxBound } -> 
+            return $ expressionRaw ("prim_maxbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
+        PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimUMaxBound } -> 
+            return $ expressionRaw ("prim_umaxbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
         PrimString s -> return $ cast (basicType "uintptr_t") (expressionRaw (show s))
         x -> return $ err (show x)
     f (ValPrim p [x] (TyPrim opty)) = do
@@ -681,10 +692,15 @@ convertPrim p vs ty
     | Op {} <- p = do
         let [rt] = ty
         convertVal (ValPrim p vs rt)
-    | (Func _ n as r) <- p = do
+    | (Func _ n as r []) <- p = do
         vs' <- mapM convertVal vs
         rt <- convertTypes ty
-        return $ cast (rt) (functionCall (name $ unpackPS n) [ cast (basicType' t) v | v <- vs' | t <- as ])
+        return $ cast rt (functionCall (name $ unpackPS n) [ cast (basicType' t) v | v <- vs' | t <- as ])
+    | (Func _ n as r rs) <- p = do
+        vs' <- mapM convertVal vs
+        rt <- convertTypes ty
+        ras <- mapM (newVar . basicType') rs
+        return $ cast rt (functionCall (name $ unpackPS n) ([ cast (basicType' t) v | v <- vs' | t <- as ] ++ map reference ras))
     | (IFunc _ as r) <- p = do
         v':vs' <- mapM convertVal vs
         rt <- convertTypes ty

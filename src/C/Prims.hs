@@ -53,7 +53,7 @@ primReqs p = f p where
     f _ = mempty
 
 data Prim =
-    PrimPrim Atom          -- Special primitive implemented in the compiler somehow.
+    PrimPrim Atom -- Special primitive implemented in the compiler somehow.
     | CConst {
         primRequires :: Requires,
         primConst :: !PackedString
@@ -62,7 +62,8 @@ data Prim =
         primRequires :: Requires,
         funcName :: !PackedString,
         primArgTypes :: [ExtType],
-        primRetType :: ExtType
+        primRetType :: ExtType,
+	primRetArgs :: [ExtType]
         }   -- function call with C calling convention
     | IFunc {
         primRequires :: Requires,
@@ -71,7 +72,7 @@ data Prim =
         } -- indirect function call with C calling convention
     | AddrOf {
         primRequires :: Requires,
-        primConst :: !PackedString         -- address of linker name
+        primConst :: !PackedString -- address of linker name
         }
     | Peek { primArgTy :: Op.Ty }  -- read value from memory
     | Poke { primArgTy :: Op.Ty }  -- write value to memory
@@ -80,7 +81,7 @@ data Prim =
         primRetTy :: Op.Ty,
         primTypeInfo :: {-# UNPACK #-} !PrimTypeInfo
         }
-    | PrimString !PackedString                                 -- address of a raw string. encoded in utf8.
+    | PrimString !PackedString  -- address of a raw string. encoded in utf8.
     | PrimDotNet {
         primStatic :: {-# UNPACK #-} !Bool,
         primDotNet :: !DotNetPrim,

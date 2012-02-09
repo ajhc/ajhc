@@ -240,7 +240,7 @@ unbox dataTable e vn wtd = eCase e [Alt (litCons { litName = cna, litArgs = [tvr
     tvra = tVr vn sta
     Just (ExtTypeBoxed cna sta _) = lookupExtTypeInfo dataTable te
 
-createFunc :: [E] -> ([TVr] -> (E -> E,E)) -> C E
+createFunc :: [E] -> ([TVr] -> C (E -> E,E)) -> C E
 createFunc es ee = do
     dataTable <- getDataTable
     xs <- flip mapM es $ \te -> do
@@ -255,8 +255,8 @@ createFunc es ee = do
                 return (n,n,Nothing)
     let tvrs' = [ n' | (_,n',_) <- xs ]
         tvrs = [ t | (t,_,_) <- xs]
-        (me,innerE) = ee tvrs'
-        eee = me $ foldr esr innerE xs
+    (me,innerE) <- ee tvrs'
+    let eee = me $ foldr esr innerE xs
         esr (tvr,tvr',Just cn) e = eCase (EVar tvr) [Alt (litCons { litName = cn, litArgs = [tvr'], litType = tvrType tvr }) e] Unknown
         esr (_,_,Nothing) e = e
     return $ foldr ELam eee tvrs
@@ -316,7 +316,7 @@ newtype C a = Ce (RWST CeEnv [Warning] Int IO a)
     deriving(Monad,Functor,MonadIO,MonadReader CeEnv,MonadState Int,MonadError IOError)
 
 instance MonadWarn C where
-    addWarning w = Ce $ tell [w]
+    addWarning w = liftIO (addWarning w)
 
 instance MonadSrcLoc C where
     getSrcLoc = asks ceSrcLoc
@@ -347,6 +347,10 @@ applyCoersion ct e = etaReduce `liftM` f ct e where
         fgy <- f ct (EAp e (EVar y))
         return (eLam y fgy)
 
+fromTuple_ :: Monad m => E -> m [E]
+fromTuple_ (ELit LitCons { litName = n, litArgs = as }) | Just c <- fromUnboxedNameTuple n, c == length as = return as
+fromTuple_ e = fail "fromTuple_ : not unboxed tuple"
+
 {-# NOINLINE convertDecls #-}
 convertDecls :: TiData -> IdMap Properties
     -> ClassHierarchy -> Map.Map Name Type -> DataTable
@@ -376,55 +380,56 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
     -- first argument builds the actual call primitive, given
     -- (a) the C argtypes
     -- (b) the C return type
-    -- (c) whether it's IO-like or not
-    -- (d) the real return type
-    -- (e) the arguments themselves
+    -- (c) the extra return variables passed back in pointers
+    -- (d) the arguments themselves
+    -- (e) the real return type
     -- ccallHelper returns a function expression to perform the call, when given the arguments
-    ccallHelper :: ([ExtType] -> ExtType -> Bool -> [E] -> E -> E) -> E -> C E
+    invalidDecl s = addWarn InvalidDecl s >> fail s
+    ccallHelper :: ([ExtType] -> ExtType -> [ExtType] -> [E] -> E -> E) -> E -> C E
     ccallHelper myPrim ty = do
-        let (ts,isIO,rt') = extractIO' ty
+        let (ts,isIO,rt) = extractIO' ty
         es <- newVars [ t |  t <- ts, not (sortKindLike t) ]
+        let (rt':ras) = case fromTuple_ rt of
+                Just (x:ys@(_:_)) -> (x:ys)
+                _ -> [rt]
+        ras' <- forM ras $ \t -> ffiTypeInfo ExtTypeVoid t return
         ffiTypeInfo Unknown rt' $ \pt -> do
         cts <- forM  (filter (not . sortKindLike) ts) $ \t -> do ffiTypeInfo ExtTypeVoid t $ return
         [tvrWorld, tvrWorld2] <- newVars [tWorld__,tWorld__]
         let cFun = createFunc (map tvrType es)
-            prim = myPrim (map extTypeInfoExtType cts) (extTypeInfoExtType pt)
-        case (isIO,pt) of
-            (True,ExtTypeVoid) -> cFun $ \rs -> (,) (ELam tvrWorld) $
-                        eStrictLet tvrWorld2
-                                   (prim True
-                                         (EVar tvrWorld
-                                          :[EVar t | t <- rs ])
-                                         tWorld__)
-                                   (eJustIO (EVar tvrWorld2) vUnit)
-            (False,ExtTypeVoid) -> fail "pure foreign function must return a valid value"
-            (_,ExtTypeBoxed cn rtt' _) -> do
+            prim = myPrim (map extTypeInfoExtType cts) (extTypeInfoExtType pt) (map extTypeInfoExtType ras')
+        case (isIO,pt,ras') of
+            (True,ExtTypeVoid,[]) -> cFun $ \rs -> return (ELam tvrWorld, 
+                eStrictLet tvrWorld2 (prim (EVar tvrWorld :[EVar t | t <- rs ]) tWorld__)
+                    (eJustIO (EVar tvrWorld2) vUnit))
+            (False,ExtTypeVoid,_) -> invalidDecl  "pure foreign function must return a non void value"
+            (True,_,(_:_)) -> invalidDecl "IO-like functions may not return a tuple"
+            (_,ExtTypeBoxed cn rtt' _,[]) -> do
                 [rtVar,rtVar'] <- newVars [rt',rtt']
                 let rttIO' = ltTuple' [tWorld__, rtt']
                 case isIO of
-                    False -> cFun $ \rs -> (,) id $
-                                 eStrictLet rtVar'
-                                           (prim False
-                                                 [ EVar t | t <- rs ]
-                                                 rtt')
-                                           (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' })
-                    True -> cFun $ \rs -> (,) (ELam tvrWorld) $
-                                eCaseTup' (prim True
-                                                (EVar tvrWorld:[EVar t | t <- rs ])
-                                                rttIO')
-                                          [tvrWorld2,rtVar']
-                                          (eLet rtVar
-                                                (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' })
-                                                (eJustIO (EVar tvrWorld2) (EVar rtVar)))
-            (_,ExtTypeRaw  _) -> do
-                [rtVar] <- newVars [rt']
+                    False -> cFun $ \rs -> return (id,
+                        eStrictLet rtVar' (prim [ EVar t | t <- rs ] rtt')
+                            (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' }))
+                    True -> cFun $ \rs -> return $ (,) (ELam tvrWorld) $
+                        eCaseTup' (prim (EVar tvrWorld:[EVar t | t <- rs ]) rttIO') [tvrWorld2,rtVar']
+                            (eLet rtVar (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' })
+                                (eJustIO (EVar tvrWorld2) (EVar rtVar)))
+            (True,ExtTypeRaw  _,[]) -> do
                 let rttIO' = ltTuple' [tWorld__, rt']
-                case isIO of
-                    False -> cFun $ \rs -> (,) id $ (prim False [ EVar t | t <- rs ] rt')
-                    True -> cFun $ \rs -> (,) (ELam tvrWorld) $ (prim True (EVar tvrWorld:[EVar t | t <- rs ]) rttIO')
-                                --eCaseTup' (prim True (EVar tvrWorld:[EVar t | t <- rs ]) rttIO')
-                                --          [tvrWorld2,rtVar]
-                                --          (eJustIO (EVar tvrWorld2) (EVar rtVar))
+                cFun $ \rs -> return (ELam tvrWorld,prim (EVar tvrWorld:[EVar t | t <- rs ]) rttIO')
+            (False,_,(_:_)) -> do
+                let rets = (rt':ras)
+                rets' <- mapM unboxedVersion rets
+                cFun $ \rs -> do
+                fun <- extractUnboxedTup (prim [ EVar t | t <- rs ] (ltTuple' rets')) $ \vs -> do
+                    rv <- zipWithM marshallFromC vs rets
+                    return $ eTuple' rv
+                return (id,fun)
+            _ -> invalidDecl "foreign declaration is of incorrect form."
+
+    isExtTypeRaw ExtTypeRaw {} = True
+    isExtTypeRaw _ = False
 
     cDecl,cDecl' :: HsDecl -> C [(Name,TVr,E)]
     cDecl' d = withSrcLoc (srcLoc d) $ catchError (cDecl d) (\(_ :: IOError) -> return [])
@@ -450,14 +455,14 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
             ExtTypeBoxed cn st _ -> do
                 [uvar] <- newVars [st]
                 expr $ eStrictLet uvar (EPrim prim [] st) (ELit (litCons { litName = cn, litArgs = [EVar uvar], litType = rt }))
-            _ -> fail "foreign import of address must be of a boxed type"
+            _ -> invalidDecl "foreign import of address must be of a boxed type"
 
     cDecl (HsForeignDecl _ (FfiSpec (Import rcn req) _ CCall) n _) = do
         let name = toName Name.Val n
         (var,ty,lamt) <- convertValue name
         result <- ccallHelper
-                     (\cts crt io args rt ->
-                      EPrim (Func req (packString rcn) cts crt) args rt)
+                     (\cts crt cras args rt ->
+                      EPrim (Func req (packString rcn) cts crt cras) args rt)
                      ty
         return [(name,setProperty prop_INLINE var,lamt result)]
     cDecl (HsForeignDecl _ (FfiSpec Dynamic _ CCall) n _) = do
@@ -466,18 +471,15 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
         (var,ty,lamt) <- convertValue name
         --let ((fptrTy:_), _) = argTypes' ty
         --    fty = discardArgs 1 ty
-
         result <- ccallHelper
-                     (\cts crt io args rt ->
+                     (\cts crt cras args rt ->
                       EPrim (IFunc mempty (tail cts) crt) args rt)
                      ty
         return [(name,setProperty prop_INLINE var,lamt result)]
 
     cDecl (HsForeignDecl _ (FfiSpec (Import rcn _) _ DotNet) n _) = do
         (var,ty,lamt) <- convertValue (toName Name.Val n)
-        let --(ts,rt) = argTypes' ty
-            --(isIO,rt') = extractIO' rt
-            (ts,isIO,rt') = extractIO' ty
+        let (ts,isIO,rt') = extractIO' ty
         es <- newVars [ t |  t <- ts, not (sortKindLike t) ]
         ffiTypeInfo [] rt' $ \pt -> do
         [tvrWorld, tvrWorld2] <- newVars [tWorld__,tWorld__]
@@ -485,21 +487,21 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
         let cFun = createFunc (map tvrType es)
             prim rs rtt = EPrim dnet
         result <- case (isIO,pt) of
-            (True,ExtTypeVoid) -> cFun $ \rs -> (,) (ELam tvrWorld) $
+            (True,ExtTypeVoid) -> cFun $ \rs -> return $  (,) (ELam tvrWorld) $
                         eStrictLet tvrWorld2 (prim rs "void" (EVar tvrWorld:[EVar t | t <- rs ]) tWorld__) (eJustIO (EVar tvrWorld2) vUnit)
-            (False,ExtTypeVoid) -> fail "pure foreign function must return a valid value"
+            (False,ExtTypeVoid) -> invalidDecl "pure foreign function must return a valid value"
             _ -> do
                 ExtTypeBoxed cn rtt' rtt <- lookupExtTypeInfo dataTable rt'
                 [rtVar,rtVar'] <- newVars [rt',rtt']
                 let _rttIO = ltTuple [tWorld__, rt']
                     rttIO' = ltTuple' [tWorld__, rtt']
                 case isIO of
-                    False -> cFun $ \rs -> (,) id $ eStrictLet rtVar' (prim rs rtt [ EVar t | t <- rs ] rtt') (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' })
-                    True -> cFun $ \rs -> (,) (ELam tvrWorld) $
+                    False -> cFun $ \rs -> return $ (,) id $ eStrictLet rtVar' (prim rs rtt [ EVar t | t <- rs ] rtt') (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' })
+                    True -> cFun $ \rs -> return $ (,) (ELam tvrWorld) $
                                 eCaseTup' (prim rs rtt (EVar tvrWorld:[EVar t | t <- rs ]) rttIO')  [tvrWorld2,rtVar'] (eLet rtVar (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' }) (eJustIO (EVar tvrWorld2) (EVar rtVar)))
         return [(toName Name.Val n,var,lamt result)]
 
-    cDecl x@HsForeignDecl {} = fail ("Unsupported foreign declaration: "++ show x)
+    cDecl x@HsForeignDecl {} = invalidDecl ("Unsupported foreign declaration: "++ show x)
 
     cDecl (HsForeignExport _ ffi@FfiExport { ffiExportCName = ecn } n _) = do
         let name = ffiExportName ffi
@@ -519,7 +521,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
             ffiTypeInfo (Unknown,undefined,undefined) ty $ \eti -> do
 --            eti <- lookupExtTypeInfo dataTable ty
             ty' <- case eti of
-                ExtTypeVoid -> fail "attempt to foreign export function with void argument"
+                ExtTypeVoid -> invalidDecl "attempt to foreign export function with void argument"
                 ExtTypeRaw _ -> do return ty
                 ExtTypeBoxed _ ty' _  -> do return ty'
             [v] <- newVars [ty']
@@ -673,7 +675,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
         case Map.lookup (toName Val n') cc of
             Nothing -> return e
             Just c -> applyCoersion c e
-    cExpr e = fail ("Cannot convert: " ++ show e)
+    cExpr e = invalidDecl ("Cannot convert: " ++ show e)
     hsLetE [] e = return  e
     hsLetE dl e = do
         nds <- mconcatMapM cDecl dl
@@ -763,23 +765,6 @@ litconvert e t = error $ "litconvert: shouldn't happen: " ++ show (e,t)
 fromHsPLitInt (HsPLit l@(HsInt _)) = return l
 fromHsPLitInt (HsPLit l@(HsFrac _)) = return l
 fromHsPLitInt x = fail $ "fromHsPLitInt: " ++ show x
-
-{-
-patVar ::
-    Monad m
-    => HsPat -- ^ the pattern
-    -> E     -- ^ the type of the expression
-    -> Ce m (HsPat,TVr)  -- ^ a new pattern and a binding variable
-patVar HsPWildCard t = return (HsPWildCard,tvr { tvrType = t })
-patVar (HsPVar n) t | isTypePlaceholder n = return (HsPWildCard,tvr { tvrType = t })
-patVar (HsPAsPat n p) t | not (isTypePlaceholder n) = do
-    nn <- convertVar (toName Name.Val n)
-    return (p,nn)
-patVar (HsPAsPat n p) t | isTypePlaceholder n = patVar p t
-patVar p t = do
-    [nv] <- newVars [t]
-    return (p,nv)
-    -}
 
 tidyPat
     :: HsPat
@@ -1013,6 +998,13 @@ ffiTypeInfo bad t cont = do
             liftIO $ warn sl InvalidFFIType $ printf "Type '%s' cannot be used in a foreign declaration" (pprint t :: String)
             return bad
 
+
+unboxedVersion t = do
+    ffiTypeInfo Unknown t $ \eti -> case eti of
+        ExtTypeBoxed _ uv _ -> return uv
+        ExtTypeRaw _ -> return t
+        ExtTypeVoid -> return (eTuple' [])
+
 marshallToC e te = do
     ffiTypeInfo Unknown te $ \eti -> do
     case eti of
@@ -1030,3 +1022,9 @@ marshallFromC ce te = do
         ExtTypeBoxed cna _ _ -> return $ ELit (litCons { litName = cna, litArgs = [ce], litType = te })
         ExtTypeRaw _ -> return ce
         ExtTypeVoid -> fail "marshallFromC: trying to marshall void"
+
+extractUnboxedTup :: E -> ([E] -> C E) -> C E
+extractUnboxedTup e f = do
+    vs <- newVars $ concat (fromTuple_ (getType e))
+    a <- f (map EVar vs)
+    return $ eCaseTup' e vs a
