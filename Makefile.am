@@ -209,6 +209,9 @@ built-sources: $(BUILT_SOURCES)
 i: $(BUILT_SOURCES)
 	$(HC) --interactive $(GHCOPTS) src/Main.hs $(CFILES)
 
+i2: $(BUILT_SOURCES)
+	$(HC) --interactive $(GHCOPTS)  $(CFILES)
+
 lint:
 	perl utils/hslint.prl `darcs wh -s | sed -e 's/^..//' -e 's/ .*$$//' | grep '.hs$$'`
 hlint:

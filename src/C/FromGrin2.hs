@@ -292,6 +292,7 @@ convertType (TyPtr TyNode) = return $ ptrType wptr_t
 convertType ~(TyPrim opty) = return (opTyToC opty)
 
 tyToC _ Op.TyBool = "bool"
+tyToC dh (Op.TyComplex ty) = "_Complex " ++ tyToC dh ty
 tyToC dh (Op.TyBits (Op.BitsExt s) _) = s
 tyToC dh (Op.TyBits b h) = f b h where
     f b Op.HintNone = f b dh

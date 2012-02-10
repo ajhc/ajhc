@@ -15,12 +15,13 @@ import Info.Binary()
 import Info.Types
 import Name.Name
 import Name.Names
+import PackedString
 import StringTable.Atom
 import Util.HasSize
 import Util.SetLike
-import PackedString
-import qualified Data.ByteString as BS
 import qualified C.Generate
+import qualified Cmm.Op as Op
+import qualified Data.ByteString as BS
 import qualified Info.Info as Info
 
 {-# NOINLINE main #-}
@@ -67,20 +68,19 @@ appendPS :: PackedString -> PackedString -> PackedString
 appendPS = mappend
 
 testPackedString = do
-    putStrLn "Testing PackedString"
     let prop_psid xs = unpackPS (packString xs) == (xs::String)
 --        prop_pslen xs = lengthPS (packString xs) == length (xs::String)
         prop_psappend (xs,ys) = (packString xs `appendPS` packString ys) == packString ((xs::String) ++ ys)
         prop_psappend' (xs,ys) = unpackPS (packString xs `appendPS` packString ys) == ((xs::String) ++ ys)
         prop_sort xs = sort (map packString xs) == map packString (sort xs)
-    quickCheck prop_psid
+    qc "PackedString.psid" prop_psid
+    qc "PackedString.sort"  prop_sort
+    qc "PackedString.psappend"  prop_psappend
+    qc "PackedString.psappend'"  prop_psappend'
 --    quickCheck prop_pslen
-    doTime "prop_sort" $ quickCheck prop_sort
-    quickCheck prop_psappend
-    quickCheck prop_psappend'
-    print $ map packString strings
-    print $ sort $ map packString strings
-    print $ sort strings
+--    print $ map packString strings
+--    print $ sort $ map packString strings
+--    print $ sort strings
  --   pshash "Hello"
 --    pshash "Foo"
 --    pshash "Bar"
@@ -106,7 +106,7 @@ testName = do
     qc "name.setModule" $ \t a b c ->  nn b && nn c ==> setModule (toModule c) (toName t (a :: Maybe Module,b)) == toName t (c,b)
     qc "name.show" $ \ t a b -> nn a && nn b ==> show (toName t (a,b)) == a ++ "." ++ b
     qc "name.quote" $ \ t a b -> nn a && nn b ==> let n = toName t (a,b) in fromQuotedName (quoteName n) == Just n
-    qc "name.noquote" $ \ t a b -> (nn b && (t /= QuotedName)) ==> fromQuotedName (toName t (a :: Maybe Module,b)) == Nothing
+    qc "name.noquote" $ \ t a b -> t /= QuotedName && nn b ==> collect t $ fromQuotedName (toName t (a :: Maybe Module,b)) == Nothing
     qc "name.acc" prop_acc
     qc "name.tup" $ \n -> n >= 0 ==> fromUnboxedNameTuple (unboxedNameTuple RawType n) == Just n
     qc "name.overlap" $ \t -> (isTypeNamespace t,isValNamespace t) /= (True,True)
@@ -171,8 +171,20 @@ testBinary = do
     if (z /= t) then fail "Info Test Failed" else return ()
 
 
+deriving instance Bounded NameType
+deriving instance Enum Op.ValOp
+--deriving instance Bounded Op.ValOp
+
 instance Arbitrary NameType where
-    arbitrary = oneof $ map return [ TypeConstructor .. ]
+    arbitrary = oneof $ map return [ minBound .. ]
+instance Arbitrary Op.BinOp where
+    arbitrary = oneof $ map return [ minBound .. ]
+instance Arbitrary Op.UnOp where
+    arbitrary = oneof $ map return [ minBound .. ]
+instance Arbitrary Op.ConvOp where
+    arbitrary = oneof $ map return [ minBound .. ]
+instance Arbitrary Op.ValOp where
+    arbitrary = oneof $ map return [ minBound .. ]
 
 instance Arbitrary Info.Types.Property where
     arbitrary = oneof $ map return [ minBound .. ]
@@ -186,6 +198,6 @@ instance Arbitrary Module where
         f "" = f "X"
         f s = toModule s
 
---instance Arbitrary Char where
---    arbitrary     = Test.QuickCheck.choose ('\32', '\128')
---    coarbitrary c = variant (fromEnum c `rem` 4)
+instance Arbitrary Char where
+    arbitrary     = Test.QuickCheck.choose ('\32', '\128')
+    coarbitrary c = variant (fromEnum c `rem` 4)

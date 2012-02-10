@@ -418,6 +418,8 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
             (True,ExtTypeRaw  _,[]) -> do
                 let rttIO' = ltTuple' [tWorld__, rt']
                 cFun $ \rs -> return (ELam tvrWorld,prim (EVar tvrWorld:[EVar t | t <- rs ]) rttIO')
+            (False,ExtTypeRaw  _,[]) -> do
+                cFun $ \rs -> return (id,prim [EVar t | t <- rs ] rt')
             (False,_,(_:_)) -> do
                 let rets = (rt':ras)
                 rets' <- mapM unboxedVersion rets

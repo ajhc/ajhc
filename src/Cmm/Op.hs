@@ -3,6 +3,8 @@ module Cmm.Op where
 
 import Data.Binary
 import Util.Gen
+import Text.ParserCombinators.ReadP as P
+import Text.Read.Lex
 
 {-
 
@@ -167,21 +169,37 @@ data TyHint
 data Ty
     = TyBits !TyBits !TyHint
     | TyBool
+    | TyComplex Ty
+    | TyVector !Int Ty
     deriving(Eq,Ord)
     {-! derive: Binary !-}
 
+--runReadP :: ReadP a -> String -> Maybe a
+--runReadP rp s = case readP_to_S rp s of
+--    [(x,"")] -> Just x
+--    _ -> Nothing
+
+preadTy :: ReadP Ty
+preadTy = choice cs where
+    cs = [ do string "bool"; return TyBool
+         , do char 's'; TyBits x _ <- preadTy; return $ TyBits x HintSigned
+         , do char 'u'; TyBits x _ <- preadTy; return $ TyBits x HintUnsigned
+         , do char 'f'; TyBits x _ <- preadTy; return $ TyBits x HintFloat
+         , do char 'c'; TyBits x _ <- preadTy; return $ TyBits x HintCharacter
+         , do string "bits<"; x <- manyTill P.get (char '>'); return $ TyBits (f x) HintNone
+         , do string "bits"; x <- readDecP; return $ TyBits (Bits x) HintNone
+         , do n <- readDecP; char '*'; t <- preadTy; return (TyVector n t)
+         , do string "i"; t <- preadTy; return (TyComplex t)
+         ]
+    f "ptr" = BitsArch BitsPtr
+    f "max" = BitsArch BitsMax
+    f "?"   = BitsArch BitsUnknown
+    f x     = BitsExt x
+
 readTy :: Monad m => String -> m Ty
-readTy "bool" = return TyBool
-readTy "bits<ptr>" = return $ TyBits (BitsArch BitsPtr) HintNone
-readTy "bits<max>" = return $ TyBits (BitsArch BitsMax) HintNone
-readTy "bits<?>" = return $ TyBits (BitsArch BitsUnknown) HintNone
-readTy ('b':'i':'t':'s':'<':rs) = return $ TyBits (BitsExt (takeWhile ('>' /=) rs)) HintNone
-readTy ('b':'i':'t':'s':rs) = do n <- readM rs; return $ TyBits (Bits n) HintNone
-readTy ('s':rs) = do TyBits x _ <- readTy rs; return $ TyBits x HintSigned
-readTy ('u':rs) = do TyBits x _ <- readTy rs; return $ TyBits x HintUnsigned
-readTy ('f':rs) = do TyBits x _ <- readTy rs; return $ TyBits x HintFloat
-readTy ('c':rs) = do TyBits x _ <- readTy rs; return $ TyBits x HintCharacter
-readTy _ = fail "readTy: not type"
+readTy s = case runReadP preadTy s of
+    Nothing -> fail "readTy: not type"
+    Just x -> return x
 
 stringToOpTy ::  String -> Ty
 stringToOpTy s = case readTy s of
@@ -219,6 +237,8 @@ instance Show TyHint where
 instance Show Ty where
     showsPrec _ TyBool = showString "bool"
     showsPrec _ (TyBits b h) = shows h . showString "bits" . shows b
+    showsPrec _ (TyVector n t) = shows n . showChar '*' . shows t
+    showsPrec _ (TyComplex t) = showChar 'i' . shows t
 
 instance Show TyBits where
     showsPrec _ (Bits n) = shows n

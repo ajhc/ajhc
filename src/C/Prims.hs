@@ -147,7 +147,7 @@ parsePrimString s = do
     ws@(_:_) <- return $ words s
     let v = case last ws of
             '&':s -> AddrOf { primConst = (packString s), primRequires = reqs }
-            s -> Func { funcName = (packString s), primArgTypes = [], primRetType = "" }
+            s -> Func { funcName = (packString s), primArgTypes = [], primRetType = "", primRequires = reqs, primRetArgs = [] }
         f opt@('-':'l':_) = Requires [] [opt]
         f s = Requires [s] []
         reqs = (mconcat (map f (init ws)))

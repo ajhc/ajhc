@@ -6,7 +6,7 @@ GHCOPTS= -fallow-overlapping-instances -fallow-undecidable-instances -fglasgow-e
 	-XRecordWildCards -XRecursiveDo -XTupleSections -XParallelListComp \
 	-XGeneralizedNewtypeDeriving -XScopedTypeVariables -XFlexibleInstances \
 	-XTypeSynonymInstances -XMultiParamTypeClasses -XDeriveDataTypeable \
-	-fglasgow-exts -XNoMonoLocalBinds -XNamedFieldPuns
+	-fglasgow-exts -XNoMonoLocalBinds -XNamedFieldPuns 
 
 HC= ghc
 

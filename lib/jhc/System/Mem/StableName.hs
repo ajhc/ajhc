@@ -16,7 +16,7 @@ hashStableName :: StableName a -> Int
 hashStableName (StableName a) = bitsPtrToInt (jhc_hashptr a)
 
 foreign import primitive toHeapAddr :: a -> BitsPtr_
-foreign import primitive "U2I" bitsPtrToInt :: BitsPtr_ -> Int
+foreign import primitive "U2U" bitsPtrToInt :: BitsPtr_ -> Int
 foreign import jhc_hashptr :: BitsPtr_ -> BitsPtr_
 
 INST_EQORDER((StableName a),StableName,BitsPtr_,U)

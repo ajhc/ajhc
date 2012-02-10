@@ -22,7 +22,7 @@ data Float80_  :: #
 data Float128_ :: #
 data FloatMax_ :: #
 
--- data Complex_ :: # -> #
+data Complex_ :: # -> #
 
 -- these newtypes exist to modify the
 -- calling convention and provide hints as

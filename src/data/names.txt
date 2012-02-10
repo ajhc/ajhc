@@ -80,6 +80,8 @@ Float64    Jhc.Prim.Bits.Float64_
 Float80    Jhc.Prim.Bits.Float80_
 Float128   Jhc.Prim.Bits.Float128_
 
+Complex    Jhc.Prim.Bits.Complex_
+
 Addr_      Jhc.Prim.Bits.Addr_
 FunAddr_   Jhc.Prim.Bits.FunAddr_
 Char_      Jhc.Prim.Bits.Char_
