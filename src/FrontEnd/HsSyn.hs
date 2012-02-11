@@ -49,11 +49,12 @@ data HsModule = HsModule {
 -- Export/Import Specifications
 
 data HsExportSpec
-	 = HsEVar HsName		-- variable
-	 | HsEAbs HsName		-- T
-	 | HsEThingAll HsName		-- T(..)
-	 | HsEThingWith HsName [HsName]	-- T(C_1,...,C_n)
-	 | HsEModuleContents Module	-- module M   (not for imports)
+    = HsEVar HsName                      -- variable
+    | HsEAbs HsName                      -- T
+    | HsEThingAll HsName                 -- T(..)
+    | HsEThingWith HsName [HsName]       -- T(C_1,...,C_n)
+    | HsEModuleContents Module           -- module M   (not for imports)
+    | HsEQualified NameType HsExportSpec -- class Foo, type Bar, kind ANY
   deriving(Eq,Show)
 
 instance HasLocation HsImportDecl where
@@ -64,15 +65,8 @@ data HsImportDecl = HsImportDecl {
     hsImportDeclModule :: Module,
     hsImportDeclQualified :: !Bool,
     hsImportDeclAs :: (Maybe Module),
-    hsImportDeclSpec :: (Maybe (Bool,[HsImportSpec]))
+    hsImportDeclSpec :: (Maybe (Bool,[HsExportSpec]))
     }
-  deriving(Eq,Show)
-
-data HsImportSpec
-	 = HsIVar HsName		-- variable
-	 | HsIAbs HsName		-- T
-	 | HsIThingAll HsName		-- T(..)
-	 | HsIThingWith HsName [HsName]	-- T(C_1,...,C_n)
   deriving(Eq,Show)
 
 data HsAssoc = HsAssocNone | HsAssocLeft | HsAssocRight

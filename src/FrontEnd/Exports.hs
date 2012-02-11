@@ -110,35 +110,35 @@ determineExports' owns doneMods todoMods = mdo
             es' <- case hsImportDeclSpec x of
                 Nothing -> return es -- return $ (mapDomain ((Name.qualifyName as)) es `mappend` if hsImportDeclQualified x then mempty else es)
                 Just (isHiding,xs) -> do
-                    let listed = mconcat $ map (entSpec isHiding es . importToExport) xs
+                    let listed = mconcat $ map (entSpec isHiding es) xs
                     return $ if isHiding then es SL.\\ listed else listed
             return $ (mapDomain ((Name.qualifyName as)) es' `mappend` if hsImportDeclQualified x then mempty else es')
         is = modInfoModImports mi
         ls = fromList $  concat [ [(toUnqualified z,z),(z,z)]| (z, _, _) <- modInfoDefs mi]
 
     entSpec ::
-        Bool     -- ^ is it a hiding import?
+        Bool              -- ^ is it a hiding import?
         -> Rel Name Name  -- ^ the original relation
         -> HsExportSpec   -- ^ the specification
         -> Rel Name Name  -- ^ the subset satisfying the specification
-    entSpec isHiding rel (HsEVar n) = restrictDomainS (toName Val n) rel
-    entSpec isHiding rel (HsEAbs n) = restrictDomainSet (Set.fromList [ toName x n | x <- ts]) rel  where
-        ts = TypeConstructor:ClassName:if isHiding then [DataConstructor] else []
-    entSpec isHiding rel (HsEThingWith n xs) = restrictDomainSet (fromList (concat (ct:(map cd xs)))) rel where
-        ct = [toName TypeConstructor n, toName ClassName n]
-        cd n =  [toName DataConstructor n, toName Val n, toName FieldLabel n ]
-    entSpec isHiding rel (HsEThingAll n) = rdl `mappend` restrictRange (`elem` ss) rel where
-        ct = [toName TypeConstructor n, toName ClassName n]
-        ss = concat $ concat [ maybeToList (Map.lookup x ownsMap) | x <- Set.toList $ range rdl ]
-        cd n =  [toName DataConstructor n, toName Val n, toName FieldLabel n ]
-        rdl = (restrictDomain (`elem` ct) rel)
+    entSpec isHiding rel e = f Nothing e where
+	f _ (HsEVar n) = restrictDomainS (toName Val n) rel
+	f Nothing (HsEAbs n) = restrictDomainSet (Set.fromList [ toName x n | x <- ts]) rel  where
+	    ts = TypeConstructor:ClassName:if isHiding then [DataConstructor] else []
+	f (Just nt) (HsEAbs n) = restrictDomainSet (Set.singleton (toName nt n)) rel  where
+	f mnt (HsEThingWith n xs) = restrictDomainSet (fromList (concat (map (`toName` n) ct:(map cd xs)))) rel where
+	    ct = case mnt of
+		Nothing -> [TypeConstructor,ClassName]
+		Just nt -> [nt]
+	    cd n =  [toName DataConstructor n, toName Val n, toName FieldLabel n ]
+	f mnt (HsEThingAll n) = rdl `mappend` restrictRange (`elem` ss) rel where
+	    ct = case mnt of
+		Nothing -> [TypeConstructor,ClassName]
+		Just nt -> [nt]
+	    ss = concat $ concat [ maybeToList (Map.lookup x ownsMap) | x <- Set.toList $ range rdl ]
+	    cd n = [toName DataConstructor n, toName Val n, toName FieldLabel n ]
+	    rdl = (restrictDomain (`elem` map (`toName` n) ct) rel)
+	f _ (HsEQualified t n) = f (Just t) n
 
 defsToRel xs = fromList $ map f xs where
     f (n,_,_) = (toUnqualified n,n)
-
-importToExport :: HsImportSpec -> HsExportSpec
-importToExport x = f x where
-    f (HsIVar n) = HsEVar n
-    f (HsIAbs n) = HsEAbs n
-    f (HsIThingAll n) = HsEThingAll n
-    f (HsIThingWith n xs) = HsEThingWith n xs

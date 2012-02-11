@@ -192,13 +192,20 @@ ppHsModuleHeader (Module modName) mbExportList = mySep [
 		 text "where"]
 
 ppHsExportSpec :: HsExportSpec -> Doc
-ppHsExportSpec (HsEVar name)                     = ppHsQNameParen name
-ppHsExportSpec (HsEAbs name)                     = ppHsQName name
-ppHsExportSpec (HsEThingAll name)                = ppHsQName name <> text"(..)"
-ppHsExportSpec (HsEThingWith name nameList)      = ppHsQName name <>
-                                                   (parenList . map ppHsQNameParen $ nameList)
-ppHsExportSpec (HsEModuleContents (show -> name)) = text "module" <+> text name
+ppHsExportSpec e = f e where
+    f (HsEVar name)                     = ppHsQNameParen name
+    f (HsEAbs name)                     = ppHsQName name
+    f (HsEThingAll name)                = ppHsQName name <> text"(..)"
+    f (HsEThingWith name nameList)      = ppHsQName name <> (parenList . map ppHsQNameParen $ nameList)
+    f (HsEModuleContents (show -> name)) = text "module" <+> text name
+    f (HsEQualified ClassName e)         = text "class" <+> ppHsExportSpec e
+    f (HsEQualified SortName e)          = text "kind" <+> ppHsExportSpec e
+    f (HsEQualified TypeConstructor e)   = text "type" <+> ppHsExportSpec e
+    f (HsEQualified DataConstructor e)   = text "data" <+> ppHsExportSpec e
+    f (HsEQualified n e)                 = tshow n <+> ppHsExportSpec e
 
+
+tshow = text . show
 ppHsImportDecl (HsImportDecl pos (show -> mod) bool mbName mbSpecs) =
 	   mySep [text "import",
 		 if bool then text "qualified" else empty,
@@ -207,15 +214,9 @@ ppHsImportDecl (HsImportDecl pos (show -> mod) bool mbName mbSpecs) =
 		 maybePP exports mbSpecs]
            where
 	   exports (b,specList)
-	    | b = text "hiding" <+> (parenList . map ppHsImportSpec $ specList)
-	    | otherwise = parenList . map ppHsImportSpec $  specList
+	    | b = text "hiding" <+> (parenList . map ppHsExportSpec $ specList)
+	    | otherwise = parenList . map ppHsExportSpec $  specList
 
-ppHsImportSpec :: HsImportSpec -> Doc
-ppHsImportSpec (HsIVar name)                     = ppHsNameParen name
-ppHsImportSpec (HsIAbs name)                     = ppHsName name
-ppHsImportSpec (HsIThingAll name)                = ppHsName name <> text"(..)"
-ppHsImportSpec (HsIThingWith name nameList)      = ppHsName name <>
-                                                   (parenList . map ppHsNameParen $ nameList)
 ppHsTName (n,Nothing) = ppHsName n
 ppHsTName (n,Just t) = parens (ppHsName n <+> text "::" <+> ppHsType t)
 

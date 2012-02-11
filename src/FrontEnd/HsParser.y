@@ -232,26 +232,29 @@ maybeas :: { Maybe Module }
       : 'as' modid                            { Just $2 }
       | {- empty -}                           { Nothing }
 
-maybeimpspec :: { Maybe (Bool, [HsImportSpec]) }
+maybeimpspec :: { Maybe (Bool, [HsExportSpec]) }
       : impspec                               { Just $1 }
       | {- empty -}                           { Nothing }
 
-impspec :: { (Bool, [HsImportSpec]) }
+impspec :: { (Bool, [HsExportSpec]) }
       :  '(' importlist maybecomma ')'          { (False, reverse $2) }
       |  '(' ')'                                { (False, []) }
       |  'hiding' '(' importlist maybecomma ')' { (True,  reverse $3) }
       |  'hiding' '(' ')'                       { (True, []) }
 
-importlist :: { [HsImportSpec] }
+importlist :: { [HsExportSpec] }
       :  importlist ',' import                { $3 : $1 }
       |  import                               { [$1]  }
 
-import :: { HsImportSpec }
-      :  var                                  { HsIVar $1 }
-      |  tyconorcls                           { HsIAbs $1 }
-      |  tyconorcls '(' '..' ')'              { HsIThingAll $1 }
-      |  tyconorcls '(' ')'                   { HsIThingWith $1 [] }
-      |  tyconorcls '(' cnames ')'            { HsIThingWith $1 (reverse $3) }
+import :: { HsExportSpec }
+      :  var                                  { HsEVar $1 }
+      |  tyconorcls                           { HsEAbs $1 }
+      |  tyconorcls '(' '..' ')'              { HsEThingAll $1 }
+      |  tyconorcls '(' ')'                   { HsEThingWith $1 [] }
+      |  tyconorcls '(' cnames ')'            { HsEThingWith $1 (reverse $3) }
+      |  'class' import                       { HsEQualified ClassName $2 }
+      |  'type'  import                       { HsEQualified TypeConstructor $2 }
+      |  'kind'  import                       { HsEQualified SortName $2 }
 
 cnames :: { [HsName] }
       :  cnames ',' cname                     { $3 : $1 }

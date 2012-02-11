@@ -87,7 +87,8 @@ saturated with arguments.
        (**,#,*)
        (**,!,*)
        (**,**,**)  -- we have functions from types to types
-       (**,##,##)  -- Array__ a :: #
+       (**,##,##)  -- MutArray_ :: * -> #
+       (##,##,##)  -- Complex_ :: # -> #
 
     The defining feature of boxed values is
 
@@ -171,7 +172,8 @@ ptsRulesMap = Map.fromList [ ((a,b),c) | (as,bs,c) <- ptsRules, a <- as, b <- bs
         ([ETuple],ETuple:starHashBang,EBang),
         ([EStarStar],starHashBang,EStar),
         ([EStarStar],[EStarStar],EStarStar),
-        ([EStarStar],[EHashHash],EHashHash)
+        ([EStarStar],[EHashHash],EHashHash),
+        ([EHashHash],[EHashHash],EHashHash)
         ]
 
 canBeBox x | getType (getType x) == ESort EStarStar = True
