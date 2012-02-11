@@ -151,7 +151,7 @@ splitReduce fs gs ps = do
     --liftIO $ putStrLn $ pprint (fs,gs,ps)
     (ds, rs) <- splitPreds h fs ps
     --liftIO $ putStrLn $ pprint (ds,rs)
-    (rs',sub) <- genDefaults h (fs `Set.union` gs) rs
+    let (rs',sub) = genDefaults h (fs `Set.union` gs) rs
     --liftIO $ putStrLn $ pprint (rs')
     flip mapM_ sub $ \ (x,y) ->  do
         let msg = "defaulting: " <+> pprint x <+> "=>" <+> prettyPrintType y
@@ -160,30 +160,15 @@ splitReduce fs gs ps = do
     sequence_ [ varBind x y | (x,y) <- nub sub]
     return (Set.toList gs List.\\ map fst sub, ds, rs')
 
-withDefaults :: Monad m
-             => ClassHierarchy
-             -> Set.Set MetaVar -- ^ Variables to be considered known
-             -> [Pred]          -- ^ Predicates to consider
-             -> m [(MetaVar, [Pred], Type)]
-             -- ^ List of (defaulted meta var, predicates involving it, type defaulted to)
-withDefaults h vs ps
-  | any null tss = fail $ "withDefaults.ambiguity: " ++ (pprint ps)  ++ pprint (Set.toList vs) -- ++ show ps
---  | otherwise = fail $ "Zambiguity: " ++ (render $ pprint ps) ++  show (ps,ps',ams)
-  | otherwise    = return $ [ (v,qs,head ts) | (v,qs,ts) <- ams ]
-    where ams = ambig h vs ps
-          tss = [ ts | (v,qs,ts) <- ams ]
-
 -- | Return retained predicates and a defaulting substitution
-genDefaults :: Monad m
-            => ClassHierarchy
+genDefaults :: ClassHierarchy
             -> Set.Set MetaVar -- ^ Variables to be considered known
             -> [Pred]          -- ^ Predicates to examine
-            -> m ([Pred], [(MetaVar,Type)])
-genDefaults h vs ps = do
-    ams <- withDefaults h vs ps
-    let ps' = [ p | (v,qs,ts) <- ams, p<-qs ]
-        vs  = [ (v,t)  | (v,qs,t) <- ams ]
-    return (ps \\ ps',  vs)
+            -> ([Pred], [(MetaVar,Type)])
+genDefaults h vs ps = (ps \\ ps',  vs')
+ where ams = [ (v,qs,t) | (v,qs,t:ts) <- ambig h vs ps ]
+       ps' = [ p | (v,qs,ts) <- ams, p <-qs ]
+       vs' = [ (v,t)  | (v,qs,t) <- ams ]
 
 -- ambiguities from THIH + call to candidates
 ambig :: ClassHierarchy
