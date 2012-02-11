@@ -283,7 +283,7 @@ jhc_man.mkd: $(JHC_MANUAL_FILES)
 man: jhc_man.mkd
 	pandoc $< -s -f markdown -t man -s  -o jhc.1
 
-options.mkd: src/Options.hs | jhc
+options.mkd: drift_processed/Options.hs | jhc
 	echo "{-@Options 1" > $@
 	./jhc --help | sed -e 's/^/    /'  >> $@
 
