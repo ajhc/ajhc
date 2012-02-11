@@ -45,12 +45,11 @@ instance FromTupname Name where
         (_,(m,nn)) = fromName name
     fromTupname _ = fail "not a tuple"
 
-s_Star = toName SortName (Module "Jhc@","*"::String)
-s_Hash = toName SortName (Module "Jhc@","#"::String)
-s_Bang = toName SortName (Module "Jhc@","!"::String)
+-- quasi-kinds (placeholders for existential kinds)
 s_Quest = toName SortName (Module "Jhc@","?"::String)
 s_QuestQuest = toName SortName (Module "Jhc@","??"::String)
 s_StarBang = toName SortName (Module "Jhc@","*!"::String)
+s_Any = toName SortName (Module "Jhc@","ANY"::String)
 
 u_instance = toName UnknownType (Module "Jhc@","instance"::String)
 

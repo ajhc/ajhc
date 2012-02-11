@@ -210,7 +210,6 @@ fromQuotedName n = case nameParts n of
 newtype Module = Module Atom
   deriving(Eq,Data,Typeable,ToAtom,FromAtom)
 
-
 instance Ord Module where
     compare x y = show x `compare` show y
 
@@ -225,4 +224,3 @@ preludeModule = Module "Prelude"
 
 toModule :: String -> Module
 toModule s = Module $ toAtom s
-

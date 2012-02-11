@@ -115,9 +115,9 @@ tipe' ~(TExists xs (_ :=> t)) = do
 kind (KBase KUTuple) = eHash
 kind (KBase KHash) = eHash
 kind (KBase Star) = eStar
+kind (KBase (KNamed t)) = ESort (ESortNamed t)
 kind (Kfun k1 k2) = EPi (tVr emptyId (kind k1)) (kind k2)
-kind (KVar _) = error "Kind variable still existing."
-kind _ = error "DataConstructors.kind"
+kind k = error $ "DataConstructors.kind: cannot convert " ++ show k
 
 data AliasType = NotAlias | ErasedAlias | RecursiveAlias
     deriving(Eq,Ord,Show)
@@ -283,6 +283,23 @@ primitiveConstructor name = emptyConstructor {
     conInhabits = s_Hash,
     conChildren = DataPrimitive
     }
+
+sortName :: ESort -> Name
+sortName s = f s where
+    f EStar          = s_Star     -- ^ the sort of boxed lazy types
+    f EBang          = s_Bang     -- ^ the sort of boxed strict types
+    f EHash          = s_Hash     -- ^ the sort of unboxed types
+    f ETuple         = s_Tuple    -- ^ the sort of unboxed tuples
+    f EHashHash      = s_HashHash -- ^ the supersort of unboxed types
+    f EStarStar      = s_StarStar -- ^ the supersort of boxed types
+    f (ESortNamed n) = n          -- ^ user defined sorts
+
+sortConstructor name ss = emptyConstructor {
+    conName = name,
+    conType = ESort ss,
+    conExpr = ESort (ESortNamed name),
+    conInhabits = sortName ss
+}
 
 typesCompatable :: forall m . Monad m => DataTable -> E -> E -> m ()
 typesCompatable dataTable a b = f etherealIds a b where
@@ -550,7 +567,8 @@ collectDeriving ds = concatMap f ds where
 {-# NOINLINE toDataTable #-}
 toDataTable :: (Map.Map Name Kind) -> (Map.Map Name Type) -> [HsDecl] -> DataTable -> DataTable
 toDataTable km cm ds currentDataTable = newDataTable  where
-    newDataTable = DataTable (Map.mapWithKey fixupMap $ Map.fromList [ (conName x,procNewTypes x) | x <- ds', conName x `notElem` keys primitiveAliases ])
+    newDataTable = DataTable (Map.mapWithKey fixupMap $
+        Map.fromList [ (conName x,procNewTypes x) | x <- ds', conName x `notElem` keys primitiveAliases ])
     fullDataTable = (newDataTable `mappend` currentDataTable)
     procNewTypes c = c { conExpr = f (conExpr c), conType = f (conType c), conOrigSlots = map (mapESlot f) (conOrigSlots c) } where
         f = removeNewtypes fullDataTable
@@ -562,8 +580,10 @@ toDataTable km cm ds currentDataTable = newDataTable  where
         fm t = execWriter $ f t
         f HsTyCon { hsTypeName = n } = tell [n]
         f t = traverseHsType_ f t
-    f decl@HsNewTypeDecl {  hsDeclName = nn, hsDeclCon = c } = dt decl (if nn `elem` newtypeLoopBreakers then RecursiveAlias else ErasedAlias)  [c]
-    f decl@HsDataDecl {  hsDeclCons = cs } = dt decl NotAlias  cs
+    f decl@HsNewTypeDecl {  hsDeclName = nn, hsDeclCon = c } =
+        dt decl (if nn `elem` newtypeLoopBreakers then RecursiveAlias else ErasedAlias)  [c]
+    f decl@HsDataDecl { hsDeclKindDecl = True } = dkind decl
+    f decl@HsDataDecl { hsDeclCons = cs } = dt decl NotAlias  cs
     f _ = return ()
     dt decl NotAlias cs@(_:_:_) | all null (map hsConDeclArgs cs) = do
         let virtualCons'@(fc:_) = map (makeData NotAlias typeInfo) cs
@@ -593,6 +613,25 @@ toDataTable km cm ds currentDataTable = newDataTable  where
             typeInfo@(theType,_,_) = makeType decl
         tell (Seq.fromList dataCons)
         tell $ Seq.singleton theType { conChildren = DataNormal (map conName dataCons) }
+
+    dkind HsDataDecl { .. } = do
+        tell $ Seq.singleton $ (sortConstructor hsDeclName EHashHash) {
+            conChildren = DataNormal (map hsConDeclName hsDeclCons) }
+        flip mapM_  hsDeclCons $ \ HsConDecl { .. } -> do
+            let Just theKind = kind `fmap` (Map.lookup hsConDeclName km)
+                (theTypeFKind,theTypeKArgs') = fromPi theKind
+                theTypeArgs = [ tvr { tvrIdent = x } | tvr  <- theTypeKArgs' | x <- anonymousIds ]
+                theTypeExpr = ELit litCons {
+                    litName = hsConDeclName,
+                    litArgs = map EVar theTypeArgs,
+                    litType = theTypeFKind }
+            tell $ Seq.singleton emptyConstructor {
+                conName      = hsConDeclName,
+                conType      = theKind,
+                conOrigSlots = map (SlotNormal . tvrType) theTypeArgs,
+                conExpr      = foldr ($) theTypeExpr (map ELam theTypeArgs),
+                conInhabits  = hsDeclName
+            }
 
     makeData alias (theType,theTypeArgs,theTypeExpr) x = theData where
         theData = emptyConstructor {
@@ -655,7 +694,7 @@ toDataTable km cm ds currentDataTable = newDataTable  where
 
     makeType decl = (theType,theTypeArgs,theTypeExpr) where
         theTypeName = toName Name.TypeConstructor (hsDeclName decl)
-        theKind = kind $ fromJust (Map.lookup theTypeName km)
+        Just theKind = kind `fmap` (Map.lookup theTypeName km)
         (theTypeFKind,theTypeKArgs') = fromPi theKind
         theTypeArgs = [ tvr { tvrIdent = x } | tvr  <- theTypeKArgs' | x <- anonymousIds ]
         theTypeExpr = ELit litCons { litName = theTypeName, litArgs = map EVar theTypeArgs, litType = theTypeFKind }

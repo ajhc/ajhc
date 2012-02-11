@@ -374,8 +374,8 @@ kiPred (HsAsstEq a b) = do
 
 -- first pass over declarations adds classes to environment.
 kiInitClasses :: [HsDecl] -> Ki ()
-kiInitClasses ds = do
-    mapM_ kiInitDecl ds
+kiInitClasses ds = do mapM_ kiInitDecl ds
+
 kiInitDecl :: HsDecl -> Ki ()
 kiInitDecl d = withSrcLoc (srcLoc d) (f d) where
     f HsClassDecl { .. } = do
@@ -383,7 +383,6 @@ kiInitDecl d = withSrcLoc (srcLoc d) (f d) where
         extendEnv mempty { kindEnvClasses =
             Map.singleton (hsClassHead hsDeclClassHead) (map KVar args) }
     f _ = return ()
-
 kiDecl :: HsDecl -> Ki ()
 kiDecl d = withSrcLoc (srcLoc d) (f d) where
     varLike HsTyVar {} = True
@@ -397,6 +396,7 @@ kiDecl d = withSrcLoc (srcLoc d) (f d) where
     f HsTypeFamilyDecl { .. } = do
         kc <- lookupKind KindSimple (toName TypeConstructor hsDeclName)
         kiApps kc hsDeclTArgs (maybe kindStar hsKindToKind hsDeclHasKind)
+    f HsDataDecl { hsDeclKindDecl = True, .. } = kiDataKind hsDeclName hsDeclCons
     f HsDataDecl {
             hsDeclContext = context,
             hsDeclName = tyconName,
@@ -488,6 +488,13 @@ kiData context tyconName args condecls = do
     flip mapM_  (concatMap (map hsBangType . hsConDeclArgs) condecls) $ \t -> do
         v <- newKindVar KindQuestQuest
         kiType (KVar v) t
+
+kiDataKind tyconName condecls = do
+    unless (nameType tyconName == SortName) $ fail "tycon isn't sort"
+    flip mapM_  condecls $ \ HsConDecl { .. } -> do
+        kc <- lookupKind KindAny (toName TypeConstructor hsConDeclName)
+        let args = [ KBase (KNamed t) | HsTyCon t <- map hsBangType hsConDeclConArg ]
+        kiApps' kc args (KBase (KNamed tyconName))
 
 kiHsQualType :: KindEnv -> HsQualType -> KindEnv
 kiHsQualType inputEnv qualType@(HsQualType ps t) = newState where

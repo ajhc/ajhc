@@ -179,3 +179,14 @@ enum_toEnum          Jhc.Inst.PrimEnum.enum_toEnum
 ix_index             Jhc.Inst.PrimEnum.ix_index
 ix_inRange           Jhc.Inst.PrimEnum.ix_inRange
 ix_range             Jhc.Inst.PrimEnum.ix_range
+
+SortName:s:
+# kinds
+Star Jhc@.*
+Hash Jhc@.#
+Bang Jhc@.!
+Tuple Jhc@.(#)
+
+# superkinds
+HashHash  Jhc@.##
+StarStar  Jhc@.**
