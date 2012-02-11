@@ -708,6 +708,11 @@ tcDecl decl@(HsActionDecl srcLoc pat@(HsPVar v) exp) typ = withContext (declDiag
 
 tcDecl decl@(HsPatBind sloc (HsPVar v) rhs wheres) typ = withContext (declDiagnostic decl) $ do
     typ <- evalType typ
+    mainFunc <- nameOfMainFunc
+    when ( v == mainFunc ) $ do
+       tMain <- typeOfMainFunc
+       typ `subsumes` tMain
+       return ()
     (wheres', env) <- tcWheres wheres
     localEnv env $ do
     case rhs of
@@ -746,6 +751,16 @@ tcMatch (HsMatch sloc funName pats rhs wheres) typ = withContext (locMsg sloc "i
     typ <- evalType typ
     res <- lam pats typ []
     return res
+
+typeOfMainFunc :: Tc Type
+typeOfMainFunc = do
+    a <- newMetaVar Tau kindStar
+    -- a <- newMetaVar Tau kindStar
+    -- a <- Tvar `fmap` newVar kindStar
+    return $ tAp (TCon (Tycon tc_IO (Kfun kindStar kindStar))) a
+
+nameOfMainFunc :: Tc Name
+nameOfMainFunc = fmap (parseName Val . maybe "Main.main" snd . optMainFunc) getOptions
 
 declDiagnostic ::  (HsDecl) -> Diagnostic
 declDiagnostic decl@(HsPatBind sloc (HsPVar {}) _ _) = locMsg sloc "in the declaration" $ render $ ppHsDecl decl
