@@ -124,17 +124,17 @@ localTodo todo (C act) = C $ local (\ r -> r { rTodo = todo }) act
 --------------
 
 {-# NOINLINE compileGrin #-}
-compileGrin :: Grin -> (LBS.ByteString,[String])
-compileGrin grin = (LBS.fromChunks code, snub (reqLibraries req))  where
+compileGrin :: Grin -> (LBS.ByteString,Requires)
+compileGrin grin = (LBS.fromChunks code, req)  where
     code = [
         theData,
         BS.fromString $ P.render ans,
         BS.fromString "\n"
         ]
     ans = vcat [
-        vcat includes,
         vcat jgcs,
-        vcat cincludes,
+        vcat includes,
+--        vcat cincludes,
         text "",
         enum_tag_t,
         header,
@@ -147,9 +147,10 @@ compileGrin grin = (LBS.fromChunks code, snub (reqLibraries req))  where
         ]
     jgcs | fopts FO.Jgc = [ text "static struct s_cache *" <> tshow (nodeCacheName m) <> char ';' | (m,_) <- Set.toList wAllocs]
          | otherwise = empty
-    nh_stuff = text "static const void * const nh_stuff[] = {" $$ fsep (punctuate (char ',') (cafnames ++ constnames ++ [text "NULL"]))  $$ text "};"
-    includes = map include (filter ((".h" ==) . takeExtension) $ snub $ reqIncludes req)
-    cincludes = map include (filter ((".c" ==) . takeExtension) $ snub $ reqIncludes req)
+    fromRequires (Requires s) = map (unpackPS . snd) (Set.toList s)
+    nh_stuff  = text "static const void * const nh_stuff[] = {" $$ fsep (punctuate (char ',') (cafnames ++ constnames ++ [text "NULL"]))  $$ text "};"
+    includes  = map include (filter ((".h" ==) . takeExtension)  $ fromRequires req)
+--    cincludes = map include (filter ((".c" ==) . takeExtension) $ fromRequires req)
     include fn = text "#include <" <> text fn <> text ">"
     (header,body) = generateC (function (name "jhc_hs_init") voidType [] [] icaches:Map.elems fm) (Map.elems sm)
     icaches :: Statement

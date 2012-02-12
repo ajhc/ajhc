@@ -1,16 +1,18 @@
 module Grin.Main(compileToGrin) where
 
 import Control.Monad
+import Data.List
 import Data.Monoid(mappend)
 import System.Directory
-import System.Process
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Lazy.UTF8 as LBS
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import qualified System
 import qualified System.FilePath as FP
 
+import C.Prims
 import Grin.DeadCode
 import Grin.Devolve(twiddleGrin,devolveTransform)
 import Grin.EvalInline(createEvalApply)
@@ -24,6 +26,7 @@ import Grin.Show
 import Grin.StorageAnalysis
 import Ho.ReadSource
 import Options
+import PackedString
 import RawFiles
 import Support.TempDir
 import Support.Transform
@@ -83,7 +86,8 @@ dumpFinalGrin grin = do
     wdump FD.GrinFinal $ dumpGrin "final" grin
 
 compileGrinToC grin = do
-    let (cg,rls) = FG2.compileGrin grin
+    let (cg,Requires reqs) = FG2.compileGrin grin
+        rls = filter ("-l" `isPrefixOf`) $ map (unpackPS . snd) (Set.toList reqs)
         fn = outputName ++ lup "executable_extension"
         lup k = maybe "" id $ Map.lookup k (optInis options)
     cf <- case (optOutName options,optStop options) of
@@ -105,7 +109,7 @@ compileGrinToC grin = do
     tdir <- getTempDir
     ds <- catch (getDirectoryContents (tdir FP.</> "cbits")) (\_ -> return [])
     let extraCFiles = ["-I" ++ tdir ++ "/cbits", "-I" ++ tdir ] ++ [ tdir FP.</> "cbits" FP.</> fn | fn@(reverse -> 'c':'.':_) <- ds ]
-    let comm = shellQuote $ [cc] ++ ["-o", fn, cf] ++ args ++ (map ("-l" ++) rls) ++ extraCFiles
+    let comm = shellQuote $ [cc] ++ ["-o", fn, cf] ++ args ++ rls ++ extraCFiles
         globalvar n c = LBS.fromString $ "char " ++ n ++ "[] = \"" ++ c ++ "\";"
     putProgressLn ("Writing " ++ show cf)
     LBS.writeFile cf $ LBS.intercalate (LBS.fromString "\n") [

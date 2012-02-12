@@ -4,6 +4,7 @@ module C.Prims where
 import Data.Binary
 import Data.Monoid
 import Data.Typeable
+import qualified Data.Set as Set
 
 import Doc.DocLike
 import Doc.PPrint
@@ -12,18 +13,10 @@ import StringTable.Atom
 import qualified Cmm.Op as Op
 
 import GHC.Exts
-{-
-data PrimTypeType = PrimTypeIntegral | PrimTypeFloating | PrimTypePointer | PrimTypeVoid
-    deriving(Show,Eq,Ord)
 
-data PrimType = PrimType {
-    primTypeName :: ExtType,
-    primTypeType :: {-# UNPACK #-} !PrimTypeType,
-    primTypeAlignmentOf :: {-# UNPACK #-} !Int,
-    primTypeIsSigned :: {-# UNPACK #-} !Bool,
-    primTypeSizeOf :: {-# UNPACK #-} !Int
-    } deriving(Show)
--}
+data CallConv = CCall | StdCall | CApi | Primitive | DotNet 
+    deriving(Eq,Ord,Show)
+    {-! derive: Binary !-}
 
 newtype ExtType = ExtType PackedString
     deriving(Binary,IsString,Eq,Ord)
@@ -32,14 +25,10 @@ instance Show ExtType where
     show (ExtType p) = unpackPS p
 
 instance Show Requires where
-    show (Requires [] []) = "()"
-    show (Requires xs ys) = show (xs,ys)
+    show (Requires s) = show (Set.toList s)
 
-data Requires = Requires {
-    reqIncludes :: [String],
-    reqLibraries :: [String]
-    } deriving(Eq, Ord)
-    {-! derive: Monoid, Binary !-}
+newtype Requires = Requires (Set.Set (CallConv,PackedString))
+    deriving(Eq,Ord,Monoid,Binary)
 
 data DotNetPrim = DotNetField | DotNetCtor | DotNetMethod
     deriving(Typeable, Eq, Ord, Show)
@@ -142,16 +131,6 @@ primEagerSafe AddrOf {} = True
 primEagerSafe PrimTypeInfo {} = True
 primEagerSafe Op { primCOp = op } = Op.isEagerSafe op
 primEagerSafe _ = False
-
-parsePrimString s = do
-    ws@(_:_) <- return $ words s
-    let v = case last ws of
-            '&':s -> AddrOf { primConst = (packString s), primRequires = reqs }
-            s -> Func { funcName = (packString s), primArgTypes = [], primRetType = "", primRequires = reqs, primRetArgs = [] }
-        f opt@('-':'l':_) = Requires [] [opt]
-        f s = Requires [s] []
-        reqs = (mconcat (map f (init ws)))
-    return v
 
 primPrim s = PrimPrim $ toAtom s
 

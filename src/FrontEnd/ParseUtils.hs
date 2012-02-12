@@ -14,16 +14,16 @@
 -----------------------------------------------------------------------------
 
 module FrontEnd.ParseUtils (
-	  splitTyConApp		-- HsType -> P (HsName,[HsType])
+	  splitTyConApp		-- HsType -> P (Name,[HsType])
 	, mkRecConstrOrUpdate	-- HsExp -> [HsFieldUpdate] -> P HsExp
 	, checkPrec		-- Integer -> P Int
 	, checkContext		-- HsType -> P HsContext
-	, checkDataHeader	-- HsQualType -> P (HsContext,HsName,[HsName])
+	, checkDataHeader	-- HsQualType -> P (HsContext,Name,[Name])
 	, checkPattern		-- HsExp -> P HsPat
 	, checkPatterns
 	, checkExpr		-- HsExp -> P HsExp
 	, checkValDef		-- SrcLoc -> HsExp -> HsRhs -> [HsDecl] -> P HsDecl
-	, checkUnQual		-- HsQName -> P HsName
+	, checkUnQual		-- Name -> P Name
         , readInteger
         , readRational
         , fixupHsDecls
@@ -38,6 +38,7 @@ import Char
 import Data.Maybe
 import Data.Monoid
 import Ratio
+import qualified Data.Set as Set
 import qualified Data.Traversable as T
 
 import C.FFI
@@ -46,16 +47,15 @@ import FrontEnd.ParseMonad
 import FrontEnd.SrcLoc
 import Name.Name
 import Name.Names
-
-type HsQName = HsName
+import PackedString
 
 parseError :: String -> P a
 parseError = fail
 
-splitTyConApp :: HsType -> P (HsName,[HsType])
+splitTyConApp :: HsType -> P (Name,[HsType])
 splitTyConApp t0 = split t0 []
  where
-	split :: HsType -> [HsType] -> P (HsName,[HsType])
+	split :: HsType -> [HsType] -> P (Name,[HsType])
 	split (HsTyApp t u) ts = split t (u:ts)
 	split (HsTyCon t) ts = return (t,ts)
 	split _ _ = fail "Illegal data/newtype declaration"
@@ -99,23 +99,23 @@ checkAssertion t =  checkAssertion' [] t
 checkPatterns :: [HsExp] -> P [HsPat]
 checkPatterns es = mapM checkPattern es
 
-checkDataHeader :: HsQualType -> P (HsContext,HsName,[HsName])
+checkDataHeader :: HsQualType -> P (HsContext,Name,[Name])
 checkDataHeader (HsQualType cs t) = do
 	(c,ts) <- checkSimple "data/newtype" t []
 	return (cs,c,ts)
 
-checkSimple :: String -> HsType -> [HsName] -> P ((HsName,[HsName]))
+checkSimple :: String -> HsType -> [Name] -> P ((Name,[Name]))
 checkSimple kw (HsTyApp l (HsTyVar a)) xs = checkSimple kw l (a:xs)
 checkSimple _kw (HsTyCon t)   xs = return (t,xs)
 checkSimple kw _ _ = fail ("Illegal " ++ kw ++ " declaration")
 --checkSimple kw t ts = fail ("Illegal " ++ kw ++ " declaration: " ++ show (t,ts))
 
-checkInstHeader :: HsQualType -> P (HsContext,HsQName,[HsType])
+checkInstHeader :: HsQualType -> P (HsContext,Name,[HsType])
 checkInstHeader (HsQualType cs t) = do
 	(c,ts) <- checkInsts t []
 	return (cs,c,ts)
 
-checkInsts :: HsType -> [HsType] -> P ((HsQName,[HsType]))
+checkInsts :: HsType -> [HsType] -> P ((Name,[HsType]))
 checkInsts (HsTyApp l t) ts = checkInsts l (t:ts)
 checkInsts (HsTyCon c)   ts = return (c,ts)
 checkInsts _ _ = fail "Illegal instance declaration"
@@ -296,7 +296,7 @@ checkValDef srcloc lhs rhs whereBinds =
 
 -- A variable binding is parsed as an HsPatBind.
 
-isFunLhs :: HsExp -> [HsExp] -> Maybe (HsName, [HsExp])
+isFunLhs :: HsExp -> [HsExp] -> Maybe (Name, [HsExp])
 isFunLhs (HsInfixApp l (HsVar ( op)) r) es = Just (op, l:r:es)
 isFunLhs (HsApp (HsVar ( f)) e) es = Just (f, e:es)
 isFunLhs (HsApp (HsParen f) e) es = isFunLhs f (e:es)
@@ -321,7 +321,7 @@ checkMethodDef _ = return ()
 -- Check that an identifier or symbol is unqualified.
 -- For occasions when doing this in the grammar would cause conflicts.
 
-checkUnQual :: HsQName -> P HsName
+checkUnQual :: Name -> P Name
 checkUnQual n = if isJust (getModule n) then fail "Illegal qualified name" else return n
 --checkUnQual (Qual _ _) = fail "Illegal qualified name"
 --checkUnQual n@(UnQual _) = return n
@@ -376,11 +376,11 @@ matchName (HsMatch _sloc name _pats _rhs _whereDecls) = name
 
 -- True if the decl is a HsFunBind and binds the same name as the
 -- first argument, False otherwise
-sameFun :: HsName -> HsDecl -> Bool
+sameFun :: Name -> HsDecl -> Bool
 sameFun name (HsFunBind matches@(_:_)) = name == (matchName $ head matches)
 sameFun _ _ = False
 
-doForeign :: Monad m => SrcLoc -> [HsName] -> Maybe (String,HsName) -> HsQualType -> m HsDecl
+doForeign :: Monad m => SrcLoc -> [Name] -> Maybe (String,Name) -> HsQualType -> m HsDecl
 doForeign srcLoc names ms qt = ans where
     ans = do
         (mstring,vname@(nameParts -> (_,Nothing,cname)),names') <- case ms of
@@ -392,7 +392,8 @@ doForeign srcLoc names ms qt = ans where
             f ["import","dotnet"] cname = return $ HsForeignDecl srcLoc (FfiSpec (Import cname mempty) Safe DotNet) vname qt
             f ("import":rs) cname = do
                 let (safe,conv) = pconv rs
-                im <- parseImport mstring vname
+                im <- parseImport conv mstring vname
+                conv <- return (if conv == CApi then CCall else conv)
                 return $ HsForeignDecl srcLoc (FfiSpec im safe conv) vname qt
             f ("export":rs) cname = do
                 let (safe,conv) = pconv rs
@@ -402,39 +403,39 @@ doForeign srcLoc names ms qt = ans where
         g _ cc ("safe":rs) = g Safe cc rs
         g _ cc ("unsafe":rs) = g Unsafe cc rs
         g s _  ("ccall":rs)  = g s CCall rs
-        g s _  ("capi":rs)  = g s CCall rs
+        g s _  ("capi":rs)  = g s CApi rs
         g s _  ("stdcall":rs) = g s StdCall rs
         g s c  [] = (s,c)
         g _ _ rs = error $ "FrontEnd.ParseUtils: unknown foreign flags " ++ show rs
 
-doForeignEq :: Monad m => SrcLoc -> [HsName] -> Maybe (String,HsName) -> HsQualType -> HsExp -> m HsDecl
+doForeignEq :: Monad m => SrcLoc -> [Name] -> Maybe (String,Name) -> HsQualType -> HsExp -> m HsDecl
 doForeignEq srcLoc names ms qt e = undefined
 
 -- FFI parsing
 
-parseExport :: Monad m => String -> HsName -> m String
+parseExport :: Monad m => String -> Name -> m String
 parseExport cn hn =
     case words cn of
       [x] | isCName x -> return x
       []              -> return (show hn)
       _               -> fail ("Invalid cname in export declaration: "++show cn)
 
-parseImport :: Monad m => Maybe String -> HsName -> m FfiType
-parseImport Nothing hn = return $ Import (show hn) mempty
-parseImport (Just cn) hn =
+parseImport :: Monad m => CallConv -> Maybe String -> Name -> m FfiType
+parseImport _ Nothing hn = return $ Import (show hn) mempty
+parseImport cc (Just cn) hn =
     case words cn of
       ["dynamic"]   -> return Dynamic
       ["wrapper"]   -> return Wrapper
       []            -> return $ Import (show hn) mempty
-      ("static":xs) -> parseIS [] [] xs
-      xs            -> parseIS [] [] xs
+      ("static":xs) -> parseIS cc xs
+      xs            -> parseIS cc xs
 
-parseIS a b ['&':n] | isCName n = return $ ImportAddr n $ Requires a b
-parseIS a b [n]     | isCName n = return $ Import     n $ Requires a b
-parseIS a b ["&",n] | isCName n = return $ ImportAddr n $ Requires a b
-parseIS a b (('-':'l':l):r)     = parseIS a (l:b) r
-parseIS a b (i:r)               = parseIS (i:a) b r
-parseIS _ _ x                   = fail ("Syntax error parsing foreign import: "++show x)
+parseIS cc rs = f Set.empty rs where
+    f s ['&':n] | isCName n = return $ ImportAddr n $ Requires s
+    f s [n]     | isCName n = return $ Import     n $ Requires s
+    f s ["&",n] | isCName n = return $ ImportAddr n $ Requires s
+    f s (i:r)               = f (Set.insert (cc,packString i) s) r
+    f s x                   = fail ("Syntax error parsing foreign import: "++show x)
 
 isCName []     = False
 isCName (c:cs) = p1 c && all p2 cs

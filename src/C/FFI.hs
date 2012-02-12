@@ -11,10 +11,7 @@ import C.Prims
 import Data.Binary
 import Data.Typeable
 
-type CName    = String
-
-data CallConv = CCall | StdCall | CApi | Primitive | DotNet deriving(Eq,Ord,Show)
-    {-! derive: Binary !-}
+type CName = String
 
 data Safety = Safe | Unsafe deriving(Eq,Ord,Show)
     {-! derive: Binary !-}
@@ -29,10 +26,10 @@ data FfiSpec = FfiSpec FfiType Safety CallConv
              deriving(Eq,Ord,Show)
 
 data FfiExport = FfiExport {
-    ffiExportCName :: CName,
-    ffiExportSafety :: Safety,
+    ffiExportCName    :: CName,
+    ffiExportSafety   :: Safety,
     ffiExportCallConv :: CallConv,
-    ffiExportArgTypes ::[ExtType],
+    ffiExportArgTypes :: [ExtType],
     ffiExportRetType  :: ExtType
     }
  deriving(Eq,Ord,Show,Typeable)
