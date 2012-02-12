@@ -27,8 +27,6 @@
 
 #include "HsFFI.h"
 #include "rts/wsize.h"
-#include "rts/bitarray.h"
-#include "sys/queue.h"
 
 // #define our options
 

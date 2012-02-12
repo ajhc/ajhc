@@ -1,5 +1,8 @@
 #if _JHC_GC == _JHC_GC_JGC
 
+#include "sys/bitarray.h"
+#include "sys/queue.h"
+
 #define BLOCK_SIZE     (1UL << 12)
 #define MEGABLOCK_SIZE (1UL << 20)
 

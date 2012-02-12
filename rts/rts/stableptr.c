@@ -1,3 +1,5 @@
+#include "sys/queue.h"
+
 struct StablePtr {
     LIST_ENTRY(StablePtr) link;
     sptr_t contents;

@@ -1,4 +1,7 @@
 #if _JHC_GC == _JHC_GC_JGC
+
+#include "sys/queue.h"
+
 static struct s_arena *arena;
 
 #ifdef JHC_JGC_STACK

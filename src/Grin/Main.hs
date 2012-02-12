@@ -3,6 +3,7 @@ module Grin.Main(compileToGrin) where
 import Control.Monad
 import Data.Monoid(mappend)
 import System.Directory
+import System.Process
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Lazy.UTF8 as LBS
@@ -91,9 +92,12 @@ compileGrinToC grin = do
               | otherwise -> fileInTempDir ("main_code.c") (\_ -> return ())
     (argstring,sversion) <- getArgString
     (cc,args) <- fetchCompilerFlags
-    forM_ [("rts/rts_constants.h",rts_constants_h),("rts/stableptr.c",stableptr_c),
-           ("sys/queue.h",queue_h),("HsFFI.h",hsffi_h),("rts/wsize.h",wsize_h),
-           ("rts/bitarray.h",bitarray_h)] $ \ (fn,bs) -> do
+    forM_ [("rts/constants.h",constants_h),
+           ("rts/stableptr.c",stableptr_c),
+           ("sys/queue.h",queue_h),
+           ("HsFFI.h",hsffi_h),
+           ("rts/wsize.h",wsize_h),
+           ("sys/bitarray.h",bitarray_h)] $ \ (fn,bs) -> do
         fileInTempDir fn $ flip BS.writeFile bs
 
     tdir <- getTempDir
