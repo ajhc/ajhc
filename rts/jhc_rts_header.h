@@ -135,3 +135,9 @@ static char *jhc_progname;
 #else
 #define debugf(...) do { } while (0)
 #endif
+
+
+#define JHC_HEADER
+#include "rts/gc_jgc.c"
+#include "rts/slub.c"
+#undef JHC_HEADER

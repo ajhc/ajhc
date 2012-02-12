@@ -94,9 +94,11 @@ compileGrinToC grin = do
     (cc,args) <- fetchCompilerFlags
     forM_ [("rts/constants.h",constants_h),
            ("rts/stableptr.c",stableptr_c),
+           ("rts/slub.c",slub_c),
            ("sys/queue.h",queue_h),
            ("HsFFI.h",hsffi_h),
-           ("rts/wsize.h",wsize_h),
+           ("sys/wsize.h",wsize_h),
+           ("rts/gc_jgc.c",gc_jgc_c),
            ("sys/bitarray.h",bitarray_h)] $ \ (fn,bs) -> do
         fileInTempDir fn $ flip BS.writeFile bs
 

@@ -286,3 +286,6 @@ update(void * thunk, wptr_t new)
         assert(!IS_LAZY(new));
         GETHEAD(thunk) = (fptr_t)new;
 }
+
+#include "rts/slub.c"
+#include "rts/gc_jgc.c"

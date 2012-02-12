@@ -1,7 +1,28 @@
 #if _JHC_GC == _JHC_GC_JGC
+#ifdef JHC_HEADER
+
+#ifdef JHC_JGC_STACK
+struct frame;
+typedef struct frame *gc_t;
+#else
+typedef void* *gc_t;
+static gc_t gc_stack_base;
+static unsigned number_gcs;             // number of garbage collections
+static unsigned number_allocs;          // number of allocations since last garbage collection
+#endif
+
+static gc_t saved_gc;
+
+#define GC_BASE sizeof(void *)
+#define TO_BLOCKS(x) ((x) <= GC_BASE ? 1 : (((x) - 1)/GC_BASE) + 1)
+
+static void gc_perform_gc(gc_t gc);
+
+#else
 
 #include "sys/queue.h"
 
+//static gc_t saved_gc;
 static struct s_arena *arena;
 
 #ifdef JHC_JGC_STACK
@@ -212,20 +233,6 @@ gc_perform_gc(gc_t gc)
         profile_pop(&gc_gc_time);
 }
 
-A_UNUSED static void *
-(gc_alloc)(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs)
-{
-        profile_push(&gc_alloc_time);
-        if (JHC_STATUS)
-                number_allocs++;
-        assert(nptrs <= count);
-        entry_t *e = s_alloc(gc, find_cache(sc, arena, count, nptrs));
-        VALGRIND_MAKE_MEM_UNDEFINED(e,sizeof(uintptr_t)*count);
-        debugf("allocated: %p %i %i\n",(void *)e, count, nptrs);
-        profile_pop(&gc_alloc_time);
-        return (void *)e;
-}
-
 static void jhc_alloc_print_stats(void) { }
 static const void * const nh_stuff[];
 
@@ -259,4 +266,6 @@ jhc_alloc_fini(void) {
                 }
         }
 }
+
+#endif
 #endif

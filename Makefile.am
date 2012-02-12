@@ -111,11 +111,12 @@ UTILS = utils/op_process.prl utils/opt_sets.prl utils/gen_props.prl utils/op_nam
 
 RAWFILES = src/data/ViaGhc.hs src/data/prelude.m4 \
 	   src/data/targets.ini rts/rts/constants.h rts/rts/stableptr.c rts/sys/queue.h rts/HsFFI.h \
-           rts/sys/wsize.h rts/sys/bitarray.h ChangeLog src/data/shortchange.txt 
+           rts/sys/wsize.h rts/sys/bitarray.h ChangeLog src/data/shortchange.txt rts/rts/slub.c \
+	   rts/rts/gc_jgc.c
 
-RTSFILES = rts/jhc_rts_header.h rts/jhc_jgc.h \
+RTSFILES = rts/jhc_rts_header.h \
 	   rts/debug.c rts/jhc_rts_alloc.c rts/jhc_rts.c rts/profile.c rts/jhc_rts2.c \
-	   rts/slub.c rts/jhc_jgc.c rts/lib/lib_cbits.c
+	   rts/lib/lib_cbits.c
 
 DRIFTFILES = drift_processed/C/FFI.hs drift_processed/C/FromGrin2.hs drift_processed/Cmm/Op.hs drift_processed/C/Prims.hs drift_processed/DataConstructors.hs \
    drift_processed/DerivingDrift/StandardRules.hs drift_processed/E/CPR.hs drift_processed/E/Demand.hs drift_processed/E/LambdaLift.hs \
@@ -278,7 +279,6 @@ $(firstword $(JHC_MANUAL_FILES)): utils/stitch.prl docs/man_header.mkd
 
 jhc_man.mkd: $(JHC_MANUAL_FILES)
 	perl $(srcdir)/utils/stitch.prl -h $(srcdir)/docs/man_header.mkd -c Using,Options $^ > $@
-
 
 man: jhc_man.mkd
 	pandoc $< -s -f markdown -t man -s  -o jhc.1
