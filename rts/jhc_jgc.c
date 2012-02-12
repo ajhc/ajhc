@@ -77,7 +77,7 @@ gc_add_root(gc_t gc, sptr_t root)
 static void
 gc_add_grey(struct stack *stack, entry_t *s)
 {
-        VALGRIND_MAKE_MEM_DEFINED(s,S_BLOCK(s)->pi.size * sizeof(uintptr_t));
+        VALGRIND_MAKE_MEM_DEFINED(s,(S_BLOCK(s))->pi.size * sizeof(uintptr_t));
         if(gc_check_heap(s) && s_set_used_bit(s))
                 stack->stack[stack->ptr++] = s;
 }

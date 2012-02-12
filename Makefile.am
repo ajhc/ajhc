@@ -93,7 +93,7 @@ install-data-hook: $(JHC_LIBS) $(JHC_EXT_LIBS)
 		test -f "$$lib" && $(INSTALL_DATA) $$lib $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@ ; \
 		test -f "$(srcdir)/$$lib" && $(INSTALL_DATA) "$(srcdir)/$$lib" $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@ ; \
 	done
-	$(INSTALL_DATA) "$(srcdir)/src/data/HsFFI.h" $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/include
+	$(INSTALL_DATA) "$(srcdir)/rts/HsFFI.h" $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/include
 	$(INSTALL_DATA) "$(srcdir)/src/data/targets.ini" $(DESTDIR)$(sysconfdir)/@PACKAGE@-@SHORTVERSION@
 
 uninstall-hook:
@@ -110,7 +110,7 @@ uninstall-hook:
 UTILS = utils/op_process.prl utils/opt_sets.prl utils/gen_props.prl utils/op_names.prl utils/op_raw.prl
 
 RAWFILES = src/data/ViaGhc.hs src/data/prelude.m4 \
-	   src/data/targets.ini rts/rts_constants.h rts/stableptr.c rts/queue.h src/data/HsFFI.h \
+	   src/data/targets.ini rts/rts_constants.h rts/stableptr.c rts/queue.h rts/HsFFI.h \
            rts/wsize.h rts/bitarray.h ChangeLog src/data/shortchange.txt 
 
 RTSFILES = rts/jhc_rts_header.h rts/jhc_jgc.h \
