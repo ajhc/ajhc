@@ -25,3 +25,8 @@ sptr_t c_derefStablePtr(wptr_t wp) {
     struct StablePtr *sp = FROM_SPTR((HsPtr)wp);
     return sp->contents;
 }
+
+/*
+wptr_t c_castPtrToStablePtr(void *)
+void * c_castStablePtrToPtr(wptr_t)
+*/

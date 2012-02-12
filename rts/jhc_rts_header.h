@@ -26,7 +26,7 @@
 #endif
 
 #include "HsFFI.h"
-#include "rts/wsize.h"
+#include "sys/wsize.h"
 
 // #define our options
 
