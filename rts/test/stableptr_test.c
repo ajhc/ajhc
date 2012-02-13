@@ -8,14 +8,7 @@ char jhc_version[] = "(version)";
 #define _JHC_GC _JHC_GC_JGC
 
 #include "jhc_rts_header.h"
-#include "jhc_jgc.h"
-#include "debug.c"
-#include "jhc_rts_alloc.c"
-#include "jhc_rts.c"
-#include "profile.c"
 #include "jhc_rts2.c"
-#include "slub.c"
-#include "jhc_jgc.c"
 #include "rts/stableptr.c"
 
 #include "seatest.h"

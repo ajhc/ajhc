@@ -65,7 +65,6 @@ hs_init(int *argc, char **argv[])
                 jhc_hs_init();
                 hs_set_argv(*argc,*argv);
 #if JHC_isPosix
-
                 struct utsname jhc_utsname;
                 if(!uname(&jhc_utsname)) {
                         jhc_options_arch = jhc_utsname.machine;

@@ -1,7 +1,15 @@
+#if defined(__WIN32__)
+#define HAVE_TIMES 0
+#else
+#define HAVE_TIMES 1
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
+#if HAVE_TIMES
 #include <sys/times.h>
 #include <time.h>
+#endif
 #include <unistd.h>
 
 #include "rts/gc.h"
@@ -20,10 +28,8 @@ profile_print_header(FILE *file, char *value_unit)
         fprintf(file, "SAMPLE_UNIT \"seconds\"\n");
         fprintf(file, "VALUE_UNIT \"%s\"\n", value_unit ? value_unit : "bytes");
 }
-#if  defined(__WIN32__) || defined(__ARM_EABI__)
-struct tms {};
-#endif
 
+#if HAVE_TIMES
 struct profile_stack {
     struct tms tm_total;
     struct tms tm_pushed;
@@ -56,6 +62,13 @@ void print_times(struct tms *tm) {
 #endif
     return;
 }
+#else
+
+struct profile_stack;
+void jhc_profile_push(struct profile_stack *ps) {}
+void jhc_profile_pop(struct profile_stack *ps) {}
+
+#endif
 
 void A_COLD
 jhc_print_profile(void) {
@@ -66,7 +79,7 @@ jhc_print_profile(void) {
         fprintf(stderr, "Complie: %s\n", jhc_c_compile);
         fprintf(stderr, "Version: %s\n\n", jhc_version);
         jhc_alloc_print_stats();
-#ifndef __WIN32__
+#if HAVE_TIMES
         struct tms tm;
         times(&tm);
         print_times(&tm);
