@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
 module Support.IniParse(parseIniFiles) where
 
 import Control.Monad.State

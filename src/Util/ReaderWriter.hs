@@ -1,5 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
-
+{-# LANGUAGE UnboxedTuples #-}
 module Util.ReaderWriter(ReaderWriter(),runReaderWriter) where
 
 import Data.Monoid
@@ -7,9 +6,7 @@ import Control.Monad.Reader
 import Control.Monad.Writer
 -- strict unboxed ReaderWriter monad
 
-
 newtype ReaderWriter r w a = ReaderWriter { _runReaderWriter :: r -> (# a, w #) }
-
 
 runReaderWriter :: ReaderWriter r w a -> r -> (a,w)
 runReaderWriter (ReaderWriter m) r = case m r of
@@ -29,7 +26,6 @@ instance (Monoid w) => Monad (ReaderWriter r w) where
             (# _, w #) -> case g r of
                 (# a, w' #) -> let w'' = w `mappend` w' in w'' `seq` (# a, w'' #)
 
-
 instance (Monoid w) => MonadWriter w (ReaderWriter r w) where
 	tell   w = ReaderWriter $ \ _ -> w `seq` (# (), w #)
 	listen (ReaderWriter m) = ReaderWriter $ \r -> case m r of
@@ -40,5 +36,3 @@ instance (Monoid w) => MonadWriter w (ReaderWriter r w) where
 instance Monoid w => MonadReader r (ReaderWriter r w) where
 	ask       = ReaderWriter $ \r -> (# r, mempty #)
 	local f (ReaderWriter m) = ReaderWriter $ \r -> m (f r)
-
-

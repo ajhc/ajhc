@@ -152,7 +152,7 @@ compileGrin grin = (LBS.fromChunks code, req)  where
     includes  = map include (filter ((".h" ==) . takeExtension)  $ fromRequires req)
 --    cincludes = map include (filter ((".c" ==) . takeExtension) $ fromRequires req)
     include fn = text "#include <" <> text fn <> text ">"
-    (header,body) = generateC (function (name "jhc_hs_init") voidType [] [] icaches:Map.elems fm) (Map.elems sm)
+    (header,body) = generateC (function (name "jhc_hs_init") voidType [] [Public] icaches:Map.elems fm) (Map.elems sm)
     icaches :: Statement
     icaches | fopts FO.Jgc = mconcat [  toStatement $ functionCall (name "find_cache") [reference (toExpression $ nodeCacheName t),toExpression $ name "arena", tbsize (sizeof (structType $ nodeStructName t)), toExpression nptrs] | (t,nptrs) <- Set.toList wAllocs ]
             | otherwise = mempty
@@ -661,13 +661,13 @@ convertConst v = return (f v) where
     f (ValPrim p [] ty) = case p of
         CConst _ s -> return $ expressionRaw $ unpackPS s
         AddrOf _ t -> do rt <- convertType ty; return . cast rt $ expressionRaw ('&':unpackPS t)
-        PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimSizeOf } -> 
+        PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimSizeOf } ->
             return $ expressionRaw ("sizeof(" ++ tyToC Op.HintUnsigned arg ++ ")")
-        PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimMinBound } -> 
+        PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimMinBound } ->
             return $ expressionRaw ("prim_minbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
-        PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimMaxBound } -> 
+        PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimMaxBound } ->
             return $ expressionRaw ("prim_maxbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
-        PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimUMaxBound } -> 
+        PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimUMaxBound } ->
             return $ expressionRaw ("prim_umaxbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
         PrimString s -> return $ cast (basicType "uintptr_t") (expressionRaw (show s))
         x -> return $ err (show x)

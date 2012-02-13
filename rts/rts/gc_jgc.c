@@ -233,10 +233,10 @@ gc_perform_gc(gc_t gc)
         profile_pop(&gc_gc_time);
 }
 
-static void jhc_alloc_print_stats(void) { }
+void jhc_alloc_print_stats(void) { }
 static const void * const nh_stuff[];
 
-static void
+void
 jhc_alloc_init(void) {
         VALGRIND_PRINTF("Jhc-Valgrind mode active.\n");
 #ifndef JHC_JGC_STACK
@@ -254,7 +254,7 @@ jhc_alloc_init(void) {
         }
 }
 
-static void
+void
 jhc_alloc_fini(void) {
         if(JHC_STATUS) {
                 fprintf(stderr, "arena: %p\n", arena);

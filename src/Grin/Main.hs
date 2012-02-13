@@ -99,16 +99,23 @@ compileGrinToC grin = do
     forM_ [("rts/constants.h",constants_h),
            ("rts/stableptr.c",stableptr_c),
            ("rts/slub.c",slub_c),
+           ("rts/profile.c",profile_c),
+           ("rts/profile.h",profile_h),
+           ("rts/gc.h",gc_h),
+           ("rts/rts_support.c",rts_support_c),
+           ("rts/rts_support.h",rts_support_h),
+           ("rts/cdefs.h",cdefs_h),
            ("sys/queue.h",queue_h),
            ("HsFFI.h",hsffi_h),
            ("sys/wsize.h",wsize_h),
            ("rts/gc_jgc.c",gc_jgc_c),
            ("sys/bitarray.h",bitarray_h)] $ \ (fn,bs) -> do
         fileInTempDir fn $ flip BS.writeFile bs
+    let cFiles = ["rts/profile.c","rts/rts_support.c"]
 
     tdir <- getTempDir
     ds <- catch (getDirectoryContents (tdir FP.</> "cbits")) (\_ -> return [])
-    let extraCFiles = ["-I" ++ tdir ++ "/cbits", "-I" ++ tdir ] ++ [ tdir FP.</> "cbits" FP.</> fn | fn@(reverse -> 'c':'.':_) <- ds ]
+    let extraCFiles = map (tdir FP.</>) cFiles ++ ["-I" ++ tdir ++ "/cbits", "-I" ++ tdir ] ++ [ tdir FP.</> "cbits" FP.</> fn | fn@(reverse -> 'c':'.':_) <- ds ]
     let comm = shellQuote $ [cc] ++ ["-o", fn, cf] ++ args ++ rls ++ extraCFiles
         globalvar n c = LBS.fromString $ "char " ++ n ++ "[] = \"" ++ c ++ "\";"
     putProgressLn ("Writing " ++ show cf)

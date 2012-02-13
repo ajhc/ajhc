@@ -1,4 +1,3 @@
-{-# OPTIONS -fglasgow-exts #-}
 module E.FreeVars(
     decomposeLet,
     decomposeDs,

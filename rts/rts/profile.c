@@ -1,4 +1,15 @@
-static void A_UNUSED
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/times.h>
+#include <time.h>
+#include <unistd.h>
+
+#include "rts/gc.h"
+#include "rts/cdefs.h"
+#include "rts/profile.h"
+#include "rts/rts_support.h"
+
+void A_UNUSED
 profile_print_header(FILE *file, char *value_unit)
 {
         fprintf(file, "JOB \"%s", jhc_progname);
@@ -10,8 +21,6 @@ profile_print_header(FILE *file, char *value_unit)
         fprintf(file, "VALUE_UNIT \"%s\"\n", value_unit ? value_unit : "bytes");
 }
 
-#if _JHC_PROFILE
-
 struct profile_stack {
     struct tms tm_total;
     struct tms tm_pushed;
@@ -21,13 +30,13 @@ struct profile_stack gc_alloc_time;
 struct profile_stack gc_gc_time;
 
 void
-profile_push(struct profile_stack *ps)
+jhc_profile_push(struct profile_stack *ps)
 {
         times(&ps->tm_pushed);
 }
 
 void
-profile_pop(struct profile_stack *ps)
+jhc_profile_pop(struct profile_stack *ps)
 {
     struct tms tm;
     times(&tm);
@@ -35,25 +44,17 @@ profile_pop(struct profile_stack *ps)
     ps->tm_total.tms_stime += tm.tms_stime - ps->tm_pushed.tms_stime;
 }
 
-#else
-
-#define profile_push(x) do { } while(0)
-#define profile_pop(x) do { } while(0)
-
-#endif
-
-#ifndef __WIN32__
-#ifndef __ARM_EABI__
 void print_times(struct tms *tm) {
+#if  !defined(__WIN32__) && !defined(__ARM_EABI__)
     float cpt = (float)sysconf(_SC_CLK_TCK);
     fprintf(stderr, "User Time:   %.2fs\n", (float)tm->tms_utime/cpt);
     fprintf(stderr, "System Time: %.2fs\n", (float)tm->tms_stime/cpt);
     fprintf(stderr, "Total Time:  %.2fs\n", (float)(tm->tms_stime + tm->tms_utime)/cpt);
+#endif
+    return;
 }
-#endif
-#endif
 
-static void A_COLD
+void A_COLD
 jhc_print_profile(void) {
 #ifndef __WIN32__
         struct tms tm;
@@ -67,14 +68,38 @@ jhc_print_profile(void) {
         fprintf(stderr, "Complie: %s\n", jhc_c_compile);
         fprintf(stderr, "Version: %s\n\n", jhc_version);
         jhc_alloc_print_stats();
-#ifndef __WIN32__
-#ifndef __ARM_EABI__
         print_times(&tm);
 #if _JHC_PROFILE
         print_times(&gc_gc_time.tm_total);
         print_times(&gc_alloc_time.tm_total);
 #endif
-#endif
-#endif
         fprintf(stderr, "-----------------\n");
 }
+
+#if _JHC_PROFILE
+
+#define BUCKETS 7
+static unsigned alloced[BUCKETS];
+static unsigned alloced_atomic[BUCKETS];
+
+static void
+alloc_count(int n,int atomic)
+{
+        n = n ? ((n - 1)/sizeof(void *)) + 1 : 0;
+        n = n > BUCKETS - 1 ? BUCKETS - 1 : n;
+        (atomic ? alloced_atomic : alloced)[n]++;
+}
+
+static void
+print_alloc_size_stats(void) {
+        char fmt[] = "%10s %10s %10s %10s %10s\n";
+        char fmt2[] = "%10u %10u %10u %10u %10u\n";
+        fprintf(stderr,fmt,"Size","Normal","Atomic","Total","Accum");
+        fprintf(stderr,fmt,"----","------","------","-----","-----");
+        unsigned accum = 0;
+        for(int i = 0; i < BUCKETS; i++) {
+                accum += alloced[i] + alloced_atomic[i];
+                fprintf(stderr,fmt2,i,alloced[i],alloced_atomic[i],alloced_atomic[i] + alloced[i], accum);
+        }
+}
+#endif

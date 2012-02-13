@@ -29,6 +29,29 @@ foreign import ccall "math.h frexp"  c_frexp2 :: Double -> (# Double, CInt #)
 -- is undefined.
 ~~~~
 
+# Explicit namespaces in import/export lists
+
+jhc allows explicit namespaces in import export lists. In haskell 98, a name
+such as 'Foo' in an export list will indicate that all of a class named Foo, a
+type named 'Foo' and a data constructor named 'Foo' shoud be exported. Jhc
+allows finer grained control by prefixing exports with a namespace indicator.
+The valid namespace indicators are
+
+    * 'type' - The name is a type, as in something defined by 'type', 'newtype',
+       or 'data', or the constructors of a kind declaration.
+    * 'class' - Specifies that the name is that of a class.
+    * 'data'  - Specifies that the name is a data constructor.
+    * 'kind'  - specifies that the name is a user defined kind.
+
+In addition, classes and types are in independent namespaces, so a type and a
+class of the same name may be in scope and not conflict.
+
+When an unqualified name is given in a import/export list then all names that
+match it that are in scope are matched. The only exception is a holdover from
+haskell 98 where in hiding lists data constructors are not matched. This
+behavior may change in the future when explicit namespaces are used, so it
+should not be relied upon when using explicit namespaces.
+
 # Standalone deriving
 
 Jhc supports a standalone deriving mechanism under certain circumstances.

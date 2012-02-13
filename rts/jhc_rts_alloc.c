@@ -3,47 +3,11 @@
 #define jhc_malloc_atomic jhc_malloc
 #define jhc_malloc_atomic_whnf jhc_malloc_atomic
 #define jhc_malloc_sanity(p,t) (1)
-#define _JHC_GC_CONTEXT 0
 
 #ifdef JHC_ALLOC_NEEDS_STUBS
 void hs_perform_gc(void) {}
 void hs_free_stable_ptr(HsStablePtr sp) {}
 void hs_free_fun_ptr(HsFunPtr fp) {}
-#endif
-
-#if _JHC_PROFILE
-
-#define BUCKETS 7
-
-static unsigned alloced[BUCKETS];
-static unsigned alloced_atomic[BUCKETS];
-
-static void
-alloc_count(int n,int atomic)
-{
-        n = n ? ((n - 1)/sizeof(void *)) + 1 : 0;
-        n = n > BUCKETS - 1 ? BUCKETS - 1 : n;
-        (atomic ? alloced_atomic : alloced)[n]++;
-}
-
-static void
-print_alloc_size_stats(void) {
-        char fmt[] = "%10s %10s %10s %10s %10s\n";
-        char fmt2[] = "%10u %10u %10u %10u %10u\n";
-        fprintf(stderr,fmt,"Size","Normal","Atomic","Total","Accum");
-        fprintf(stderr,fmt,"----","------","------","-----","-----");
-        unsigned accum = 0;
-        for(int i = 0; i < BUCKETS; i++) {
-                accum += alloced[i] + alloced_atomic[i];
-                fprintf(stderr,fmt2,i,alloced[i],alloced_atomic[i],alloced_atomic[i] + alloced[i], accum);
-        }
-}
-
-#else
-
-#define alloc_count(x,y)
-#define print_alloc_size_stats()
-
 #endif
 
 #if _JHC_GC == _JHC_GC_BOEHM
