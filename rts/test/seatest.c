@@ -18,8 +18,6 @@ static void (*seatest_suite_teardown_func)( void ) = 0;
 static void (*seatest_fixture_setup)( void ) = 0;
 static void (*seatest_fixture_teardown)( void ) = 0;
 
-
-
 void suite_setup(void (*setup)( void ))
 {
 	seatest_suite_setup_func = setup;
@@ -92,7 +90,6 @@ void seatest_assert_false(int test, const char* function, unsigned int line)
 {
 	seatest_simple_test_result(!test, "Should of been false", function, line);
 }
-
 
 void seatest_assert_int_equal(int expected, int actual, const char* function, unsigned int line)
 {
@@ -177,7 +174,6 @@ void seatest_header_printer(char* s, int length, char f)
 	printf("\r\n");
 }
 
-
 void seatest_test_fixture_start(char* filepath)
 {
 	seatest_current_fixture = test_file_name(filepath);
@@ -204,12 +200,10 @@ void fixture_filter(char* filter)
 	seatest_fixture_filter = filter;
 }
 
-
 void test_filter(char* filter)
 {
 	seatest_test_filter = filter;
 }
-
 
 int seatest_should_run( char* fixture, char* test)
 {
@@ -245,4 +239,3 @@ int run_tests(void (*tests)(void))
 	_getch();
 	return sea_tests_failed == 0;
 }
-

@@ -109,14 +109,16 @@ compileGrinToC grin = do
            ("HsFFI.h",hsffi_h),
            ("sys/wsize.h",wsize_h),
            ("rts/gc_jgc.c",gc_jgc_c),
+           ("rts/gc_none.c",gc_none_c),
+           ("rts/gc_none.h",gc_none_h),
            ("sys/bitarray.h",bitarray_h)] $ \ (fn,bs) -> do
         fileInTempDir fn $ flip BS.writeFile bs
-    let cFiles = ["rts/profile.c","rts/rts_support.c"]
+    let cFiles = ["rts/profile.c","rts/rts_support.c", "rts/gc_none.c"]
 
     tdir <- getTempDir
     ds <- catch (getDirectoryContents (tdir FP.</> "cbits")) (\_ -> return [])
     let extraCFiles = map (tdir FP.</>) cFiles ++ ["-I" ++ tdir ++ "/cbits", "-I" ++ tdir ] ++ [ tdir FP.</> "cbits" FP.</> fn | fn@(reverse -> 'c':'.':_) <- ds ]
-    let comm = shellQuote $ [cc] ++ ["-o", fn, cf] ++ args ++ rls ++ extraCFiles
+    let comm = shellQuote $ [cc] ++ extraCFiles ++ [cf, "-o", fn] ++ args ++ rls
         globalvar n c = LBS.fromString $ "char " ++ n ++ "[] = \"" ++ c ++ "\";"
     putProgressLn ("Writing " ++ show cf)
     LBS.writeFile cf $ LBS.intercalate (LBS.fromString "\n") [

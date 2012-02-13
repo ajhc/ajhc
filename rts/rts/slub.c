@@ -4,11 +4,11 @@
 
 struct s_arena;
 struct s_cache;
-static void *s_alloc(gc_t gc, struct s_cache *sc);
+static void *s_alloc(gc_t gc, struct s_cache *sc) A_UNUSED;
 static struct s_cache *find_cache(struct s_cache **rsc, struct s_arena *arena,
-                                  unsigned short size, unsigned short num_ptrs);
-static bool s_set_used_bit(void *val);
-static void clear_used_bits(struct s_arena *arena);
+                                  unsigned short size, unsigned short num_ptrs) A_UNUSED;
+static bool s_set_used_bit(void *val) A_UNUSED;
+static void clear_used_bits(struct s_arena *arena) A_UNUSED;
 
 #define S_BLOCK(val) ((struct s_block *)((uintptr_t)(val) & ~ (BLOCK_SIZE - 1)))
 #define BLOCK_SIZE     (1UL << 12)

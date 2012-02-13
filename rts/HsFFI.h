@@ -7,7 +7,6 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-
 typedef int32_t HsInt;
 typedef int8_t  HsInt8;
 typedef int16_t HsInt16;

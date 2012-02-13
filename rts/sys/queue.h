@@ -143,7 +143,6 @@ struct {								\
 #define	LIST_FIRST(head)		((head)->lh_first)
 #define	LIST_NEXT(elm, field)		((elm)->field.le_next)
 
-
 /*
  * Singly-linked List definitions.
  */
@@ -203,7 +202,6 @@ struct {								\
 #define	SLIST_EMPTY(head)	((head)->slh_first == NULL)
 #define	SLIST_FIRST(head)	((head)->slh_first)
 #define	SLIST_NEXT(elm, field)	((elm)->field.sle_next)
-
 
 /*
  * Singly-linked Tail queue declarations.
@@ -286,7 +284,6 @@ struct {								\
 #define	STAILQ_FIRST(head)	((head)->stqh_first)
 #define	STAILQ_NEXT(elm, field)	((elm)->field.stqe_next)
 
-
 /*
  * Simple queue definitions.
  */
@@ -359,7 +356,6 @@ struct {								\
 #define	SIMPLEQ_EMPTY(head)		((head)->sqh_first == NULL)
 #define	SIMPLEQ_FIRST(head)		((head)->sqh_first)
 #define	SIMPLEQ_NEXT(elm, field)	((elm)->field.sqe_next)
-
 
 /*
  * Tail queue definitions.
@@ -462,7 +458,6 @@ struct {								\
 	(*(((struct headname *)((head)->tqh_last))->tqh_last))
 #define	TAILQ_PREV(elm, headname, field) \
 	(*(((struct headname *)((elm)->field.tqe_prev))->tqh_last))
-
 
 /*
  * Circular queue definitions.

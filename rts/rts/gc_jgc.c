@@ -267,5 +267,19 @@ jhc_alloc_fini(void) {
         }
 }
 
+A_UNUSED static void *
+(gc_alloc)(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs)
+{
+        profile_push(&gc_alloc_time);
+        if (JHC_STATUS)
+                number_allocs++;
+        assert(nptrs <= count);
+        entry_t *e = s_alloc(gc, find_cache(sc, arena, count, nptrs));
+        VALGRIND_MAKE_MEM_UNDEFINED(e,sizeof(uintptr_t)*count);
+        debugf("allocated: %p %i %i\n",(void *)e, count, nptrs);
+        profile_pop(&gc_alloc_time);
+        return (void *)e;
+}
+
 #endif
 #endif

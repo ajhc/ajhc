@@ -20,6 +20,9 @@ profile_print_header(FILE *file, char *value_unit)
         fprintf(file, "SAMPLE_UNIT \"seconds\"\n");
         fprintf(file, "VALUE_UNIT \"%s\"\n", value_unit ? value_unit : "bytes");
 }
+#if  defined(__WIN32__) || defined(__ARM_EABI__)
+struct tms {};
+#endif
 
 struct profile_stack {
     struct tms tm_total;
@@ -56,19 +59,18 @@ void print_times(struct tms *tm) {
 
 void A_COLD
 jhc_print_profile(void) {
-#ifndef __WIN32__
-        struct tms tm;
-        times(&tm);
-#endif
         if(!(_JHC_PROFILE || getenv("JHC_RTS_PROFILE"))) return;
-
         fprintf(stderr, "\n-----------------\n");
         fprintf(stderr, "Profiling: %s\n", jhc_progname);
         fprintf(stderr, "Command: %s\n", jhc_command);
         fprintf(stderr, "Complie: %s\n", jhc_c_compile);
         fprintf(stderr, "Version: %s\n\n", jhc_version);
         jhc_alloc_print_stats();
+#ifndef __WIN32__
+        struct tms tm;
+        times(&tm);
         print_times(&tm);
+#endif
 #if _JHC_PROFILE
         print_times(&gc_gc_time.tm_total);
         print_times(&gc_alloc_time.tm_total);
@@ -102,4 +104,34 @@ print_alloc_size_stats(void) {
                 fprintf(stderr,fmt2,i,alloced[i],alloced_atomic[i],alloced_atomic[i] + alloced[i], accum);
         }
 }
+#endif
+
+#if JHC_MEM_ANNOTATE && _JHC_GC == _JHC_GC_JGC
+#include <Judy.h>
+
+static Pvoid_t mem_annotate = NULL;
+
+#define XSTR(x) #x
+#define STR(x) XSTR(x)
+#define gc_alloc(gc,sc,c,nptrs) \
+    gc_alloc_annot(gc,sc,c,nptrs,(__FILE__ ":" STR(__LINE__)))
+
+A_UNUSED static void *
+gc_alloc_annot(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs, char *str)
+{
+        void *ret = (gc_alloc)(gc,sc,count,nptrs);
+        PWord_t pval;
+        JLI(pval,mem_annotate,(Word_t)ret);
+        *pval = (Word_t)str;
+        return ret;
+}
+
+char *
+gc_lookup(void *ptr)
+{
+        PWord_t pval;
+        JLG(pval,mem_annotate,(Word_t)ptr & ~(Word_t)3);
+        return pval ? (char *)*pval : "(none)";
+}
+
 #endif

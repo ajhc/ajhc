@@ -1,27 +1,17 @@
-#define jhc_malloc_whnf jhc_malloc
-#define jhc_malloc_suspension jhc_malloc
-#define jhc_malloc_atomic jhc_malloc
-#define jhc_malloc_atomic_whnf jhc_malloc_atomic
-#define jhc_malloc_sanity(p,t) (1)
-
-#ifdef JHC_ALLOC_NEEDS_STUBS
-void hs_perform_gc(void) {}
-void hs_free_stable_ptr(HsStablePtr sp) {}
-void hs_free_fun_ptr(HsFunPtr fp) {}
-#endif
+#include <stdlib.h>
+#include <stdio.h>
+#include "rts/gc.h"
+#include "rts/profile.h"
 
 #if _JHC_GC == _JHC_GC_BOEHM
 
-#include <gc/gc.h>
+void hs_perform_gc(void) {
+        GC_gcollect();
+}
 
-#define jhc_malloc GC_malloc
-#undef  jhc_malloc_atomic
-#define jhc_malloc_atomic GC_malloc_atomic
-#define jhc_free GC_free
-
-static void jhc_alloc_init(void) { GC_INIT(); }
-static void jhc_alloc_fini(void) { }
-static void jhc_alloc_print_stats(void) { }
+void jhc_alloc_init(void) { GC_INIT(); }
+void jhc_alloc_fini(void) { }
+void jhc_alloc_print_stats(void) { }
 
 #elif _JHC_GC == _JHC_GC_NONE
 
@@ -33,10 +23,10 @@ static char initial_chunk[JHC_MEM_CHUNK_SIZE];
 static void *jhc_current_chunk = initial_chunk;
 static unsigned mem_chunks,mem_offset;
 
-static void jhc_alloc_init(void) {}
-static void jhc_alloc_fini(void) {}
+void jhc_alloc_init(void) {}
+void jhc_alloc_fini(void) {}
 
-static void
+void
 jhc_alloc_print_stats(void) {
         fprintf(stderr, "Memory Allocated: %u bytes\n", (JHC_MEM_CHUNK_SIZE*(mem_chunks)) + mem_offset);
         print_alloc_size_stats();
@@ -54,6 +44,8 @@ jhc_malloc_grow(void) {
         mem_offset = 0;
 }
 
+#define M_ALIGN(a,n) ((n) - 1 + ((a) - ((n) - 1) % (a)))
+
 static inline void * A_MALLOC
 jhc_malloc_basic(size_t n) {
         n = M_ALIGN(sizeof(void *),n);
@@ -66,11 +58,7 @@ jhc_malloc_basic(size_t n) {
 
 #if _JHC_DEBUG
 
-#define jhc_malloc(n) jhc_malloc_debug(n,__LINE__,0)
-#undef jhc_malloc_atomic
-#define jhc_malloc_atomic(n) jhc_malloc_debug(n,__LINE__,1)
-
-static void * A_MALLOC
+void * A_MALLOC
 jhc_malloc_debug(size_t n,int line,int atomic) {
         alloc_count(n,atomic);
         void *ret = jhc_malloc_basic(n + sizeof(uintptr_t));
@@ -80,14 +68,14 @@ jhc_malloc_debug(size_t n,int line,int atomic) {
 
 #else
 
-static inline void * A_MALLOC
+void * A_MALLOC
 jhc_malloc(size_t n) {
         alloc_count(n,0);
         return jhc_malloc_basic(n);
 }
 
 #undef jhc_malloc_atomic
-static inline void * A_MALLOC
+void * A_MALLOC
 jhc_malloc_atomic(size_t n) {
         alloc_count(n,1);
         return jhc_malloc_basic(n);

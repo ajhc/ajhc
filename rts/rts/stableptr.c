@@ -26,6 +26,11 @@ sptr_t c_derefStablePtr(wptr_t wp) {
     return sp->contents;
 }
 
+void hs_free_stable_ptr(HsStablePtr sp) {
+        c_freeStablePtr((HsStablePtr)sp);
+}
+void hs_free_fun_ptr(HsFunPtr fp) {}
+
 /*
 wptr_t c_castPtrToStablePtr(void *)
 void * c_castStablePtrToPtr(wptr_t)

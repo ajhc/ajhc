@@ -29,15 +29,6 @@
 #include "sys/wsize.h"
 #include "rts/cdefs.h"
 
-#define _JHC_GC_NONE   0
-#define _JHC_GC_JGC    1
-#define _JHC_GC_BOEHM  2
-#define _JHC_GC_REGION 3
-
-#ifndef _JHC_GC
-#define _JHC_GC _JHC_GC_NONE
-#endif
-
 #ifndef _JHC_DEBUG
 #ifdef NDEBUG
 #define _JHC_DEBUG 0
@@ -53,8 +44,6 @@
 #ifndef JHC_STATUS
 #define JHC_STATUS 0
 #endif
-
-#define M_ALIGN(a,n) ((n) - 1 + ((a) - ((n) - 1) % (a)))
 
 #ifdef __WIN32__
 #define JHC_isWindows   1
