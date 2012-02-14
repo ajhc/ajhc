@@ -4,6 +4,7 @@ module Jhc.Basics(module Jhc.Basics, module Jhc.Prim.Prim, module Jhc.Type.Basic
 import Jhc.Type.Basic
 import Jhc.Prim.Prim
 import Jhc.Prim.IO
+import Jhc.Int
 
 ------------------------
 -- the basic combinators
@@ -118,6 +119,14 @@ concatMap f xs = g xs where
 foldr :: (a -> b -> b) -> b -> [a] -> b
 foldr k z [] = z
 foldr k z (x:xs) = k x (foldr k z xs)
+
+drop :: Int -> [a] -> [a]
+drop n xs = f n xs where
+    f n xs | n `leq` zero =  xs
+    f _ [] = []
+    f n (_:xs) = f (n `minus` one) xs
+
+foreign import primitive "Lte" leq :: Int -> Int -> Bool
 
 foreign import primitive "error.Prelude.undefined" undefined :: a
 

@@ -329,12 +329,6 @@ take n xs = f n xs where
     f _ []              =  []
     f n (x:xs)          =  x : f (n `minus` one) xs
 
-drop :: Int -> [a] -> [a]
-drop n xs = f n xs where
-    f n xs | n <= zero =  xs
-    f _ [] = []
-    f n (_:xs) = f (n `minus` one) xs
-
 -- replicate n x is a list of length n with x the value of every element
 replicate        :: Int -> a -> [a]
 replicate n x    = f n where
