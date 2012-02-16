@@ -20,12 +20,12 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 
 import Doc.DocLike(tupled)
-import FrontEnd.Desugar (doToExp,listCompToExp)
+import DerivingDrift.Drift
+import FrontEnd.Desugar (desugarHsModule,doToExp,listCompToExp)
 import FrontEnd.HsSyn
 import FrontEnd.SrcLoc hiding(srcLoc)
 import qualified FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse
-import FrontEnd.Utils
 import FrontEnd.Warning
 import Name.Name as Name
 import Name.Names
@@ -100,7 +100,7 @@ createSelectors sloc ds = mapM g ns where
 
 ambig x ys = "Ambiguous Name: " ++ show x ++ "\nCould refer to: " ++ tupled (map show ys)
 
-runRename :: MonadWarn m => (a -> RM a) -> Opt -> Module -> FieldMap -> [(Name,[Name])] -> a -> m (a,Map.Map Name Name)
+runRename :: MonadWarn m => (a -> RM b) -> Opt -> Module -> FieldMap -> [(Name,[Name])] -> a -> m (b,Map.Map Name Name)
 runRename doit opt mod fls ns m = mapM_ addWarning errors >> return (renamedMod,reverseMap) where
     nameMap = fromList $ map f ns where
         f (x,[y]) = (x,Right y)
@@ -116,8 +116,14 @@ runRename doit opt mod fls ns m = mapM_ addWarning errors >> return (renamedMod,
     (renamedMod, _, (reverseMap,errors)) = runRWS (unRM $ doit m) startEnv startState
 
 {-# NOINLINE renameModule #-}
-renameModule :: MonadWarn m => Opt -> FieldMap -> [(Name,[Name])] -> HsModule -> m (HsModule, Map.Map Name Name)
-renameModule opt fls ns m = runRename renameDecls opt (hsModuleName m) fls ns m
+renameModule :: MonadWarn m => Opt -> FieldMap -> [(Name,[Name])] -> HsModule -> m ((HsModule,[HsDecl]),Map.Map Name Name)
+renameModule opt fls ns m = runRename go opt (hsModuleName m) fls (ns ++ driftResolvedNames) m
+  where go mod = do
+          let renDesugared = renameDecls . desugarHsModule
+          rmod <- renDesugared mod
+          inst <- hsModuleDecls `fmap` renDesugared mod{hsModuleDecls = driftDerive rmod}
+          return (hsModuleDecls_u (++ inst) rmod,inst)
+
 
 {-# NOINLINE renameStatement #-}
 renameStatement :: MonadWarn m => FieldMap -> [(Name,[Name])] ->  Module -> HsStmt -> m HsStmt

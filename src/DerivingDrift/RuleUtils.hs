@@ -5,6 +5,7 @@ module DerivingDrift.RuleUtils (
     )where
 
 import DerivingDrift.DataP
+import Name.Name(getIdent)
 import Text.PrettyPrint.HughesPJ
 
 x = text "x"
@@ -55,7 +56,7 @@ simpleInstance :: Class -> Data -> Doc
 simpleInstance s d = hsep [text "instance"
 		, opt constr (\x -> parenList x <+> text "=>")
 		, text s
-		, opt1 (texts (name d : vars d)) parenSpace id]
+		, opt1 (texts (getIdent (name d) : vars d)) parenSpace id]
    where
    constr = map (\(c,v) -> text c <+> text v) (constraints d) ++
 		      map (\x -> text s <+> text x) (vars d)

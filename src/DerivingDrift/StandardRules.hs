@@ -1,4 +1,4 @@
-module DerivingDrift.StandardRules (standardRules) where
+module DerivingDrift.StandardRules (standardRules,driftResolvedNames) where
 
 import DerivingDrift.RuleUtils
 import Name.Prim
@@ -14,26 +14,48 @@ standardRules = Map.fromList [
     (class_Read,readfn),
     (class_Bounded,boundedfn)]
 
+-- this list is to be feeded to the renamer in the
+-- renaming phase of the derived instances
+driftResolvedNames :: [(Name.Name.Name,[Name.Name.Name])]
+driftResolvedNames = map unkn stdCls ++ map self stdCls ++ map self stdVals
+  where unkn n  = (toName UnknownType (q n), [n])
+        self n  = (n,[n])
+        stdCls  = Map.keys standardRules
+        stdVals = [v_sub,v_compose,
+                   dc_True,dc_False,v_and,
+                   dc_EQ,v_equals,v_geq,v_gt,v_compare,
+                   dc_Pair,
+                   dc_EmptyList,dc_Cons,v_foldl,v_cat,v_drop,
+                   v_showsPrec,v_showParen,v_showChar,v_showString,
+                   v_readsPrec,v_readParen,v_lex,
+                   v_fromEnum,v_toEnum,v_enumFrom,v_enumFromThen,
+                   v_minBound,v_maxBound]
+
+-- short for qualified and unqualified
+q,u :: Name.Name.Name -> String
+q = snd . fromName
+u = getIdent
+
 ------------------------------------------------------------------------------
 -- Rules for the derivable Prelude Classes
 
 -- Eq
 
-eqfn = instanceSkeleton "Eq" [(makeEq,defaultEq)]
+eqfn = instanceSkeleton (q class_Eq) [(makeEq,defaultEq)]
 
 makeEq :: IFunction
 makeEq (Body{constructor=constructor,types=types})
-	| null types = hsep $ texts [constructor,"==",constructor, "=", "True"]
+	| null types = hsep $ texts [constructor,u v_equals,constructor, "=", q dc_True]
 	| otherwise = let
 	v = varNames types
 	v' = varNames' types
 	d x = parens . hsep $ text constructor : x
-	head = [ text "==", d v', text "="]
-	body = sepWith (text "&&") $
-		zipWith (\x y -> (x <+> text "==" <+> y)) v v'
+	head = [ text (u v_equals), d v', text "="]
+	body = sepWith (text $ q v_and) $
+		zipWith (\x y -> (x <+> text (q v_equals) <+> y)) v v'
 	in d v <+> fsep (head ++  body)
 
-defaultEq = hsep $ texts ["_", "==", "_", "=" ,"False"]
+defaultEq = hsep $ texts ["_", u v_equals, "_", "=" ,q dc_False]
 
 ----------------------------------------------------------------------
 
@@ -45,7 +67,7 @@ ordfn d = let
 		, c' <- zip (body d) [1 :: Int ..]]
    cmp n n' = show $  compare n n'
    f (b,n) (b',n')
-	| null (types b) = text "compare" <+>
+	| null (types b) = text (u v_compare) <+>
 		   fsep [text (constructor b),
 			 pattern (constructor b') (types b')
 			, char '=', text $ cmp n n' ]
@@ -53,17 +75,17 @@ ordfn d = let
 		      head  = fsep [l,r, char '=']
 		      l = pattern (constructor b) (types b)
 		      r = pattern' (constructor b') (types b')
-		      one x y = fsep [text "compare",x,y]
+		      one x y = fsep [text (q v_compare),x,y]
 		      list [x] [y] = one x y
-		      list xs ys = fsep [text "foldl", parens fn, text "EQ",
+		      list xs ys = fsep [text (q v_foldl), parens fn, text (q dc_EQ),
 			           bracketList (zipWith one xs ys)]
-		      fn = fsep $ texts  ["\\x y", "->", "if", "x", "==","EQ",
-			   "then", "compare", "y", "EQ", "else", "x"]
+		      fn = fsep $ texts  ["\\x y", "->", "if", "x", q v_equals, q dc_EQ,
+			   "then", q v_compare, "y", q dc_EQ, "else", "x"]
 		in if constructor b == constructor b' then
-		    text "compare" <+> fsep [head,
+		    text (u v_compare) <+> fsep [head,
 			     list (varNames $ types b) (varNames' $ types b')]
-		   else  text "compare" <+> fsep [head,text (cmp n n')]
-    in simpleInstance "Ord" d <+> text "where" $$ block ifn
+		   else  text (u v_compare) <+> fsep [head,text (cmp n n')]
+    in simpleInstance (q class_Ord) d <+> text "where" $$ block ifn
 
 
 ----------------------------------------------------------------------
@@ -73,7 +95,7 @@ ordfn d = let
 --
 -- Show
 
-showfn = instanceSkeleton "Show" [(makeShow,empty)]
+showfn = instanceSkeleton (q class_Show) [(makeShow,empty)]
 
 makeShow :: IFunction
 makeShow (Body{constructor=constructor,labels=labels,types=types})
@@ -81,29 +103,29 @@ makeShow (Body{constructor=constructor,labels=labels,types=types})
 	| null labels = fnName <+> fsep [headfn,bodyStart, body]   -- datatype
 	| otherwise = fnName <+> fsep[headfn,bodyStart,recordBody] -- record
 	where
-	fnName = text "showsPrec"
+	fnName = text (u v_showsPrec)
 	headfn = fsep [char 'd',(pattern constructor types),equals]
-	bodyStart = fsep [text "showParen",parens (text "d >= 10")]
+	bodyStart = fsep [text (q v_showParen),parens $ fsep [text "d",text (q v_geq),text "10"]]
 	body = parens . fsep $ sepWith s (c : b)
 	recordBody = parens $ fsep [c,comp,showChar '{',comp,
 				    fsep (sepWith s' b'),comp,showChar '}']
 	c = showString constructor
-	b = map (\x -> fsep[text "showsPrec", text "10", x]) (varNames types)
+	b = map (\x -> fsep[text (q v_showsPrec), text "10", x]) (varNames types)
 	b' = zipWith (\x l -> fsep[showString l,comp,showChar '=',comp,x])
-			            b labels
+			            b (map getIdent labels)
 	s = fsep [comp,showChar ' ', comp]
 	s' = fsep [comp,showChar ',',comp]
-	showChar c = fsep [text "showChar", text ('\'':c:"\'")]
-	showString s = fsep[ text "showString", doubleQuotes $ text s]
-	comp = char '.'
+	showChar c = fsep [text (q v_showChar), text ('\'':c:"\'")]
+	showString s = fsep [text (q v_showString), doubleQuotes $ text s]
+	comp = text (q v_compose)
 
 -- Read
 
-readfn d = simpleInstance "Read" d <+> text "where" $$ readsPrecFn d
+readfn d = simpleInstance (q class_Read) d <+> text "where" $$ readsPrecFn d
 
 readsPrecFn d = let
-	fnName = text "readsPrec"
-	bodies = vcat $ sepWith (text "++") (map makeRead (body d))
+	fnName = text (u v_readsPrec)
+	bodies = vcat $ sepWith (text $ q v_cat) (map makeRead (body d))
 	in nest 4 $ fnName <+> fsep[char 'd', text "input", equals,bodies]
 
 makeRead :: IFunction
@@ -112,7 +134,7 @@ makeRead (Body{constructor=constructor,labels=labels,types=types})
 	| null labels = fsep [headfn,read,text "input"]
 	| otherwise = fsep [headfn,readRecord, text "input"]
 	where
-	headfn = fsep [text "readParen", parens (text "d > 9")]
+	headfn = fsep [text (q v_readParen), parens (text $ unwords ["d",q v_gt,"9"])]
 	read0 = lambda $ listComp (result rest) [lexConstr rest]
 	read = lambda . listComp (result rest)
 		     $ lexConstr ip : ( map f (init vars) )
@@ -140,9 +162,9 @@ makeRead (Body{constructor=constructor,labels=labels,types=types})
 	vars = varNames types
 	ip = text "inp"
 	rest = text "rest"
-	tup x y = parens $ fsep [x, char ',',y]
-	lex = fsep[from,text "lex",ip]
-	readsPrec = fsep [text "readsPrec",text "10"]
+	tup x y = parens $ fsep [text (u dc_Pair), x, y]
+	lex = fsep[from,text (q v_lex),ip]
+	readsPrec = fsep [text (q v_readsPrec),text "10"]
 	from = text "<-"
 
 ----------------------------------------------------------------------
@@ -156,38 +178,45 @@ enumfn d = let
 	eFrom = enumFromFn d
 	in if any (not . null . types) (body d)
 	   then commentLine $ text "Warning -- can't derive Enum for"
-				<+> text (name d)
-	   else simpleInstance "Enum" d <+> text "where"
+				<+> text (getIdent $ name d)
+	   else simpleInstance (q class_Enum) d <+> text "where"
 		$$ block (fromE ++ toE ++ [eFrom,enumFromThenFn])
 
 fromEnumFn :: Data -> [Doc]
 fromEnumFn (D{body=body}) = map f (zip body [0:: Int ..])
 	where
-	f (Body{constructor=constructor},n) = text "fromEnum" <+> (fsep $
-		texts [constructor , "=", show n])
+	f (Body{constructor=constructor},x) = text (u v_fromEnum) <+> (fsep $
+		texts [constructor , "=", show x])
 
 toEnumFn :: Data -> [Doc]
 toEnumFn (D{body=body}) = map f (zip body [0 :: Int ..])
 	where
-	f (Body{constructor=constructor},n) = text "toEnum" <+> (fsep $
-		texts [show n , "=", constructor])
+	f (Body{constructor=constructor},x) = text (u v_toEnum) <+> (fsep $
+		texts [show x , "=", constructor])
 
 enumFromFn :: Data -> Doc
 enumFromFn D{body=body} = let
 	conList = bracketList . texts . map constructor $ body
-	bodydoc = fsep [char 'e', char '=', text "drop",
-		parens (text "fromEnum" <+> char 'e'), conList]
-	in text "enumFrom" <+> bodydoc
+	bodydoc = fsep [char 'e', char '=', text (q v_drop),
+		parens (text (q v_fromEnum) <+> char 'e'), conList]
+	in text (u v_enumFrom) <+> bodydoc
 
 enumFromThenFn ::  Doc
 enumFromThenFn = let
 	wrapper = fsep $ texts ["i","j","=","enumFromThen\'","i","j","(",
-		 "enumFrom", "i", ")"]
-	eq1 = text "enumFromThen\'" <+> fsep (texts ["_","_","[]","=","[]"])
-	eq2 = text "enumFromThen\'" <+> fsep ( texts ["i","j","(x:xs)","=",
-		"let","d","=","fromEnum","j","-","fromEnum","i","in",
-		"x",":","enumFromThen\'","i","j","(","drop","(d-1)","xs",")"])
-	in text "enumFromThen" <+> wrapper $$ block [text "where",eq1,eq2]
+		 q v_enumFrom, "i", ")"]
+	eq1 = text "enumFromThen\'"
+                <+> fsep (texts ["_","_",u dc_EmptyList,"=",u dc_EmptyList])
+	eq2 = text "enumFromThen\'"
+                <+> fsep (texts ["i","j","(x",u dc_Cons,"xs)","="])
+                <+> fsep [hsep $ texts [
+                           "let", "d", "=",
+                                q v_fromEnum,"j",q v_sub,q v_fromEnum,"i"],
+                          text "in" <+> fsep (texts [
+                             "x",u dc_Cons,"enumFromThen\'","i","j","(", q v_drop]
+                                ++ [parens . hsep $ texts ["d",q v_sub,"1"]]
+                                ++ [text "xs",text ")"])]
+	in text (q v_enumFromThen) <+> wrapper $$ block [text "where",eq1,eq2]
 
 ----------------------------------------------------------------------
 
@@ -197,20 +226,20 @@ boundedfn d@D{name=name,body=body,derives=derives}
 	| all (null . types) body  = boundedEnum d
 	| singleton body = boundedSingle d
        | otherwise = commentLine $ text "Warning -- can't derive Bounded for"
-			<+> text name
+			<+> (text $ getIdent name)
 
 boundedEnum d@D{body=body} = let f = constructor . head $ body
 			         l = constructor . last $ body
-	in simpleInstance "Bounded" d <+> text "where" $$ block [
-		hsep (texts[ "minBound","=",f]),
-		hsep (texts[ "maxBound","=",l])]
+	in simpleInstance (q class_Bounded) d <+> text "where" $$ block [
+		hsep (texts [u v_minBound,"=",f]),
+		hsep (texts [u v_maxBound,"=",l])]
 
 boundedSingle d@D{body=body} = let f = head $ body
-	in simpleInstance "Bounded" d <+> text "where" $$ block [
-		hsep . texts $ [ "minBound","=",constructor f] ++
-			replicate (length (types f)) "minBound",
-		hsep . texts $ [ "maxBound","=",constructor f] ++
-			replicate (length (types f)) "maxBound"]
+	in simpleInstance (q class_Bounded) d <+> text "where" $$ block [
+		hsep . texts $ [u v_minBound,"=",constructor f] ++
+			replicate (length (types f)) (q v_minBound),
+		hsep . texts $ [u v_maxBound,"=",constructor f] ++
+			replicate (length (types f)) (q v_maxBound)]
 
 singleton [x] = True
 singleton _ = False

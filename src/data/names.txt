@@ -96,7 +96,11 @@ Int        Jhc.Type.Word.Int
 Integer    Jhc.Type.Basic.Integer
 Ratio      Jhc.Type.Float.:%
 Unit       Jhc.Prim.Prim.()
+Pair       Jhc.Prim.Prim.(,)
 Word       Jhc.Type.Word.Word
+True       Jhc.Prim.Prim.True
+False      Jhc.Prim.Prim.True
+EQ         Jhc.Prim.Prim.EQ
 
 ClassName:class:
 Eq              Jhc.Class.Ord.Eq
@@ -137,8 +141,12 @@ eqString         Jhc.String.eqString
 eqUnpackedString Jhc.String.eqUnpackedString
 error            Jhc.IO.error
 map              Jhc.Basics.map
-and              Jhc.Class.Ord.&&
+and              Jhc.Order.&&
 foldr            Jhc.Basics.foldr
+foldl            Jhc.Basics.foldl
+drop             Jhc.List.drop
+cat              Jhc.Basics.++
+compose          Jhc.Basics..
 
 bind                 Jhc.Monad.>>=
 bind_                Jhc.Monad.>>
@@ -146,8 +154,10 @@ fail                 Jhc.Monad.fail
 concatMap            Jhc.Basics.concatMap
 fromInteger          Jhc.Class.Num.fromInteger
 fromInt              Jhc.Class.Num.fromInt
+sub                  Jhc.Class.Num.-
 fromRational         Jhc.Class.Real.fromRational
 negate               Jhc.Class.Num.negate
+compare              Jhc.Class.Ord.compare
 leq                  Jhc.Class.Ord.<=
 geq                  Jhc.Class.Ord.>=
 lt                   Jhc.Class.Ord.<
@@ -161,6 +171,15 @@ enumFromThenTo       Jhc.Enum.enumFromThenTo
 enumFromThen         Jhc.Enum.enumFromThen
 succ                 Jhc.Enum.succ
 pred                 Jhc.Enum.pred
+minBound             Jhc.Enum.minBound
+maxBound             Jhc.Enum.maxBound
+showsPrec            Jhc.Show.showsPrec
+showParen            Jhc.Show.showParen
+showChar             Jhc.Show.showChar
+showString           Jhc.Show.showString
+readsPrec            Jhc.Text.Read.readsPrec
+readParen            Jhc.Text.Read.readParen
+lex                  Jhc.Text.Read.lex
 range                Data.Ix.range
 index                Data.Ix.index
 inRange              Data.Ix.inRange

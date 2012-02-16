@@ -14,7 +14,6 @@ import FrontEnd.Class
 import FrontEnd.DataConsAssump     (dataConsEnv)
 import FrontEnd.DeclsDepends       (getDeclDeps, debugDeclBindGroups)
 import FrontEnd.DependAnalysis     (getBindGroups)
-import FrontEnd.Desugar
 import FrontEnd.Exports
 import FrontEnd.HsSyn
 import FrontEnd.Infix
@@ -74,15 +73,18 @@ processModule defs m = do
         putStrLn $ HsPretty.render
             $ HsPretty.ppHsModule
                 $ modInfoHsModule m
-    -- driftDerive only uses IO to print the derived instances.
-    zmod' <- driftDerive (modInfoHsModule m)
-    let mod = desugarHsModule (zmod')
-    let ((mod',rmap),errs) = runWriter $
-            renameModule (modInfoOptions m) defs (modInfoImport m)  mod
-    when (dump FD.Renamed) $ do
+    let mod = modInfoHsModule m
+    let imp = modInfoImport m
+    let (((mod',inst),rmap),errs) = runWriter $ renameModule (modInfoOptions m) defs imp mod
+    when (dump FD.Derived && (not $ null inst)) $ do
+        putStrLn " \n ---- derived instances ---- \n"
+        putStrLn $ HsPretty.render $ HsPretty.ppHsDecls $ inst
+    wdump FD.Renamed $ do
         putStrLn " \n ---- renamed code ---- \n"
         putStrLn $ HsPretty.render $ HsPretty.ppHsModule $  mod'
-    return $ (m { modInfoReverseMap = rmap, modInfoHsModule = mod' },errs)
+    return (m { modInfoReverseMap = rmap,
+                modInfoImport = imp ++ driftResolvedNames,
+                modInfoHsModule = mod' }, errs)
 
 -- type check a set of mutually recursive modules.
 -- assume all dependencies are met in the

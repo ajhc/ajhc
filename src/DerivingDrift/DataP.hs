@@ -1,5 +1,6 @@
 module DerivingDrift.DataP where
 
+import Name.Name(Name)
 import FrontEnd.HsSyn
 
 data Statement = DataStmt | NewTypeStmt
@@ -20,7 +21,6 @@ data Body = Body {
     types :: [HsBangType]
     } deriving (Eq,Show)
 
-type Name = String
 type Var = String
 type Class = String
 type Constructor = String

@@ -794,7 +794,7 @@ slotTypesHs wdt n kind
     | sortKindLike kind, (e,ts) <- fromPi kind = take (length (conSlots mc) - length ts) (conSlots mc)
     where Identity mc = getConstructor n wdt
 slotTypesHs wdt n e | Just fa <- followAlias wdt e  = slotTypes wdt n fa
-slotTypesHs _ n e = error $ "slotTypes: error in " ++ show n ++ ": " ++ show e
+slotTypesHs _ n e = error $ "slotTypesHs: error in " ++ show n ++ ": " ++ show e
 
 {-# NOINLINE showDataTable #-}
 showDataTable (DataTable mp) = vcat xs where
