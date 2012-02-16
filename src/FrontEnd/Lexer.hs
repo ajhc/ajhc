@@ -52,8 +52,9 @@ data Token
     | StringTok  String
     | UStringTok String
     | PragmaOptions [String]
-    | PragmaInline String
-    | PragmaRules !Bool
+    | PragmaInline  String
+    | PragmaExp     String
+    | PragmaRules   !Bool
     | PragmaSpecialize !Bool
     | PragmaStart String
     | PragmaEnd
@@ -693,6 +694,10 @@ pragmas_std = [
     ["SRCLOC_ANNOTATE"]
     ]
 
+pragmas_exp = [
+    ["CTYPE"]
+    ]
+
 -- pragmas with a special starting token
 pragmas_parsed = [
     (["INLINE"],PragmaInline "INLINE"),
@@ -703,8 +708,11 @@ pragmas_parsed = [
     (["SUPERSPECIALIZE", "SUPERSPECIALISE"],PragmaSpecialize True)
     ]
 
-pragmas = Map.fromList $ [ (y,Left x) | xs@(x:_)  <- pragmas_raw, y <- xs] ++  [ (y,Right w) | (xs@(~(x:_)),w)  <- pragmas_all , y <- xs] where
-    pragmas_all = pragmas_parsed ++ [ (xs,PragmaStart x) | xs@(~(x:_)) <- pragmas_std ]
+pragmas = Map.fromList $ [ (y,Left x) | xs@(x:_)  <- pragmas_raw, y <- xs] ++
+    [ (y,Right w) | (xs@(~(x:_)),w)  <- pragmas_all , y <- xs] where
+        pragmas_all = pragmas_parsed ++
+            [ (xs,PragmaStart x) | xs@(~(x:_)) <- pragmas_std ] ++
+            [ (xs,PragmaExp x) | xs@(~(x:_)) <- pragmas_exp ]
 
 pragmas_ignored = Set.fromList ["LANGUAGE", "OPTIONS_GHC", "UNPACK"]
 

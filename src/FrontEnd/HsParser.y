@@ -63,6 +63,7 @@ import Debug.Trace (trace)
       USTRING  { UStringTok $$ }
       PRAGMAOPTIONS { PragmaOptions $$ }
       PRAGMASTART { PragmaStart $$ }
+      PRAGMAEXP { PragmaExp $$ }
       PRAGMAINLINE { PragmaInline $$ }
       PRAGMARULES { PragmaRules $$ }
       PRAGMASPECIALIZE { PragmaSpecialize $$ }
@@ -395,7 +396,7 @@ signdecl :: { HsDecl }
       : vars srcloc '::' ctype        { HsTypeSig $2 (reverse $1) $4 }
 
 pragmainline  :: { HsDecl }
-      : PRAGMAINLINE srcloc optphasesn vars PRAGMAEND  { HsPragmaProps $2 $1 $4 }
+      : PRAGMAINLINE srcloc optphasesn vars PRAGMAEND { HsPragmaProps $2 $1 $4 }
 
 optphasesn :: { (Bool, Maybe Int) }
       : '~' optphases                 { (True, $2) }
@@ -407,6 +408,10 @@ optphases :: { Maybe Int }
 
 pragmaprops  :: { HsDecl }
       : PRAGMASTART srcloc  vars PRAGMAEND  { HsPragmaProps $2 $1 $3 }
+
+pragmaexp  :: { Located HsPragmaExp }
+      : PRAGMAEXP srcloc texps srcloc PRAGMAEND
+        { located ($2,$4) $ HsPragmaExp $1 $3 }
 
 -- ATTENTION: Dirty Hackery Ahead! If the second alternative of vars is var
 -- instead of qvar, we get another shift/reduce-conflict. Consider the

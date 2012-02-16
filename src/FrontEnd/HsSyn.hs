@@ -36,13 +36,13 @@ instance HasLocation HsModule where
     srcLoc x = hsModuleSrcLoc x
 
 data HsModule = HsModule {
-    hsModuleName :: Module,
-    hsModuleSrcLoc :: SrcLoc,
+    hsModuleName    :: Module,
+    hsModuleSrcLoc  :: SrcLoc,
     hsModuleExports :: (Maybe [HsExportSpec]),
     hsModuleImports :: [HsImportDecl],
-    hsModuleDecls :: [HsDecl],
+    hsModuleDecls   :: [HsDecl],
     hsModuleOptions :: [String],
-    hsModuleOpt :: Opt
+    hsModuleOpt     :: Opt
     }
   {-! derive: update !-}
 
@@ -61,11 +61,11 @@ instance HasLocation HsImportDecl where
     srcLoc x = hsImportDeclSrcLoc x
 
 data HsImportDecl = HsImportDecl {
-    hsImportDeclSrcLoc :: SrcLoc,
-    hsImportDeclModule :: Module,
+    hsImportDeclSrcLoc    :: SrcLoc,
+    hsImportDeclModule    :: Module,
     hsImportDeclQualified :: !Bool,
-    hsImportDeclAs :: (Maybe Module),
-    hsImportDeclSpec :: (Maybe (Bool,[HsExportSpec]))
+    hsImportDeclAs        :: (Maybe Module),
+    hsImportDeclSpec      :: (Maybe (Bool,[HsExportSpec]))
     }
   deriving(Eq,Show)
 
@@ -230,6 +230,8 @@ data HsRule = HsRule {
     }
   deriving(Eq,Show)
 
+data HsPragmaExp = HsPragmaExp String [HsExp]
+
 instance HasLocation HsMatch where
     srcLoc (HsMatch sl _ _ _ _) = sl
 
@@ -246,13 +248,13 @@ data HsConDecl
     = HsConDecl {
         hsConDeclSrcLoc :: SrcLoc,
         hsConDeclExists :: [HsTyVarBind],
-        hsConDeclName :: HsName,
+        hsConDeclName   :: HsName,
         hsConDeclConArg :: [HsBangType]
         }
     | HsRecDecl {
         hsConDeclSrcLoc :: SrcLoc,
         hsConDeclExists :: [HsTyVarBind],
-        hsConDeclName :: HsName,
+        hsConDeclName   :: HsName,
         hsConDeclRecArg :: [([HsName],HsBangType)]
         }
   deriving(Eq,Show)
