@@ -29,7 +29,6 @@ import Grin.Show()
 import Grin.Val
 import Options
 import PackedString
-import RtsFiles
 import StringTable.Atom
 import Support.CanType
 import Support.FreeVars
@@ -127,7 +126,7 @@ localTodo todo (C act) = C $ local (\ r -> r { rTodo = todo }) act
 compileGrin :: Grin -> (LBS.ByteString,Requires)
 compileGrin grin = (LBS.fromChunks code, req)  where
     code = [
-        theData,
+        BS.fromString "#include \"jhc_rts_header.h\"\n",
         BS.fromString $ P.render ans,
         BS.fromString "\n"
         ]
@@ -148,7 +147,7 @@ compileGrin grin = (LBS.fromChunks code, req)  where
     jgcs | fopts FO.Jgc = [ text "static struct s_cache *" <> tshow (nodeCacheName m) <> char ';' | (m,_) <- Set.toList wAllocs]
          | otherwise = empty
     fromRequires (Requires s) = map (unpackPS . snd) (Set.toList s)
-    nh_stuff  = text "static const void * const nh_stuff[] = {" $$ fsep (punctuate (char ',') (cafnames ++ constnames ++ [text "NULL"]))  $$ text "};"
+    nh_stuff  = text "const void * const nh_stuff[] = {" $$ fsep (punctuate (char ',') (cafnames ++ constnames ++ [text "NULL"]))  $$ text "};"
     includes  = map include (filter ((".h" ==) . takeExtension)  $ fromRequires req)
 --    cincludes = map include (filter ((".c" ==) . takeExtension) $ fromRequires req)
     include fn = text "#include <" <> text fn <> text ">"

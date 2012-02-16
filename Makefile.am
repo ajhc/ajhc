@@ -4,7 +4,7 @@ bin_PROGRAMS = jhc
 
 jhc_SOURCES = src/Main.hs $(HSFILES) $(BUILT_SOURCES) $(HSBOOT) $(DRIFTFILES)
 
-BUILT_SOURCES= src/RtsFiles.hs src/RawFiles.hs src/FrontEnd/HsParser.hs src/FlagDump.hs \
+BUILT_SOURCES= src/RawFiles.hs src/FrontEnd/HsParser.hs src/FlagDump.hs \
 	       src/FlagOpts.hs src/Name/Prim.hs src/Info/Properties.hs $(DRIFTFILES)
 
 MY_CINCLUDES= -I$(srcdir)/src/data -I$(srcdir)/src/StringTable -I$(srcdir)/src/cbits -I$(builddir)/src/cbits
@@ -28,7 +28,7 @@ HSFILES=src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/
 	src/Grin/Whiz.hs src/Ho/Binary.hs src/Ho/Collected.hs src/Ho/Library.hs src/Info/Binary.hs src/Info/Info.hs src/Info/Properties.hs \
 	src/Info/Types.hs src/Interactive.hs src/Main.hs src/Name/Binary.hs src/Name/Id.hs src/Name/Name.hs src/Name/Names.hs \
 	src/Name/Prim.hs src/Options.hs src/PackedString.hs src/Ho/ReadSource.hs \
-	src/RawFiles.hs src/RtsFiles.hs src/Stats.hs src/Support/CanType.hs src/Support/CFF.hs src/Support/Compat.hs \
+	src/RawFiles.hs src/Stats.hs src/Support/CanType.hs src/Support/CFF.hs src/Support/Compat.hs \
 	src/Support/FreeVars.hs src/Support/MapBinaryInstance.hs src/Support/MD5.hs src/Support/Tickle.hs src/Support/Transform.hs \
 	src/Support/Tuple.hs src/Support/Unparse.hs src/Util/BitSet.hs src/Util/ContextMonad.hs src/Util/FilterInput.hs \
 	src/Util/Gen.hs src/Util/Graph.hs src/Util/Graphviz.hs src/Util/HasSize.hs src/Util/Histogram.hs src/Util/Inst.hs \
@@ -112,10 +112,9 @@ UTILS = utils/op_process.prl utils/opt_sets.prl utils/gen_props.prl utils/op_nam
 RAWFILES = src/data/ViaGhc.hs src/data/prelude.m4 \
 	   src/data/targets.ini rts/rts/constants.h rts/rts/stableptr.c rts/sys/queue.h rts/HsFFI.h \
            rts/sys/wsize.h rts/sys/bitarray.h ChangeLog src/data/shortchange.txt rts/rts/slub.c \
-	   rts/rts/gc_jgc.c rts/rts/profile.c rts/rts/profile.h rts/rts/cdefs.h rts/rts/rts_support.c \
-	   rts/rts/rts_support.h rts/rts/gc.h rts/rts/gc_none.c rts/rts/gc_none.h
-
-RTSFILES = rts/jhc_rts_header.h rts/jhc_rts2.c rts/lib/lib_cbits.c
+	   rts/rts/gc_jgc.c rts/rts/gc_jgc.h rts/rts/profile.c rts/rts/profile.h rts/rts/cdefs.h rts/rts/rts_support.c \
+	   rts/rts/rts_support.h rts/rts/gc.h rts/rts/gc_none.c rts/rts/gc_none.h rts/rts/jhc_rts.c rts/rts/jhc_rts.h \
+	   rts/lib/lib_cbits.c rts/jhc_rts_header.h rts/lib/lib_cbits.h
 
 DRIFTFILES = drift_processed/C/FFI.hs drift_processed/C/FromGrin2.hs drift_processed/Cmm/Op.hs drift_processed/C/Prims.hs drift_processed/DataConstructors.hs \
    drift_processed/DerivingDrift/StandardRules.hs drift_processed/E/CPR.hs drift_processed/E/Demand.hs drift_processed/E/LambdaLift.hs \
@@ -168,9 +167,6 @@ src/Name/Prim.hs: utils/op_names.prl src/data/names.txt
 
 src/RawFiles.hs: $(RAWFILES)
 	perl $(srcdir)/utils/op_raw.prl $(basename $@) $^ > $@
-
-src/RtsFiles.hs: $(RTSFILES)
-	perl $(srcdir)/utils/op_raw.prl -c $(basename $@) $^ > $@
 
 src/FrontEnd/HsParser.hs: src/FrontEnd/HsParser.y
 	happy -a -g -c $< -o $@
@@ -382,5 +378,5 @@ JHC_EXT_LIBS = containers-0.3.0.0.hl Diff-0.1.2.hl html-1.0.1.2.hl HUnit-1.2.2.1
     xhtml-3000.2.0.1.hl transformers-0.2.1.0.hl filepath-1.2.0.0.hl deepseq-1.1.0.2.hl
 
 JHC_MANUAL_FILES = docs/make.mkd options.mkd docs/dependency_format.mkd docs/pragmas.mkd docs/differences.mkd \
-	docs/unboxed.mkd rts/jhc_rts2.c src/FlagOpts.mkd src/FlagDump.mkd src/E/PrimOpt.hs \
+	docs/unboxed.mkd rts/rts/jhc_rts.c src/FlagOpts.mkd src/FlagDump.mkd src/E/PrimOpt.hs \
 	drift_processed/E/TypeCheck.hs drift_processed/Options.hs

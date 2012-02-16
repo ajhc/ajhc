@@ -104,17 +104,23 @@ compileGrinToC grin = do
            ("rts/gc.h",gc_h),
            ("rts/rts_support.c",rts_support_c),
            ("rts/rts_support.h",rts_support_h),
+           ("rts/jhc_rts.c",jhc_rts_c),
+           ("rts/jhc_rts.h",jhc_rts_h),
+           ("lib/lib_cbits.c",lib_cbits_c),
+           ("lib/lib_cbits.h",lib_cbits_h),
            ("rts/cdefs.h",cdefs_h),
            ("sys/queue.h",queue_h),
            ("HsFFI.h",hsffi_h),
+           ("jhc_rts_header.h",jhc_rts_header_h),
            ("sys/wsize.h",wsize_h),
            ("rts/gc_jgc.c",gc_jgc_c),
+           ("rts/gc_jgc.h",gc_jgc_h),
            ("rts/gc_none.c",gc_none_c),
            ("rts/gc_none.h",gc_none_h),
            ("sys/bitarray.h",bitarray_h)] $ \ (fn,bs) -> do
         fileInTempDir fn $ flip BS.writeFile bs
-    let cFiles = ["rts/profile.c","rts/rts_support.c", "rts/gc_none.c"]
-
+    let cFiles = ["rts/profile.c", "rts/rts_support.c", "rts/gc_none.c",
+                  "rts/jhc_rts.c", "lib/lib_cbits.c"]
     tdir <- getTempDir
     ds <- catch (getDirectoryContents (tdir FP.</> "cbits")) (\_ -> return [])
     let extraCFiles = map (tdir FP.</>) cFiles ++ ["-I" ++ tdir ++ "/cbits", "-I" ++ tdir ] ++ [ tdir FP.</> "cbits" FP.</> fn | fn@(reverse -> 'c':'.':_) <- ds ]

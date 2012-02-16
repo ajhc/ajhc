@@ -15,5 +15,6 @@ void jhc_alloc_fini(void);
 void jhc_alloc_print_stats(void);
 
 #include "rts/gc_none.h"
+#include "rts/gc_jgc.h"
 
 #endif

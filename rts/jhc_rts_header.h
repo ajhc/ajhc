@@ -55,12 +55,13 @@
 
 #define JHC_isPosix (!JHC_isWindows && !defined(__ARM_EABI__))
 
-static void _amain(void);
+// the program will provide the following
+void _amain(void);
+void jhc_hs_init(void);
+extern const void * const nh_stuff[];
 
 #include "rts/profile.h"
 #include "rts/rts_support.h"
 #include "rts/gc.h"
-#define JHC_HEADER
-#include "rts/gc_jgc.c"
-#include "rts/slub.c"
-#undef JHC_HEADER
+#include "rts/jhc_rts.h"
+#include "lib/lib_cbits.h"
