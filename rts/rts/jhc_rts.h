@@ -69,15 +69,18 @@ wptr_t A_STD
 #if _JHC_GC == _JHC_GC_JGC
 eval(gc_t gc,sptr_t s);
 #else
-eval(sptr_t s)
+eval(sptr_t s);
 #endif
 
 #if _JHC_DEBUG
 wptr_t A_STD promote(sptr_t s);
 sptr_t A_STD demote(wptr_t s);
+void   A_STD update(void *, wptr_t);
 #else
 #define promote(x) PROMOTE(x)
 #define demote(x) DEMOTE(x)
+inline static void update(void *t, wptr_t n) { GETHEAD(t) = (fptr_t)n; }
 #endif
+
 
 #endif

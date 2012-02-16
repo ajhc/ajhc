@@ -1,6 +1,7 @@
 #include "jhc_rts_header.h"
 #include "sys/queue.h"
 #include "sys/bitarray.h"
+#include "rts/cdefs.h"
 
 #if _JHC_GC == _JHC_GC_JGC
 
@@ -44,24 +45,14 @@ struct s_cache {
 };
 
 gc_t saved_gc;
-static struct s_arena *arena;
+struct s_arena *arena;
 static unsigned number_gcs;             // number of garbage collections
 static unsigned number_allocs;          // number of allocations since last garbage collection
 static gc_t gc_stack_base;
 
-#ifdef JHC_JGC_STACK
-struct frame {
-        struct frame *prev;
-        unsigned nptrs;
-        void *ptrs[0];
-};
-#define gc_frame0(gc,n,...) struct { struct frame *prev; unsigned nptrs;void *ptrs[n]; } l \
-          = { gc, n, { __VA_ARGS__ } }; gc_t gc = (gc_t)(void *)&l;
-#else
 #define gc_frame0(gc,n,...) void *ptrs[n] = { __VA_ARGS__ }; for(int i = 0; i < n; i++) gc[i] = (sptr_t)ptrs[i]; gc_t sgc = gc;  gc_t gc = sgc + n;
 #define gc_frame1(gc,p1) gc[0] = (sptr_t)p1; gc_t sgc = gc;  gc_t gc = sgc + 1;
 #define gc_frame2(gc,p1,p2) gc[0] = (sptr_t)p1; gc[1] = (sptr_t)p2; gc_t sgc = gc;  gc_t gc = sgc + 2;
-#endif
 
 static unsigned number_gcs;             // number of garbage collections
 static unsigned number_allocs;          // number of allocations since last garbage collection
@@ -117,8 +108,7 @@ stack_check(struct stack *s, unsigned n) {
 
 static struct stack root_stack = EMPTY_STACK;
 
-A_UNUSED static void
-gc_add_root(gc_t gc, sptr_t root)
+void gc_add_root(gc_t gc, void *root)
 {
         if(IS_PTR(root)) {
                 entry_t *nroot = TO_GCPTR(root);
@@ -158,35 +148,6 @@ gc_perform_gc(gc_t gc)
         }
         debugf("\n");
         debugf("Trace:");
-#ifdef JHC_JGC_STACK
-        for(;gc;gc = gc->prev) {
-                debugf(" |");
-                stack_check(&stack, gc->nptrs);
-                for(unsigned i = 0;i < gc->nptrs; i++) {
-                        number_stack++;
-                        // TODO - short circuit redirects on stack
-                        sptr_t ptr = gc->ptrs[i];
-                        if(P_LAZY == GET_PTYPE(ptr)) {
-                                if(!IS_LAZY(GETHEAD(FROM_SPTR(ptr)))) {
-                                        J1U(r,gc_allocated,((uintptr_t)FROM_SPTR(ptr) - sizeof(entry_t))/GC_ALIGNMENT);
-                                        if(r)
-                                                J1S(r,gc_grey,((uintptr_t)FROM_SPTR(ptr) - sizeof(entry_t))/GC_ALIGNMENT);
-                                        number_redirects++;
-                                        debugf(" *");
-                                        ptr = (sptr_t)GETHEAD(FROM_SPTR(ptr));
-                                }
-                        }
-                        if(__predict_false(!IS_PTR(ptr))) {
-                                debugf(" -");
-                                continue;
-                        }
-                        number_ptr++;
-                        entry_t *e = (entry_t *)FROM_SPTR(ptr) - 1;
-                        debugf(" %p",(void *)e);
-                        gc_add_grey(&gc_grey, &stack, (uintptr_t)e / GC_ALIGNMENT);
-                }
-        }
-#else
         stack_check(&stack, gc - gc_stack_base);
         number_stack = gc - gc_stack_base;
         for(unsigned i = 0; i < number_stack; i++) {
@@ -214,7 +175,6 @@ gc_perform_gc(gc_t gc)
                 debugf(" %p",(void *)e);
                 gc_add_grey(&stack, e);
         }
-#endif
         debugf("\n");
 
         while(stack.ptr) {
@@ -243,12 +203,6 @@ gc_perform_gc(gc_t gc)
         free(stack.stack);
         s_cleanup_blocks(arena);
         if(JHC_STATUS) {
-#ifdef JHC_JGC_STACK
-                void * gc_stack_base = &gc_stack_base;
-                Word_t n_roots;
-                J1C(n_roots,gc_roots,0,-1);
-#endif
-
                 fprintf(stderr, "%3u - %6u Used: %4u Thresh: %4u Ss: %5u Ps: %5u Rs: %5u Root: %3u\n",
                         number_gcs,
                         number_allocs,
@@ -269,9 +223,7 @@ void jhc_alloc_print_stats(void) { }
 void
 jhc_alloc_init(void) {
         VALGRIND_PRINTF("Jhc-Valgrind mode active.\n");
-#ifndef JHC_JGC_STACK
         saved_gc = gc_stack_base = malloc((1UL << 18)*sizeof(gc_stack_base[0]));
-#endif
         arena = new_arena();
         if(nh_stuff[0]) {
                 nh_end = nh_start = nh_stuff[0];
@@ -461,7 +413,7 @@ clear_block_used_bits(unsigned num_entries, struct s_block *pg)
 #endif
 }
 
-void *
+void * A_STD
 s_alloc(gc_t gc, struct s_cache *sc)
 {
         struct s_block *pg = SLIST_FIRST(&sc->blocks);

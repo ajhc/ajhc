@@ -120,7 +120,7 @@ compileGrinToC grin = do
            ("sys/bitarray.h",bitarray_h)] $ \ (fn,bs) -> do
         fileInTempDir fn $ flip BS.writeFile bs
     let cFiles = ["rts/profile.c", "rts/rts_support.c", "rts/gc_none.c",
-                  "rts/jhc_rts.c", "lib/lib_cbits.c"]
+                  "rts/jhc_rts.c", "lib/lib_cbits.c", "rts/gc_jgc.c"]
     tdir <- getTempDir
     ds <- catch (getDirectoryContents (tdir FP.</> "cbits")) (\_ -> return [])
     let extraCFiles = map (tdir FP.</>) cFiles ++ ["-I" ++ tdir ++ "/cbits", "-I" ++ tdir ] ++ [ tdir FP.</> "cbits" FP.</> fn | fn@(reverse -> 'c':'.':_) <- ds ]

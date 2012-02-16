@@ -223,15 +223,15 @@ eval(sptr_t s)
         return (wptr_t)s;
 }
 
-static void A_STD A_UNUSED A_HOT
+#if _JHC_DEBUG
+void A_STD A_UNUSED A_HOT
 update(void * thunk, wptr_t new)
 {
         assert(GETHEAD(thunk) == BLACK_HOLE);
         assert(!IS_LAZY(new));
         GETHEAD(thunk) = (fptr_t)new;
 }
-
-#include "rts/gc_jgc.c"
+#endif
 
 #if _JHC_STANDALONE
 int
