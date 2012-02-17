@@ -143,7 +143,7 @@ gc_perform_gc(gc_t gc)
         debugf(" # ");
         struct StablePtr *sp;
         LIST_FOREACH(sp, &root_StablePtrs, link) {
-            gc_add_grey(&stack, sp);
+            gc_add_grey(&stack, (entry_t *)sp);
             debugf(" %p", root_stack.stack[i]);
         }
 
@@ -263,9 +263,6 @@ void *
         profile_pop(&gc_alloc_time);
         return (void *)e;
 }
-
-#include "sys/bitarray.h"
-#include "sys/queue.h"
 
 /* This finds a bit that isn't set, sets it, then returns its index.  It
  * assumes that a bit is available to be found, otherwise it goes into an
@@ -452,20 +449,6 @@ s_alloc(gc_t gc, struct s_cache *sc)
                 return val;
         }
 }
-
-/*
-static void
-s_free(void *val)
-{
-        assert(val);
-        struct s_block *pg = s_block(val);
-        unsigned int offset = ((uintptr_t *)val - (uintptr_t *)pg) - pg->pi.color;
-//        printf("s_free:  val: %p s_block: %p size: %i color: %i num_free: %i offset: %i bit: %i\n", val, pg, pg->pi.size, pg->pi.color, pg->num_free, offset, offset/pg->pi.size);
-        assert(BIT_VALUE(pg->used,offset/(pg->pi.size)));
-        BIT_UNSET(pg->used,offset/(pg->pi.size));
-        pg->num_free++;
-}
-*/
 
 struct s_cache *
 new_cache(struct s_arena *arena, unsigned short size, unsigned short num_ptrs)

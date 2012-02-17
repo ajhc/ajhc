@@ -65,6 +65,8 @@ typedef struct dnode {
 #define FETCH_MEM_TAG(x)  (DNODEP(x)->what)
 #define SET_MEM_TAG(x,v)  (DNODEP(x)->what = (what_t)RAW_SET_16(v))
 
+#define BLACK_HOLE TO_FPTR(0xDEADBEE0)
+
 wptr_t A_STD
 #if _JHC_GC == _JHC_GC_JGC
 eval(gc_t gc,sptr_t s);
@@ -72,6 +74,8 @@ eval(gc_t gc,sptr_t s);
 eval(sptr_t s);
 #endif
 
+// both promote and demote evaluate to nothing when debugging is not enabled
+// otherwise, they check that their arguments are in the correct form.
 #if _JHC_DEBUG
 wptr_t A_STD promote(sptr_t s);
 sptr_t A_STD demote(wptr_t s);
@@ -82,5 +86,12 @@ void   A_STD update(void *, wptr_t);
 inline static void update(void *t, wptr_t n) { GETHEAD(t) = (fptr_t)n; }
 #endif
 
+#if _JHC_DEBUG && _JHC_GC == _JHC_GC_JGC
+bool jhc_valid_whnf(wptr_t s);
+bool jhc_valid_lazy(sptr_t s);
+#else
+#define jhc_valid_whnf(x) true
+#define jhc_valid_lazy(x) true
+#endif
 
 #endif

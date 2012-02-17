@@ -1,3 +1,5 @@
+// profiling and debugging code.
+
 #if defined(__WIN32__)
 #define HAVE_TIMES 0
 #else
@@ -12,10 +14,7 @@
 #endif
 #include <unistd.h>
 
-#include "rts/gc.h"
-#include "rts/cdefs.h"
-#include "rts/profile.h"
-#include "rts/rts_support.h"
+#include "jhc_rts_header.h"
 
 void A_UNUSED
 profile_print_header(FILE *file, char *value_unit)
@@ -145,6 +144,67 @@ gc_lookup(void *ptr)
         PWord_t pval;
         JLG(pval,mem_annotate,(Word_t)ptr & ~(Word_t)3);
         return pval ? (char *)*pval : "(none)";
+}
+
+#endif
+
+#if _JHC_DEBUG  && _JHC_GC == _JHC_GC_JGC
+
+// these ensure the type synonyms are available to the debugger
+uintptr_t _dummy1;
+node_t *_dummy2;
+dnode_t *_dummy3;
+sptr_t *_dummy4;
+fptr_t *_dummy5;
+wptr_t *_dummy6;
+
+bool A_UNUSED
+jhc_valid_whnf(wptr_t s)
+{
+        return ((GET_PTYPE(s) == P_VALUE) || ((GET_PTYPE(s) == P_WHNF) && jhc_malloc_sanity(s,P_WHNF)));
+}
+
+bool A_UNUSED
+jhc_valid_lazy(sptr_t s)
+{
+        if(jhc_valid_whnf((wptr_t)s))
+                return true;
+        assert(GET_PTYPE(s) == P_LAZY);
+        node_t *ds = (node_t *)FROM_SPTR(s);
+        assert(jhc_malloc_sanity(ds,P_LAZY));
+        if(IS_LAZY(ds->head)) {
+                if(ds->head == BLACK_HOLE) return true;
+                assert(GET_PTYPE(ds->head) == P_FUNC);
+                return true;
+        } else
+                return jhc_valid_whnf((wptr_t)ds->head);
+}
+
+#endif
+
+#if _JHC_DEBUG
+wptr_t A_STD
+promote(sptr_t s)
+{
+        assert(!IS_LAZY(s));
+        assert(jhc_valid_whnf((wptr_t)s));
+        return (wptr_t)s;
+}
+
+sptr_t A_STD
+demote(wptr_t s)
+{
+        assert(!IS_LAZY(s));
+        assert(jhc_valid_whnf(s));
+        return (sptr_t)s;
+}
+
+void A_STD
+update(void * thunk, wptr_t new)
+{
+        assert(GETHEAD(thunk) == BLACK_HOLE);
+        assert(!IS_LAZY(new));
+        GETHEAD(thunk) = (fptr_t)new;
 }
 
 #endif

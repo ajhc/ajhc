@@ -106,73 +106,10 @@ redirection to a whnf value.
 
 #include "jhc_rts_header.h"
 
-
-#define BLACK_HOLE TO_FPTR(0xDEADBEE0)
-
-#if _JHC_DEBUG
-
-// these ensure the type synonyms are available to the debugger
-uintptr_t _dummy1;
-node_t *_dummy2;
-dnode_t *_dummy3;
-sptr_t *_dummy4;
-fptr_t *_dummy5;
-wptr_t *_dummy6;
-
-static bool A_UNUSED
-jhc_valid_whnf(wptr_t s)
-{
-        return ((GET_PTYPE(s) == P_VALUE) || ((GET_PTYPE(s) == P_WHNF) && jhc_malloc_sanity(s,P_WHNF)));
-}
-
-static bool A_UNUSED
-jhc_valid_lazy(sptr_t s)
-{
-        if(jhc_valid_whnf((wptr_t)s))
-                return true;
-        assert(GET_PTYPE(s) == P_LAZY);
-        node_t *ds = (node_t *)FROM_SPTR(s);
-        assert(jhc_malloc_sanity(ds,P_LAZY));
-        if(IS_LAZY(ds->head)) {
-                if(ds->head == BLACK_HOLE) return true;
-                assert(GET_PTYPE(ds->head) == P_FUNC);
-                return true;
-        } else
-                return jhc_valid_whnf((wptr_t)ds->head);
-}
-
-#else
-
-#define jhc_valid_whnf(x) true
-#define jhc_valid_lazy(x) true
-
-#endif
-
 #if _JHC_GC == _JHC_GC_JGC
 typedef wptr_t (*eval_fn)(gc_t gc,node_t *node) A_STD;
 #else
 typedef wptr_t (*eval_fn)(node_t *node) A_STD;
-#endif
-
-// both promote and demote evaluate to nothing when debugging is not enabled
-// otherwise, they check that their arguments are in the correct form.
-
-#if _JHC_DEBUG
-wptr_t A_STD A_UNUSED
-promote(sptr_t s)
-{
-        assert(!IS_LAZY(s));
-        assert(jhc_valid_whnf((wptr_t)s));
-        return (wptr_t)s;
-}
-
-sptr_t A_STD A_UNUSED
-demote(wptr_t s)
-{
-        assert(!IS_LAZY(s));
-        assert(jhc_valid_whnf(s));
-        return (sptr_t)s;
-}
 #endif
 
 // like eval but you know the target is in WHNF or is a already evaluated indirection
@@ -222,16 +159,6 @@ eval(sptr_t s)
         assert(jhc_valid_whnf((wptr_t)s));
         return (wptr_t)s;
 }
-
-#if _JHC_DEBUG
-void A_STD A_UNUSED A_HOT
-update(void * thunk, wptr_t new)
-{
-        assert(GETHEAD(thunk) == BLACK_HOLE);
-        assert(!IS_LAZY(new));
-        GETHEAD(thunk) = (fptr_t)new;
-}
-#endif
 
 #if _JHC_STANDALONE
 int
