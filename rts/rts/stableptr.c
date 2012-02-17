@@ -1,11 +1,7 @@
 #include "sys/queue.h"
+#include "jhc_rts_header.h"
 
-struct StablePtr {
-    LIST_ENTRY(StablePtr) link;
-    sptr_t contents;
-};
-
-LIST_HEAD(, StablePtr) root_StablePtrs = LIST_HEAD_INITIALIZER();
+struct StablePtr_list root_StablePtrs = LIST_HEAD_INITIALIZER();
 
 wptr_t c_newStablePtr(sptr_t c) {
     struct StablePtr* sp = malloc(sizeof(struct StablePtr));

@@ -1,20 +1,12 @@
-char jhc_c_compile[] = "(compile)";
-char jhc_command[] = "(command)";
-char jhc_version[] = "(version)";
-
 #define JHC_VALGRIND 1
 
 #define _JHC_STANDALONE 0
 #define _JHC_GC _JHC_GC_JGC
 
 #include "jhc_rts_header.h"
-#include "jhc_rts2.c"
 
 #define NUM_CACHES 15
 #define FACTOR (1 << 16)
-
-static void jhc_hs_init(void) {}
-static const void * const nh_stuff[] = { NULL };
 
 void
 stress_test(int n) {

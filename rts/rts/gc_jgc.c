@@ -53,18 +53,12 @@ static gc_t gc_stack_base;
 #define gc_frame0(gc,n,...) void *ptrs[n] = { __VA_ARGS__ }; for(int i = 0; i < n; i++) gc[i] = (sptr_t)ptrs[i]; gc_t sgc = gc;  gc_t gc = sgc + n;
 #define gc_frame1(gc,p1) gc[0] = (sptr_t)p1; gc_t sgc = gc;  gc_t gc = sgc + 1;
 #define gc_frame2(gc,p1,p2) gc[0] = (sptr_t)p1; gc[1] = (sptr_t)p2; gc_t sgc = gc;  gc_t gc = sgc + 2;
-
-static unsigned number_gcs;             // number of garbage collections
-static unsigned number_allocs;          // number of allocations since last garbage collection
-
 #define TO_GCPTR(x) (entry_t *)(FROM_SPTR(x))
 
 static void gc_perform_gc(gc_t gc);
 static bool s_set_used_bit(void *val) A_UNUSED;
 static void clear_used_bits(struct s_arena *arena) A_UNUSED;
-static struct s_arena *new_arena(void);
 static void s_cleanup_blocks(struct s_arena *arena);
-static void print_cache(struct s_cache *sc);
 
 typedef struct {
         sptr_t ptrs[0];
@@ -146,6 +140,13 @@ gc_perform_gc(gc_t gc)
                 gc_add_grey(&stack, root_stack.stack[i]);
                 debugf(" %p", root_stack.stack[i]);
         }
+        debugf(" # ");
+        struct StablePtr *sp;
+        LIST_FOREACH(sp, &root_StablePtrs, link) {
+            gc_add_grey(&stack, sp);
+            debugf(" %p", root_stack.stack[i]);
+        }
+
         debugf("\n");
         debugf("Trace:");
         stack_check(&stack, gc - gc_stack_base);
@@ -466,7 +467,7 @@ s_free(void *val)
 }
 */
 
-static struct s_cache *
+struct s_cache *
 new_cache(struct s_arena *arena, unsigned short size, unsigned short num_ptrs)
 {
         struct s_cache *sc = malloc(sizeof(*sc));

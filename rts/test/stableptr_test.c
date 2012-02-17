@@ -1,20 +1,7 @@
-char jhc_c_compile[] = "(compile)";
-char jhc_command[] = "(command)";
-char jhc_version[] = "(version)";
-
-#define JHC_VALGRIND 1
-
-#define _JHC_STANDALONE 0
-#define _JHC_GC _JHC_GC_JGC
-
 #include "jhc_rts_header.h"
-#include "jhc_rts2.c"
-#include "rts/stableptr.c"
+#include "sys/queue.h"
 
 #include "seatest.h"
-
-static void jhc_hs_init(void) {}
-static const void * const nh_stuff[] = { NULL };
 
 #define SAMPLE_SPTR (sptr_t)TO_SPTR(P_VALUE,0xF0D0);
 
