@@ -249,7 +249,7 @@ jhc_alloc_fini(void) {
         }
 }
 
-A_UNUSED static void *
+void *
 (gc_alloc)(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs)
 {
         profile_push(&gc_alloc_time);
