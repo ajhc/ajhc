@@ -50,7 +50,8 @@ foreach my $fn (@ARGV) {
     my $url = "http://hackage.haskell.org/packages/archive/$name/$version/$name-$version.tar.gz";
     print "Fetching $url\n";
     unless(-e "$tmpdir/$name-$version.tar.gz") {
-        getstore($url, "$tmpdir/$name-$version.tar.gz") or die "$!: $url";
+        my $rc = getstore($url, "$tmpdir/$name-$version.tar.gz");
+        if (is_error $rc) { die "$url: $rc" } ;
     }
     mysystem "tar -zxv --directory $tmpdir -f $tmpdir/$name-$version.tar.gz" and die "$!: tar";
     my $src = -d "$tmpdir/$name-$version/src" ? "/src" : "";
