@@ -29,7 +29,7 @@ class  (Real a, Enum a) => Integral a  where
     n `rem` d        =  r  where (q,r) = quotRem n d
     n `div` d        =  q  where (q,r) = divMod n d
     n `mod` d        =  r  where (q,r) = divMod n d
-    divMod n d       =  if signum r == - signum d then (q-1, r+d) else qr
+    divMod n d       =  n `seq` d `seq` if signum r == - signum d then (q-1, r+d) else qr
                         where qr@(q,r) = quotRem n d
     quotRem n d       =  (n `quot` d, n `rem` d)
     toInteger x = toInteger (toInt x)

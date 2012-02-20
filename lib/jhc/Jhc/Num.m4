@@ -33,18 +33,18 @@ foreign import primitive "$2{{}}2F" toDouble$1 :: $1 -> Double
 
 m4_define(MkIntegralPrim,{{
 instance Integral $1 where
-    div = div$1
+--    div = div$1
     quot = quot$1
-    mod = mod$1
+--    mod = mod$1
     rem = rem$1
     toInt = toInt$1
     toInteger = toInteger$1
 
 foreign import primitive "I2I" toInt$1 :: $1 -> Int
 foreign import primitive "I2I" toInteger$1 :: $1 -> Integer
-foreign import primitive "Div" div$1   :: $1 -> $1 -> $1
+--foreign import primitive "Div" div$1   :: $1 -> $1 -> $1
 foreign import primitive "Quot" quot$1 :: $1 -> $1 -> $1
-foreign import primitive "Mod" mod$1   :: $1 -> $1 -> $1
+--foreign import primitive "Mod" mod$1   :: $1 -> $1 -> $1
 foreign import primitive "Rem" rem$1   :: $1 -> $1 -> $1
 }})
 

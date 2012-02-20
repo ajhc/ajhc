@@ -713,8 +713,8 @@ convertPrim p vs ty
     | otherwise = return $ err ("prim: " ++ show (p,vs))
 
 signedOps = [
-    (Op.Div,"/"),  -- TODO round to -Infinity
-    (Op.Mod,"%"),  -- TODO round to -Infinity
+--    (Op.Div,"/"),  -- TODO round to -Infinity
+--    (Op.Mod,"%"),  -- TODO round to -Infinity
     (Op.Quot,"/"),
     (Op.Rem,"%"),
     (Op.Shra,">>"),
