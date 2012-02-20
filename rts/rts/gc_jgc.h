@@ -25,6 +25,7 @@ struct s_cache *new_cache(struct s_arena *arena, unsigned short size,
 struct s_arena *new_arena(void);
 struct s_cache *find_cache(struct s_cache **rsc, struct s_arena *arena,
                            unsigned short size, unsigned short num_ptrs);
+void *(gc_alloc)(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs);
 void gc_add_root(gc_t gc, void * root);
 
 #define gc_frame0(gc,n,...) void *ptrs[n] = { __VA_ARGS__ }; \
