@@ -28,6 +28,7 @@ import E.Rules
 import E.Traverse
 import E.TypeAnalysis
 import E.TypeCheck
+import E.Values
 import E.WorkerWrapper
 import FrontEnd.Class(augmentClassHierarchy)
 import FrontEnd.HsSyn
@@ -554,6 +555,12 @@ boxifyProgram prog = ans where
     g e = do
         emapEG g (boxify) e -- (\e -> do putStrLn ("box: " ++ pprint e) ; return $ boxify e) e
 --    boxify t | Just e <- followAlias (progDataTable prog) t = boxify e
+    boxify (from_unsafeCoerce -> Just (e,t)) = do
+        t' <- boxify t
+        e' <- boxify e
+        case typesCompatable t' (getType e') of
+            Just () -> return e
+            _ -> return $ prim_unsafeCoerce e' t'
     boxify (EPi t e) = local (Set.insert (tvrIdent t)) $ do
         nt <- boxify $ tvrType t
         ne <- boxify e

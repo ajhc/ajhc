@@ -39,8 +39,8 @@ import qualified Stats
 type Typ = VMap () Name
 data Env = Env {
     envRuleSupply :: Supply (Module,Int) Bool,
-    envValSupply :: Supply TVr Bool,
-    envEnv :: IdMap [Value Typ]
+    envValSupply  :: Supply TVr Bool,
+    envEnv        :: IdMap [Value Typ]
     }
 
 extractValMap :: [(TVr,E)] -> IdMap [Value Typ]
@@ -116,6 +116,7 @@ calcComb env@Env { envRuleSupply = ur, envValSupply = uv } comb = do
                             when (isEVar a') $ addRule $ modifiedSuperSetOf a'' t' (vmapArg n i)
                     addRule $ conditionalRule (n `vmapMember`) t' (assert ruleUsed)
                     return False
+                hrg x y = error $ "TypeAnalyis.hrg: " ++ show (x,y)
             rr <- mapM (hrg r) (zip tls (ruleArgs r))
             when (and rr) $ addRule (assert ruleUsed)
     valUsed <- supplyValue uv t
@@ -162,7 +163,7 @@ calcDs env@Env { envRuleSupply = ur, envValSupply = uv } ds = do
     forM_ ds $ \ (v,e) -> do calcDef env (v,e)
 
 -- TODO - make default case conditional
-calcAlt env v (Alt LitCons { litName = n, litArgs = xs } e) = do
+calcAlt env v (Alt ~LitCons { litName = n, litArgs = xs } e) = do
     addRule $ conditionalRule (n `vmapMember`) v $ ioToRule $ do
         calcE env e
         forMn_ xs $ \ (t,i) -> do
@@ -210,7 +211,6 @@ getValue (EVar v)
     -- | otherwise = fail $ "getValue: no varinfo: " ++ show v
 getValue e | Just c <- typConstant e = return $ value c
 getValue e = return $ value $ fuzzyConstant e -- TODO - make more accurate
-getValue e = fail $ "getValue: " ++ show e
 
 fuzzyConstant :: E -> Typ
 fuzzyConstant e | Just (n,as) <- toLit e = vmapValue n (map fuzzyConstant as)
@@ -230,7 +230,7 @@ data SpecEnv = SpecEnv {
 getTyp :: Monad m => E -> DataTable -> Typ -> m E
 getTyp kind dataTable vm = f (10::Int) kind vm where
     f n _ _ | n <= 0 = fail "getTyp: too deep"
-    f n kind vm | Just [] <- vmapHeads vm = return $ tAbsurd kind  -- TODO - absurdize values properly
+    f n kind vm | Just [] <- vmapHeads vm = return $ tAbsurd kind
     f n kind vm | Just [h] <- vmapHeads vm = do
         let ss = slotTypes dataTable h kind
             as = [ (s,vmapArg h i vm) | (s,i) <- zip ss [0..]]
@@ -247,20 +247,15 @@ specializeProgram :: (Stats.MonadStats m) =>
     -> Program
     -> m Program
 specializeProgram doSpecialize unusedRules unusedValues prog = do
-    (nds,_) <- specializeCombs doSpecialize SpecEnv { senvUnusedRules = unusedRules
-                                                    , senvUnusedVars = unusedValues
-                                                    , senvDataTable = progDataTable prog
-                                                    , senvArgs = mempty } (progCombinators prog)
+    (nds,_) <- specializeCombs doSpecialize SpecEnv
+        { senvUnusedRules = unusedRules
+        , senvUnusedVars = unusedValues
+        , senvDataTable = progDataTable prog
+        , senvArgs = mempty } (progCombinators prog)
     return $ progCombinators_s nds prog
 
 repi (ELit LitCons { litName = n, litArgs = [a,b] }) | n == tc_Arrow = EPi tvr { tvrIdent = emptyId, tvrType = repi a } (repi b)
 repi e = runIdentity $ emapE (return . repi ) e
-
-{-
-specializeComb doSpecialize env comb = do
-    ((t,e),nds) <- specializeDef doSpecialize env (combHead comb,combBody comb)
-    return (combHead_s t . combBody_s e $ comb,nds)
--}
 
 specializeComb _ env  comb | isUnused env (combHead comb) = let tvr = combHead comb in
     return (combRules_s [] . combBody_s (EError ("Unused Def: " ++ tvrShowName tvr) (tvrType tvr)) $ comb , mempty)
@@ -286,7 +281,6 @@ specializeComb True SpecEnv { senvDataTable = dataTable }  comb | needsSpec = an
 specializeComb _ _ comb = return (comb,mempty)
 
 instance Error () where
-
     noMsg = ()
     strMsg _ = ()
 
@@ -309,6 +303,8 @@ eToPatM cv e = f e where
 
 caseCast :: TVr -> E -> E -> E
 caseCast t ty e = evalState  (f t ty e) (newIds (freeIds e),[]) where
+--    f t ty e | isFullyConst ty = return $
+--        prim_unsafeCoerce (subst t ty e) (getType e)
     f t ty e = do
         p <- eToPatM cv ty
         (ns,es) <- get
@@ -321,10 +317,9 @@ caseCast t ty e = evalState  (f t ty e) (newIds (freeIds e),[]) where
         let t = tvr { tvrIdent = n, tvrType = getType e }
         put (ns,(t,e):es)
         return t
-caseCast t _ty e = e
 
 specAlt :: Stats.MonadStats m => SpecEnv -> Alt E -> m (Alt E)
-specAlt env@SpecEnv { senvDataTable = dataTable } (Alt lc@LitCons { litArgs = ts } e) = ans where
+specAlt env@SpecEnv { senvDataTable = dataTable } (Alt ~lc@LitCons { litArgs = ts } e) = ans where
     f xs = do
         ws <- forM xs $ \t -> evalErrorT id $ do
             False <- return $ isUnused env t
@@ -337,12 +332,13 @@ specAlt env@SpecEnv { senvDataTable = dataTable } (Alt lc@LitCons { litArgs = ts
         ws <- f ts
         return (Alt lc (ws e))
 
-isUnused SpecEnv { senvUnusedVars = unusedVars } v = v `member` unusedVars && isJust (Info.lookup $ tvrInfo v :: Maybe Typ)
+isUnused SpecEnv { senvUnusedVars = unusedVars } v =
+    v `member` unusedVars && isJust (Info.lookup $ tvrInfo v :: Maybe Typ)
 
 specBody :: Stats.MonadStats m => Bool -> SpecEnv -> E -> m E
-specBody _ env e | (EVar h,as) <- fromAp e, isUnused env h  = do
-    Stats.mtick $ "Specialize.delete.{" ++ pprint h ++ "}"
-    return $ foldl EAp (EError ("Unused: " ++ pprint h) (getType h)) as
+--specBody _ env e | (EVar h,as) <- fromAp e, isUnused env h  = do
+--    Stats.mtick $ "Specialize.delete.{" ++ pprint h ++ "}"
+--    return $ foldl EAp (EError ("Unused: " ++ pprint h) (getType h)) as
 specBody True env@SpecEnv { senvArgs = dmap } e | (EVar h,as) <- fromAp e, Just os <- mlookup h dmap = do
     Stats.mtick $ "Specialize.use.{" ++ pprint h ++ "}"
     as' <- mapM (specBody True env) as
@@ -357,7 +353,7 @@ specBody doSpecialize env (ELetRec ds e) = do
 specBody doSpecialize env e = emapE' (specBody doSpecialize env) e
 
 --specializeDs :: MonadStats m => DataTable -> Map.Map TVr [Int] -> [(TVr,E)] -> m ([(TVr,E)]
-specializeDs doSpecialize env@SpecEnv { senvUnusedRules = unusedRules, senvDataTable = dataTable }  ds = do
+specializeDs doSpecialize env@SpecEnv { senvUnusedRules = unusedRules, senvDataTable = dataTable } ds = do
     (ds,nenv) <- mapAndUnzipM (specializeComb doSpecialize env) (map bindComb ds)
     ds <- return $ map combBind ds
     let tenv = env { senvArgs = unions nenv `union` senvArgs env }
@@ -369,7 +365,7 @@ specializeDs doSpecialize env@SpecEnv { senvUnusedRules = unusedRules, senvDataT
     return (ds,tenv)
 
 --specializeDs :: MonadStats m => DataTable -> Map.Map TVr [Int] -> [(TVr,E)] -> m ([(TVr,E)]
-specializeCombs doSpecialize env@SpecEnv { senvUnusedRules = unusedRules, senvDataTable = dataTable }  ds = do
+specializeCombs doSpecialize env@SpecEnv { senvUnusedRules = unusedRules, senvDataTable = dataTable } ds = do
     (ds,nenv) <- mapAndUnzipM (specializeComb doSpecialize env) ds
     let tenv = env { senvArgs = unions nenv `union` senvArgs env }
         sb = specBody doSpecialize tenv
@@ -404,32 +400,4 @@ expandPlaceholder comb  | getProperty prop_PLACEHOLDER (combHead comb) = do
         calt rule@Rule { ruleArgs = ~(arg:rs) } = Alt vp (substMap (fromList [ (tvrIdent v,EVar r) | ~(EVar v) <- rs | r <- ras ]) $ ruleBody rule) where
             Just vp = eToPat arg
     return (mcomb (foldr ELam ne as'))
-
 expandPlaceholder _x = fail "not placeholder"
-
-{-
-
--- pruning the unused branches of typecase statements
-
-pruneE :: E -> IO E
-pruneE e = return $ runIdentity (prune e)  where
-    prune ec@ECase { eCaseScrutinee = EVar v } | sortKindLike (getType v), Just vm <- Info.lookup (tvrInfo v) = do
-        ec' <- pruneCase ec vm
-        emapE' prune ec'
-    prune e = emapE' prune e
-
-pruneCase :: (Monad m) => E -> VMap () Name -> m E
-pruneCase ec ns = return $ if null (caseBodies nec) then err else nec where
-    err = EError "pruneCase: all alternatives pruned" (getType ec)
-    nec = caseUpdate ec { eCaseAlts = f [] $ eCaseAlts ec, eCaseDefault = cd (eCaseDefault ec)}
-    f xs [] = reverse xs
-    f xs (alt@(Alt LitCons { litName = n } _):rs) | not (n `vmapMember` ns) = f xs rs
-    f xs (alt:rs) = f (alt:xs) rs
-    cd (Just d) | Just nns <- vmapHeads ns, or [ n `notElem` as | n <- nns ] = Just d
-                | Nothing <- vmapHeads ns = Just d
-    cd Nothing = Nothing
-    -- The reason we do this is because for a typecase, we need a valid default in order to get the most general type
-    cd (Just d) = Just $ EError "pruneCase: default pruned" (getType d)
-    as = [ n | LitCons { litName = n } <- casePats ec ]
-
--}

@@ -301,8 +301,8 @@ sortConstructor name ss = emptyConstructor {
     conInhabits = sortName ss
 }
 
-typesCompatable :: forall m . Monad m => DataTable -> E -> E -> m ()
-typesCompatable dataTable a b = f etherealIds a b where
+typesCompatable :: forall m . Monad m => E -> E -> m ()
+typesCompatable a b = f etherealIds a b where
         f :: [Id] -> E -> E -> m ()
         f _ (ESort a) (ESort b) = when (a /= b) $ fail $ "Sorts don't match: " ++ pprint (ESort a,ESort b)
         f _ (EVar a) (EVar b) = when (a /= b) $ fail $ "Vars don't match: " ++ pprint (a,b)
