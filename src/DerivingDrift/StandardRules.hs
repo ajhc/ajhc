@@ -111,7 +111,7 @@ makeShow (Body{constructor=constructor,labels=labels,types=types})
 				    fsep (sepWith s' b'),comp,showChar '}']
 	c = showString constructor
 	b = map (\x -> fsep[text (q v_showsPrec), text "10", x]) (varNames types)
-	b' = zipWith (\x l -> fsep[showString l,comp,showChar '=',comp,x])
+	b' = zipWith (\x l -> fsep [showString l, comp, showString " = ", comp, x])
 			            b (map getIdent labels)
 	s = fsep [comp,showChar ' ', comp]
 	s' = fsep [comp,showChar ',',comp]
@@ -143,7 +143,7 @@ makeRead (Body{constructor=constructor,labels=labels,types=types})
 	final v = [fsep[tup v rest,from,readsPrec,ip]]
 	readRecord = let
 		f lab v = [
-			fsep [tup (text $ show lab) ip,lex],
+			fsep [tup (tshow $ show (toUnqualified lab)) ip,lex],
 			fsep [tup (text $ show "=") ip,lex],
 			fsep [tup v ip ,from,readsPrec,ip]]
 		openB = fsep [tup (text $ show "{") ip,lex]
@@ -162,11 +162,13 @@ makeRead (Body{constructor=constructor,labels=labels,types=types})
 	vars = varNames types
 	ip = text "inp"
 	rest = text "rest"
-	tup x y = parens $ fsep [text (u dc_Pair), x, y]
+	tup x y = parens $ fsep [x <> char ',', y]
 	lex = fsep[from,text (q v_lex),ip]
 	readsPrec = fsep [text (q v_readsPrec),text "10"]
 	from = text "<-"
 
+
+tshow x = text (show x)
 ----------------------------------------------------------------------
 
 -- Enum -- a lot of this code should be provided as default instances,

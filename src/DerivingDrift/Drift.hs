@@ -16,10 +16,10 @@ driftDerive :: HsModule -> [HsDecl]
 driftDerive hsModule = if null ss then [] else hsModuleDecls hsMod
   where
     --hsMod = case parse (unlines ss) (SrcLoc (show $ hsModuleName hsModule) 1 1) 0 [] of
-    hsMod = case snd $ runParser parse (unlines ss)  of
+    hsMod = case snd $ runParser parse ss  of
         ParseOk e -> e
-        ParseFailed sl err -> error $ "driftDerive: " ++ show sl ++ err
-    ss = [ n | Just n <- map driftDerive' $ hsModuleDecls hsModule, any (not . isSpace) n ]
+        ParseFailed sl err -> error $ "internal parse error(driftDerive): " ++ show sl ++ err  ++ "\n" ++ ss
+    ss = unlines [ n | Just n <- map driftDerive' $ hsModuleDecls hsModule, any (not . isSpace) n ]
 
 driftDerive' :: Monad m => HsDecl -> m String
 driftDerive' HsDataDecl { hsDeclName = name, hsDeclArgs = args, hsDeclCons = condecls, hsDeclDerives = derives } = do
