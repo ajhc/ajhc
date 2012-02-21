@@ -13,9 +13,6 @@ import Data.Typeable
 
 type CName = String
 
-data Safety = Safe | Unsafe deriving(Eq,Ord,Show)
-    {-! derive: Binary !-}
-
 data FfiType = Import CName Requires
              | ImportAddr CName Requires
              | Wrapper

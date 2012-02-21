@@ -27,12 +27,21 @@
 // of things.
 
 // virtual flag to indicate location is a value
-#define SLAB_VIRTUAL_VALUE    256
+#define SLAB_VIRTUAL_VALUE     256
 
 // virtual flag to indicate location has a special intererpretation.
-#define SLAB_VIRTUAL_SPECIAL  512
+#define SLAB_VIRTUAL_SPECIAL   512
 
 // virtual flag to indication location is a constant.
-#define SLAB_VIRTUAL_CONSTANT 1024
+#define SLAB_VIRTUAL_CONSTANT  1024
+
+// virtual flag to indication location has been freed. (for debugging)
+#define SLAB_VIRTUAL_FREED     2048
+
+// virtual flag to indication location is lazy.
+#define SLAB_VIRTUAL_LAZY      4096
+
+// virtual flag to indication location is func.
+#define SLAB_VIRTUAL_FUNC      8192
 
 #endif

@@ -115,6 +115,7 @@ compileGrinToC grin = do
            ("sys/wsize.h",wsize_h),
            ("rts/gc_jgc.c",gc_jgc_c),
            ("rts/gc_jgc.h",gc_jgc_h),
+           ("rts/gc_jgc_internal.h",gc_jgc_internal_h),
            ("rts/gc_none.c",gc_none_c),
            ("rts/gc_none.h",gc_none_h),
            ("sys/bitarray.h",bitarray_h)] $ \ (fn,bs) -> do

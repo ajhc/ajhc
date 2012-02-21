@@ -530,25 +530,24 @@ simpleRet er = do
         _ -> error "simpleRet: odd rTodo"
 
 nodeAssign :: Val -> Atom -> [Val] -> Exp -> C Statement
-nodeAssign v t as e' = cna where
-    cna = do
-        cpr <- asks rCPR
-        v' <- convertVal v
-        case mlookup t cpr of
-            Just (TyRepRawVal signed) -> do
-                [arg] <- return as
-                t <- convertType $ getType arg
-                arg' <- iDeclare $ convertVal arg
-                let s = arg' =* cast t (if signed then f_RAW_GET_F v' else f_RAW_GET_UF v')
-                ss <- convertBody e'
-                return $ s & ss
-            _ -> do
-                declareStruct t
-                as' <- iDeclare $ mapM convertVal as
-                let ass = concat [perhapsM (a `Set.member` fve) $ a' =* (project' (arg i) (concrete t v')) | a' <- as' | Var a _ <- as |  i <- [( 1 :: Int) ..] ]
-                    fve = freeVars e'
-                ss' <- convertBody e'
-                return $ mconcat ass & ss'
+nodeAssign v t as e' = do
+    cpr <- asks rCPR
+    v' <- convertVal v
+    case mlookup t cpr of
+        Just (TyRepRawVal signed) -> do
+            [arg] <- return as
+            t <- convertType $ getType arg
+            arg' <- iDeclare $ convertVal arg
+            let s = arg' =* cast t (if signed then f_RAW_GET_F v' else f_RAW_GET_UF v')
+            ss <- convertBody e'
+            return $ s & ss
+        _ -> do
+            declareStruct t
+            as' <- iDeclare $ mapM convertVal as
+            let ass = concat [perhapsM (a `Set.member` fve) $ a' =* (project' (arg i) (concrete t v')) | a' <- as' | Var a _ <- as |  i <- [( 1 :: Int) ..] ]
+                fve = freeVars e'
+            ss' <- convertBody e'
+            return $ mconcat ass & ss'
 
 --isCompound Fetch {} = False
 isCompound BaseOp {} = False
@@ -561,13 +560,20 @@ mgc = if fopts FO.Jgc then (v_gc:) else id
 mgct = if fopts FO.Jgc then ((name "gc",gc_t):) else id
 
 convertExp :: Exp -> C (Statement,Expression)
-convertExp (Prim (Func _ n as r rs@(_:_)) vs ty) = do
-        vs' <- mapM convertVal vs
-        rt <- mapM convertType ty
-        let rrs = map basicType' (r:rs)
-        ras <- mapM (newVar . basicType') rs
-        (stmt,rv) <- basicType' r `newTmpVar` (functionCall (name $ unpackPS n) ([ cast (basicType' t) v | v <- vs' | t <- as ] ++ map reference ras))
-        return $ (stmt, structAnon (zip (rv:ras) rt))
+convertExp (Prim Func { primArgTypes = as, primRetType = r, primRetArgs = rs@(_:_), ..} vs ty) = do
+    tell mempty { wRequires = primRequires }
+    vs' <- mapM convertVal vs
+    rt <- mapM convertType ty
+    let rrs = map basicType' (r:rs)
+    ras <- mapM (newVar . basicType') rs
+    (stmt,rv) <- basicType' r `newTmpVar` (functionCall (name $ unpackPS funcName) ([ cast (basicType' t) v | v <- vs' | t <- as ] ++ map reference ras))
+    return $ (stmt, structAnon (zip (rv:ras) rt))
+convertExp (Prim Func { primRetArgs = [], .. } vs ty) = do
+    tell mempty { wRequires = primRequires }
+    vs' <- mapM convertVal vs
+    rt <- convertTypes ty
+    let fcall =  cast rt (functionCall (name $ unpackPS funcName) [ cast (basicType' t) v | v <- vs' | t <- primArgTypes ])
+    return (if primSafety == Safe && fopts FO.Jgc then v_saved_gc =* v_gc else mempty,fcall)
 convertExp (Prim p vs ty) =  do
     tell mempty { wRequires = primReqs p }
     e <- convertPrim p vs ty
@@ -603,7 +609,8 @@ convertExp (BaseOp Overwrite [v@(Var vv _),tn@(NodeC t as)]) | getType v == TyIN
         let ass = [project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
         return (mconcat $ s:ass,emptyExpression)
 
-convertExp Alloc { expValue = v, expCount = c, expRegion = r } | r == region_heap, TyINode == getType v  = do
+convertExp Alloc { expValue = v, expCount = c, expRegion = r }
+        | r == region_heap, TyINode == getType v  = do
     v' <- convertVal v
     c' <- convertVal c
     (malloc,tmp) <- jhc_malloc_ptrs c' =:: ptrType sptr_t
@@ -617,7 +624,7 @@ convertExp Alloc { expValue = v, expCount = c, expRegion = r } |
     r == region_atomic_heap, TyPrim Op.bits_ptr == getType v  = do
         v' <- convertVal v
         c' <- convertVal c
-        (malloc,tmp) <- jhc_malloc_atomic (operator "*" (sizeof uintptr_t) c') =:: ptrType uintptr_t
+        (malloc,tmp) <- jhc_malloc_atomic c' =:: ptrType uintptr_t
         fill <- case v of
             ValUnknown _ -> return mempty
             _ -> do
@@ -628,9 +635,11 @@ convertExp Alloc { expValue = v, expCount = c, expRegion = r } |
 convertExp e = return (err (show e),err "nothing")
 
 ccaf :: (Var,Val) -> P.Doc
-ccaf (v,val) = text "/* " <> text (show v) <> text " = " <> (text $ P.render (pprint val)) <> text "*/\n" <>
+ccaf (v,val) = text "/* " <> text (show v) <> text " = " <>
+    (text $ P.render (pprint val)) <> text "*/\n" <>
      text "static node_t _" <> tshow (varName v) <> text ";\n" <>
-     text "#define " <> tshow (varName v) <+>  text "(MKLAZY_C(&_" <> tshow (varName v) <> text "))\n";
+     text "#define " <> tshow (varName v) <+>  text "(MKLAZY_C(&_" <>
+     tshow (varName v) <> text "))\n";
 
 buildConstants cpr grin fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
     tyenv = grinTypeEnv grin
@@ -691,10 +700,6 @@ convertPrim p vs ty
     | Op {} <- p = do
         let [rt] = ty
         convertVal (ValPrim p vs rt)
-    | (Func _ n as r []) <- p = do
-        vs' <- mapM convertVal vs
-        rt <- convertTypes ty
-        return $ cast rt (functionCall (name $ unpackPS n) [ cast (basicType' t) v | v <- vs' | t <- as ])
     | (IFunc _ as r) <- p = do
         v':vs' <- mapM convertVal vs
         rt <- convertTypes ty
@@ -911,8 +916,6 @@ castFunc _ _ tb e = cast (opTyToC tb) e
 -- c constants and utilities
 ----------------------------
 
---gc_roots vs = functionCall (name "gc_begin_frame0") (constant (number (fromIntegral $ length vs)):vs)
---gc_roots vs   = functionCall (name "gc_frame0") (v_gc:constant (number (fromIntegral $ length vs)):vs)
 gc_roots vs   = case length vs of
 --    1 ->  functionCall (name "gc_frame1") (v_gc:vs)
 --    2 ->  functionCall (name "gc_frame2") (v_gc:vs)
@@ -920,8 +923,8 @@ gc_roots vs   = case length vs of
 gc_end        = functionCall (name "gc_end") []
 tbsize sz = functionCall (name "TO_BLOCKS") [sz]
 
-jhc_malloc_atomic sz | fopts FO.Jgc = functionCall (name "gc_alloc") [v_gc,nullPtr, tbsize sz, toExpression (0::Int)]
-                     | otherwise = jhc_malloc nullPtr (0::Int) sz
+jhc_malloc_atomic sz | fopts FO.Jgc = functionCall (name "gc_array_alloc_atomic") [v_gc,nullPtr, sz, toExpression (0::Int)]
+                     | otherwise = jhc_malloc nullPtr (0::Int) (sizeof sptr_t *# sz)
 
 jhc_malloc ntn nptrs sz | fopts FO.Jgc = functionCall (name "gc_alloc") [v_gc,ntn, tbsize sz, toExpression nptrs]
 --    | fopts FO.Jgc =  functionCall (name "gc_alloc") [v_gc,tbsize sz, toExpression nptrs]
@@ -969,6 +972,7 @@ fptr_t  = basicGCType "fptr_t"
 wptr_t  = basicGCType "wptr_t"
 gc_t    = basicGCType "gc_t"
 v_gc = variable (name "gc")
+v_saved_gc = variable (name "saved_gc")
 
 a_STD = Attribute "A_STD"
 a_FALIGNED = Attribute "A_FALIGNED"

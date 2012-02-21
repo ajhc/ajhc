@@ -3,63 +3,9 @@
 #include "sys/bitarray.h"
 #include "rts/cdefs.h"
 #include "rts/constants.h"
+#include "rts/gc_jgc_internal.h"
 
 #if _JHC_GC == _JHC_GC_JGC
-
-struct s_arena {
-        struct s_megablock *current_megablock;
-        SLIST_HEAD(,s_block) free_blocks;
-        unsigned block_used;
-        unsigned block_threshold;
-        SLIST_HEAD(,s_cache) caches;
-        SLIST_HEAD(,s_block) monolithic_blocks;
-        SLIST_HEAD(,s_megablock) megablocks;
-        unsigned number_gcs;    // number of garbage collections
-        unsigned number_allocs; // number of allocations since last garbage collection
-};
-
-struct s_megablock {
-        void *base;
-        unsigned next_free;
-        SLIST_ENTRY(s_megablock) next;
-};
-
-struct s_block {
-        SLIST_ENTRY(s_block) link;
-        unsigned char flags;  // defined in rts/constants.h
-        unsigned char color;  // offset in words to first entry.
-        union {
-                // A normal block.
-                struct {
-                        unsigned char num_ptrs;
-                        unsigned char size;
-                        unsigned short num_free;
-                        unsigned short next_free;
-                } pi;
-                // A monolithic block.
-                struct {
-                        unsigned num_ptrs;
-                } m;
-        } u;
-        bitarray_t used[];
-};
-
-struct s_cache {
-        SLIST_ENTRY(s_cache) next;
-        SLIST_HEAD(,s_block) blocks;
-        SLIST_HEAD(,s_block) full_blocks;
-        unsigned char color;
-        unsigned char size;
-        unsigned char num_ptrs;
-        unsigned char flags;
-        unsigned short num_entries;
-        struct s_arena *arena;
-        void (*init_fn)(void *);
-        void (*fini_fn)(void *);
-#if _JHC_PROFILE
-        unsigned allocations;
-#endif
-};
 
 gc_t saved_gc;
 struct s_arena *arena;
@@ -67,7 +13,7 @@ static gc_t gc_stack_base;
 
 #define TO_GCPTR(x) (entry_t *)(FROM_SPTR(x))
 
-static void gc_perform_gc(gc_t gc);
+void gc_perform_gc(gc_t gc) A_STD;
 static bool s_set_used_bit(void *val) A_UNUSED;
 static void clear_used_bits(struct s_arena *arena) A_UNUSED;
 static void s_cleanup_blocks(struct s_arena *arena);
@@ -135,7 +81,7 @@ gc_add_grey(struct stack *stack, entry_t *s)
                 stack->stack[stack->ptr++] = s;
 }
 
-static void
+void A_STD
 gc_perform_gc(gc_t gc)
 {
         profile_push(&gc_gc_time);
@@ -218,7 +164,7 @@ gc_perform_gc(gc_t gc)
         }
         free(stack.stack);
         s_cleanup_blocks(arena);
-        if(JHC_STATUS) {
+        if (JHC_STATUS) {
                 fprintf(stderr, "%3u - %6u Used: %4u Thresh: %4u Ss: %5u Ps: %5u Rs: %5u Root: %3u\n",
                         arena->number_gcs,
                         arena->number_allocs,
@@ -236,10 +182,10 @@ gc_perform_gc(gc_t gc)
 
 // 7 to share caches with the first 7 tuples
 #define GC_STATIC_ARRAY_NUM 7
-#define GC_MAX_BLOCK_ENTRIES 100
+#define GC_MAX_BLOCK_ENTRIES 150
 
 static struct s_cache *array_caches[GC_STATIC_ARRAY_NUM];
-static struct s_cache *array_atomic_caches[GC_STATIC_ARRAY_NUM];
+static struct s_cache *array_caches_atomic[GC_STATIC_ARRAY_NUM];
 
 void
 jhc_alloc_init(void) {
@@ -257,6 +203,7 @@ jhc_alloc_init(void) {
         }
         for (int i = 0; i < GC_STATIC_ARRAY_NUM; i++) {
                 find_cache(&array_caches[i], arena, i + 1, i + 1);
+                find_cache(&array_caches_atomic[i], arena, i + 1, 0);
         }
 }
 
@@ -266,10 +213,9 @@ jhc_alloc_fini(void) {
                 fprintf(stderr, "arena: %p\n", arena);
                 fprintf(stderr, "  block_used: %i\n", arena->block_used);
                 fprintf(stderr, "  block_threshold: %i\n", arena->block_threshold);
-                struct s_cache *sc = SLIST_FIRST(&arena->caches);
-                for(;sc;sc = SLIST_NEXT(sc,next)) {
+                struct s_cache *sc;
+                SLIST_FOREACH(sc,&arena->caches,next)
                         print_cache(sc);
-                }
         }
 }
 
@@ -284,9 +230,9 @@ heap_t A_STD
 }
 
 static heap_t A_STD
-s_monoblock(struct s_arena *arena, unsigned size, unsigned nptrs) {
+s_monoblock(struct s_arena *arena, unsigned size, unsigned nptrs, unsigned flags) {
         struct s_block *b = aligned_alloc(size * sizeof(uintptr_t));
-        b->flags = SLAB_MONOLITH;
+        b->flags = flags | SLAB_MONOLITH;
         b->color = (sizeof(struct s_block) + BITARRAY_SIZE_IN_BYTES(1) +
                     sizeof(uintptr_t) - 1) / sizeof(uintptr_t);
         b->u.m.num_ptrs = nptrs;
@@ -295,7 +241,8 @@ s_monoblock(struct s_arena *arena, unsigned size, unsigned nptrs) {
         return (void *)b + b->color*sizeof(uintptr_t);
 }
 
-// Allocate an array of count garbage collectable locations in the garbage collected heap
+// Allocate an array of count garbage collectable locations in the garbage
+// collected heap.
 heap_t A_STD
 gc_array_alloc(gc_t gc, unsigned count)
 {
@@ -305,7 +252,22 @@ gc_array_alloc(gc_t gc, unsigned count)
                 return (wptr_t)s_alloc(gc,array_caches[count - 1]);
         if (count < GC_MAX_BLOCK_ENTRIES)
                 return s_alloc(gc, find_cache(NULL, arena, count, count));
-        return s_monoblock(arena, count, count);
+        return s_monoblock(arena, count, count, 0);
+        abort();
+}
+
+// Allocate an array of count non-garbage collectable locations in the garbage
+// collected heap.
+heap_t A_STD
+gc_array_alloc_atomic(gc_t gc, unsigned count, unsigned flags)
+{
+        if (!count)
+               return NULL;
+        if (count <= GC_STATIC_ARRAY_NUM && !flags)
+                return (wptr_t)s_alloc(gc,array_caches_atomic[count - 1]);
+        if (count < GC_MAX_BLOCK_ENTRIES && !flags)
+                return s_alloc(gc, find_cache(NULL, arena, count, 0));
+        return s_monoblock(arena, count, count, flags);
         abort();
 }
 
@@ -334,14 +296,14 @@ aligned_alloc(unsigned size) {
         void *base;
 #if defined(__WIN32__)
         base = _aligned_malloc(MEGABLOCK_SIZE, BLOCK_SIZE);
-        int ret = !mb->base;
+        int ret = !base;
 #elif defined(__ARM_EABI__)
         base = memalign(BLOCK_SIZE, MEGABLOCK_SIZE);
-        int ret = !mb->base;
+        int ret = !base;
 #elif (defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ <  1060)
         assert(sysconf(_SC_PAGESIZE) == BLOCK_SIZE);
         base = valloc(MEGABLOCK_SIZE);
-        int ret = !mb->base;
+        int ret = !base;
 #else
         int ret = posix_memalign(&base,BLOCK_SIZE,MEGABLOCK_SIZE);
 #endif
@@ -394,16 +356,31 @@ get_free_block(gc_t gc, struct s_arena *arena) {
         }
 }
 
+typedef void (*finalizer_ptr)(HsPtr arg);
+typedef void (*finalizer_env_ptr)(HsPtr env, HsPtr arg);
+
+void hs_foreignptr_env_helper(HsPtr env, HsPtr arg) {
+        ((finalizer_ptr)env)(arg);
+}
+
 static void
 s_cleanup_blocks(struct s_arena *arena) {
         struct s_block *pg = SLIST_FIRST(&arena->monolithic_blocks);
         SLIST_INIT(&arena->monolithic_blocks);
         while (pg) {
-                if(BIT_IS_SET(pg->used, 0)) {
+                if (pg->used[0]) {
                         SLIST_INSERT_HEAD(&arena->monolithic_blocks, pg, link);
                         pg = SLIST_NEXT(pg,link);
-                }
-                else  {
+                } else {
+                        if (pg->flags & SLAB_FLAG_FINALIZER) {
+                                HsPtr *ptr = (HsPtr *)pg;
+                                if(ptr[pg->color + 1]) {
+                                        finalizer_ptr *fp = ptr[pg->color + 1];
+                                        do {
+                                                fp[0](ptr[pg->color]);
+                                        } while(*++fp);
+                                }
+                        }
                         void *ptr = pg;
                         pg = SLIST_NEXT(pg,link);
                         free(ptr);
@@ -619,6 +596,64 @@ new_arena(void) {
         return arena;
 }
 
+uint32_t
+get_heap_flags(void * sp) {
+        uint32_t ret = 0;
+        switch (GET_PTYPE(sp)) {
+        case P_VALUE: return SLAB_VIRTUAL_VALUE;
+        case P_FUNC: return SLAB_VIRTUAL_FUNC;
+        case P_LAZY:
+                     ret |= SLAB_VIRTUAL_LAZY;
+        case P_WHNF:
+                     if (S_BLOCK(sp) == NULL)
+                             return (ret | SLAB_VIRTUAL_SPECIAL);
+                     if ((void *)sp >= nh_start && (void *)sp <= nh_end)
+                             return (ret | SLAB_VIRTUAL_CONSTANT);
+                     return ret |= S_BLOCK(sp)->flags;
+        }
+        return ret;
+}
+
+heap_t A_STD
+gc_malloc_foreignptr(unsigned alignment, unsigned size, bool finalizer) {
+        // we don't allow higher alignments yet.
+        assert (alignment <= sizeof(uintptr_t));
+        // no finalizers yet
+        assert (!finalizer);
+        unsigned spacing = 1 + finalizer;
+        wptr_t *res = gc_array_alloc_atomic(saved_gc, spacing + TO_BLOCKS(size),
+                                             finalizer ? SLAB_FLAG_FINALIZER : SLAB_FLAG_NONE);
+        res[0] = (wptr_t)(res + spacing);
+        if (finalizer)
+                res[1] = NULL;
+        return TO_SPTR(P_WHNF, res);
+}
+
+heap_t A_STD
+gc_new_foreignptr(HsPtr ptr) {
+        HsPtr *res = gc_array_alloc_atomic(saved_gc, 2, SLAB_FLAG_FINALIZER);
+        res[0] = ptr;
+        res[1] = NULL;
+        return TO_SPTR(P_WHNF, res);
+}
+
+bool A_STD
+gc_add_foreignptr_finalizer(wptr_t fp, HsFunPtr finalizer) {
+        if (!(SLAB_FLAG_FINALIZER & get_heap_flags(fp)))
+                return false;
+        HsFunPtr **res = (HsFunPtr**)FROM_SPTR(fp);
+        unsigned len = 0;
+        if (res[1])
+                while(res[1][len++]);
+        else
+                len = 1;
+        res[1] = realloc(res[1], (len + 1) * sizeof(HsFunPtr));
+        HsFunPtr *ptrs = res[1];
+        ptrs[len - 1] = finalizer;
+        ptrs[len] = NULL;
+        return true;
+}
+
 void
 print_cache(struct s_cache *sc) {
         fprintf(stderr, "num_entries: %i with %lu bytes of header\n",
@@ -638,6 +673,10 @@ print_cache(struct s_cache *sc) {
             fprintf(stderr, "%20p %9i %9i %c\n", pg, pg->u.pi.num_free, pg->u.pi.next_free, 'P');
         SLIST_FOREACH(pg,&sc->full_blocks,link)
             fprintf(stderr, "%20p %9i %9i %c\n", pg, pg->u.pi.num_free, pg->u.pi.next_free, 'F');
+}
+
+void hs_perform_gc(void) {
+        gc_perform_gc(saved_gc);
 }
 
 #endif

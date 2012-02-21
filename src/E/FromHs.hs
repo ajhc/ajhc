@@ -399,7 +399,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
         let cFun = createFunc (map tvrType es)
             prim = myPrim (map extTypeInfoExtType cts) (extTypeInfoExtType pt) (map extTypeInfoExtType ras')
         case (isIO,pt,ras') of
-            (True,ExtTypeVoid,[]) -> cFun $ \rs -> return (ELam tvrWorld, 
+            (True,ExtTypeVoid,[]) -> cFun $ \rs -> return (ELam tvrWorld,
                 eStrictLet tvrWorld2 (prim (EVar tvrWorld :[EVar t | t <- rs ]) tWorld__)
                     (eJustIO (EVar tvrWorld2) vUnit))
             (False,ExtTypeVoid,_) -> invalidDecl  "pure foreign function must return a non void value"
@@ -459,12 +459,12 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
                 expr $ eStrictLet uvar (EPrim prim [] st) (ELit (litCons { litName = cn, litArgs = [EVar uvar], litType = rt }))
             _ -> invalidDecl "foreign import of address must be of a boxed type"
 
-    cDecl (HsForeignDecl _ (FfiSpec (Import rcn req) _ CCall) n _) = do
+    cDecl (HsForeignDecl _ (FfiSpec (Import rcn req) safe CCall) n _) = do
         let name = toName Name.Val n
         (var,ty,lamt) <- convertValue name
         result <- ccallHelper
                      (\cts crt cras args rt ->
-                      EPrim (Func req (packString rcn) cts crt cras) args rt)
+                      EPrim (Func req (packString rcn) cts crt cras safe) args rt)
                      ty
         return [(name,setProperty prop_INLINE var,lamt result)]
     cDecl (HsForeignDecl _ (FfiSpec Dynamic _ CCall) n _) = do
@@ -999,7 +999,6 @@ ffiTypeInfo bad t cont = do
             sl <- getSrcLoc
             liftIO $ warn sl InvalidFFIType $ printf "Type '%s' cannot be used in a foreign declaration" (pprint t :: String)
             return bad
-
 
 unboxedVersion t = do
     ffiTypeInfo Unknown t $ \eti -> case eti of

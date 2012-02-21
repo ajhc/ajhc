@@ -14,8 +14,11 @@ import qualified Cmm.Op as Op
 
 import GHC.Exts
 
-data CallConv = CCall | StdCall | CApi | Primitive | DotNet 
+data CallConv = CCall | StdCall | CApi | Primitive | DotNet
     deriving(Eq,Ord,Show)
+    {-! derive: Binary !-}
+
+data Safety = Safe | Unsafe deriving(Eq,Ord,Show)
     {-! derive: Binary !-}
 
 newtype ExtType = ExtType PackedString
@@ -52,7 +55,8 @@ data Prim =
         funcName :: !PackedString,
         primArgTypes :: [ExtType],
         primRetType :: ExtType,
-	primRetArgs :: [ExtType]
+	primRetArgs :: [ExtType],
+        primSafety  :: Safety
         }   -- function call with C calling convention
     | IFunc {
         primRequires :: Requires,

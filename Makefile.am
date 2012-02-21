@@ -114,7 +114,7 @@ RAWFILES = src/data/ViaGhc.hs src/data/prelude.m4 \
            rts/sys/wsize.h rts/sys/bitarray.h ChangeLog src/data/shortchange.txt rts/rts/slub.c \
 	   rts/rts/gc_jgc.c rts/rts/gc_jgc.h rts/rts/profile.c rts/rts/profile.h rts/rts/cdefs.h rts/rts/rts_support.c \
 	   rts/rts/rts_support.h rts/rts/gc.h rts/rts/gc_none.c rts/rts/gc_none.h rts/rts/jhc_rts.c rts/rts/jhc_rts.h \
-	   rts/lib/lib_cbits.c rts/jhc_rts_header.h rts/lib/lib_cbits.h
+	   rts/lib/lib_cbits.c rts/jhc_rts_header.h rts/lib/lib_cbits.h rts/rts/gc_jgc_internal.h
 
 DRIFTFILES = drift_processed/C/FFI.hs drift_processed/C/FromGrin2.hs drift_processed/Cmm/Op.hs drift_processed/C/Prims.hs drift_processed/DataConstructors.hs \
    drift_processed/DerivingDrift/StandardRules.hs drift_processed/E/CPR.hs drift_processed/E/Demand.hs drift_processed/E/LambdaLift.hs \

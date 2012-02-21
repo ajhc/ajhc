@@ -4,4 +4,4 @@ module System.Mem where
 
 import Jhc.Prim.IO
 
-foreign import ccall "hs_perform_gc" performGC :: IO ()
+foreign import ccall safe "hs_perform_gc" performGC :: IO ()

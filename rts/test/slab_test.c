@@ -1,8 +1,3 @@
-#define JHC_VALGRIND 1
-
-#define _JHC_STANDALONE 0
-#define _JHC_GC _JHC_GC_JGC
-
 #include "jhc_rts_header.h"
 
 #define NUM_CACHES 15
