@@ -8,6 +8,7 @@ struct sptr;
 struct s_arena;
 struct s_cache;
 typedef void* *gc_t;
+typedef void* heap_t;  // a pointer into the GCed heap.
 
 #define BLOCK_SIZE     (1UL << 12)
 #define MEGABLOCK_SIZE (1UL << 20)
@@ -18,16 +19,18 @@ typedef void* *gc_t;
 extern struct s_arena *arena;
 extern gc_t saved_gc;
 
-void *s_alloc(gc_t gc, struct s_cache *sc) A_STD;
 void print_cache(struct s_cache *sc);
 struct s_cache *new_cache(struct s_arena *arena, unsigned short size,
                           unsigned short num_ptrs);
 struct s_arena *new_arena(void);
 struct s_cache *find_cache(struct s_cache **rsc, struct s_arena *arena,
                            unsigned short size, unsigned short num_ptrs);
-void *(gc_alloc)(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs);
 void gc_add_root(gc_t gc, void * root);
-void *gc_array_alloc(gc_t gc, unsigned count);
+
+heap_t s_alloc(gc_t gc, struct s_cache *sc) A_STD;
+heap_t (gc_alloc)(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs);
+heap_t gc_array_alloc(gc_t gc, unsigned count);
+heap_t gc_array_alloc_atomic(gc_t gc, unsigned count);
 
 #define gc_frame0(gc,n,...) void *ptrs[n] = { __VA_ARGS__ }; \
         for(int i = 0; i < n; i++) gc[i] = (sptr_t)ptrs[i]; \

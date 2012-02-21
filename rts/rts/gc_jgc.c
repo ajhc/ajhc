@@ -2,6 +2,7 @@
 #include "sys/queue.h"
 #include "sys/bitarray.h"
 #include "rts/cdefs.h"
+#include "rts/constants.h"
 
 #if _JHC_GC == _JHC_GC_JGC
 
@@ -13,6 +14,8 @@ struct s_arena {
         SLIST_HEAD(,s_cache) caches;
         SLIST_HEAD(,s_block) monolithic_blocks;
         SLIST_HEAD(,s_megablock) megablocks;
+        unsigned number_gcs;    // number of garbage collections
+        unsigned number_allocs; // number of allocations since last garbage collection
 };
 
 struct s_megablock {
@@ -21,18 +24,23 @@ struct s_megablock {
         SLIST_ENTRY(s_megablock) next;
 };
 
-struct s_block_info {
-        unsigned char color;
-        unsigned char size;
-        unsigned char num_ptrs;
-        unsigned char flags;
-};
-
 struct s_block {
         SLIST_ENTRY(s_block) link;
-        struct s_block_info pi;
-        unsigned short num_free;
-        unsigned short next_free;
+        unsigned char flags;  // defined in rts/constants.h
+        unsigned char color;  // offset in words to first entry.
+        union {
+                // A normal block.
+                struct {
+                        unsigned char num_ptrs;
+                        unsigned char size;
+                        unsigned short num_free;
+                        unsigned short next_free;
+                } pi;
+                // A monolithic block.
+                struct {
+                        unsigned num_ptrs;
+                } m;
+        } u;
         bitarray_t used[];
 };
 
@@ -40,7 +48,10 @@ struct s_cache {
         SLIST_ENTRY(s_cache) next;
         SLIST_HEAD(,s_block) blocks;
         SLIST_HEAD(,s_block) full_blocks;
-        struct s_block_info pi;
+        unsigned char color;
+        unsigned char size;
+        unsigned char num_ptrs;
+        unsigned char flags;
         unsigned short num_entries;
         struct s_arena *arena;
         void (*init_fn)(void *);
@@ -52,8 +63,6 @@ struct s_cache {
 
 gc_t saved_gc;
 struct s_arena *arena;
-static unsigned number_gcs;    // number of garbage collections
-static unsigned number_allocs; // number of allocations since last garbage collection
 static gc_t gc_stack_base;
 
 #define TO_GCPTR(x) (entry_t *)(FROM_SPTR(x))
@@ -62,6 +71,8 @@ static void gc_perform_gc(gc_t gc);
 static bool s_set_used_bit(void *val) A_UNUSED;
 static void clear_used_bits(struct s_arena *arena) A_UNUSED;
 static void s_cleanup_blocks(struct s_arena *arena);
+static struct s_block *get_free_block(gc_t gc, struct s_arena *arena);
+static void *aligned_alloc(unsigned size);
 
 typedef struct {
         sptr_t ptrs[0];
@@ -119,7 +130,7 @@ void gc_add_root(gc_t gc, void *root)
 static void
 gc_add_grey(struct stack *stack, entry_t *s)
 {
-        VALGRIND_MAKE_MEM_DEFINED(s,(S_BLOCK(s))->pi.size * sizeof(uintptr_t));
+        VALGRIND_MAKE_MEM_DEFINED(s,(S_BLOCK(s))->u.pi.size * sizeof(uintptr_t));
         if(gc_check_heap(s) && s_set_used_bit(s))
                 stack->stack[stack->ptr++] = s;
 }
@@ -128,7 +139,7 @@ static void
 gc_perform_gc(gc_t gc)
 {
         profile_push(&gc_gc_time);
-        number_gcs++;
+        arena->number_gcs++;
 
         unsigned number_redirects = 0;
         unsigned number_stack = 0;
@@ -184,11 +195,12 @@ gc_perform_gc(gc_t gc)
         while(stack.ptr) {
                 entry_t *e = stack.stack[--stack.ptr];
                 struct s_block *pg = S_BLOCK(e);
-                VALGRIND_MAKE_MEM_DEFINED(e,pg->pi.size * sizeof(uintptr_t));
+                if(!(pg->flags & SLAB_MONOLITH))
+                        VALGRIND_MAKE_MEM_DEFINED(e,pg->u.pi.size * sizeof(uintptr_t));
                 debugf("Processing Grey: %p\n",e);
-
-                stack_check(&stack, pg->pi.num_ptrs);
-                for(int i = 0; i < pg->pi.num_ptrs; i++) {
+                unsigned num_ptrs = pg->flags & SLAB_MONOLITH ? pg->u.m.num_ptrs : pg->u.pi.num_ptrs;
+                stack_check(&stack, num_ptrs);
+                for(unsigned i = 0; i < num_ptrs; i++) {
                         if(1 && (P_LAZY == GET_PTYPE(e->ptrs[i]))) {
                                 VALGRIND_MAKE_MEM_DEFINED(FROM_SPTR(e->ptrs[i]), sizeof(uintptr_t));
                                 if(!IS_LAZY(GETHEAD(FROM_SPTR(e->ptrs[i])))) {
@@ -208,8 +220,8 @@ gc_perform_gc(gc_t gc)
         s_cleanup_blocks(arena);
         if(JHC_STATUS) {
                 fprintf(stderr, "%3u - %6u Used: %4u Thresh: %4u Ss: %5u Ps: %5u Rs: %5u Root: %3u\n",
-                        number_gcs,
-                        number_allocs,
+                        arena->number_gcs,
+                        arena->number_allocs,
                         (unsigned)arena->block_used,
                         (unsigned)arena->block_threshold,
                         number_stack,
@@ -217,15 +229,17 @@ gc_perform_gc(gc_t gc)
                         number_redirects,
                         (unsigned)root_stack.ptr
                        );
-                number_allocs = 0;
+                arena->number_allocs = 0;
         }
         profile_pop(&gc_gc_time);
 }
 
 // 7 to share caches with the first 7 tuples
-#define GC_STATIC_ARRAY_NUM 256
+#define GC_STATIC_ARRAY_NUM 7
+#define GC_MAX_BLOCK_ENTRIES 100
 
-static struct s_cache *static_array_caches[GC_STATIC_ARRAY_NUM];
+static struct s_cache *array_caches[GC_STATIC_ARRAY_NUM];
+static struct s_cache *array_atomic_caches[GC_STATIC_ARRAY_NUM];
 
 void
 jhc_alloc_init(void) {
@@ -242,7 +256,7 @@ jhc_alloc_init(void) {
                 }
         }
         for (int i = 0; i < GC_STATIC_ARRAY_NUM; i++) {
-                find_cache(&static_array_caches[i], arena, i + 1, i + 1);
+                find_cache(&array_caches[i], arena, i + 1, i + 1);
         }
 }
 
@@ -259,30 +273,39 @@ jhc_alloc_fini(void) {
         }
 }
 
-void *
+heap_t A_STD
 (gc_alloc)(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs)
 {
-        profile_push(&gc_alloc_time);
-        if (JHC_STATUS)
-                number_allocs++;
         assert(nptrs <= count);
         entry_t *e = s_alloc(gc, find_cache(sc, arena, count, nptrs));
         VALGRIND_MAKE_MEM_UNDEFINED(e,sizeof(uintptr_t)*count);
-        debugf("allocated: %p %i %i\n",(void *)e, count, nptrs);
-        profile_pop(&gc_alloc_time);
+        debugf("gc_alloc: %p %i %i\n",(void *)e, count, nptrs);
         return (void *)e;
 }
 
+static heap_t A_STD
+s_monoblock(struct s_arena *arena, unsigned size, unsigned nptrs) {
+        struct s_block *b = aligned_alloc(size * sizeof(uintptr_t));
+        b->flags = SLAB_MONOLITH;
+        b->color = (sizeof(struct s_block) + BITARRAY_SIZE_IN_BYTES(1) +
+                    sizeof(uintptr_t) - 1) / sizeof(uintptr_t);
+        b->u.m.num_ptrs = nptrs;
+        SLIST_INSERT_HEAD(&arena->monolithic_blocks, b, link);
+        b->used[0] = 1;
+        return (void *)b + b->color*sizeof(uintptr_t);
+}
+
 // Allocate an array of count garbage collectable locations in the garbage collected heap
-void *
+heap_t A_STD
 gc_array_alloc(gc_t gc, unsigned count)
 {
         if (!count)
                return NULL;
         if (count <= GC_STATIC_ARRAY_NUM)
-                return (wptr_t)s_alloc(gc,static_array_caches[count - 1]);
-        //if (count < GC_MAX_BLOCK_ENTRIES)
+                return (wptr_t)s_alloc(gc,array_caches[count - 1]);
+        if (count < GC_MAX_BLOCK_ENTRIES)
                 return s_alloc(gc, find_cache(NULL, arena, count, count));
+        return s_monoblock(arena, count, count);
         abort();
 }
 
@@ -306,29 +329,35 @@ bitset_find_free(unsigned *next_free,int n,bitarray_t ba[static n]) {
         } while (1);
 }
 
+static void *
+aligned_alloc(unsigned size) {
+        void *base;
+#if defined(__WIN32__)
+        base = _aligned_malloc(MEGABLOCK_SIZE, BLOCK_SIZE);
+        int ret = !mb->base;
+#elif defined(__ARM_EABI__)
+        base = memalign(BLOCK_SIZE, MEGABLOCK_SIZE);
+        int ret = !mb->base;
+#elif (defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ <  1060)
+        assert(sysconf(_SC_PAGESIZE) == BLOCK_SIZE);
+        base = valloc(MEGABLOCK_SIZE);
+        int ret = !mb->base;
+#else
+        int ret = posix_memalign(&base,BLOCK_SIZE,MEGABLOCK_SIZE);
+#endif
+        if(ret != 0) {
+                fprintf(stderr,"Unable to allocate memory for aligned alloc: %u\n", size);
+                abort();
+        }
+        return base;
+}
+
 struct s_megablock *
 s_new_megablock(struct s_arena *arena)
 {
         struct s_megablock *mb = malloc(sizeof(*mb));
-#if defined(__WIN32__)
-        mb->base = _aligned_malloc(MEGABLOCK_SIZE, BLOCK_SIZE);
-        int ret = !mb->base;
-#elif defined(__ARM_EABI__)
-        mb->base = memalign(BLOCK_SIZE,MEGABLOCK_SIZE);
-        int ret = !mb->base;
-#elif (defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ <  1060)
-        assert(sysconf(_SC_PAGESIZE) == BLOCK_SIZE);
-        mb->base = valloc(MEGABLOCK_SIZE);
-        int ret = !mb->base;
-#else
-        int ret = posix_memalign(&mb->base,BLOCK_SIZE,MEGABLOCK_SIZE);
-#endif
-        if(ret != 0) {
-                fprintf(stderr,"Unable to allocate memory for megablock\n");
-                abort();
-        }
+        mb->base = aligned_alloc(MEGABLOCK_SIZE);
         VALGRIND_MAKE_MEM_NOACCESS(mb->base,MEGABLOCK_SIZE);
-        //VALGRIND_FREELIKE_BLOCK(mb->base,0);
         mb->next_free = 0;
         return mb;
 }
@@ -360,7 +389,7 @@ get_free_block(gc_t gc, struct s_arena *arena) {
                         arena->current_megablock = NULL;
                 }
                 VALGRIND_MAKE_MEM_UNDEFINED(pg,sizeof(struct s_block));
-                pg->num_free = 0;
+                pg->u.pi.num_free = 0;
                 return pg;
         }
 }
@@ -402,10 +431,10 @@ s_cleanup_blocks(struct s_arena *arena) {
                 }
                 while(pg) {
                         struct s_block *npg = SLIST_NEXT(pg,link);
-                        if(__predict_false(pg->num_free == 0)) {
+                        if(__predict_false(pg->u.pi.num_free == 0)) {
                                 // Add full blockes to the cache's full block list.
                                 SLIST_INSERT_HEAD(&sc->full_blocks,pg,link);
-                        } else if(__predict_true(pg->num_free == sc->num_entries)) {
+                        } else if(__predict_true(pg->u.pi.num_free == sc->num_entries)) {
                                 // Return completely free block to arena free block list.
                                 arena->block_used--;
                                 VALGRIND_MAKE_MEM_NOACCESS((char *)pg + sizeof(struct s_block),
@@ -413,13 +442,13 @@ s_cleanup_blocks(struct s_arena *arena) {
                                 SLIST_INSERT_HEAD(&arena->free_blocks,pg,link);
                         } else {
                                 if(!best) {
-                                        free_best = pg->num_free;
+                                        free_best = pg->u.pi.num_free;
                                         best = pg;
                                 } else {
-                                        if(pg->num_free < free_best) {
+                                        if(pg->u.pi.num_free < free_best) {
                                                 struct s_block *tmp = best;
                                                 best = pg; pg = tmp;
-                                                free_best = pg->num_free;
+                                                free_best = pg->u.pi.num_free;
                                         }
                                         SLIST_INSERT_HEAD(&sc->blocks,pg,link);
                                 }
@@ -438,7 +467,7 @@ s_cleanup_blocks(struct s_arena *arena) {
 inline static void
 clear_block_used_bits(unsigned num_entries, struct s_block *pg)
 {
-        pg->num_free = num_entries;
+        pg->u.pi.num_free = num_entries;
         memset(pg->used,0,BITARRAY_SIZE_IN_BYTES(num_entries) - sizeof(pg->used[0]));
         int excess = num_entries % BITS_PER_UNIT;
         pg->used[BITARRAY_SIZE(num_entries) - 1] = ~((1UL << excess) - 1);
@@ -448,40 +477,48 @@ clear_block_used_bits(unsigned num_entries, struct s_block *pg)
 #endif
 }
 
-void * A_STD
+/*
+ * allocators
+ */
+
+heap_t A_STD
 s_alloc(gc_t gc, struct s_cache *sc)
 {
 #if _JHC_PROFILE
        sc->allocations++;
+       sc->arena->number_allocs++;
 #endif
         struct s_block *pg = SLIST_FIRST(&sc->blocks);
         if(__predict_false(!pg)) {
                 pg = get_free_block(gc, sc->arena);
                 VALGRIND_MAKE_MEM_NOACCESS(pg, BLOCK_SIZE);
                 VALGRIND_MAKE_MEM_DEFINED(pg, sizeof(struct s_block));
-                if(sc->num_entries != pg->num_free)
+                if(sc->num_entries != pg->u.pi.num_free)
                         VALGRIND_MAKE_MEM_UNDEFINED((char *)pg->used,
                                                     BITARRAY_SIZE_IN_BYTES(sc->num_entries));
                 else
                         VALGRIND_MAKE_MEM_DEFINED((char *)pg->used,
                                                   BITARRAY_SIZE_IN_BYTES(sc->num_entries));
                 assert(pg);
-                pg->pi = sc->pi;
-                pg->next_free = 0;
+                pg->flags = sc->flags;
+                pg->color = sc->color;
+                pg->u.pi.num_ptrs = sc->num_ptrs;
+                pg->u.pi.size = sc->size;
+                pg->u.pi.next_free = 0;
                 SLIST_INSERT_HEAD(&sc->blocks,pg,link);
-                if(sc->num_entries != pg->num_free)
+                if(sc->num_entries != pg->u.pi.num_free)
                         clear_block_used_bits(sc->num_entries, pg);
                 pg->used[0] = 1; //set the first bit
-                pg->num_free = sc->num_entries - 1;
-                return (uintptr_t *)pg + pg->pi.color;
+                pg->u.pi.num_free = sc->num_entries - 1;
+                return (uintptr_t *)pg + pg->color;
         } else {
                 __builtin_prefetch(pg->used,1);
-                pg->num_free--;
-                unsigned next_free = pg->next_free;
+                pg->u.pi.num_free--;
+                unsigned next_free = pg->u.pi.next_free;
                 unsigned found = bitset_find_free(&next_free,BITARRAY_SIZE(sc->num_entries),pg->used);
-                pg->next_free = next_free;
-                void *val = (uintptr_t *)pg + pg->pi.color + found*pg->pi.size;
-                if(__predict_false(0 == pg->num_free)) {
+                pg->u.pi.next_free = next_free;
+                void *val = (uintptr_t *)pg + pg->color + found*pg->u.pi.size;
+                if(__predict_false(0 == pg->u.pi.num_free)) {
                         assert(pg == SLIST_FIRST(&sc->blocks));
                         SLIST_REMOVE_HEAD(&sc->blocks,link);
                         SLIST_INSERT_HEAD(&sc->full_blocks,pg,link);
@@ -498,12 +535,12 @@ new_cache(struct s_arena *arena, unsigned short size, unsigned short num_ptrs)
         struct s_cache *sc = malloc(sizeof(*sc));
         memset(sc,0,sizeof(*sc));
         sc->arena = arena;
-        sc->pi.size = size;
-        sc->pi.num_ptrs = num_ptrs;
-        sc->pi.flags = 0;
+        sc->size = size;
+        sc->num_ptrs = num_ptrs;
+        sc->flags = 0;
         size_t excess = BLOCK_SIZE - sizeof(struct s_block);
         sc->num_entries = (8*excess) / (8*sizeof(uintptr_t)*size + 1) - 1;
-        sc->pi.color = (sizeof(struct s_block) + BITARRAY_SIZE_IN_BYTES(sc->num_entries) +
+        sc->color = (sizeof(struct s_block) + BITARRAY_SIZE_IN_BYTES(sc->num_entries) +
                         sizeof(uintptr_t) - 1) / sizeof(uintptr_t);
         SLIST_INIT(&sc->blocks);
         SLIST_INIT(&sc->full_blocks);
@@ -515,16 +552,15 @@ new_cache(struct s_arena *arena, unsigned short size, unsigned short num_ptrs)
 static void
 clear_used_bits(struct s_arena *arena)
 {
+        struct s_block *pg;
+        SLIST_FOREACH(pg, &arena->monolithic_blocks, link)
+            pg->used[0] = 0;
         struct s_cache *sc = SLIST_FIRST(&arena->caches);
         for(;sc;sc = SLIST_NEXT(sc,next)) {
-                struct s_block *pg = SLIST_FIRST(&sc->blocks);
-                struct s_block *fpg = SLIST_FIRST(&sc->full_blocks);
-                do {
-                        for(;pg;pg = SLIST_NEXT(pg,link))
-                                clear_block_used_bits(sc->num_entries,pg);
-                        pg = fpg;
-                        fpg = NULL;
-                }  while(pg);
+                SLIST_FOREACH(pg, &sc->blocks, link)
+                    clear_block_used_bits(sc->num_entries,pg);
+                SLIST_FOREACH(pg, &sc->full_blocks, link)
+                    clear_block_used_bits(sc->num_entries,pg);
         }
 }
 
@@ -537,11 +573,17 @@ s_set_used_bit(void *val)
 {
         assert(val);
         struct s_block *pg = S_BLOCK(val);
-        unsigned int offset = ((uintptr_t *)val - (uintptr_t *)pg) - pg->pi.color;
-        if(__predict_true(BIT_IS_UNSET(pg->used,offset/pg->pi.size))) {
-                BIT_SET(pg->used,offset/pg->pi.size);
-                pg->num_free--;
-                return (bool)pg->pi.num_ptrs;
+        unsigned int offset = ((uintptr_t *)val - (uintptr_t *)pg) - pg->color;
+        if(__predict_true(BIT_IS_UNSET(pg->used,offset/pg->u.pi.size))) {
+                if (pg->flags & SLAB_MONOLITH) {
+                        pg->used[0] = 1;
+                        return (bool)pg->u.m.num_ptrs;
+
+                } else {
+                        BIT_SET(pg->used,offset/pg->u.pi.size);
+                        pg->u.pi.num_free--;
+                        return (bool)pg->u.pi.num_ptrs;
+                }
         }
         return false;
 }
@@ -554,7 +596,7 @@ find_cache(struct s_cache **rsc, struct s_arena *arena,
                 return *rsc;
         struct s_cache *sc = SLIST_FIRST(&arena->caches);
         for(;sc;sc = SLIST_NEXT(sc,next)) {
-                if(sc->pi.size == size && sc->pi.num_ptrs == num_ptrs)
+                if(sc->size == size && sc->num_ptrs == num_ptrs)
                         goto found;
         }
         sc = new_cache(arena,size,num_ptrs);
@@ -583,7 +625,7 @@ print_cache(struct s_cache *sc) {
                 (int)sc->num_entries, sizeof(struct s_block) +
                 BITARRAY_SIZE_IN_BYTES(sc->num_entries));
         fprintf(stderr, "  size: %i words %i ptrs\n",
-                (int)sc->pi.size,(int)sc->pi.num_ptrs);
+                (int)sc->size,(int)sc->num_ptrs);
 #if _JHC_PROFILE
         fprintf(stderr, "  allocations: %lu\n", (unsigned long)sc->allocations);
 #endif
@@ -593,9 +635,9 @@ print_cache(struct s_cache *sc) {
         fprintf(stderr, "%20s %9s %9s %s\n", "block", "num_free", "next_free", "status");
         struct s_block *pg;
         SLIST_FOREACH(pg,&sc->blocks,link)
-                fprintf(stderr, "%20p %9i %9i %c\n", pg, pg->num_free, pg->next_free, 'P');
+            fprintf(stderr, "%20p %9i %9i %c\n", pg, pg->u.pi.num_free, pg->u.pi.next_free, 'P');
         SLIST_FOREACH(pg,&sc->full_blocks,link)
-                fprintf(stderr, "%20p %9i %9i %c\n", pg, pg->num_free, pg->next_free, 'F');
+            fprintf(stderr, "%20p %9i %9i %c\n", pg, pg->u.pi.num_free, pg->u.pi.next_free, 'F');
 }
 
 #endif
