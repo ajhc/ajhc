@@ -3,6 +3,8 @@ module C.Generate(
     Structure(..),
     (=*),
     (&),
+    (*#),
+    (+#),
     ToExpression(..),
     ToStatement(..),
     eq,
@@ -680,5 +682,9 @@ instance (ToExpression a,ToExpression b) => ToExpression (a,b) where
 
 infixl 1 &
 
+
 (&) :: (ToStatement a,ToStatement b) => a -> b -> Statement
 x & y = toStatement x `mappend` toStatement y
+
+x *# y = operator "*" (toExpression x) (toExpression y)
+x +# y = operator "+" (toExpression x) (toExpression y)

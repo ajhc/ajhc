@@ -606,7 +606,7 @@ convertExp (BaseOp Overwrite [v@(Var vv _),tn@(NodeC t as)]) | getType v == TyIN
 convertExp Alloc { expValue = v, expCount = c, expRegion = r } | r == region_heap, TyINode == getType v  = do
     v' <- convertVal v
     c' <- convertVal c
-    (malloc,tmp) <- jhc_malloc_ptrs  (operator "*" (sizeof sptr_t) c') =:: ptrType sptr_t
+    (malloc,tmp) <- jhc_malloc_ptrs c' =:: ptrType sptr_t
     fill <- case v of
         ValUnknown _ -> return mempty
         _ -> do
@@ -928,8 +928,8 @@ jhc_malloc ntn nptrs sz | fopts FO.Jgc = functionCall (name "gc_alloc") [v_gc,nt
 jhc_malloc _ 0 sz = functionCall (name "jhc_malloc_atomic") [sz]
 jhc_malloc _ _ sz = functionCall (name "jhc_malloc") [sz]
 
-jhc_malloc_ptrs sz | fopts FO.Jgc =  functionCall (name "gc_alloc") [v_gc,nullPtr,tbsize sz, tbsize sz]
-jhc_malloc_ptrs sz = functionCall (name "jhc_malloc") [sz]
+jhc_malloc_ptrs sz | fopts FO.Jgc =  functionCall (name "gc_array_alloc") [v_gc, sz]
+jhc_malloc_ptrs sz = functionCall (name "jhc_malloc") [sizeof sptr_t *# sz]
 
 f_assert e    = functionCall (name "assert") [e]
 f_FROM_SPTR e = functionCall (name "FROM_SPTR") [e]

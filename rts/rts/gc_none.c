@@ -11,7 +11,6 @@ void hs_perform_gc(void) {
 
 void jhc_alloc_init(void) { GC_INIT(); }
 void jhc_alloc_fini(void) { }
-void jhc_alloc_print_stats(void) { }
 
 #elif _JHC_GC == _JHC_GC_NONE
 
@@ -24,12 +23,13 @@ static void *jhc_current_chunk = initial_chunk;
 static unsigned mem_chunks,mem_offset;
 
 void jhc_alloc_init(void) {}
-void jhc_alloc_fini(void) {}
 
 void
-jhc_alloc_print_stats(void) {
-        fprintf(stderr, "Memory Allocated: %u bytes\n", (JHC_MEM_CHUNK_SIZE*(mem_chunks)) + mem_offset);
-        print_alloc_size_stats();
+jhc_alloc_fini(void) {
+        if(_JHC_PROFILE) {
+                fprintf(stderr, "Memory Allocated: %u bytes\n", (JHC_MEM_CHUNK_SIZE*(mem_chunks)) + mem_offset);
+                print_alloc_size_stats();
+        }
 }
 
 static void

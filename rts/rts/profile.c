@@ -77,7 +77,6 @@ jhc_print_profile(void) {
         fprintf(stderr, "Command: %s\n", jhc_command);
         fprintf(stderr, "Complie: %s\n", jhc_c_compile);
         fprintf(stderr, "Version: %s\n\n", jhc_version);
-        jhc_alloc_print_stats();
 #if HAVE_TIMES
         struct tms tm;
         times(&tm);
@@ -90,7 +89,7 @@ jhc_print_profile(void) {
         fprintf(stderr, "-----------------\n");
 }
 
-#if _JHC_PROFILE
+#if _JHC_PROFILE && _JHC_GC != _JHC_GC_JGC
 
 #define BUCKETS 7
 static unsigned alloced[BUCKETS];
