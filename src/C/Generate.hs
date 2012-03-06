@@ -72,8 +72,10 @@ module C.Generate(
     ) where
 
 import Char
-import Control.Monad.RWS
-import Control.Monad.Writer
+import Control.Monad
+import Control.Monad.RWS(RWS(..),MonadState(..),MonadWriter(..),MonadReader(..),runRWS,asks,MonadFix(..))
+import Control.Monad.Writer(Writer(..),censor, runWriter)
+import Data.Monoid(Monoid(..))
 import Data.List(intersperse)
 import Data.Maybe(isNothing)
 import Numeric

@@ -42,12 +42,13 @@ GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
 GHCPROFOPTS= -prof -auto-all -osuf prof.o -hisuf prof.hi
 GHCSELFTESTOPTS= -osuf test.o -hisuf test.hi -DEXPORT_SELFTEST=,_selftest
 GHCNONSELFTESTOPTS= -DEXPORT_SELFTEST=
-GHCINC=  -i -i$(srcdir)/drift_processed \
-	 -i$(srcdir)/src -i$(builddir)/src -odir $(builddir)/src -hidir $(builddir)/src
+GHCINC=  -i @GHCINC@ -i$(srcdir)/drift_processed \
+	 -i$(srcdir)/src -i$(builddir)/src -odir $(builddir)/src -hidir $(builddir)/src \
+	 -I$(srcdir)/src
 
-PACKAGES= -package fgl -package regex-compat -package random -package array -package directory \
+PACKAGES= -hide-all-packages -package base -package fgl -package regex-compat -package random -package array -package directory \
           -package bytestring -package binary -package pretty -package mtl -package containers \
-	  -package unix -package haskell98 -package utf8-string -package zlib -package HsSyck \
+	  -package unix  -package utf8-string -package zlib -package HsSyck \
 	  -package filepath -package process
 
 GHCLANG= -XTypeFamilies -XViewPatterns -XUndecidableInstances -XOverlappingInstances \

@@ -12,7 +12,7 @@ module Fixer.VMap(
     vmapHeads
     )where
 
-import Data.Monoid
+import Data.Monoid(Monoid(..))
 import Data.Typeable
 import List(intersperse)
 import qualified Data.Map as Map

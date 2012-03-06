@@ -6,7 +6,7 @@ module FrontEnd.Exports(determineExports,ModInfo(..)) where
 import Control.Monad.Identity
 import Data.List
 import Data.Maybe
-import Data.Monoid
+import Data.Monoid(Monoid(..))
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 

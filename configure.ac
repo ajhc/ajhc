@@ -40,6 +40,7 @@ AC_CHECK_PROGS([MINGW],[mingw-gcc mingw32-gcc i386-mingw32-gcc i586-mingw32msvc-
 GHC=$HC
 GHCFLAGS="-hide-all-packages -package base"
 GHC_CHECK_MODULE(Data.Generics.Instances,syb,,,[])
+GHC_CHECK_MODULE(System.Time,old-time,,,[])
 GHC_CHECK_MODULE(System.Console.Readline,readline,,,[
      GHC_CHECK_MODULE(System.Console.Editline.Readline,editline,,
          GHCFLAGS="$GHCFLAGS -DUSE_EDITLINE"
@@ -49,11 +50,21 @@ GHC_CHECK_MODULE(System.Console.Readline,readline,,,[
       ])
 ])
 
+GHC_CHECK_MODULE(System,,,[] ,[ GHCINC="$GHCINC -icompat/haskell98"])
+
 AC_PROGRAM_REQUIRE(hsc2hs,hsc2hs,     [  --with-hsc2hs=<hsc2hs location>    Specify location of hsc2hs.])
 if test -z "$HSC2HS"; then
     echo "The hsc2hs program not found, please specify a location for it with the --with-hsc2hs flag"
     exit 1
 fi
+
+GHCFLAGS="$GHCFLAGS -package pretty"
+TRY_COMPILE_GHC([
+import Text.PrettyPrint.HughesPJ
+import Data.Monoid
+instance Monoid Doc
+main = putStrLn "hello"
+],[HAS_MONOID_DOC=0],[HAS_MONOID_DOC=1])
 
 jlibpath=${datadir}/$PACKAGE-$SHORTVERSION
 jetcpath=${sysconfdir}/$PACKAGE-$SHORTVERSION
@@ -65,7 +76,6 @@ AC_DEFINE_DIR(JETCPATH,jetcpath)
 
 dnl AX_CREATE_STDINT_H([cbits/_stdint.h])
 
-
 AC_SUBST(HC)
 AC_SUBST(HCFLAGS)
 AC_SUBST(HSC2HS)
@@ -76,9 +86,11 @@ AC_SUBST(SHORTVERSION)
 AC_SUBST(BYTE_ORDER)
 AC_SUBST(JLIBPATH)
 AC_SUBST(JETCPATH)
+AC_SUBST(HAS_MONOID_DOC)
 AC_SUBST(MINGW)
 AC_SUBST(VERSION_MAJOR)
 AC_SUBST(VERSION_MINOR)
 AC_SUBST(VERSION_PATCH)
-AC_CONFIG_FILES([Makefile jhc.spec src/Version/Config.hs docs/building.mkd src/cbits/config.h src/data/targets.ini])
+AC_SUBST(GHCINC)
+AC_CONFIG_FILES([Makefile jhc.spec src/hs_src_config.h src/Version/Config.hs docs/building.mkd src/cbits/config.h src/data/targets.ini])
 AC_OUTPUT

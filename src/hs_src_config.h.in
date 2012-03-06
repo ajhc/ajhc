@@ -1,0 +1,6 @@
+#ifndef HS_SRC_CONFIG
+#define HS_SRC_CONFIG
+
+#define HAS_MONOID_DOC @HAS_MONOID_DOC@
+
+#endif

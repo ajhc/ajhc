@@ -52,7 +52,7 @@ import qualified Data.Set as Set hiding(map)
 
 import C.Prims
 import Data.Binary
-import Doc.DocLike
+import Doc.DocLike as D
 import Doc.PPrint
 import Doc.Pretty
 import E.Binary()
@@ -871,7 +871,7 @@ pprintTypeAsHs e = unparse $ runVarName (f e) where
         r <- f e
         return $ fixitize (N,-3) $ pop (text "forall" <+> hsep (map char ts') <+> text ". ")  (atomize r)
     f e = error $ "printTypeAsHs: " ++ show e
-    arr = bop (R,0) (space <> text "->" <> space)
+    arr = bop (R,0) (space D.<> text "->" D.<> space)
     app = bop (L,100) (text " ")
 
 class Monad m => DataTableMonad m where

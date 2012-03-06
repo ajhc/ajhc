@@ -4,7 +4,7 @@ module Grin.FromE(compile) where
 import Control.Monad.Reader
 import Data.Graph(stronglyConnComp, SCC(..))
 import Data.IORef
-import Data.Monoid
+import Data.Monoid(Monoid(..))
 import List
 import Maybe
 import qualified Data.Map as Map

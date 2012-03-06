@@ -6,7 +6,9 @@ module FrontEnd.Tc.Unify(
     listenSolvePreds
     ) where
 
-import Control.Monad.Writer
+import Control.Monad
+import Control.Monad.Trans
+import Control.Monad.Writer(Monoid(..),Writer(..))
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 

@@ -53,11 +53,10 @@ module Grin.Grin(
     valIsNF
     ) where
 
-import Char
 import Control.Monad.Identity
-import Data.Monoid
+import Data.Char
+import Data.Monoid(Monoid(..))
 import List(isPrefixOf)
-import Prelude
 import qualified Data.Set as Set
 
 import C.FFI

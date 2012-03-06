@@ -31,7 +31,7 @@ module Util.Seq( -- * Type
           , fromList
           ) where
 
-import Data.Monoid
+import Data.Monoid(Monoid(..))
 import Control.Monad
 
 {--------------------------------------------------------------------

@@ -8,7 +8,7 @@ module Grin.Show(
     ) where
 
 import Char
-import Control.Monad.Writer
+import Control.Monad.Writer(Writer(..),tell,when,forM_,execWriter)
 import Data.Maybe
 import IO
 import qualified Data.Map as Map

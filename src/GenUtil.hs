@@ -649,7 +649,7 @@ overlaps :: Ord a => (a,a) -> (a,a) -> Bool
 _ `overlaps` _ = True
 
 -- | translate a number of seconds to a string representing the duration expressed.
-showDuration :: Integral a => a -> String
+showDuration :: (Show a,Integral a) => a -> String
 showDuration x = st "d" dayI ++ st "h" hourI ++ st "m" minI ++ show secI ++ "s" where
         (dayI, hourI) = divMod hourI' 24
         (hourI', minI) = divMod minI' 60

@@ -1,6 +1,6 @@
 module E.CPR(Val(..), cprAnalyzeDs, cprAnalyzeProgram) where
 
-import Control.Monad.Writer hiding(Product(..))
+import Control.Monad.Writer(Writer(..),runWriter,tell,Monoid(..))
 import Data.Binary
 import Data.Monoid()
 import Data.Typeable

@@ -1,16 +1,17 @@
-{-# LANGUAGE UndecidableInstances,OverlappingInstances #-}
+{-# LANGUAGE CPP,UndecidableInstances,OverlappingInstances #-}
 module Doc.DocLike where
+
+#include "hs_src_config.h"
 
 -- arch-tag: a88f19fb-e18d-475f-b6d1-8da78676261a
 
-import Data.Monoid
+import Data.Monoid(Monoid(..))
 import Control.Monad.Reader()
 import qualified Text.PrettyPrint.HughesPJ as P
 
 infixr 5 <$> -- ,<//>,<$>,<$$>
 infixr 6 <>
 infixr 6 <+>
-
 
 class TextLike a where
     empty :: a
@@ -20,7 +21,6 @@ class TextLike a where
     --char '\n' = string "\n"
     char x = text [x]
     empty = text ""
-
 
 class (TextLike a) => DocLike a where
     (<>) :: a -> a -> a
@@ -49,15 +49,12 @@ class (TextLike a) => DocLike a where
     tupled          = encloseSep lparen   rparen  comma
     semiBraces      = encloseSep lbrace   rbrace  semi
 
-
 ------------------------
 -- Basic building blocks
 ------------------------
 
 tshow :: (Show a,DocLike b) => a -> b
 tshow x = text (show x)
-
-
 
 lparen,rparen,langle,rangle,
     lbrace,rbrace,lbracket,rbracket,squote,
@@ -81,7 +78,6 @@ space           = char ' '
 dot             = char '.'
 backslash       = char '\\'
 equals          = char '='
-
 
 squotes x = enclose squote squote x
 dquotes x = enclose dquote dquote x
@@ -114,7 +110,6 @@ instance DocLike String where
     a <> b = a ++ b
     a <+> b = a ++ " " ++ b
 
-
 instance TextLike ShowS where
     empty = id
     text x = (x ++)
@@ -127,7 +122,6 @@ instance (TextLike a, Monad m) => TextLike (m a) where
     empty = return empty
     char x = return (char x)
     text x = return (text x)
-
 
 instance (DocLike a, Monad m,TextLike (m a)) => DocLike (m a) where
     a <$> b = do
@@ -154,10 +148,12 @@ instance TextLike P.Doc where
     text = P.text
     char = P.char
 
+#if !HAS_MONOID_DOC
 instance Monoid P.Doc where
     mappend = (P.<>)
     mempty = P.empty
     mconcat = P.hcat
+#endif
 
 instance DocLike P.Doc where
     (<>) = (P.<>)
@@ -180,4 +176,3 @@ instance DocLike P.Doc where
 --instance (DocLike a, Monoid (b -> a)) => DocLike (b -> a) where
 --    parens x = \a -> parens (x a)
 --    (<+>) x y = \a -> x a <+> y a
-

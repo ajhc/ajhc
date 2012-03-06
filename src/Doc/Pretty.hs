@@ -49,9 +49,9 @@ module Doc.Pretty
 import IO      (Handle,hPutStr,hPutChar,stdout)
 import Doc.DocLike hiding(empty)
 import qualified Doc.DocLike as DocLike
-import Data.Monoid
+import Data.Monoid(Monoid(..))
 
-infixr 5 </>,<//>,<$>,<$$>
+infixr 5 </>,<//>,<$$>
 --infixr 6 <>,<+>
 
 

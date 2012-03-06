@@ -3,11 +3,12 @@
 module C.FromGrin2(compileGrin) where
 
 import Control.Monad.Identity
-import Control.Monad.RWS
+import Control.Monad.RWS(asks,tell,local,get,runRWST,RWST,MonadState(..),MonadWriter(..),MonadReader(..))
+import Control.Monad
 import Data.Char
 import Data.List
 import Data.Maybe
-import Data.Monoid
+import Data.Monoid(Monoid(..))
 import System.FilePath
 import Text.PrettyPrint.HughesPJ(nest,($$),fsep)
 import qualified Data.ByteString.Lazy as LBS

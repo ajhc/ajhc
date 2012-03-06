@@ -2,7 +2,7 @@
 module C.Prims where
 
 import Data.Binary
-import Data.Monoid
+import Data.Monoid(Monoid(..))
 import Data.Typeable
 import qualified Data.Set as Set
 

@@ -14,7 +14,7 @@ import Data.Char
 import Data.IORef
 import Data.List hiding(union)
 import Data.Maybe
-import Data.Monoid
+import Data.Monoid(Monoid(..))
 import Data.Tree
 import Data.Version(Version,parseVersion,showVersion)
 import Data.Yaml.Syck
