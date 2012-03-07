@@ -20,7 +20,7 @@ cflags=-std=gnu99 -D_GNU_SOURCE -falign-functions=4 -ffast-math -Wextra -Wall -W
 cflags_debug=-g
 cflags_nodebug=-DNDEBUG -O3
 profile=false
-autoload=base,haskell98
+autoload=haskell2010,haskell-extras,haskell98
 
 
 ; cross compilation entries

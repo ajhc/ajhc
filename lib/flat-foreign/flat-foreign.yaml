@@ -2,6 +2,7 @@ Name: flat-foreign
 Version: 1.0
 hs-source-dir: .
 build-depends: [haskell2010]
+options: --noauto
 exposed-modules: [ Bits, CError, CForeign, CString, CTypes, ForeignPtr, Int,
         MarshalAlloc, MarshalArray, MarshalError, MarshalUtils, Ptr,
         StablePtr, Storable, Word ]
