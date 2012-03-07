@@ -64,7 +64,7 @@ LIB_OPTIONS=$(RTSOPTS) $(JHC_TEST)  -L- -L.
 include library_deps.make
 
 EXTRA_DIST = src/data rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
-             lib/jhc lib/jhc-prim lib/base lib/haskell98 lib/flat-foreign $(JHC_LIBS) $(JHC_EXT_LIBS) \
+             lib/jhc lib/jhc-prim lib/haskell-extras lib/haskell98 lib/flat-foreign $(JHC_LIBS) $(JHC_EXT_LIBS) \
 	     src/StringTable/StringTable_cbits.c src/StringTable/StringTable_cbits.h src/cbits/md5sum.c jhc.1 \
 	     src/StringTable/Atom.hsc jhc.spec src/cbits/lookup3.c \
 	     manual.html lib/applicative examples/HelloWorld.hs examples/Calendar.hs \
@@ -279,7 +279,7 @@ libs: $(JHC_LIBS) $(JHC_EXT_LIBS)
 show_elibs: lib/ext/*.cabal  lib/ext/*.yaml
 	-perl utils/build_extlibs.prl -l $^
 
-%: examples/%.hs jhc base-1.0.hl haskell98-1.0.hl
+%: examples/%.hs jhc $(JHC_LIBS)
 	./jhc -L- -L$(srcdir) -L. --no-cache $(JHC_TEST) $< -o $@ # 2>&1 | tee $@.log
 
 TESTS=HelloWorld Primes

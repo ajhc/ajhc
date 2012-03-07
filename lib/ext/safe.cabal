@@ -7,7 +7,7 @@ Copyright:      2007-8, Neil Mitchell
 Maintainer:     ndmitchell@gmail.com
 Author:         Neil Mitchell
 Homepage:       http://www-users.cs.york.ac.uk/~ndm/safe/
-Build-Depends:  base
+Build-Depends:  haskell-extras
 Category:       Unclassified
 Synopsis:       Library for safe (pattern match free) functions
 Description:

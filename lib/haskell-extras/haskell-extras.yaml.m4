@@ -1,8 +1,9 @@
-Name: base
-Version: 1.0
+Name: haskell-extras
+Version: __JHC_VERSION__
 Hs-Source-Dir: .
 Extensions: ForeignFunctionInterface
-Options: [ -pjhc, --noauto ]
+build-depends: jhc
+Options: [ --noauto ]
 Exposed-Modules:
         - Control.Exception
         - Control.Monad

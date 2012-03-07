@@ -6,7 +6,6 @@ Maintainer: bjorn@bringert.net
 Author: Bjorn Bringert
 License: BSD3
 License-file: LICENSE
-build-depends: base
 Extensions:
 Synopsis: An XHTML combinator library
 Description:

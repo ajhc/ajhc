@@ -3,8 +3,8 @@ Version: __JHC_VERSION__
 Extensions: [ ForeignFunctionInterface, NoImplicitPrelude,
               UnboxedTuples, UnboxedValues ]
 Hs-Source-Dir: .
-build-depends: [ jhc, base ]
-#Options: [ --noauto ]
+build-depends: [ jhc, haskell-extras ]
+Options: [ --noauto ]
 Exposed-Modules:
         - Control.Monad
         - Data.Array

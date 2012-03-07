@@ -1,7 +1,7 @@
 Name: applicative
 Version: 1.0
 Hs-Source-Dirs: .
-Options: [ -pbase, --noauto ]
+Options: [ -phaskell2010, -phaskell-extras, --noauto ]
 Exposed-Modules:
         - Control.Applicative
         - Control.Arrow
