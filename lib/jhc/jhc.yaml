@@ -38,6 +38,7 @@ Exposed-Modules:
         - Jhc.String
         - Jhc.Text.Read
         - Jhc.Tuples
+        - Jhc.ForeignPtr
         - Numeric
         - Prelude.CType
         - Prelude.Float

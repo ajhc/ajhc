@@ -13,14 +13,9 @@ import Foreign.Marshal.Array
 import Foreign.Ptr
 import Foreign.Storable
 import Jhc.IO
-
-newtype ForeignPtr a = FP (Ptr a)
-    deriving(Eq,Ord)
+import Jhc.ForeignPtr
 
 type FinalizerPtr  a = FunPtr (Ptr a -> IO ())
-
-newForeignPtr_ :: Ptr a -> IO (ForeignPtr a)
-newForeignPtr_ = return . FP
 
 newForeignPtr :: FinalizerPtr a -> Ptr a -> IO (ForeignPtr a)
 newForeignPtr finalizer ptr = do
@@ -32,19 +27,18 @@ addForeignPtrFinalizer :: FinalizerPtr a -> ForeignPtr a -> IO ()
 addForeignPtrFinalizer _ _ = return ()
 
 mallocForeignPtrBytes :: Int -> IO (ForeignPtr a)
-mallocForeignPtrBytes x = do
-    ptr <- mallocBytes x
-    newForeignPtr finalizerFree ptr
+mallocForeignPtrBytes sz = mallocForeignPtrAlignBytes 0 sz
 
 mallocForeignPtr :: Storable a => IO (ForeignPtr a)
 mallocForeignPtr = doMalloc undefined where
     doMalloc :: Storable b => b -> IO (ForeignPtr b)
-    doMalloc x = mallocForeignPtrBytes (sizeOf x)
+    doMalloc x = mallocForeignPtrAlignBytes (alignment x) (sizeOf x)
 
 mallocForeignPtrArray  :: Storable a => Int -> IO (ForeignPtr a)
 mallocForeignPtrArray  = doMalloc undefined where
     doMalloc            :: Storable a' => a' -> Int -> IO (ForeignPtr a')
-    doMalloc dummy size  = mallocForeignPtrBytes (size * sizeOf dummy)
+    doMalloc dummy size  = mallocForeignPtrAlignBytes
+        (alignment dummy) (size * sizeOf dummy)
 
 mallocForeignPtrArray0  :: Storable a => Int -> IO (ForeignPtr a)
 mallocForeignPtrArray0 sz = mallocForeignPtrArray (sz + 1)
@@ -54,17 +48,6 @@ withForeignPtr fp act = do
     r <- act (unsafeForeignPtrToPtr fp)
     touchForeignPtr fp
     return r
-
-unsafeForeignPtrToPtr :: ForeignPtr a -> Ptr a
-unsafeForeignPtrToPtr (FP x) = x
-
-touchForeignPtr :: ForeignPtr a -> IO ()
-touchForeignPtr x = fromUIO_ (touch_ x)
-
-foreign import primitive touch_ :: ForeignPtr a -> UIO_
-
-castForeignPtr :: ForeignPtr a -> ForeignPtr b
-castForeignPtr (FP x) = FP $ castPtr x
 
 -- |A finalizer is represented as a pointer to a foreign function that, at
 -- finalisation time, gets as an argument a plain pointer variant of the
