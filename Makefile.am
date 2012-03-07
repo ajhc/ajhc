@@ -61,7 +61,7 @@ GHCLANG= -XTypeFamilies -XViewPatterns -XUndecidableInstances -XOverlappingInsta
 GHCOPTS= $(HSOPTS) -XBangPatterns -O @GHCFLAGS@ $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 
 JHC_LIBS = jhc-1.0.hl base-1.0.hl haskell98-1.0.hl applicative-1.0.hl flat-foreign-1.0.hl jhc-prim-1.0.hl
-
+#                                   haskell2010-@VERSION@.hl
 EXTRA_DIST = src/data rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
              lib/jhc lib/jhc-prim lib/base lib/haskell98 lib/flat-foreign $(JHC_LIBS) $(JHC_EXT_LIBS) \
 	     src/StringTable/StringTable_cbits.c src/StringTable/StringTable_cbits.h src/cbits/md5sum.c jhc.1 \
@@ -242,8 +242,10 @@ applicative-1.0.hl: lib/applicative/applicative.yaml base-1.0.hl
 	./jhc $(LIB_OPTIONS) --build-hl $< -o $@
 haskell98-1.0.hl: lib/haskell98/haskell98.yaml base-1.0.hl
 	./jhc $(LIB_OPTIONS) --build-hl $< -o $@
-flat-foreign-1.0.hl: lib/flat-foreign/flat-foreign.cabal base-1.0.hl
-	./jhc $(LIB_OPTIONS) -ilib/flat-foreign -pjhc -pbase --build-hl $< -o $@
+flat-foreign-1.0.hl: lib/flat-foreign/flat-foreign.yaml base-1.0.hl
+	./jhc $(LIB_OPTIONS) --build-hl $< -o $@
+haskell2010-@VERSION@.hl: lib/haskell2010/haskell2010.yaml.m4 jhc-1.0.hl
+	./jhc $(LIB_OPTIONS) --build-hl $< -o $@
 
 %.pdf: %.ps
 	epstopdf $< --outfile $@
@@ -321,7 +323,7 @@ base-1.0.hl: lib/base/base.yaml lib/base/Debug/Trace.hs lib/base/Data/Array.hs \
     lib/base/Foreign/StablePtr.hs lib/base/Foreign/C.hs lib/base/Data/Bits.hs lib/base/Foreign/Marshal.hs \
     lib/base/Foreign.hs lib/base/Data/Array/Unboxed.hs lib/base/Data/Function.hs lib/base/Data/Ix.hs \
     lib/base/System/Info.hs jhc-1.0.hl
-flat-foreign-1.0.hl: lib/flat-foreign/flat-foreign.cabal lib/flat-foreign/StablePtr.hs lib/flat-foreign/MarshalAlloc.hs lib/flat-foreign/CForeign.hs \
+flat-foreign-1.0.hl: lib/flat-foreign/flat-foreign.yaml lib/flat-foreign/StablePtr.hs lib/flat-foreign/MarshalAlloc.hs lib/flat-foreign/CForeign.hs \
     lib/flat-foreign/Storable.hs lib/flat-foreign/Ptr.hs lib/flat-foreign/MarshalArray.hs lib/flat-foreign/Int.hs \
     lib/flat-foreign/CString.hs lib/flat-foreign/Word.hs lib/flat-foreign/CError.hs lib/flat-foreign/CTypes.hs \
     lib/flat-foreign/MarshalError.hs lib/flat-foreign/MarshalUtils.hs lib/flat-foreign/Bits.hs lib/flat-foreign/ForeignPtr.hs \

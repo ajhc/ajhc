@@ -42,7 +42,7 @@ foreach my $fn (@ARGV) {
     next unless $name;
     next unless $version;
 
-    $options = "$options --deps tmp/$name-$version-deps.yaml" if $opt_d;
+    $options = "$options --stop deps --deps tmp/$name-deps.yaml" if $opt_d;
 
     print("$name-$version.hl\n"),next if $opt_l;
 
