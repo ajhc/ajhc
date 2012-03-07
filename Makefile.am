@@ -36,7 +36,8 @@ HSFILES=src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/
 	src/Util/Relation.hs src/Util/RWS.hs src/Util/SameShape.hs src/Util/Seq.hs src/Util/SetLike.hs src/Util/UnionFind.hs \
 	src/Util/UnionSolve.hs src/Util/UniqueMonad.hs src/Util/Util.hs src/Util/VarName.hs src/Version/Config.hs src/Version/Version.hs \
 	src/Support/IniParse.hs src/E/Lint.hs src/Util/Progress.hs src/Grin/StorageAnalysis.hs src/Util/YAML.hs src/Grin/Main.hs \
-        src/E/Main.hs src/Util/GMap.hs src/Util/ExitCodes.hs src/Support/TempDir.hs src/E/PrimDecode.hs
+        src/E/Main.hs src/Util/GMap.hs src/Util/ExitCodes.hs src/Support/TempDir.hs src/E/PrimDecode.hs \
+        src/DerivingDrift/StandardRules.hs src/FrontEnd/Exports.hs
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
 GHCPROFOPTS= -prof -auto-all -osuf prof.o -hisuf prof.hi
@@ -118,9 +119,9 @@ RAWFILES = src/data/ViaGhc.hs src/data/prelude.m4 \
 	   rts/lib/lib_cbits.c rts/jhc_rts_header.h rts/lib/lib_cbits.h rts/rts/gc_jgc_internal.h
 
 DRIFTFILES = drift_processed/C/FFI.hs drift_processed/C/FromGrin2.hs drift_processed/Cmm/Op.hs drift_processed/C/Prims.hs drift_processed/DataConstructors.hs \
-   drift_processed/DerivingDrift/StandardRules.hs drift_processed/E/CPR.hs drift_processed/E/Demand.hs drift_processed/E/LambdaLift.hs \
+   drift_processed/E/CPR.hs drift_processed/E/Demand.hs drift_processed/E/LambdaLift.hs \
    drift_processed/E/SSimplify.hs drift_processed/E/ToHs.hs drift_processed/E/TypeCheck.hs drift_processed/E/Type.hs drift_processed/FrontEnd/Class.hs \
-   drift_processed/FrontEnd/Exports.hs drift_processed/FrontEnd/HsSyn.hs drift_processed/FrontEnd/KindInfer.hs \
+   drift_processed/FrontEnd/HsSyn.hs drift_processed/FrontEnd/KindInfer.hs \
    drift_processed/FrontEnd/Representation.hs drift_processed/FrontEnd/SrcLoc.hs drift_processed/FrontEnd/Tc/Kind.hs \
    drift_processed/FrontEnd/Tc/Monad.hs drift_processed/Grin/SSimplify.hs drift_processed/Name/VConsts.hs drift_processed/Options.hs \
    drift_processed/DataConstructors.hs-boot drift_processed/Ho/Type.hs  drift_processed/Ho/Build.hs
@@ -284,8 +285,8 @@ options.mkd: drift_processed/Options.hs | jhc
 	./jhc --help | sed -e 's/^/    /'  >> $@
 
 fix-whitespace:
-	find src -not \( -name .svn -prune -o -name .git -prune \) -type f -print0 | xargs -0 sed -i  -E 's/[ 	]*$$//'
-	find lib -not \( -name .svn -prune -o -name .git -prune \) -type f -print0 | xargs -0 sed -i  -E 's/[ 	]*$$//'
+	find src -not \( -name .svn -prune -o -name .git -prune \) -type f -name \*.hs -print0 | xargs -0 sed -i  -E 's/[ 	]*$$//'
+	find lib -not \( -name .svn -prune -o -name .git -prune \) -type f -name \*.hs -print0 | xargs -0 sed -i  -E 's/[ 	]*$$//'
 
 jhc.1 :
 	$(MAKE) man
