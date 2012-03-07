@@ -41,6 +41,7 @@ GHC=$HC
 GHCFLAGS="-hide-all-packages -package base"
 GHC_CHECK_MODULE(Data.Generics.Instances,syb,,,[])
 GHC_CHECK_MODULE(System.Time,old-time,,,[])
+GHC_CHECK_MODULE(Text.PrettyPrint.HughesPJ,pretty,,,[])
 GHC_CHECK_MODULE(System.Console.Readline,readline,,,[
      GHC_CHECK_MODULE(System.Console.Editline.Readline,editline,,
          GHCFLAGS="$GHCFLAGS -DUSE_EDITLINE"
@@ -50,7 +51,7 @@ GHC_CHECK_MODULE(System.Console.Readline,readline,,,[
       ])
 ])
 
-GHC_CHECK_MODULE(System,,,[] ,[ GHCINC="$GHCINC -icompat/haskell98"])
+GHC_CHECK_MODULE(System,base,,[] ,[ GHCINC="$GHCINC -icompat/haskell98"])
 
 AC_PROGRAM_REQUIRE(hsc2hs,hsc2hs,     [  --with-hsc2hs=<hsc2hs location>    Specify location of hsc2hs.])
 if test -z "$HSC2HS"; then
@@ -58,7 +59,6 @@ if test -z "$HSC2HS"; then
     exit 1
 fi
 
-GHCFLAGS="$GHCFLAGS -package pretty"
 TRY_COMPILE_GHC([
 import Text.PrettyPrint.HughesPJ
 import Data.Monoid
