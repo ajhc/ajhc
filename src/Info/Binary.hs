@@ -9,7 +9,6 @@ import E.CPR
 import GenUtil
 import Info.Info
 import Info.Types
-import StringTable.Atom(HasHash(..))
 import Util.BitSet as BS
 import qualified E.Demand
 
@@ -18,31 +17,33 @@ data Binable = forall a . (Typeable a, Binary a, Show a) => Binable a
 u :: (Typeable a, Binary a) => a
 u = u
 
-createTyp :: Typeable a => a -> Word32
-createTyp x = hash32 $ (show (typeOf x))
 newEntry x = Entry { entryThing = toDyn x, entryString = show x, entryType = typeOf x }
 
-cb x = (createTyp x, Binable x)
+cb n x = (n, Binable x, typeOf x)
 
-binTable :: Map.Map Word32 Binable
-binTable = Map.fromList [
-    cb (u :: Properties),
-    cb (u :: E.CPR.Val),
-    cb (u :: FfiExport),
-    cb (u :: E.Demand.DemandSignature)
+-- Note: the numbers here are part of the ABI of the serialized files.
+-- If you change them then you must change the ABI version number in
+-- Ho.Binary and invalidate all old files.
+binTableValues =  [
+    cb 1 (u :: Properties),
+    cb 2 (u :: E.CPR.Val),
+    cb 3 (u :: FfiExport),
+    cb 4 (u :: E.Demand.DemandSignature)
     ]
 
-putDyn :: (Word32,Dynamic,Binable) -> Put
+binTable :: Map.Map Word8 Binable
+binTable = Map.fromList [ (n,x) | (n,x,_) <- binTableValues ]
+
+revBinTable :: [(TypeRep,(Word8,Binable))]
+revBinTable = [ (t,(n,x)) | (n,x,t) <- binTableValues ]
+
+putDyn :: (Word8,Dynamic,Binable) -> Put
 putDyn (ps,d,Binable (_::a)) = do
     put ps
     put (fromDyn d (error (show d)) :: a)
 
--- = case Map.lookup (packString (show d)) of
---    Just (Binable (x::a)) -> put_ h (case fromDynamic d of Just x -> x :: a)
---    Nothing -> return ()
-
 getDyn = do
-    (ps::Word32) <- get
+    (ps::Word8) <- get
     case Map.lookup ps binTable of
         Just (Binable (_ :: a)) -> do
             x <- get :: Get a
@@ -60,9 +61,8 @@ instance Binary Info where
 putInfo :: Info.Info.Info -> Put
 putInfo (Info ds) = do
     let ds' = concatMap (\d -> do
-            let ps = hash32 $ (show $ entryType d)
-            case Map.lookup ps binTable of
-              Just x  -> return (ps,entryThing d,x)
+            case Prelude.lookup (entryType d) revBinTable of
+              Just (ps,x)  -> return (ps,entryThing d,x)
               Nothing -> fail "key not found"
           ) ds
     putWord8 (fromIntegral $ length ds')
@@ -72,4 +72,4 @@ getInfo :: Get Info.Info.Info
 getInfo = do
     n <- getWord8
     xs <- replicateM (fromIntegral n) getDyn
-    return (Info  [ x | x <- xs])
+    return (Info xs)
