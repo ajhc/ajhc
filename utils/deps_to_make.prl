@@ -28,18 +28,23 @@ foreach (@ARGV) {
     my @deps;
     @deps = values %{$y->{ModuleSource}} if !$opt_e;
     push @deps, values %{$y->{LibraryDeps}} if exists $y->{LibraryDeps};
-    @deps = (@{$y->{LibraryDesc}}, @deps) if exists $y->{LibraryDesc};
+    if (exists $y->{LibraryDesc}) {
+        my @ld = @{$y->{LibraryDesc}};
+        map { s/^tmp\/build\/[^\/]*/lib\/ext/ } @ld;
+        @deps = (@ld, @deps);
+    }
     map { s/^\.\/// } @deps;
     foreach (@deps) {
         my $patch = $_;
         push @deps, $patch if $patch =~ s/\.(cabal|yaml)(.m4)?$/.patch/ and -e $patch;
     }
-    push @targets, @{$y->{Target}} if $opt_e;
+    push @targets, @{$y->{Target}};
     for (@{$y->{Target}}) {
         print "$_:";
         pdeps(@deps);
         print "\tperl utils/build_extlibs.prl \$<\n" if $opt_e;
+        print "\t./jhc \$(LIB_OPTIONS) --build-hl \$< -o \$@\n" if !$opt_e;
     }
 }
-print "JHC_EXT_LIBS =" if @targets;
+print ($opt_e ? "JHC_EXT_LIBS =" : "JHC_LIBS =") if @targets;
 pdeps(@targets) if @targets;
