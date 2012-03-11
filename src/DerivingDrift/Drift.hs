@@ -27,10 +27,10 @@ driftDerive' HsDataDecl { hsDeclName = name, hsDeclArgs = args, hsDeclCons = con
             isEnum = length condecls > 1 && null (concatMap hsConDeclArgs condecls)
         xs <- return $  map (derive isEnum d) derives
         return $ unlines xs
-driftDerive' (HsNewTypeDecl sloc cntxt name args condecl derives) = do
-        let d =  unrenameTyVars $ toData  name args [condecl] derives
-        xs <- return $ map (derive False d) derives
-        return $ unlines xs
+--driftDerive' (HsNewTypeDecl sloc cntxt name args condecl derives) = do
+--        let d =  unrenameTyVars $ toData  name args [condecl] derives
+--        xs <- return $ map (derive False d) derives
+--        return $ unlines xs
 
 driftDerive' _ = fail "Nothing to derive"
 

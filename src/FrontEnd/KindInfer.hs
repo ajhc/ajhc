@@ -396,7 +396,7 @@ kiDecl d = withSrcLoc (srcLoc d) (f d) where
     f HsTypeFamilyDecl { .. } = do
         kc <- lookupKind KindSimple (toName TypeConstructor hsDeclName)
         kiApps kc hsDeclTArgs (maybe kindStar hsKindToKind hsDeclHasKind)
-    f HsDataDecl { hsDeclKindDecl = True, .. } = kiDataKind hsDeclName hsDeclCons
+    f HsDataDecl { hsDeclDeclType = DeclTypeKind, .. } = kiDataKind hsDeclName hsDeclCons
     f HsDataDecl {
             hsDeclContext = context,
             hsDeclName = tyconName,
@@ -407,8 +407,8 @@ kiDecl d = withSrcLoc (srcLoc d) (f d) where
         kc <- lookupKind KindAny (toName TypeConstructor tyconName)
         kiApps' kc args (hsKindToKind kk)
         mapM_ kiPred context
+    f HsDataDecl { hsDeclDeclType = DeclTypeNewtype, .. } = kiAlias hsDeclContext hsDeclName hsDeclArgs (head hsDeclCons)
     f HsDataDecl { .. }    = kiData hsDeclContext hsDeclName hsDeclArgs hsDeclCons
-    f HsNewTypeDecl { .. } = kiAlias hsDeclContext hsDeclName hsDeclArgs hsDeclCon
     f HsTypeDecl { hsDeclName = name, hsDeclTArgs = args, hsDeclType = ty } = do
         wh <- asks kiWhere
         let theconstraint = if wh == Other then KindAny else KindSimple

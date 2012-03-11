@@ -63,7 +63,7 @@ import Debug.Trace (trace)
       USTRING  { UStringTok $$ }
       PRAGMAOPTIONS { PragmaOptions $$ }
       PRAGMASTART { PragmaStart $$ }
-      PRAGMAEXP { PragmaExp $$ }
+      PRAGMACTYPE { PragmaExp "CTYPE" }
       PRAGMAINLINE { PragmaInline $$ }
       PRAGMARULES { PragmaRules $$ }
       PRAGMASPECIALIZE { PragmaSpecialize $$ }
@@ -318,10 +318,10 @@ topdecl :: { HsDecl }
                          returnP hsDataDecl { hsDeclSrcLoc = $3, hsDeclContext = cs, hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $6, hsDeclCons = reverse $5 } }
       | 'data' 'kind' ctype srcloc '=' constrs deriving
                       {% checkDataHeader $3 `thenP` \(cs,c,t) ->
-                         returnP hsDataDecl { hsDeclKindDecl = True, hsDeclSrcLoc = $4, hsDeclContext = cs, hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $7, hsDeclCons = reverse $6 } }
+                         returnP hsDataDecl { hsDeclDeclType = DeclTypeKind, hsDeclSrcLoc = $4, hsDeclContext = cs, hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $7, hsDeclCons = reverse $6 } }
       | 'newtype' ctype srcloc '=' constr deriving
                       {% checkDataHeader $2 `thenP` \(cs,c,t) ->
-                         returnP (HsNewTypeDecl $3 cs c t $5 $6) }
+                         returnP hsNewTypeDecl { hsDeclSrcLoc = $3, hsDeclContext = cs, hsDeclName = c, hsDeclArgs = t, hsDeclCons = [$5], hsDeclDerives = $6} }
       | 'class' srcloc classhead optfundep optcbody
                       { HsClassDecl $2 $3 $5 }
       | 'class' 'alias' srcloc conid varids '=' carhs optcbody
@@ -409,9 +409,9 @@ optphases :: { Maybe Int }
 pragmaprops  :: { HsDecl }
       : PRAGMASTART srcloc  vars PRAGMAEND  { HsPragmaProps $2 $1 $3 }
 
-pragmaexp  :: { Located HsPragmaExp }
-      : PRAGMAEXP srcloc texps srcloc PRAGMAEND
-        { located ($2,$4) $ HsPragmaExp $1 $3 }
+--pragmaexp  :: { Located HsPragmaExp }
+--      : PRAGMAEXP srcloc texps srcloc PRAGMAEND
+--        { located ($2,$4) $ HsPragmaExp $1 $3 }
 
 -- ATTENTION: Dirty Hackery Ahead! If the second alternative of vars is var
 -- instead of qvar, we get another shift/reduce-conflict. Consider the

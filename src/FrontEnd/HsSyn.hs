@@ -80,7 +80,6 @@ instance HasLocation HsDecl where
     srcLoc HsSpaceDecl    { hsDeclSrcLoc = sl } = sl
     srcLoc HsDataDecl	  { hsDeclSrcLoc = sl } = sl
     srcLoc HsInfixDecl    { hsDeclSrcLoc = sl } = sl
-    srcLoc HsNewTypeDecl  { hsDeclSrcLoc = sl } = sl
     srcLoc HsPragmaSpecialize { hsDeclSrcLoc = sl } = sl
     srcLoc (HsPragmaRules rs) = srcLoc rs
     srcLoc HsForeignDecl  { hsDeclSrcLoc = sl } = sl
@@ -99,7 +98,7 @@ instance HasLocation HsRule where
     srcLoc HsRule { hsRuleSrcLoc = sl } = sl
 
 hsDataDecl = HsDataDecl {
-    hsDeclKindDecl = False,
+    hsDeclDeclType = DeclTypeData,
     hsDeclSrcLoc = bogusASrcLoc,
     hsDeclContext = [],
     hsDeclName = error "hsDataDecl.hsDeclName",
@@ -109,14 +108,13 @@ hsDataDecl = HsDataDecl {
     hsDeclDerives = []
     }
 
-hsNewTypeDecl = HsNewTypeDecl {
-    hsDeclSrcLoc = bogusASrcLoc,
-    hsDeclContext = [],
-    hsDeclName = error "hsNewTypeDecl.hsDeclName",
-    hsDeclArgs = [],
-    hsDeclCon = error "hsNewTypeDecl.hsDeclCon",
-    hsDeclDerives = []
+hsNewTypeDecl = hsDataDecl {
+    hsDeclDeclType = DeclTypeNewtype,
+    hsDeclName = error "hsNewTypeDecl.hsDeclName"
     }
+
+data DeclType = DeclTypeData | DeclTypeNewtype | DeclTypeKind
+    deriving(Eq,Show)
 
 data HsDecl
     = HsTypeFamilyDecl {
@@ -129,25 +127,17 @@ data HsDecl
     | HsTypeDecl	 {
         hsDeclSrcLoc :: SrcLoc,
         hsDeclName   :: HsName,
-        hsDeclTArgs   :: [HsType],
+        hsDeclTArgs  :: [HsType],
         hsDeclType   :: HsType
         }
     | HsDataDecl	 {
-        hsDeclKindDecl :: !Bool,
+        hsDeclDeclType :: !DeclType,
         hsDeclSrcLoc   :: SrcLoc,
         hsDeclContext  :: HsContext,
         hsDeclName     :: HsName,
         hsDeclArgs     :: [Name],
         hsDeclCons     :: [HsConDecl],
         hsDeclHasKind  :: Maybe HsKind,
-        {- deriving -} hsDeclDerives :: [HsName]
-        }
-    | HsNewTypeDecl {
-        hsDeclSrcLoc  :: SrcLoc,
-        hsDeclContext :: HsContext,
-        hsDeclName    :: HsName,
-        hsDeclArgs    :: [Name],
-        hsDeclCon     :: HsConDecl,
         {- deriving -} hsDeclDerives :: [HsName]
         }
     | HsInfixDecl   {

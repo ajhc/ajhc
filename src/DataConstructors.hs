@@ -552,7 +552,7 @@ removeNewtypes dataTable e = runIdentity (f e) where
 
 collectDeriving :: [HsDecl] -> [(SrcLoc,Name,Name)]
 collectDeriving ds = concatMap f ds where
-    f decl@HsNewTypeDecl {} = g decl
+--    f decl@HsNewTypeDecl {} = g decl
     f decl@HsDataDecl {} = g decl
     f decl@HsDeclDeriving {} = h decl
     f _ = []
@@ -576,14 +576,15 @@ toDataTable km cm ds currentDataTable = newDataTable  where
     fixupMap _ n = n
     ds' = Seq.toList $ execWriter (mapM_ f ds)
     newtypeLoopBreakers = map fst $ fst $  G.findLoopBreakers (const 0) (const True) (G.newGraph newtypeDeps fst snd) where
-        newtypeDeps = [ (n,concatMap (fm . hsBangType) $ hsConDeclArgs c) | HsNewTypeDecl { hsDeclName = n, hsDeclCon = c } <- ds  ]
+        newtypeDeps = [ (n,concatMap (fm . hsBangType) $ hsConDeclArgs c) |
+            HsDataDecl { hsDeclDeclType = DeclTypeNewtype, hsDeclName = n, hsDeclCons = (head -> c) } <- ds ]
         fm t = execWriter $ f t
         f HsTyCon { hsTypeName = n } = tell [n]
         f t = traverseHsType_ f t
-    f decl@HsNewTypeDecl {  hsDeclName = nn, hsDeclCon = c } =
-        dt decl (if nn `elem` newtypeLoopBreakers then RecursiveAlias else ErasedAlias)  [c]
-    f decl@HsDataDecl { hsDeclKindDecl = True } = dkind decl
-    f decl@HsDataDecl { hsDeclCons = cs } = dt decl NotAlias  cs
+    f decl@HsDataDecl { hsDeclDeclType = DeclTypeNewtype,  hsDeclName = nn, hsDeclCons = cs } =
+        dt decl (if nn `elem` newtypeLoopBreakers then RecursiveAlias else ErasedAlias) cs
+    f decl@HsDataDecl { hsDeclDeclType = DeclTypeKind } = dkind decl
+    f decl@HsDataDecl { hsDeclCons = cs } = dt decl NotAlias cs
     f _ = return ()
     dt decl NotAlias cs@(_:_:_) | all null (map hsConDeclArgs cs) = do
         let virtualCons'@(fc:_) = map (makeData NotAlias typeInfo) cs
@@ -632,6 +633,7 @@ toDataTable km cm ds currentDataTable = newDataTable  where
                 conExpr      = foldr ($) theTypeExpr (map ELam theTypeArgs),
                 conInhabits  = hsDeclName
             }
+    dkind _ = error "dkind passed bad decl"
 
     makeData alias (theType,theTypeArgs,theTypeExpr) x = theData where
         theData = emptyConstructor {

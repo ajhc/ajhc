@@ -51,10 +51,10 @@ hsDecl cntx decl = f cntx decl where
 --        when (not isEnum && class_Enum `elem` ds) $ warn sl "derive-enum" "Cannot derive enum from non enumeration type"
 --        when (not isEnum && length cs /= 1 && class_Bounded `elem` ds) $ warn sl "derive-bounded" "Cannot derive bounded from non enumeration or unary type"
         return ()
-    f TopLevel HsNewTypeDecl { hsDeclSrcLoc = sl, hsDeclDerives = ds' } = do
-        let ds = map (toName ClassName) ds'
-        checkDeriving sl True ds
-        return ()
+--    f TopLevel HsNewTypeDecl { hsDeclSrcLoc = sl, hsDeclDerives = ds' } = do
+--        let ds = map (toName ClassName) ds'
+--        checkDeriving sl True ds
+--        return ()
     f context@TopLevel decl@HsTypeDecl { hsDeclTArgs = as } | any (not . isHsTyVar) as = warn (srcLoc decl) InvalidDecl $ "complex type arguments not allowed " ++ show context
 --    f context@(InClass ts) decl@HsTypeDecl { hsDeclTArgs = as }
 --        | any (not . isHsTyVar) as = warn (srcLoc decl) InvalidDecl $ "complex type arguments not allowed " ++ show context
@@ -63,7 +63,7 @@ hsDecl cntx decl = f cntx decl where
     --    | length as < length ts || or (zipWith (==) as ts) = warn (srcLoc decl) "invalid-assoc" $ "arguments to associated type must match instance head"
         | any (not . isHsTyVar) (drop (length ts) as) = warn (srcLoc decl) InvalidDecl $ "extra complex type arguments not allowed " ++ show context
     f context decl@HsDataDecl {} = warn (srcLoc decl) InvalidDecl $ "data declaration not allowed " ++ show context
-    f context decl@HsNewTypeDecl {} = warn (srcLoc decl) InvalidDecl $ "newtype declaration not allowed " ++ show context
+--    f context decl@HsNewTypeDecl {} = warn (srcLoc decl) InvalidDecl $ "newtype declaration not allowed " ++ show context
 --    f TopLevel decl@HsClassDecl { hsDeclQualType = qt, hsDeclDecls = decls } = do args <- fetchQtArgs (srcLoc decl) qt; mapM_ (f (InClass args)) decls
     f TopLevel decl@HsClassDecl { hsDeclClassHead = ch, hsDeclDecls = decls } = do mapM_ (f (InClass (hsClassHeadArgs ch))) decls
     f TopLevel decl@HsInstDecl { hsDeclClassHead = ch, hsDeclDecls = decls } = do mapM_ (f (InInstance (hsClassHeadArgs ch))) decls

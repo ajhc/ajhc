@@ -104,7 +104,7 @@ getDataDesc d = g d where
     g desc = do
         r <- f d
         return (hsDeclName desc,r)
-    f HsNewTypeDecl { hsDeclCon = (hsConDeclName -> cn)  } = return $ DatNewT cn
+    f HsDataDecl { hsDeclDeclType = DeclTypeNewtype, hsDeclCons = (hsConDeclName . head -> cn)  } = return $ DatNewT cn
     f HsDataDecl { hsDeclCons = cs }
         | all null $ map hsConDeclArgs cs = return $ DatEnum (map hsConDeclName cs)
     f HsDataDecl { hsDeclCons = cs } = return $
@@ -138,7 +138,7 @@ tiModules htc ms = do
         putStrLn $ HsPretty.render (HsPretty.ppHsDecls ds)
 
     -- kind inference for all type constructors type variables and classes in the module
-    let classAndDataDecls = filter (or' [isHsDataDecl, isHsNewTypeDecl, isHsClassDecl, isHsClassAliasDecl]) ds
+    let classAndDataDecls = filter (or' [isHsDataDecl, isHsClassDecl, isHsClassAliasDecl]) ds
     kindInfo <- kiDecls importKindEnv ds -- classAndDataDecls
 
     when (dump FD.Kind) $

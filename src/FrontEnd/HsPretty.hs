@@ -20,7 +20,7 @@ module FrontEnd.HsPretty (PPLayout(..),PPHsMode(..),
                 ppHsGuardedRhs
 		) where
 
-import Char
+import Data.Char
 import qualified Text.PrettyPrint.HughesPJ as P
 
 import Doc.DocLike(TextLike(..),DocLike(..))
@@ -204,7 +204,6 @@ ppHsExportSpec e = f e where
     f (HsEQualified DataConstructor e)   = text "data" <+> ppHsExportSpec e
     f (HsEQualified n e)                 = tshow n <+> ppHsExportSpec e
 
-
 tshow = text . show
 ppHsImportDecl (HsImportDecl pos (show -> mod) bool mbName mbSpecs) =
 	   mySep [text "import",
@@ -250,21 +249,17 @@ ppHsDecl (HsTypeDecl loc name nameList htype) =
 		   ++ map ppHsType nameList
 		   ++ [equals, ppHsType htype])
 
-ppHsDecl HsDataDecl { hsDeclContext = context, hsDeclName = name, hsDeclArgs = nameList, hsDeclCons = constrList, hsDeclDerives = derives } =
-	   --blankline $
-           mySep ([text "data", ppHsContext context, ppHsName name]
-                  ++ map ppHsName nameList)
+ppHsDecl HsDataDecl { .. } = ans where
+    ans = mySep ([declType, ppHsContext hsDeclContext, ppHsName hsDeclName]
+                  ++ map ppHsName hsDeclArgs)
                   <+> (myVcat (zipWith (<+>) (equals : repeat (char '|'))
-                                           (map ppHsConstr constrList))
-                       $$$ ppHsDeriving derives)
+                                           (map ppHsConstr hsDeclCons))
+                       $$$ ppHsDeriving hsDeclDerives)
+    declType = case hsDeclDeclType of
+        DeclTypeKind    -> text "data kind"
+        DeclTypeData    -> text "data"
+        DeclTypeNewtype -> text "newtype"
 
-ppHsDecl (HsNewTypeDecl pos context name nameList constr derives) =
-	   --blankline $
-           mySep ([text "newtype", ppHsContext context, ppHsName name]
-                  ++ map ppHsName nameList)
-                  <+> equals <+> (ppHsConstr constr
-                                  $$$ ppHsDeriving derives)
---m{spacing=False}
 -- special case for empty class declaration
 ppHsDecl (HsClassDecl pos qualType []) =
 	   --blankline $

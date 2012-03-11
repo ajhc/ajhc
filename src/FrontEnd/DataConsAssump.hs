@@ -59,19 +59,19 @@ dataDeclEnv modName kt HsDataDecl { hsDeclContext = context, hsDeclName = typeNa
       = TVar (tyvar (toName TypeVal n) k)
    preds = hsContextToPreds kt context
 
-dataDeclEnv modName kt (HsNewTypeDecl _sloc context typeName args condecl _)
-   = conDeclType modName kt preds resultType condecl
-   where
-   typeName' = toName TypeConstructor typeName
-   typeKind = kindOf typeName' kt
-   resultType = foldl tAp tycon argVars
-   tycon = TCon (Tycon typeName' typeKind)
-   argVars = map fromHsNameToTyVar $ zip argKinds args
-   argKinds = init $ unfoldKind typeKind
-   fromHsNameToTyVar :: (Kind, HsName) -> Type
-   fromHsNameToTyVar (k, n)
-      = TVar (tyvar (toName TypeVal n) k)
-   preds = hsContextToPreds kt context
+--dataDeclEnv modName kt (HsNewTypeDecl _sloc context typeName args condecl _)
+--   = conDeclType modName kt preds resultType condecl
+--   where
+--   typeName' = toName TypeConstructor typeName
+--   typeKind = kindOf typeName' kt
+--   resultType = foldl tAp tycon argVars
+--   tycon = TCon (Tycon typeName' typeKind)
+--   argVars = map fromHsNameToTyVar $ zip argKinds args
+--   argKinds = init $ unfoldKind typeKind
+--   fromHsNameToTyVar :: (Kind, HsName) -> Type
+--   fromHsNameToTyVar (k, n)
+--      = TVar (tyvar (toName TypeVal n) k)
+--   preds = hsContextToPreds kt context
 
 dataDeclEnv _modName _kt _anyOtherDecl
    = Map.empty
