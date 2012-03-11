@@ -79,9 +79,10 @@ showLit showBind l = do
             e <- showBind e
             return $  atom   (char '[' <> unparse e  <> char ']')
         f LitCons { litName = n, litArgs = [] } | dc_EmptyList == n = return $ atom $ text "[]"
-        f LitCons { litName = ((tc_Addr_ ==) -> True), litType = ((eHash ==) -> True) } = return $ atom $ text "Addr_"
-        f LitCons { litName = ((tc_FunAddr_ ==) -> True), litType = ((eHash ==) -> True) } = return $ atom $ text "FunAddr_"
-        f LitCons { litName = ((tc_Char_ ==) -> True), litType = ((eHash ==) -> True) } = return $ atom $ text "Char_"
+--        f LitCons { litName = n, litArgs = [] } | Just m <- getModule n, m `elem`[toModule "Jhc.Prim.Bits", toModule "Jhc.Prim.Word"]  = return $ atom $ text "[]"
+--        f LitCons { litName = ((tc_Addr_ ==) -> True), litType = ((eHash ==) -> True) } = return $ atom $ text "Addr_"
+--        f LitCons { litName = ((tc_FunAddr_ ==) -> True), litType = ((eHash ==) -> True) } = return $ atom $ text "FunAddr_"
+--        f LitCons { litName = ((tc_Char_ ==) -> True), litType = ((eHash ==) -> True) } = return $ atom $ text "Char_"
 --        f LitCons { litName = n, litArgs = [v] }
 --        f LitCons { litName = n, litArgs = [v] }
 --            | n == dc_Integer = go "Integer#"
@@ -92,15 +93,18 @@ showLit showBind l = do
 --                    return $ atom (text n) `app` se
         f LitCons { litName = s, litArgs = es, litType = t,
 		    litAliasFor = Just af } | dump FD.EAlias = do
-	    s <- return $ fromMaybe s (Map.lookup s shortName)
+	    s <- return $ fromMaybe s (shortenName s)
             es' <- mapM showBind es
             se <- showE af
             return $ foldl appCon (atom (tshow s <> char '@' <> parens (unparse se))) es' -- `inhabit` prettye t
         f LitCons { litName = s, litArgs = es, litType = t } = do
-	    s <- return $ fromMaybe s (Map.lookup s shortName)
+	    s <- return $ fromMaybe s (shortenName s)
             es' <- mapM showBind es
             return $ foldl appCon (atom (tshow s)) es' -- `inhabit` prettye t
         cons = bop (R,5) (text ":")
+	shortenName n = Map.lookup n shortName `mplus` (getModule n >>= mm) where
+	    mm m = if m `elem` shortMods then return (toUnqualified n) else Nothing
+            shortMods = map toModule [ "Jhc.Prim.IO", "Jhc.Prim.Bits", "Jhc.Type.Word", "Jhc.Type.C" ]
     f l
 
 app = bop (L,100) (text " ")
@@ -148,16 +152,11 @@ collectAbstractions e0 = go e0 [] where
     done e xs = (reverse xs, e)
 
 short_names = [
-      tc_Bool,     tc_Char,    tc_IO,      tc_ACIO,    tc_State_,  tc_RealWorld,
-      tc_Ordering, tc_Bool_,   tc_Ratio,   tc_Float,   tc_Double,  tc_Ptr,
-      tc_FunPtr,   tc_CInt,    tc_CUInt,   tc_CLong,   tc_CULong,  tc_CLLong,
-      tc_CULLong,  tc_CShort,  tc_CUShort, tc_CWchar,  tc_CWint,   tc_CChar,
-      tc_CSChar,   tc_CUChar,  tc_CInt,    tc_CUInt,   tc_CTime,   tc_CSize,
-      tc_CClock,   tc_Integer, tc_Int,     tc_Int8,    tc_Int16,   tc_Int32,
-      tc_Int64,    tc_IntMax,  tc_IntPtr,  tc_Word,    tc_Word8,   tc_Word16,
-      tc_Word32,   tc_Word64,  tc_WordMax, tc_WordPtr, tc_Addr_,   tc_FunAddr_,
-      tc_Char_,    dc_Boolzh,  dc_Char,    dc_Int,     dc_Integer, dc_Word,
-      tc_ST,       tc_Bang_]
+      tc_Bool,      tc_Char,     tc_IO,      tc_ACIO,    tc_State_,
+      tc_RealWorld, tc_Ordering, tc_Bool_,   tc_Ratio,   tc_Float,
+      tc_Double,    tc_Ptr,      tc_FunPtr,  tc_Integer, tc_Addr_,
+      tc_FunAddr_,  tc_Char_,    dc_Boolzh,  dc_Char,    dc_Integer,
+      tc_ST,        tc_Bang_]
 
 shortName = Map.fromList [ (x, toUnqualified x) | x <- short_names]
 

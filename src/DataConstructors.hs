@@ -412,18 +412,11 @@ lookupExtTypeInfo dataTable oe = f Set.empty oe where
             Just (ExtTypeBoxed _ _ (ExtType et)) -> return $ ExtTypeBoxed b t (ExtType $ et `mappend` "*")
             Just (ExtTypeRaw (ExtType et)) -> return $ ExtTypeBoxed b t (ExtType $ et `mappend` "*")
             _ -> return $ ExtTypeBoxed b t "HsPtr"
-    f seen e@(ELit LitCons { litName = c }) | Just et <- Map.lookup c typeTable = do
-        res <- g seen e
-        return $ case res of
-            ExtTypeRaw _ -> ExtTypeRaw et
-            ExtTypeBoxed b t _ -> ExtTypeBoxed b t et
-            ExtTypeVoid -> ExtTypeVoid
     f seen e@(ELit LitCons { litName = c }) | Just (conCTYPE -> Just et) <- getConstructor c dataTable = do
-        res <- g seen e
-        return $ case res of
-            ExtTypeRaw _ -> ExtTypeRaw et
-            ExtTypeBoxed b t _ -> ExtTypeBoxed b t et
-            ExtTypeVoid -> ExtTypeVoid
+        return $ case g seen e of
+            Just (ExtTypeBoxed b t _) -> ExtTypeBoxed b t et
+            Just ExtTypeVoid -> ExtTypeVoid
+            _ -> ExtTypeRaw et
     f seen e = g seen e
     -- if we are a raw type, we can be foreigned
     g _ (ELit LitCons { litName = c })
@@ -923,66 +916,5 @@ rawExtTypeMap = Map.fromList [
     (rt_float32,   "float"),
     (rt_float64,   "double"),
     (rt_float80,   "long double"),
-    (rt_float128,  "__float128"),
-    (tc_CFile,      "FILE"),
-    (tc_CJmpBuf,    "jmp_buf"),
-    (tc_CFpos,      "fpos_t"),
-    (tc_CSigAtomic, "sigatomic_t"),
-    (tc_Bang_,     "wptr_t")
-    ]
-
--- which C types these convert to in FFI specifications for
--- figuring out calling conventions. not necessarily related
--- to the representation.
---
--- ideally, these could be set via a pragma
-
-typeTable :: Map.Map Name ExtType
-typeTable = Map.fromList [
-    (tc_Int,      "int"),
-    (tc_Int8,     "int8_t"),
-    (tc_Int16,    "int16_t"),
-    (tc_Int32,    "int32_t"),
-    (tc_Int64,    "int64_t"),
-    (tc_IntMax,   "intmax_t"),
-    (tc_IntPtr,   "intptr_t"),
-    (tc_Word,     "unsigned"),
-    (tc_Word8,    "uint8_t"),
-    (tc_Word16,   "uint16_t"),
-    (tc_Word32,   "uint32_t"),
-    (tc_Word64,   "uint64_t"),
-    (tc_WordMax,  "uintmax_t"),
-    (tc_WordPtr,  "uintptr_t"),
-    (tc_Float,    "float"),
-    (tc_Double,   "double"),
-    (tc_Ptr,      "HsPtr"),
-    (tc_FunPtr,   "HsFunPtr"),
-
-    (tc_Addr_,    "HsPtr"),
-    (tc_FunAddr_, "HsFunPtr"),
-    (tc_Char_,    "wchar_t"),
-    (tc_Bool_,    "bool"),
-    (tc_Bool,     "HsBool"),
-
-    (tc_CChar,    "char"),
-    (tc_CShort,   "short"),
-    (tc_CInt,     "int"),
-    (tc_CLong,    "long"),
-    (tc_CLLong,   "long long"),
-
-    (tc_CSChar,   "signed char"),
-    (tc_CUChar,   "unsigned char"),
-    (tc_CUShort,  "unsigned short"),
-    (tc_CUInt,    "unsigned int"),
-    (tc_CULong,   "unsigned long"),
-    (tc_CULLong,  "unsigned long long"),
-
-    (tc_CWchar,     "wchar_t"),
-    (tc_CWint,      "wint_t"),
-    (tc_CTime,      "time_t"),
-    (tc_CClock,     "clock_t"),
-    (tc_CSize,      "size_t"),
-    (tc_Unit,       "void"),
-    (tc_State_,     "void"),
-    (tc_Bang_,      "wptr_t")  -- internal rts type
+    (rt_float128,  "__float128")
     ]

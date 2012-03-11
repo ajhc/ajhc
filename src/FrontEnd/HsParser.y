@@ -307,22 +307,22 @@ mCTYPE :: { Maybe String }
     |                                { Nothing }
 
 topdecl :: { HsDecl }
-      : 'data' ctype srcloc deriving
-          {% checkDataHeader $2 `thenP` \(cs,c,t) ->
-             returnP hsDataDecl { hsDeclSrcLoc = $3, hsDeclContext = cs, hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $4 } }
-      | 'data' ctype '::' kind srcloc deriving
-          {% checkDataHeader $2 `thenP` \(cs,c,t) ->
-             returnP hsDataDecl { hsDeclSrcLoc = $5, hsDeclContext = cs, hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $6, hsDeclHasKind = Just $4 } }
+      : 'data' mCTYPE ctype srcloc deriving
+          {% checkDataHeader $3 `thenP` \(cs,c,t) ->
+             returnP hsDataDecl { hsDeclSrcLoc = $4, hsDeclContext = cs, hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $5, hsDeclCTYPE = $2 } }
+      | 'data' mCTYPE ctype '::' kind srcloc deriving
+          {% checkDataHeader $3 `thenP` \(cs,c,t) ->
+             returnP hsDataDecl { hsDeclSrcLoc = $6, hsDeclContext = cs, hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $7, hsDeclHasKind = Just $5, hsDeclCTYPE = $2 } }
       | 'data' 'family' simpletype srcloc mkind
                       { HsTypeFamilyDecl $4 True (fst $3) (snd $3) $5 }
       | 'type' 'family' simpletype srcloc mkind
                       { HsTypeFamilyDecl $4 False (fst $3) (snd $3) $5 }
-      | 'data' ctype srcloc '=' constrs deriving
-                      {% checkDataHeader $2 `thenP` \(cs,c,t) ->
-                         returnP hsDataDecl { hsDeclSrcLoc = $3, hsDeclContext = cs, hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $6, hsDeclCons = reverse $5 } }
       | 'data' 'kind' ctype srcloc '=' constrs deriving
                       {% checkDataHeader $3 `thenP` \(cs,c,t) ->
                          returnP hsDataDecl { hsDeclDeclType = DeclTypeKind, hsDeclSrcLoc = $4, hsDeclContext = cs, hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $7, hsDeclCons = reverse $6 } }
+      | 'data' mCTYPE ctype srcloc '=' constrs deriving
+                      {% checkDataHeader $3 `thenP` \(cs,c,t) ->
+                         returnP hsDataDecl { hsDeclSrcLoc = $4, hsDeclContext = cs, hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $7, hsDeclCons = reverse $6, hsDeclCTYPE = $2 } }
       | 'newtype' mCTYPE ctype srcloc '=' constr deriving
                       {% checkDataHeader $3 `thenP` \(cs,c,t) ->
                          returnP hsNewTypeDecl { hsDeclSrcLoc = $4, hsDeclContext = cs, hsDeclName = c, hsDeclArgs = t, hsDeclCons = [$6], hsDeclDerives = $7, hsDeclCTYPE = $2} }

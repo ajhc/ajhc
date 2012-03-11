@@ -8,17 +8,17 @@ import Jhc.Type.Float
 -- their own definitions of 'Errno' values.
 newtype Errno = Errno CInt
 
-newtype CChar    = CChar Int8
-newtype CSChar   = CSChar Int8
-newtype CUChar   = CUChar Word8
-newtype CShort   = CShort Int16
-newtype CUShort  = CUShort Word16
-newtype CInt     = CInt Int
-newtype CUInt    = CUInt Word
-newtype CLong    = CLong IntPtr
-newtype CULong   = CULong WordPtr
-newtype CLLong   = CLLong IntMax
-newtype CULLong  = CULLong WordMax
+newtype {-# CTYPE "char" #-}           CChar    = CChar Int8
+newtype {-# CTYPE "signed char" #-}    CSChar   = CSChar Int8
+newtype {-# CTYPE "unsigned char" #-}  CUChar   = CUChar Word8
+newtype {-# CTYPE "short" #-}          CShort   = CShort Int16
+newtype {-# CTYPE "unsigned short" #-} CUShort  = CUShort Word16
+newtype {-# CTYPE "int" #-}            CInt     = CInt Int
+newtype {-# CTYPE "unsigned" #-}       CUInt    = CUInt Word
+newtype {-# CTYPE "long" #-}           CLong    = CLong IntPtr
+newtype {-# CTYPE "unsigned long" #-}  CULong   = CULong WordPtr
+newtype {-# CTYPE "long long" #-}      CLLong   = CLLong IntMax
+newtype {-# CTYPE "unsigned long long" #-} CULLong  = CULLong WordMax
 
 newtype CIntMax  = CIntMax IntMax
 newtype CUIntMax = CUIntMax WordMax
@@ -27,16 +27,16 @@ newtype CUIntPtr = CUIntPtr WordPtr
 
 newtype CFloat   = CFloat Float
 newtype CDouble  = CDouble Double
-newtype CLDouble = CLDouble Double
+newtype {-# CTYPE "long double" #-} CLDouble = CLDouble Double
 
-newtype CWchar   = CWchar Word32
-newtype CWint    = CWint Int32
-newtype CClock   = CClock IntMax
-newtype CPtrdiff = CPtrdiff IntPtr
-newtype CSize    = CSize WordPtr
-newtype CTime    = CTime IntMax
+newtype {-# CTYPE "wchar_t" #-}   CWchar   = CWchar Word32
+newtype {-# CTYPE "wint_t" #-}    CWint    = CWint Int32
+newtype {-# CTYPE "clock_t" #-}   CClock   = CClock IntMax
+newtype {-# CTYPE "ptrdiff_t" #-} CPtrdiff = CPtrdiff IntPtr
+newtype {-# CTYPE "size_t" #-}    CSize    = CSize WordPtr
+newtype {-# CTYPE "time_t" #-}    CTime    = CTime IntMax
 
-data CFile
-data CJmpBuf
-data CFpos
-data CSigAtomic
+data {-# CTYPE "FILE" #-}        CFile
+data {-# CTYPE "jmp_buf" #-}     CJmpBuf
+data {-# CTYPE "fpos_t" #-}      CFpos
+data {-# CTYPE "sigatomic_t" #-} CSigAtomic

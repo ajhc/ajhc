@@ -5,6 +5,7 @@ module Jhc.Prim.Bits where
 -- brings the names into scope, so it is okay to
 -- have platform specific definitions here.
 
+-- The CTYPE of the raw types is declared in src/DataConstructors.hs
 data Bits1_ :: #
 
 data Bits8_   :: #
@@ -27,10 +28,10 @@ data Complex_ :: # -> #
 -- these newtypes exist to modify the
 -- calling convention and provide hints as
 -- to the use of the types.
-newtype Addr_    = Addr_ BitsPtr_
-newtype FunAddr_ = FunAddr_ BitsPtr_
-newtype Bool_    = Bool_ Bits16_
-newtype Char_    = Char_ Bits32_
+newtype {-# CTYPE "HsPtr" #-}    Addr_    = Addr_ BitsPtr_
+newtype {-# CTYPE "HsFunPtr" #-} FunAddr_ = FunAddr_ BitsPtr_
+newtype {-# CTYPE "bool" #-}     Bool_    = Bool_ Bits16_
+newtype {-# CTYPE "wchar_t" #-}  Char_    = Char_ Bits32_
 
 -- type aliases to help document whether signed or unsigned
 -- uses are intended, they have no effect other than helping

@@ -25,46 +25,9 @@ Double     Jhc.Type.Float.Double
 Ptr        Jhc.Type.Ptr.Ptr
 FunPtr     Jhc.Type.Ptr.FunPtr
 
-# Jhc.Type.C
-CLong      Jhc.Type.C.CLong
-CULong     Jhc.Type.C.CULong
-CLLong     Jhc.Type.C.CLLong
-CULLong    Jhc.Type.C.CULLong
-CShort     Jhc.Type.C.CShort
-CUShort    Jhc.Type.C.CUShort
-CWchar     Jhc.Type.C.CWchar
-CWint      Jhc.Type.C.CWint
-CChar      Jhc.Type.C.CChar
-CSChar     Jhc.Type.C.CSChar
-CUChar     Jhc.Type.C.CUChar
-
-CInt       Jhc.Type.C.CInt
-CUInt      Jhc.Type.C.CUInt
-CTime      Jhc.Type.C.CTime
-CSize      Jhc.Type.C.CSize
-CClock     Jhc.Type.C.CClock
-CFile      Jhc.Type.C.CFile
-CJmpBuf    Jhc.Type.C.CJmpBuf
-CFpos      Jhc.Type.C.CFpos
-CSigAtomic Jhc.Type.C.CSigAtomic
-
 Integer   Jhc.Type.Basic.Integer
 
 Int       Jhc.Type.Word.Int
-Int8      Jhc.Type.Word.Int8
-Int16     Jhc.Type.Word.Int16
-Int32     Jhc.Type.Word.Int32
-Int64     Jhc.Type.Word.Int64
-IntMax    Jhc.Type.Word.IntMax
-IntPtr    Jhc.Type.Word.IntPtr
-
-Word       Jhc.Type.Word.Word
-Word8      Jhc.Type.Word.Word8
-Word16     Jhc.Type.Word.Word16
-Word32     Jhc.Type.Word.Word32
-Word64     Jhc.Type.Word.Word64
-WordMax    Jhc.Type.Word.WordMax
-WordPtr    Jhc.Type.Word.WordPtr
 
 Bits1      Jhc.Prim.Bits.Bits1_
 Bits8      Jhc.Prim.Bits.Bits8_

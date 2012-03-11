@@ -11,7 +11,7 @@ data (->) :: ?? -> ? -> *
 
 infixr 5  :
 data [] a =  a : ([] a) | []
-data Bool = False | True
+data {-# CTYPE "HsBool" #-} Bool = False | True
 data Ordering =  LT | EQ | GT
 
 data () = ()

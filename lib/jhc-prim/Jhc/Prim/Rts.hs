@@ -5,7 +5,7 @@ import Jhc.Prim.Bits
 
 -- A Bang_ is always in WHNF. The mnemonic is 'Bang_ Char ~ !Char'
 -- Bang_ is also an FFI-able type that turns into a raw haskell object pointer.
-data Bang_ a :: #
+data {-# CTYPE "wptr_t" #-} Bang_ a :: #
 
 -- safe
 foreign import primitive toBang_     :: a -> Bang_ a
