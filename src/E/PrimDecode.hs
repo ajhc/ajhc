@@ -7,7 +7,6 @@ import Text.Printf
 import C.Prims
 import Cmm.Op(readTy,Ty)
 import Data.Maybe
-import Data.Monoid(Monoid(..))
 import DataConstructors
 import E.E
 import E.Values

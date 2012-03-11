@@ -304,7 +304,7 @@ constantCaf Program { progDataTable = dataTable, progCombinators = combs } = ans
 getName' :: (Show a,Monad m) => DataTable -> Lit a E -> m Atom
 getName' dataTable v@LitCons { litName = n, litArgs = es }
     | Just _ <- fromUnboxedNameTuple n = fail $ "unboxed tuples don't have names silly"
-    | conAlias cons /= NotAlias = error $ "Alias still exists: " ++ show v
+    | isDataAlias (conChildren cons) = error $ "Alias still exists: " ++ show v
     | length es == nargs  = do
         return cn
     | nameType n == TypeConstructor && length es < nargs = do
@@ -314,6 +314,10 @@ getName' dataTable v@LitCons { litName = n, litArgs = es }
     cn = convertName n
     cons = runIdentity $ getConstructor n dataTable
     nargs = length (conSlots cons)
+
+isDataAlias x = case x of
+    DataAlias {} -> True
+    _ -> False
 
 instance ToVal TVr where
     toVal TVr { tvrType = ty, tvrIdent = num } = case toType TyINode ty of
@@ -692,7 +696,7 @@ compile' cenv (tvr,as,e) = ans where
     con (EPi (TVr {tvrIdent =  z, tvrType = x}) y) | isEmptyId z = do
         return $  [NodeC tagArrow (args [x,y])]
     con v@(ELit LitCons { litName = n, litArgs = es })
-        | conAlias cons /= NotAlias = error $ "Alias still exists: " ++ show v
+        | isDataAlias (conChildren cons) = error $ "Alias still exists: " ++ show v
         | Just v <- fromUnboxedNameTuple n, DataConstructor <- nameType n = do
             return ((keepIts $ args es))
         | length es == nargs  = do

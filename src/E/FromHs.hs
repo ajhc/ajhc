@@ -788,8 +788,8 @@ tidyPat p b = f p where
     f pa@(HsPApp n [p]) = do
         dataTable <- getDataTable
         patCons <- getConstructor (toName DataConstructor n) dataTable
-        case conAlias patCons of
-            ErasedAlias -> f p
+        case conChildren patCons of
+            DataAlias ErasedAlias -> f p
             _ -> return (pa,id)
     f p@HsPApp {} = return (p,id)
     f (HsPIrrPat (Located ss p)) = f p >>= \ (p',fe) -> case p' of
@@ -985,10 +985,10 @@ makeSpec _ _ _ = fail "E.FromHs.makeSpec: invalid specialization"
 
 deNewtype :: DataTable -> E -> E
 deNewtype dataTable e = removeNewtypes dataTable (f e) where
-    f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (LitCons { litName = n, litArgs = [v], litType = t }) z):_) } | alias == ErasedAlias = f (eLet v e z) where
-        Identity Constructor { conAlias = alias } = getConstructor n dataTable
-    f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (LitCons { litName = n, litArgs = [v], litType = t }) z):_) } | alias == RecursiveAlias = f $ eLet v (prim_unsafeCoerce e (getType v)) z where
-        Identity Constructor { conAlias = alias } = getConstructor n dataTable
+    f ECase { eCaseScrutinee = e, eCaseAlts = ((Alt (LitCons { litName = n, litArgs = [v], litType = t }) z):_) } | alias == DataAlias ErasedAlias = f (eLet v e z) where
+        Identity Constructor { conChildren = alias } = getConstructor n dataTable
+    f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (LitCons { litName = n, litArgs = [v], litType = t }) z):_) } | alias == DataAlias RecursiveAlias = f $ eLet v (prim_unsafeCoerce e (getType v)) z where
+        Identity Constructor { conChildren = alias } = getConstructor n dataTable
     f e = runIdentity $ emapE (return . f) e
 
 ffiTypeInfo bad t cont = do

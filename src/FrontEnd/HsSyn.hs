@@ -105,6 +105,7 @@ hsDataDecl = HsDataDecl {
     hsDeclArgs = [],
     hsDeclCons = [],
     hsDeclHasKind = Nothing,
+    hsDeclCTYPE = Nothing,
     hsDeclDerives = []
     }
 
@@ -138,6 +139,7 @@ data HsDecl
         hsDeclArgs     :: [Name],
         hsDeclCons     :: [HsConDecl],
         hsDeclHasKind  :: Maybe HsKind,
+        hsDeclCTYPE    :: Maybe String,
         {- deriving -} hsDeclDerives :: [HsName]
         }
     | HsInfixDecl   {

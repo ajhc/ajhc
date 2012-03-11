@@ -119,7 +119,7 @@ kind (KBase (KNamed t)) = ESort (ESortNamed t)
 kind (Kfun k1 k2) = EPi (tVr emptyId (kind k1)) (kind k2)
 kind k = error $ "DataConstructors.kind: cannot convert " ++ show k
 
-data AliasType = NotAlias | ErasedAlias | RecursiveAlias
+data AliasType = ErasedAlias | RecursiveAlias
     deriving(Eq,Ord,Show)
     {-! derive: Binary !-}
 
@@ -130,6 +130,7 @@ data DataFamily =
     | DataPrimitive                -- primitive type, children are all numbers.
     | DataEnum {-# UNPACK #-} !Int -- bounded integral type, argument is maximum number
     | DataNormal [Name]            -- child constructors
+    | DataAlias !AliasType
     deriving(Eq,Ord,Show)
     {-! derive: Binary !-}
 
@@ -141,10 +142,10 @@ data Constructor = Constructor {
     conType      :: E,            -- type of constructor
     conExpr      :: E,            -- expression which constructs this value
     conOrigSlots :: [Slot],       -- original slots
-    conAlias     :: !AliasType,   -- whether this is a simple alias and has no tag of its own.
     conInhabits  :: Name,         -- what constructor it inhabits, similar to conType, but not quite.
     conVirtual   :: Maybe [Name], -- whether this is a virtual constructor that translates into an enum and its siblings
-    conChildren  :: DataFamily
+    conChildren  :: DataFamily,
+    conCTYPE     :: Maybe ExtType -- external type
     } deriving(Show)
     {-! derive: Binary !-}
 
@@ -184,8 +185,8 @@ emptyConstructor = Constructor {
     conOrigSlots = [],
     conExpr      = Unknown,
     conInhabits  = error "emptyConstructor.conInhabits",
-    conAlias     = NotAlias,
     conVirtual   = Nothing,
+    conCTYPE     = Nothing,
     conChildren  = DataNone
     }
 
@@ -417,6 +418,12 @@ lookupExtTypeInfo dataTable oe = f Set.empty oe where
             ExtTypeRaw _ -> ExtTypeRaw et
             ExtTypeBoxed b t _ -> ExtTypeBoxed b t et
             ExtTypeVoid -> ExtTypeVoid
+    f seen e@(ELit LitCons { litName = c }) | Just (conCTYPE -> Just et) <- getConstructor c dataTable = do
+        res <- g seen e
+        return $ case res of
+            ExtTypeRaw _ -> ExtTypeRaw et
+            ExtTypeBoxed b t _ -> ExtTypeBoxed b t et
+            ExtTypeVoid -> ExtTypeVoid
     f seen e = g seen e
     -- if we are a raw type, we can be foreigned
     g _ (ELit LitCons { litName = c })
@@ -538,7 +545,7 @@ updateLit dataTable lc@LitCons { litAliasFor = Just {} } = lc
 updateLit dataTable lc@LitCons { litName = n } =  lc { litAliasFor = af } where
     af = do
         Constructor { conChildren = DataNormal [x], conOrigSlots = cs } <- getConstructor n dataTable
-        Constructor { conAlias = ErasedAlias, conOrigSlots = [SlotNormal sl] } <- getConstructor x dataTable
+        Constructor { conChildren = DataAlias ErasedAlias, conOrigSlots = [SlotNormal sl] } <- getConstructor x dataTable
         return (foldr ELam sl [ tVr i s | s <- getSlots cs | i <- anonymousIds])
 
 removeNewtypes :: DataTable -> E -> E
@@ -552,7 +559,6 @@ removeNewtypes dataTable e = runIdentity (f e) where
 
 collectDeriving :: [HsDecl] -> [(SrcLoc,Name,Name)]
 collectDeriving ds = concatMap f ds where
---    f decl@HsNewTypeDecl {} = g decl
     f decl@HsDataDecl {} = g decl
     f decl@HsDeclDeriving {} = h decl
     f _ = []
@@ -582,13 +588,13 @@ toDataTable km cm ds currentDataTable = newDataTable  where
         f HsTyCon { hsTypeName = n } = tell [n]
         f t = traverseHsType_ f t
     f decl@HsDataDecl { hsDeclDeclType = DeclTypeNewtype,  hsDeclName = nn, hsDeclCons = cs } =
-        dt decl (if nn `elem` newtypeLoopBreakers then RecursiveAlias else ErasedAlias) cs
+        dt decl (if nn `elem` newtypeLoopBreakers then DataAlias RecursiveAlias else DataAlias ErasedAlias) cs
     f decl@HsDataDecl { hsDeclDeclType = DeclTypeKind } = dkind decl
-    f decl@HsDataDecl { hsDeclCons = cs } = dt decl NotAlias cs
+    f decl@HsDataDecl { hsDeclCons = cs } = dt decl DataNone cs
     f _ = return ()
-    dt decl NotAlias cs@(_:_:_) | all null (map hsConDeclArgs cs) = do
-        let virtualCons'@(fc:_) = map (makeData NotAlias typeInfo) cs
-            typeInfo@(theType,_,_) = makeType decl
+    dt decl DataNone cs@(_:_:_) | all null (map hsConDeclArgs cs) = do
+        let virtualCons'@(fc:_) = map (makeData DataNone typeInfo) cs
+            typeInfo@(theType,_,_) = makeType decl (hsDeclCTYPE decl)
             virt = Just (map conName virtualCons')
             f (n,vc) = vc { conExpr = ELit (litCons { litName = consName, litArgs = [ELit (LitInt (fromIntegral n) rtype)], litType = conType vc }), conVirtual = virt }
             virtualCons = map f (zip [(0 :: Int) ..] virtualCons')
@@ -611,7 +617,7 @@ toDataTable km cm ds currentDataTable = newDataTable  where
 
     dt decl alias cs = do
         let dataCons = map (makeData alias typeInfo) cs
-            typeInfo@(theType,_,_) = makeType decl
+            typeInfo@(theType,_,_) = makeType decl (hsDeclCTYPE decl)
         tell (Seq.fromList dataCons)
         tell $ Seq.singleton theType { conChildren = DataNormal (map conName dataCons) }
 
@@ -642,7 +648,7 @@ toDataTable km cm ds currentDataTable = newDataTable  where
             conOrigSlots = origSlots,
             conExpr = theExpr,
             conInhabits = conName theType,
-            conAlias = alias
+            conChildren = alias
             }
         dataConsName =  toName Name.DataConstructor (hsConDeclName x)
 
@@ -678,8 +684,8 @@ toDataTable km cm ds currentDataTable = newDataTable  where
                     ELit LitCons { litName = n } <- return $ followAliases fullDataTable te
                     Constructor { conChildren = DataNormal [dc] } <- getConstructor n fullDataTable
                     con <- getConstructor dc fullDataTable
-                    case (conAlias con,slotTypes fullDataTable dc te) of
-                        (ErasedAlias,[nt]) -> g e nt
+                    case (conChildren con,slotTypes fullDataTable dc te) of
+                        (DataAlias ErasedAlias,[nt]) -> g e nt
                         (_,[st]) -> do
                             let nv = tvr { tvrIdent = j, tvrType = st }
                             return $ Right (e { tvrIdent = i, tvrType = subst (tvrType e)},dc,[nv]):f is bs es
@@ -694,20 +700,20 @@ toDataTable km cm ds currentDataTable = newDataTable  where
         -- arguments that the front end passes or pulls out of this constructor
         --hsArgs = existentials ++ [ tvr {tvrIdent = x} | tvr <- origArgs | x <- drop (5 + length theTypeArgs) [2,4..] ]
 
-    makeType decl = (theType,theTypeArgs,theTypeExpr) where
+    makeType decl ct = (theType,theTypeArgs,theTypeExpr) where
         theTypeName = toName Name.TypeConstructor (hsDeclName decl)
         Just theKind = kind `fmap` (Map.lookup theTypeName km)
         (theTypeFKind,theTypeKArgs') = fromPi theKind
         theTypeArgs = [ tvr { tvrIdent = x } | tvr  <- theTypeKArgs' | x <- anonymousIds ]
         theTypeExpr = ELit litCons { litName = theTypeName, litArgs = map EVar theTypeArgs, litType = theTypeFKind }
         theType = emptyConstructor {
-            conName = theTypeName,
-            conType = theKind,
+            conCTYPE     = fmap (ExtType . packString) ct,
+            conExpr      = foldr ($) theTypeExpr (map ELam theTypeArgs),
+            conInhabits  = if theTypeFKind == eStar then s_Star else s_Hash,
+            conName      = theTypeName,
             conOrigSlots = map (SlotNormal . tvrType) theTypeArgs,
-            conExpr = foldr ($) theTypeExpr (map ELam theTypeArgs),
-            conInhabits = if theTypeFKind == eStar then s_Star else s_Hash,
-            conVirtual = Nothing,
-            conChildren = undefined
+            conType      = theKind,
+            conVirtual   = Nothing
             }
 
 isHsBangedTy HsBangedTy {} = True
@@ -722,8 +728,8 @@ constructionExpression ::
     -> E      -- ^ type of eventual constructor
     -> E      -- ^ saturated lambda calculus term
 constructionExpression dataTable n typ@(ELit LitCons { litName = pn, litArgs = xs })
-    | ErasedAlias <- conAlias mc = ELam var (EVar var)
-    | RecursiveAlias <- conAlias mc = let var' = var { tvrType = st } in ELam var' (prim_unsafeCoerce (EVar var') typ)
+    | DataAlias ErasedAlias <- conChildren mc = ELam var (EVar var)
+    | DataAlias RecursiveAlias <- conChildren mc = let var' = var { tvrType = st } in ELam var' (prim_unsafeCoerce (EVar var') typ)
     | pn == conName pc = sub (conExpr mc) where
     ~[st] = slotTypes dataTable n typ
     var = tvr { tvrIdent = vid, tvrType = typ }
@@ -800,14 +806,14 @@ slotTypesHs _ n e = error $ "slotTypesHs: error in " ++ show n ++ ": " ++ show e
 
 {-# NOINLINE showDataTable #-}
 showDataTable (DataTable mp) = vcat xs where
-    c con = vcat [t,e,cs,al,vt,ih,ch] where
+    c con = vcat [t,e,cs,vt,ih,ch,mc] where
         t  = text "::"        <+> ePretty conType
         e  = text "="         <+> ePretty conExpr
         cs = text "slots:"    <+> tupled (map ePretty (conSlots con))
-        al = text "alias:"    <+> tshow conAlias
         vt = text "virtual:"  <+> tshow conVirtual
         ih = text "inhabits:" <+> tshow conInhabits
         ch = text "children:" <+> tshow conChildren
+        mc = text "CTYPE:"    <+> tshow conCTYPE
         Constructor { .. } = con
     xs = [text x <+> hang 0 (c y) | (x,y) <- ds ]
     ds = sortBy (\(x,_) (y,_) -> compare x y) [(show x,y)  | (x,y) <-  Map.toList mp]

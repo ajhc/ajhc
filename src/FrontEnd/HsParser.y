@@ -302,6 +302,10 @@ mkind :: { Maybe HsKind }
     : '::' kind                       { Just $2 }
     |                                 { Nothing }
 
+mCTYPE :: { Maybe String }
+    :  PRAGMACTYPE STRING PRAGMAEND  { Just $2 }
+    |                                { Nothing }
+
 topdecl :: { HsDecl }
       : 'data' ctype srcloc deriving
           {% checkDataHeader $2 `thenP` \(cs,c,t) ->
@@ -319,9 +323,9 @@ topdecl :: { HsDecl }
       | 'data' 'kind' ctype srcloc '=' constrs deriving
                       {% checkDataHeader $3 `thenP` \(cs,c,t) ->
                          returnP hsDataDecl { hsDeclDeclType = DeclTypeKind, hsDeclSrcLoc = $4, hsDeclContext = cs, hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $7, hsDeclCons = reverse $6 } }
-      | 'newtype' ctype srcloc '=' constr deriving
-                      {% checkDataHeader $2 `thenP` \(cs,c,t) ->
-                         returnP hsNewTypeDecl { hsDeclSrcLoc = $3, hsDeclContext = cs, hsDeclName = c, hsDeclArgs = t, hsDeclCons = [$5], hsDeclDerives = $6} }
+      | 'newtype' mCTYPE ctype srcloc '=' constr deriving
+                      {% checkDataHeader $3 `thenP` \(cs,c,t) ->
+                         returnP hsNewTypeDecl { hsDeclSrcLoc = $4, hsDeclContext = cs, hsDeclName = c, hsDeclArgs = t, hsDeclCons = [$6], hsDeclDerives = $7, hsDeclCTYPE = $2} }
       | 'class' srcloc classhead optfundep optcbody
                       { HsClassDecl $2 $3 $5 }
       | 'class' 'alias' srcloc conid varids '=' carhs optcbody
