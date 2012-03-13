@@ -37,10 +37,12 @@ _SUPERSPECIALIZE_   has the same effect as SPECIALIZE, but also places a run-tim
 
 Pragma
 ------             ---------------------------------------------------
-_EXTTYPE_          Specify the external type that a data or newtype should use for foreign function interfaces. 
+_CTYPE_            Specify the external type that a data or newtype should use for foreign function interfaces.
                    The type must be a newtype or unary data constructor of a type that is already foreignable.
-                   This pragma must appear in the same file as the type declaration.
-                   Example {-# EXTTYPE CUShort "unsigned short" #-}
+                   Example
+                   ~~~
+                   data {-# CTYPE "unsigned short" #-} CUShort = CUShort Word16
+                   ~~~
 
 # Header Pragmas
 
@@ -55,5 +57,3 @@ when applied to a single file.
 
 LANGUAGE
 : Specify various language options
-
-
