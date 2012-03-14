@@ -51,7 +51,7 @@ GHC_CHECK_MODULE(System.Console.Readline,readline,,,[
       ])
 ])
 
-GHC_CHECK_MODULE(System,base,,[] ,[ GHCINC="$GHCINC -icompat/haskell98"])
+GHC_CHECK_MODULE(System,base,,[] ,[ GHCINC="$GHCINC -i$srcdir/compat/haskell98"])
 
 AC_PROGRAM_REQUIRE(hsc2hs,hsc2hs,     [  --with-hsc2hs=<hsc2hs location>    Specify location of hsc2hs.])
 if test -z "$HSC2HS"; then

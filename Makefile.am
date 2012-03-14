@@ -45,7 +45,7 @@ GHCSELFTESTOPTS= -osuf test.o -hisuf test.hi -DEXPORT_SELFTEST=,_selftest
 GHCNONSELFTESTOPTS= -DEXPORT_SELFTEST=
 GHCINC=  -i @GHCINC@ -i$(srcdir)/drift_processed \
 	 -i$(srcdir)/src -i$(builddir)/src -odir $(builddir)/src -hidir $(builddir)/src \
-	 -I$(srcdir)/src
+	 -I$(srcdir)/src -I$(builddir)/src
 
 PACKAGES= -hide-all-packages -package base -package fgl -package regex-compat -package random -package array -package directory \
           -package bytestring -package binary -package mtl -package containers \
@@ -64,11 +64,11 @@ LIB_OPTIONS=$(RTSOPTS) $(JHC_TEST)  -L- -L.
 include library_deps.make
 
 EXTRA_DIST = src/data rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
-             lib/jhc lib/jhc-prim lib/haskell-extras lib/haskell98 lib/flat-foreign $(JHC_LIBS) $(JHC_EXT_LIBS) \
+             lib/jhc lib/jhc-prim lib/haskell-extras lib/haskell98 lib/haskell2010 lib/flat-foreign $(JHC_LIBS) $(JHC_EXT_LIBS) \
 	     src/StringTable/StringTable_cbits.c src/StringTable/StringTable_cbits.h src/cbits/md5sum.c jhc.1 \
 	     src/StringTable/Atom.hsc jhc.spec src/cbits/lookup3.c \
 	     manual.html lib/applicative examples/HelloWorld.hs examples/Calendar.hs \
-	     examples/Primes.hs src/FlagOpts.flags src/FlagDump.flags lib/ext
+	     examples/Primes.hs src/FlagOpts.flags src/FlagDump.flags lib/ext compat
 
 dist-hook: $(BUILT_SOURCES)
 	if test -f _darcs; then \
