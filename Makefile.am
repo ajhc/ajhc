@@ -273,7 +273,7 @@ jhc.1 :
 manual.html :
 	$(MAKE) manual
 
-.PHONY: libs
+.PHONY: libs regress
 libs: $(JHC_LIBS) $(JHC_EXT_LIBS)
 
 show_elibs: lib/ext/*.cabal  lib/ext/*.yaml
@@ -287,3 +287,7 @@ TESTS=HelloWorld Primes
 JHC_MANUAL_FILES = docs/make.mkd options.mkd docs/dependency_format.mkd docs/pragmas.mkd docs/differences.mkd \
 	docs/unboxed.mkd rts/rts/jhc_rts.c src/FlagOpts.mkd src/FlagDump.mkd src/E/PrimOpt.hs \
 	drift_processed/E/TypeCheck.hs drift_processed/Options.hs
+
+regress: all
+	mkdir -p regress/results
+	./regress/regress.prl
