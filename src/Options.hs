@@ -101,16 +101,16 @@ include in addition to default.
 
 jhc will attempt to read several targets.ini files in order. they are
 
-$PREFIX/etc/jhc-\$VERSION/targets.ini
+$PREFIX/etc/ajhc-\$VERSION/targets.ini
 : this is the targets.ini that is included with jhc and contains the default options.
 
-$PREFIX/etc/jhc-\$VERSION/targets-local.ini
+$PREFIX/etc/ajhc-\$VERSION/targets-local.ini
 : jhc will read this if it exists, it is used to specify custom system wide configuration options, such as the name of local compilers.
 
-$HOME/.jhc/targets.ini
+$HOME/.ajhc/targets.ini
 : this is where a users local configuration information goes.
 
-$HOME/etc/jhc/targets.ini
+$HOME/etc/ajhc/targets.ini
 : this is simply for people that prefer to not use hidden directories for configuration
 
 The last value specified for an option is the one used, so a users local
@@ -310,7 +310,7 @@ postProcessFO o = case FlagOpts.process (optFOptsSet o) (optFOpts o) of
                         ++ unwords xs ++ "\nValid flags:\n\n" ++ FlagOpts.helpMsg)
 
 getArguments = do
-    x <- lookupEnv "JHC_OPTS"
+    x <- lookupEnv "AJHC_OPTS"
     let eas = maybe [] words x
     as <- System.getArgs
     return (eas ++ as)
@@ -329,7 +329,7 @@ pfill maxn length xs = f maxn xs [] [] where
     f _ [] ws ls = reverse (map reverse (ws:ls))
 
 helpUsage = usageInfo header theoptions ++ trailer where
-    header = "Usage: jhc [OPTION...] Main.hs"
+    header = "Usage: ajhc [OPTION...] Main.hs"
     trailer = "\n" ++ mkoptlist "-d" FlagDump.helpFlags ++ "\n" ++ mkoptlist "-f" FlagOpts.helpFlags
     mkoptlist d os = "valid " ++ d ++ " arguments: 'help' for more info\n    " ++ intercalate "\n    " (map (intercalate ", ") $ pfill 100 ((2 +) . length) os) ++ "\n"
 
@@ -356,7 +356,7 @@ processOptions = do
         _ -> return ()
     -- read targets.ini file
     Just home <- fmap (`mplus` Just "/") $ lookupEnv "HOME"
-    inis <- parseIniFiles (optVerbose o > 0) (BS.toString targets_ini) [confDir ++ "/targets.ini", confDir ++ "/targets-local.ini", home ++ "/etc/jhc/targets.ini", home ++ "/.jhc/targets.ini"] (optArch o)
+    inis <- parseIniFiles (optVerbose o > 0) (BS.toString targets_ini) [confDir ++ "/targets.ini", confDir ++ "/targets-local.ini", home ++ "/etc/ajhc/targets.ini", home ++ "/.ajhc/targets.ini"] (optArch o)
     -- process dump flags
     o <- either putErrDie return $ postProcessFD o
     when (FlagDump.Ini `S.member` optDumpSet o) $ flip mapM_ (M.toList inis) $ \(a,b) -> putStrLn (a ++ "=" ++ b)
@@ -384,13 +384,13 @@ doShowConfig = do
 
 findHoCache :: IO (Maybe FilePath)
 findHoCache = do
-    cd <- lookupEnv "JHC_CACHE"
+    cd <- lookupEnv "AJHC_CACHE"
     case optHoCache options `mplus` cd of
         Just s -> do return (Just s)
         Just "-" -> do return Nothing
         Nothing | isNothing (optHoDir options) -> do
             Just home <- fmap (`mplus` Just "/") $ lookupEnv "HOME"
-            let cd = home ++ "/.jhc/cache"
+            let cd = home ++ "/.ajhc/cache"
             createDirectoryIfMissing True cd
             return (Just cd)
         _  -> return Nothing
@@ -462,18 +462,18 @@ flint = FlagOpts.Lint `S.member` optFOptsSet options
 -- | Include directories taken from JHCPATH enviroment variable.
 initialIncludes :: [String]
 initialIncludes = unsafePerformIO $ do
-    p <- lookupEnv "JHC_PATH"
+    p <- lookupEnv "AJHC_PATH"
     let x = fromMaybe "" p
     return (".":(tokens (== ':') x))
 
 -- | Include directories taken from JHCLIBPATH enviroment variable.
 initialLibIncludes :: [String]
 initialLibIncludes = unsafePerformIO $ do
-    ps <- lookupEnv "JHC_LIBRARY_PATH"
+    ps <- lookupEnv "AJHC_LIBRARY_PATH"
     h <- lookupEnv "HOME"
     let paths = h ++ ["/usr/local","/usr"]
         bases = ["/lib","/share"]
-        vers = ["/jhc-" ++ shortVersion, "/jhc"]
+        vers = ["/ajhc-" ++ shortVersion, "/ajhc"]
     return $ nub $ maybe [] (tokens (':' ==))  ps ++ [ p ++ b ++ v | p <- paths, v <- vers, b <- bases ]
                ++ [d ++ v | d <- [libdir,datadir], v <- vers] ++ [libraryInstall]
 

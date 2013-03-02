@@ -11,10 +11,10 @@ our ($opt_l,$opt_d);
 getopts('ld') or die "unknown opt";
 
 # clean out environment
-delete $ENV{JHC_PATH};
-delete $ENV{JHC_OPTS};
-delete $ENV{JHC_CACHE};
-delete $ENV{JHC_LIBRARY_PATH};
+delete $ENV{AJHC_PATH};
+delete $ENV{AJHC_OPTS};
+delete $ENV{AJHC_CACHE};
+delete $ENV{AJHC_LIBRARY_PATH};
 
 my $tmpdir = "tmp/build";
 
@@ -58,6 +58,6 @@ foreach my $fn (@ARGV) {
     mysystem "patch -d $tmpdir/$name-$version -p1 < $patch" if -e $patch;
     mysystem("cp '$fn' '$tmpdir/$name-$version'");
     $fn =~ s/.*\///;
-    mysystem("./jhc $options " . ($ENV{JHC_TEST} || "") .
-        " --build-hl '$tmpdir/$name-$version/$fn' -L- -L. -i- '-i$tmpdir/$name-$version$src'") and die "$!: jhc";
+    mysystem("./ajhc $options " . ($ENV{AJHC_TEST} || "") .
+        " --build-hl '$tmpdir/$name-$version/$fn' -L- -L. -i- '-i$tmpdir/$name-$version$src'") and die "$!: ajhc";
 }

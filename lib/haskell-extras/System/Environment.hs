@@ -21,13 +21,13 @@ getEnv      :: String -> IO String
 
 getProgName = case Jhc.Options.target of
     Jhc.Options.GhcHs -> ghc_getProgName
-    _ -> peek jhc_progname >>= peekCString
+    _ -> peek ajhc_progname >>= peekCString
 
 getArgs = case Jhc.Options.target of
     Jhc.Options.GhcHs -> ghc_getArgs
     _ -> do
-        argc <- peek jhc_argc
-        argv <- peek jhc_argv
+        argc <- peek ajhc_argc
+        argv <- peek ajhc_argv
         let f n = peekElemOff argv n >>= peekCString
         mapM f [0 .. fromIntegral argc - 1]
 
@@ -36,9 +36,9 @@ getEnv s = withCString s c_getenv >>= \p ->
 
 foreign import unsafe ccall "stdlib.h getenv" c_getenv :: Ptr CChar -> IO (Ptr CChar)
 
-foreign import ccall "&jhc_progname" jhc_progname :: Ptr CString
-foreign import ccall "&jhc_argc" jhc_argc :: Ptr CInt
-foreign import ccall "&jhc_argv" jhc_argv :: Ptr (Ptr CString)
+foreign import ccall "&jhc_progname" ajhc_progname :: Ptr CString
+foreign import ccall "&jhc_argc" ajhc_argc :: Ptr CInt
+foreign import ccall "&jhc_argv" ajhc_argv :: Ptr (Ptr CString)
 
 ghc_getArgs :: IO [String]
 ghc_getArgs =

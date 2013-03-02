@@ -1,8 +1,8 @@
 ACLOCAL_AMFLAGS=-I ac-macros
 
-bin_PROGRAMS = jhc
+bin_PROGRAMS = ajhc
 
-jhc_SOURCES = src/Main.hs $(HSFILES) $(BUILT_SOURCES) $(HSBOOT) $(DRIFTFILES)
+ajhc_SOURCES = src/Main.hs $(HSFILES) $(BUILT_SOURCES) $(HSBOOT) $(DRIFTFILES)
 
 BUILT_SOURCES= src/RawFiles.hs src/FrontEnd/HsParser.hs src/FlagDump.hs \
 	       src/FlagOpts.hs src/Name/Prim.hs src/Info/Properties.hs $(DRIFTFILES)
@@ -60,13 +60,13 @@ GHCLANG= -XTypeFamilies -XViewPatterns -XUndecidableInstances -XOverlappingInsta
 
 GHCOPTS= $(HSOPTS) -XBangPatterns -O @GHCFLAGS@ $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 
-LIB_OPTIONS=$(RTSOPTS) $(JHC_TEST)  -L- -L.
+LIB_OPTIONS=$(RTSOPTS) $(AJHC_TEST)  -L- -L.
 include library_deps.make
 
 EXTRA_DIST = src/data rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
-             lib/jhc lib/jhc-prim lib/haskell-extras lib/haskell98 lib/haskell2010 lib/flat-foreign $(JHC_LIBS) $(JHC_EXT_LIBS) \
-	     src/StringTable/StringTable_cbits.c src/StringTable/StringTable_cbits.h src/cbits/md5sum.c jhc.1 \
-	     src/StringTable/Atom.hsc jhc.spec src/cbits/lookup3.c \
+             lib/jhc lib/jhc-prim lib/haskell-extras lib/haskell98 lib/haskell2010 lib/flat-foreign $(AJHC_LIBS) $(AJHC_EXT_LIBS) \
+	     src/StringTable/StringTable_cbits.c src/StringTable/StringTable_cbits.h src/cbits/md5sum.c ajhc.1 \
+	     src/StringTable/Atom.hsc ajhc.spec src/cbits/lookup3.c \
 	     manual.html lib/applicative examples/HelloWorld.hs examples/Calendar.hs \
 	     examples/Primes.hs src/FlagOpts.flags src/FlagDump.flags lib/ext compat
 
@@ -79,13 +79,13 @@ dist-hook: $(BUILT_SOURCES)
 		cp -f $(srcdir)/src/RawFiles.hs $(destdir)/src/RawFiles.hs; \
 	fi
 
-all-local: $(JHC_LIBS)
+all-local: $(AJHC_LIBS)
 
-install-data-hook: $(JHC_LIBS) $(JHC_EXT_LIBS)
+install-data-hook: $(AJHC_LIBS) $(AJHC_EXT_LIBS)
 	$(INSTALL) -d $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@
 	$(INSTALL) -d $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/include
 	$(INSTALL) -d $(DESTDIR)$(sysconfdir)/@PACKAGE@-@SHORTVERSION@
-	for lib in $(JHC_LIBS) $(JHC_EXT_LIBS); do \
+	for lib in $(AJHC_LIBS) $(AJHC_EXT_LIBS); do \
 		test -f "$$lib" && $(INSTALL_DATA) $$lib $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@ ; \
 		test -f "$(srcdir)/$$lib" && $(INSTALL_DATA) "$(srcdir)/$$lib" $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@ ; \
 	done
@@ -93,8 +93,8 @@ install-data-hook: $(JHC_LIBS) $(JHC_EXT_LIBS)
 	$(INSTALL_DATA) "$(srcdir)/src/data/targets.ini" $(DESTDIR)$(sysconfdir)/@PACKAGE@-@SHORTVERSION@
 
 uninstall-hook:
-	rm -f -- "$(DESTDIR)$(bindir)/jhci$(EXTEXT)"
-	for lib in $(JHC_LIBS) $(JHC_EXT_LIBS); do \
+	rm -f -- "$(DESTDIR)$(bindir)/ajhci$(EXTEXT)"
+	for lib in $(AJHC_LIBS) $(AJHC_EXT_LIBS); do \
 		rm -f -- "$(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/$$lib" ; \
 	done
 	rm -f -- "$(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/include/HsFFI.h"
@@ -130,16 +130,16 @@ CFILES = src/StringTable/StringTable_cbits.o src/cbits/md5sum.o src/cbits/lookup
 	mkdir -p `echo $@ | sed -e 's@/[^/]*$$@@'`
 	$(HC) $(MY_CFLAGS) $< -c -o $@
 
-jhc: src/Main.hs  $(HSFILES) $(BUILT_SOURCES) src/StringTable/Atom.hs $(CFILES)
+ajhc: src/Main.hs  $(HSFILES) $(BUILT_SOURCES) src/StringTable/Atom.hs $(CFILES)
 	$(BUILD_STOW) $(HC) $(GHCOPTS) --make $< $(CFILES) -o $@
 
-jhcp: src/Main.hs $(BUILT_SOURCES) $(HSFILES) src/StringTable/Atom.hs $(CFILES)
+ajhcp: src/Main.hs $(BUILT_SOURCES) $(HSFILES) src/StringTable/Atom.hs $(CFILES)
 	$(HC) $(GHCOPTS) $(GHCPROFOPTS) --make $< $(CFILES) -o $@
 
-dist_man_MANS = jhc.1
+dist_man_MANS = ajhc.1
 
 install-exec-hook:
-	cd $(DESTDIR)$(bindir) && $(LN_S) -f jhc$(EXEEXT) jhci$(EXEEXT)
+	cd $(DESTDIR)$(bindir) && $(LN_S) -f ajhc$(EXEEXT) ajhci$(EXEEXT)
 
 HSBOOT= src/DataConstructors.hs-boot src/FrontEnd/Tc/Class.hs-boot src/Grin/Grin.hs-boot src/Grin/Show.hs-boot src/Info/Binary.hs-boot src/E/Show.hs-boot
 
@@ -177,17 +177,17 @@ src/data/shortchange.txt: ChangeLog
 
 BINDISTDIR=$(PACKAGE)-$(VERSION)-$(host)
 
-bin-dist: jhc
+bin-dist: ajhc
 	rm -rf -- $(BINDISTDIR)
 	mkdir $(BINDISTDIR)
-	strip -- jhc || true
-	cp -- jhc $(BINDISTDIR)
+	strip -- ajhc || true
+	cp -- ajhc $(BINDISTDIR)
 	tar cvf $(BINDISTDIR).tar $(BINDISTDIR)
 	gzip -f -- $(BINDISTDIR).tar
 	rm -rf -- $(BINDISTDIR)
 
-.INTERMEDIATE: deps.txt jhc_man.mkd options.mkd
-.DELETE_ON_ERROR: deps.txt depend.make ChangeLog data/shortchange.txt manual.mkd jhc_man.mkd options.mkd
+.INTERMEDIATE: deps.txt ajhc_man.mkd options.mkd
+.DELETE_ON_ERROR: deps.txt depend.make ChangeLog data/shortchange.txt manual.mkd ajhc_man.mkd options.mkd
 
 deps.txt:
 	$(MAKE) $(AM_MAKEFLAGS) $(BUILT_SOURCES)
@@ -213,7 +213,7 @@ hlint:
 
 ho-clean:
 	rm -f -- `find -name \*.ho -print`
-	rm -f -- `find ~/.jhc/cache -name \*.ho -print`
+	rm -f -- `find ~/.ajhc/cache -name \*.ho -print`
 hl-clean:
 	rm -f -- `find -name \*.hl -print`
 
@@ -222,7 +222,7 @@ clean-local:
 
 MAINTAINERCLEANFILES= $(BUILT_SOURCES) $(DRIFTFILES)
 
-CLEANFILES= $(JHC_LIBS) $(JHC_EXT_LIBS) HelloWorld Primes src/StringTable/Atom.hs src/RawFiles.hs
+CLEANFILES= $(AJHC_LIBS) $(AJHC_EXT_LIBS) HelloWorld Primes src/StringTable/Atom.hs src/RawFiles.hs
 
 %.pdf: %.ps
 	epstopdf $< --outfile $@
@@ -241,50 +241,50 @@ CLEANFILES= $(JHC_LIBS) $(JHC_EXT_LIBS) HelloWorld Primes src/StringTable/Atom.h
 	pandoc $< -f markdown -t html >> $@
 	cat $(srcdir)/docs/template/my_footer.shtml >> $@
 
-publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/index.shtml docs/jhc.shtml manual.html docs/manual.css
-	cp -- $^ /home/john/public_html/computer/jhc
+publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/index.shtml docs/ajhc.shtml manual.html docs/manual.css
+	cp -- $^ /home/john/public_html/computer/ajhc
 
-manual.mkd: $(JHC_MANUAL_FILES)
+manual.mkd: $(AJHC_MANUAL_FILES)
 	perl $(srcdir)/utils/stitch.prl $^ > $@
 
 manual: manual.mkd
 	pandoc $< --toc -s -f markdown -t html -s -c manual.css -o $@.html
 
-$(firstword $(JHC_MANUAL_FILES)): utils/stitch.prl docs/man_header.mkd
+$(firstword $(AJHC_MANUAL_FILES)): utils/stitch.prl docs/man_header.mkd
 	touch $@
 
-jhc_man.mkd: $(JHC_MANUAL_FILES)
+ajhc_man.mkd: $(AJHC_MANUAL_FILES)
 	perl $(srcdir)/utils/stitch.prl -h $(srcdir)/docs/man_header.mkd -c Using,Options $^ > $@
 
-man: jhc_man.mkd
-	pandoc $< -s -f markdown -t man -s  -o jhc.1
+man: ajhc_man.mkd
+	pandoc $< -s -f markdown -t man -s  -o ajhc.1
 
-options.mkd: drift_processed/Options.hs | jhc
+options.mkd: drift_processed/Options.hs | ajhc
 	echo "{-@Options 1" > $@
-	./jhc --help | sed -e 's/^/    /'  >> $@
+	./ajhc --help | sed -e 's/^/    /'  >> $@
 
 fix-whitespace:
 	find src -not \( -name .svn -prune -o -name .git -prune \) -type f -name \*.hs -print0 | xargs -0 sed -i  -E 's/[ 	]*$$//'
 	find lib -not \( -name .svn -prune -o -name .git -prune \) -type f -name \*.hs -print0 | xargs -0 sed -i  -E 's/[ 	]*$$//'
 
-jhc.1 :
+ajhc.1 :
 	$(MAKE) man
 
 manual.html :
 	$(MAKE) manual
 
 .PHONY: libs regress
-libs: $(JHC_LIBS) $(JHC_EXT_LIBS)
+libs: $(AJHC_LIBS) $(AJHC_EXT_LIBS)
 
 show_elibs: lib/ext/*.cabal  lib/ext/*.yaml
 	-perl utils/build_extlibs.prl -l $^
 
-%: examples/%.hs jhc $(JHC_LIBS)
-	./jhc -L- -L$(srcdir) -L. --no-cache $(JHC_TEST) $< -o $@ # 2>&1 | tee $@.log
+%: examples/%.hs ajhc $(AJHC_LIBS)
+	./ajhc -L- -L$(srcdir) -L. --no-cache $(AJHC_TEST) $< -o $@ # 2>&1 | tee $@.log
 
 TESTS=HelloWorld Primes
 
-JHC_MANUAL_FILES = docs/make.mkd options.mkd docs/dependency_format.mkd docs/pragmas.mkd docs/differences.mkd \
+AJHC_MANUAL_FILES = docs/make.mkd options.mkd docs/dependency_format.mkd docs/pragmas.mkd docs/differences.mkd \
 	docs/unboxed.mkd rts/rts/jhc_rts.c src/FlagOpts.mkd src/FlagDump.mkd src/E/PrimOpt.hs \
 	drift_processed/E/TypeCheck.hs drift_processed/Options.hs
 

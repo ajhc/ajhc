@@ -1,4 +1,4 @@
-AC_INIT([jhc],[0.8.1])
+AC_INIT([ajhc],[0.8.1])
 AC_CONFIG_SRCDIR(src/Main.hs)
 AC_CONFIG_MACRO_DIR(ac-macros)
 AC_CONFIG_AUX_DIR(ac-macros)
@@ -93,5 +93,5 @@ AC_SUBST(VERSION)
 AC_SUBST(VERSION_MAJOR)
 AC_SUBST(VERSION_MINOR)
 AC_SUBST(VERSION_PATCH)
-AC_CONFIG_FILES([Makefile jhc.spec src/hs_src_config.h src/Version/Config.hs docs/building.mkd src/cbits/config.h src/data/targets.ini])
+AC_CONFIG_FILES([Makefile ajhc.spec src/hs_src_config.h src/Version/Config.hs docs/building.mkd src/cbits/config.h src/data/targets.ini])
 AC_OUTPUT

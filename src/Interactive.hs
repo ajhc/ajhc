@@ -97,19 +97,19 @@ interact cho = mre where
         xs -> runInteractions initialInteract (concatMap lines $ reverse xs) >> exitSuccess
     go = do
         putStrLn "--------------------------------------------------------------"
-        putStrLn "Welcome to the jhc interactive experience. use :help for help."
+        putStrLn "Welcome to the Ajhc interactive experience. use :help for help."
         putStrLn versionString
         putStrLn "(This is not a full interpreter, but rather is used to"
         putStrLn "help debug the compiler internals)"
         putStrLn "--------------------------------------------------------------"
-        runInteraction initialInteract ":execfile jhci.rc"
+        runInteraction initialInteract ":execfile ajhci.rc"
         beginInteraction initialInteract
     initialInteract = emptyInteract {
         interactSettables = ["prog", "args"],
         interactVersion = versionString,
         interactCommands = commands,
         interactWords = map (show . fst ) $ stateImports isStart,
-        interactHistFile = Just ".jhci-hist",
+        interactHistFile = Just ".ajhci-hist",
         interactComment = Just "--",
         interactExpr = do_expr
         }

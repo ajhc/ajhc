@@ -5,7 +5,7 @@ import Foreign.C.String
 import Foreign
 import Data.Version ( Version(..) )
 
-compilerName = "jhc"
+compilerName = "ajhc"
 
 compilerVersion :: Version
 compilerVersion = Version (splitup "__JHC_VERSION__") []

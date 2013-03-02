@@ -43,7 +43,7 @@ foreach (@ARGV) {
         print "$_:";
         pdeps(@deps);
         print "\tperl utils/build_extlibs.prl \$<\n" if $opt_e;
-        print "\t./jhc \$(LIB_OPTIONS) --build-hl \$< -o \$@\n" if !$opt_e;
+        print "\t./ajhc \$(LIB_OPTIONS) --build-hl \$< -o \$@\n" if !$opt_e;
     }
 }
 print ($opt_e ? "JHC_EXT_LIBS =" : "JHC_LIBS =") if @targets;

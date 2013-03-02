@@ -52,10 +52,10 @@ pod2usage(1) if $opt_help;
 $opt_l = !$opt_l;
 
 # clean out environment
-delete $ENV{JHC_PATH};
-delete $ENV{JHC_OPTS};
-delete $ENV{JHC_CACHE};
-delete $ENV{JHC_LIBRARY_PATH};
+delete $ENV{AJHC_PATH};
+delete $ENV{AJHC_OPTS};
+delete $ENV{AJHC_CACHE};
+delete $ENV{AJHC_LIBRARY_PATH};
 
 @opts = (@opts, (map { "-f$_" } @fopts), (map { "-m$_" } @mopts));
 @opts = (@opts, '--no-cache', '--stop', 'typecheck') if $opt_tc;
@@ -73,14 +73,14 @@ my $pwd = cwd();
 
 # figure out where we are
 
-my ($regress_dir,$jhc_dir);
+my ($regress_dir,$ajhc_dir);
 
 if (-d "tests" && -d "results") {
     $regress_dir = ".";
-    $jhc_dir = "..";
+    $ajhc_dir = "..";
 } elsif (-d "regress" && -f "Makefile") {
     $regress_dir = "regress";
-    $jhc_dir = "."
+    $ajhc_dir = "."
 } else { die "could not figure out where I am" }
 
 my $test_dir = "$regress_dir/tests";
@@ -89,8 +89,8 @@ my $results_dir = "$regress_dir/results";
 my $time = `date +%Y%m%d%H%M%S`;
 chomp $time;
 
-my $jhc_version = `$jhc_dir/jhc --version`;
-$? == 0 or die "Could not run $jhc_dir/jhc --version";
+my $ajhc_version = `$ajhc_dir/ajhc --version`;
+$? == 0 or die "Could not run $ajhc_dir/ajhc --version";
 
 my $rd = "$results_dir/$time";
 mkdir $rd or die "$!: could not make $rd";
@@ -102,12 +102,12 @@ my $ho_dir = $opt_clean ? "$rd/ho" : "$results_dir/ho";
 $ho_dir .= "_l" if $opt_l;
 mkdir $ho_dir;
 
-$ENV{JHC_CACHE} = $ho_dir;
+$ENV{AJHC_CACHE} = $ho_dir;
 
 open RLOG, ">$rd/log.txt" or die "$!: Could not open log";
 
 rlog("$now_string");
-rlog("$jhc_version");
+rlog("$ajhc_version");
 rlog("regress ", join " ", @saved_args) if @saved_args;
 rlog("-----------------------------------");
 
@@ -147,8 +147,8 @@ sub my_system {
     return ($r,$time_end - $time_start);
 }
 
-my @libs = $opt_l ? ("-L-", "-L$jhc_dir", "-pjhc") : ("--noauto", "-i$jhc_dir/lib/jhc", "-i$jhc_dir/lib/base",
-        "-i$jhc_dir/lib/haskell98", "-i$jhc_dir/lib/jhc-prim", "-XUnboxedTuples", "-XForeignFunctionInterface", "-XUnboxedValues");
+my @libs = $opt_l ? ("-L-", "-L$ajhc_dir", "-pjhc") : ("--noauto", "-i$ajhc_dir/lib/jhc", "-i$ajhc_dir/lib/base",
+        "-i$ajhc_dir/lib/haskell98", "-i$ajhc_dir/lib/jhc-prim", "-XUnboxedTuples", "-XForeignFunctionInterface", "-XUnboxedValues");
 my @fast = $opt_n ? ("-fno-lint") : ("-fdebug", "-flint");
 
 sub to_list {
@@ -200,8 +200,8 @@ sub run_test {
         }
     }
     rlog "---- $name";
-    my @jhc  = $opt_p ? ("$jhc_dir/jhcp",'+RTS', "-S$rd/$name.jhcp_prof",@opt_rts,'-RTS')  :  ("$jhc_dir/jhc");
-    my @cmd = (@jhc,"$cwd/$fn", ($verbose ? ('-v') : ()), ($opt_win ? ('-mwin32') : ()), @libs , @fast, '-o', "$rd/$name", @flags, @opts);
+    my @ajhc  = $opt_p ? ("$ajhc_dir/ajhcp",'+RTS', "-S$rd/$name.jhcp_prof",@opt_rts,'-RTS')  :  ("$ajhc_dir/ajhc");
+    my @cmd = (@ajhc,"$cwd/$fn", ($verbose ? ('-v') : ()), ($opt_win ? ('-mwin32') : ()), @libs , @fast, '-o', "$rd/$name", @flags, @opts);
     my $res = join(" ",@cmd) . " > '$rd/$name.jhc_out' 2>&1";
     my ($r,$time) = my_system $res;
     my $result = { name => $name, compile_command => $res, compile_status => $r, compile_results => "$rd/$name.jhc_out", compile_time => $time };
@@ -317,7 +317,7 @@ sub done {
     }
     rlog("-----------------------------------");
     rlog("$now_string");
-    rlog("$jhc_version");
+    rlog("$ajhc_version");
     rlog("regress ", join " ", @saved_args) if @saved_args;
     rlog "\n-------------------------------------------------------------------------";
 
@@ -360,21 +360,21 @@ regress [options] [conditions]
    --help        brief help message
    --man         full documentation
 
-   -m ARCH       passed through to JHC
-   -f FLAG       passed through to JHC
-   -o OPTION     pass given option to JHC
+   -m ARCH       passed through to AJHC
+   -f FLAG       passed through to AJHC
+   -o OPTION     pass given option to AJHC
    -t INT        timeout in seconds of CPU time
 
    -l            do not use the libraries
    -n            go faster by not linting
-   -p            profile JHC (requires jhcp to have been built)
+   -p            profile AJHC (requires ajhcp to have been built)
 
-   --rts         extra GHC RTS flags for JHC
+   --rts         extra GHC RTS flags for AJHC
    --clean       start with fresh cache for test
    --win         cross compile to windows and test with wine
 
 =head1 DESCRIPTION
 
-Run the JHC test suite.
+Run the AJHC test suite.
 
 =cut

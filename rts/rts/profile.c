@@ -71,7 +71,7 @@ void jhc_profile_pop(struct profile_stack *ps) {}
 
 void A_COLD
 jhc_print_profile(void) {
-        if(!(_JHC_PROFILE || getenv("JHC_RTS_PROFILE"))) return;
+        if(!(_JHC_PROFILE || getenv("AJHC_RTS_PROFILE"))) return;
         fprintf(stderr, "\n-----------------\n");
         fprintf(stderr, "Profiling: %s\n", jhc_progname);
         fprintf(stderr, "Command: %s\n", jhc_command);

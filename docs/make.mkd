@@ -49,7 +49,7 @@ JHC_LIBRARY_PATH
 
 JHC_CACHE
 : This specified the directory jhc will use to cache values. having a valid
-cache is essential for jhc performance. It defaults to ~/.jhc/cache.
+cache is essential for jhc performance. It defaults to ~/.ajhc/cache.
 
 # Building Haskell Libraries
 

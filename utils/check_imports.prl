@@ -11,11 +11,11 @@ $ARGV[0] || die "no yaml file specified";
 my $count = 0;
 
 sub build_attempt {
-    my $r = system "./jhc -L. --build-hl $ARGV[0] --deps tmp/deps$$.yaml --stop typecheck";
-    #my $r = system "./jhc -L. --build-hl $ARGV[0] --deps tmp/deps$$.yaml";
+    my $r = system "./ajhc -L. --build-hl $ARGV[0] --deps tmp/deps$$.yaml --stop typecheck";
+    #my $r = system "./ajhc -L. --build-hl $ARGV[0] --deps tmp/deps$$.yaml";
     if (!$r) {
         if(++$count == 5) {
-            my $r = system "./jhc -L. --build-hl $ARGV[0] --deps tmp/deps$$.yaml";
+            my $r = system "./ajhc -L. --build-hl $ARGV[0] --deps tmp/deps$$.yaml";
             $count = 0;
         }
     }

@@ -44,8 +44,8 @@ foreach (keys %s) {
     $h{$_}{text} = join "\n",map { $_->[1] } sort { $a->[0] <=> $b->[0] } @{$s{$_}};
 }
 
-print "% Jhc User's Manual\n";
-print "% John Meacham\n\n";
+print "% Ajhc User's Manual\n";
+print "% John Meacham & Metasepi team\n\n";
 
 if($o{h}) {
     open my $h,"<",$o{h} or die "$!: couldn't open $o{h}";
