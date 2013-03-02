@@ -2,13 +2,13 @@ before_install:
   - date
   - uname -a
   - cat /proc/cpuinfo
-  - sudo apt-get -q -y install make locales autoconf libreadline-dev libwww-perl libconfig-yaml-perl graphviz haskell-platform drift pandoc libghc-readline-dev libghc-utf8-string-dev libghc-hssyck-dev libghc-pandoc-dev
+  - sudo apt-get -qq -y install make locales autoconf libreadline-dev libwww-perl libconfig-yaml-perl graphviz haskell-platform drift pandoc libghc-readline-dev libghc-utf8-string-dev libghc-hssyck-dev libghc-pandoc-dev
 script:
   - ghc --version
   - autoreconf -i
   - ./configure
-  - make
-  - sudo make install
+  - make -j3
+  - sudo make -j3 install
   - make regress
 after_script:
   - date
