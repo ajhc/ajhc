@@ -712,7 +712,7 @@ convertPrim p vs ty
     | (Poke t) <- p, [v,x] <- vs = do
         v' <- convertVal v
         x' <- convertVal x
-        return $ expressionRaw ("*((" <> (opTyToC' t) <+> "*)" <> (parens $ renderG v') <> text ") = " <> renderG x')
+        return $ expressionRaw ("*((volatile " <> (opTyToC' t) <+> "*)" <> (parens $ renderG v') <> text ") = " <> renderG x')
     | (AddrOf _ t) <- p, [] <- vs = do
         rt <- convertTypes ty
         return . cast rt $ expressionRaw ('&':unpackPS t)
