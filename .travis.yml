@@ -7,8 +7,8 @@ script:
   - ghc --version
   - autoreconf -i
   - ./configure
-  - make -j3
-  - sudo make -j3 install
+  - make
+  - sudo make install
   - make regress
 after_script:
   - date
