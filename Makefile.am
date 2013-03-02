@@ -67,7 +67,7 @@ EXTRA_DIST = src/data rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
              lib/jhc lib/jhc-prim lib/haskell-extras lib/haskell98 lib/haskell2010 lib/flat-foreign $(AJHC_LIBS) $(AJHC_EXT_LIBS) \
 	     src/StringTable/StringTable_cbits.c src/StringTable/StringTable_cbits.h src/cbits/md5sum.c ajhc.1 \
 	     src/StringTable/Atom.hsc ajhc.spec src/cbits/lookup3.c \
-	     manual.html lib/applicative examples/HelloWorld.hs examples/Calendar.hs \
+	     manual.html manual_ja.html lib/applicative examples/HelloWorld.hs examples/Calendar.hs \
 	     examples/Primes.hs src/FlagOpts.flags src/FlagDump.flags lib/ext compat
 
 dist-hook: $(BUILT_SOURCES)
@@ -209,7 +209,7 @@ lint:
 hlint:
 	hlint `darcs wh -s | sed -e 's/^..//' -e 's/ .*$$//' | grep '.hs$$'`
 
-.PHONY: ho-clean hl-clean built-sources i manual man
+.PHONY: ho-clean hl-clean built-sources i manual man manual_ja
 
 ho-clean:
 	rm -f -- `find -name \*.ho -print`
@@ -250,6 +250,15 @@ manual.mkd: $(AJHC_MANUAL_FILES)
 manual: manual.mkd
 	pandoc $< --toc -s -f markdown -t html -s -c manual.css -o $@.html
 
+updatepo: manual.mkd
+	po4a-updatepo -M utf8 -f text -m manual.mkd -p po/ja.po
+
+manual_ja.mkd: manual.mkd po/ja.po
+	po4a-translate -M utf8 -f text -m manual.mkd -p po/ja.po -l manual_ja.mkd
+
+manual_ja: manual_ja.mkd
+	pandoc $< --toc -s -f markdown -t html -s -c manual.css -o $@.html
+
 $(firstword $(AJHC_MANUAL_FILES)): utils/stitch.prl docs/man_header.mkd
 	touch $@
 
@@ -272,6 +281,9 @@ ajhc.1 :
 
 manual.html :
 	$(MAKE) manual
+
+manual_ja.html :
+	$(MAKE) manual_ja
 
 .PHONY: libs regress
 libs: $(AJHC_LIBS) $(AJHC_EXT_LIBS)
