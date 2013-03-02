@@ -3,7 +3,7 @@ before_install:
   - uname -a
   - cat /proc/cpuinfo
   - sudo apt-get -qq -y install make locales autoconf libreadline-dev libwww-perl libconfig-yaml-perl graphviz haskell-platform drift pandoc libghc-readline-dev libghc-utf8-string-dev libghc-hssyck-dev libghc-pandoc-dev
-  - sudo apt-get -qq -y install pbuilder debootstrap devscripts
+  - sudo apt-get -qq -y install pbuilder debootstrap devscripts debian-archive-keyring
 script:
   - ghc --version
   - autoreconf -i
@@ -11,6 +11,7 @@ script:
   - make
   - sudo make install
   - make regress
-  - sudo DIST=sid ARCH=amd64 pbuilder create
+  - cp dot.pbuilderrc ~/.pbuilderrc
+  - sudo DIST=sid ARCH=amd64 pbuilder --override-config --configfile ~/.pbuilderrc create
 after_script:
   - date
