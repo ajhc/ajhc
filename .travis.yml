@@ -12,6 +12,6 @@ script:
   - sudo make install
   - make regress
   - cp dot.pbuilderrc ~/.pbuilderrc
-  - sudo DIST=sid ARCH=amd64 pbuilder --override-config --configfile ~/.pbuilderrc create
+  - sudo DIST=sid ARCH=amd64 pbuilder create --override-config --configfile ~/.pbuilderrc
 after_script:
   - date
