@@ -1,5 +1,5 @@
 before_install:
-  - sudo apt-get install make locales-all locales autoconf libreadline-dev libwww-perl graphviz haskell-platform drift pandoc libghc-readline-dev libghc-utf8-string-dev libghc-hssyck-dev libghc-pandoc-dev
+  - sudo apt-get -q -y install make locales autoconf libreadline-dev libwww-perl graphviz haskell-platform drift pandoc libghc-readline-dev libghc-utf8-string-dev libghc-hssyck-dev libghc-pandoc-dev
 script:
   - ghc --version
   - autoreconf -i && ./configure && make && make regress
