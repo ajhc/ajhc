@@ -29,7 +29,8 @@ module Util.Graph(
 import Control.Monad
 import Control.Monad.ST
 import Data.Array.IArray
-import Data.Array.ST
+import Data.Array.ST hiding(unsafeFreeze)
+import Data.Array.Unsafe (unsafeFreeze)
 import Data.Graph hiding(Graph)
 import Data.Maybe
 import GenUtil

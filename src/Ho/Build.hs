@@ -10,15 +10,12 @@ module Ho.Build (
 
 import Control.Concurrent
 import Control.Monad.Identity
-import Data.Char
 import Data.IORef
 import Data.List hiding(union)
 import Data.Maybe
 import Data.Monoid(Monoid(..))
 import Data.Tree
 import Data.Version(Version,parseVersion,showVersion)
-import Data.Yaml.Syck
-import System.Directory (removeFile)
 import System.FilePath as FP
 import System.Mem
 import Text.Printf
@@ -40,12 +37,9 @@ import E.Traverse(emapE)
 import E.TypeCheck()
 import FrontEnd.Class
 import FrontEnd.FrontEnd
-import FrontEnd.HsParser
 import FrontEnd.HsSyn
 import FrontEnd.Infix
-import FrontEnd.ParseMonad
 import FrontEnd.SrcLoc
-import FrontEnd.Unlit
 import FrontEnd.Warning(warn,processIOErrors,WarnType(..))
 import Ho.Binary
 import Ho.Collected()
@@ -56,7 +50,6 @@ import Name.Name
 import Options
 import PackedString(PackedString,packString,unpackPS)
 import Support.TempDir
-import Util.FilterInput
 import Util.Gen
 import Util.SetLike
 import Util.YAML

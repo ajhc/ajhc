@@ -6,6 +6,7 @@
 /jhc.spec
 /configure
 /regress/results
+/tmp
 autom4te.cache
 config.guess
 config.sub

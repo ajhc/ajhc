@@ -54,7 +54,7 @@ import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Info.Info as Info
 
-type Bind = (TVr,E)
+--type Bind = (TVr,E)
 
 data Occurance =
     Unused        -- ^ unused means a var is not used at the term level, but might be at the type level
@@ -218,14 +218,14 @@ collectBinding comb = do
 
 unOMap (OMap x) = x
 
-collectCombs :: [Comb] -> OMap -> OM [Comb]
-collectCombs cs _ = return cs
+--collectCombs :: [Comb] -> OMap -> OM [Comb]
+--collectCombs cs _ = return cs
 
 collectDs :: [Comb] -> OMap -> OM [Comb]
 collectDs ds (OMap fve) = do
     ds' <- mapM (grump . collectBinding) ds
     exp <- ask
-    let (reachable',graph) = newGraphReachable ds' (\ ((comb,_),_) -> combIdent comb) (\ ((_,rv),fv) -> keys (fv `mappend` rv))
+    let (reachable',_) = newGraphReachable ds' (\ ((comb,_),_) -> combIdent comb) (\ ((_,rv),fv) -> keys (fv `mappend` rv))
         rds = reachable' (keys fve ++ [ combIdent t | t <- ds,  (combIdent t `member` exp)])
         -- ignore rules when calculating loopbreakers
         -- we must not simplify the expanded body of a rule without recalculating occurance info.
@@ -372,13 +372,13 @@ data Env = Env {
 susp:: E -> Subst -> Range
 susp e sub =  Susp e sub
 
-insertSuspSubst :: TVr -> InE -> Env -> Env
-insertSuspSubst t e env = insertSuspSubst' (tvrIdent t) e env
+--insertSuspSubst :: TVr -> InE -> Env -> Env
+--insertSuspSubst t e env = insertSuspSubst' (tvrIdent t) e env
 
-insertSuspSubst' :: Id -> InE -> Env -> Env
-insertSuspSubst' z _e env | isEmptyId z = env
-insertSuspSubst' t e env = cacheSubst env {
-    envSubst = minsert t (susp e (envSubst env)) (envSubst env) }
+--insertSuspSubst' :: Id -> InE -> Env -> Env
+--insertSuspSubst' z _e env | isEmptyId z = env
+--insertSuspSubst' t e env = cacheSubst env {
+--    envSubst = minsert t (susp e (envSubst env)) (envSubst env) }
 
 insertRange :: Id -> Range -> Env -> Env
 insertRange z e env | isEmptyId z = env
@@ -465,8 +465,8 @@ data Cont =
         }-}
     deriving(Show)
 
-isApplyTo ApplyTo {} = True
-isApplyTo _ = False
+--isApplyTo ApplyTo {} = True
+--isApplyTo _ = False
 
 simplifyDs :: forall m . MonadStats m => Program -> SimplifyOpts -> [Comb] -> m [Comb]
 simplifyDs prog sopts dsIn = ans where
@@ -1065,11 +1065,11 @@ instance NameMonad Id SM where
         newNameFrom $ candidateIds seed -- (size used + 10000*size bound)
 
 smUsedNames = SM $ gets idsUsed
-smBoundNames = SM $ gets idsBound
+--smBoundNames = SM $ gets idsBound
 
 smAddNamesIdSet nset = --trace ("addNamesIdSet: "++ show (size nset)) $
    do modifyIds (\ (used,bound) -> (nset `union` used, bound) )
 smAddBoundNamesIdSet nset = --trace ("addBoundNamesIdSet: "++show (size nset)) $
    do modifyIds (\ (used,bound) -> (nset `union` used, nset `union` bound) )
 
-smAddBoundNamesIdMap = smAddNamesIdSet . idMapToIdSet
+--smAddBoundNamesIdMap = smAddNamesIdSet . idMapToIdSet

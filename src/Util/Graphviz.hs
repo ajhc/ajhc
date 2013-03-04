@@ -9,13 +9,14 @@ import List(intersperse)
 
 data Orient = Portrait | Landscape deriving (Eq, Show)
 
+{-
 o2s :: Orient -> String
 o2s Portrait = "\trotate = \"0\"\n"
 o2s Landscape = "\trotate = \"90\"\n"
 
-
 i2d :: Int -> Double
 i2d = fromInteger . toInteger
+-}
 
 
 -- | Format a graph for graphviz with reasonable defaults: title of \"fgl\",
@@ -60,11 +61,11 @@ graphviz g t headers fnode fedge (w, h) p@(pw', ph') o =
 	e = labEdges g
 	ns = concatMap sn n
 	es = concatMap se e
-	sz w' h' = if o == Portrait then show w'++","++show h' else show h'++","++show w'
-	ps = show w++","++show h
-	(pw, ph) = if o == Portrait then p else (ph', pw')
+	--sz w' h' = if o == Portrait then show w'++","++show h' else show h'++","++show w'
+	--ps = show w++","++show h
+	--(pw, ph) = if o == Portrait then p else (ph', pw')
 	--gs = show ((w*(i2d pw))-m)++","++show ((h*(i2d ph))-m)
-	gs = sz (w*(i2d pw)) (h*(i2d ph))
+	--gs = sz (w*(i2d pw)) (h*(i2d ph))
     in "digraph "++sq t++" {\n"
 --	    ++"\tmargin = \"0\"\n"
 --	    ++"\tpage = \""++ps++"\"\n"

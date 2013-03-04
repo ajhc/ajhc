@@ -124,6 +124,7 @@ softbreak       = group linebreak
 -- Combinators for prelude types
 -----------------------------------------------------------
 
+{-
 -- string is like "text" but replaces '\n' by "line"
 string ""       = empty
 string ('\n':s) = line <> string s
@@ -148,7 +149,7 @@ double d        = text (show d)
 
 rational :: Rational -> Doc
 rational r      = text (show r)
-
+-}
 
 
 

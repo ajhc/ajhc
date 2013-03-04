@@ -22,7 +22,9 @@ import Data.Binary.Put
 import Data.Bits
 import Data.Data
 import Data.Monoid
-import Foreign
+import System.IO.Unsafe (unsafePerformIO)
+import Foreign.Marshal
+import Foreign.Storable
 import Foreign.C
 import GHC.Exts
 import qualified Data.ByteString as BS

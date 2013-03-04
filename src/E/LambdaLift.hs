@@ -88,6 +88,7 @@ data S = S {
     }
     {-! derive: update !-}
 
+{-
 etaReduce :: E -> (E,Int)
 etaReduce e = case f e 0 of
         (ELam {},_) -> (e,0)
@@ -95,6 +96,7 @@ etaReduce e = case f e 0 of
     where
         f (ELam t (EAp x (EVar t'))) n | n `seq` True, t == t' && not (tvrIdent t `member` (freeVars x :: IdSet)) = f x (n + 1)
         f e n = (e,n)
+-}
 
 -- | we do not lift functions that only appear in saturated strict contexts,
 -- as these functions will never have an escaping thunk or partial app
