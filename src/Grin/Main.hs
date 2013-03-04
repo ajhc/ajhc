@@ -34,6 +34,7 @@ import Util.Gen
 import qualified C.FromGrin2 as FG2
 import qualified FlagDump as FD
 import qualified Stats
+import GenUtil (iocatch)
 
 {-# NOINLINE compileToGrin #-}
 compileToGrin prog = do
@@ -124,7 +125,7 @@ compileGrinToC grin = do
                   "rts/jhc_rts.c", "lib/lib_cbits.c", "rts/gc_jgc.c",
                   "rts/stableptr.c"]
     tdir <- getTempDir
-    ds <- catch (getDirectoryContents (tdir FP.</> "cbits")) (\_ -> return [])
+    ds <- iocatch (getDirectoryContents (tdir FP.</> "cbits")) (\_ -> return [])
     let extraCFiles = map (tdir FP.</>) cFiles ++ ["-I" ++ tdir ++ "/cbits", "-I" ++ tdir ] ++ [ tdir FP.</> "cbits" FP.</> fn | fn@(reverse -> 'c':'.':_) <- ds ]
     let comm = shellQuote $ [cc] ++ extraCFiles ++ [cf, "-o", fn] ++ args ++ rls
         globalvar n c = LBS.fromString $ "char " ++ n ++ "[] = \"" ++ c ++ "\";"

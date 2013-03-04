@@ -59,6 +59,7 @@ import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Support.MD5 as MD5
 import qualified Util.Graph as G
+import GenUtil (iocatch)
 
 -- Ho File Format
 --
@@ -94,7 +95,7 @@ type LibraryName = PackedString
 
 findFirstFile :: [FilePath] -> IO (LBS.ByteString,FilePath)
 findFirstFile [] = fail "findFirstFile: file not found"
-findFirstFile (x:xs) = flip catch (\e -> findFirstFile xs) $ do
+findFirstFile (x:xs) = flip iocatch (\e -> findFirstFile xs) $ do
     bs <- LBS.readFile x
     return (bs,x)
 
@@ -141,7 +142,7 @@ findHoFile done_ref fp mm sh = do
                 return (True,honame)
 
 onErr :: IO a -> IO b -> (b -> IO a) -> IO a
-onErr err good cont = join $ catch (good >>= return . cont) (\_ -> return err)
+onErr err good cont = join $ iocatch (good >>= return . cont) (\_ -> return err)
 
 fetchSource :: Opt -> IORef Done -> [FilePath] -> Maybe (Module,SrcLoc) -> IO Module
 fetchSource _ _ [] _ = fail "No files to load"
@@ -340,7 +341,7 @@ toCompUnitGraph done roots = do
         g _ = error "Build.toCompUnitGraph: bad."
         pm :: [HoHash] -> IO HoHash -> IO HoHash
         pm [] els = els
-        pm (h:hs) els = hvalid h `catch` (\_ -> pm hs els)
+        pm (h:hs) els = hvalid h `iocatch` (\_ -> pm hs els)
         hvalid h = do
             ll <- Map.lookup h `fmap` readIORef hom_ref
             case ll of
@@ -348,7 +349,7 @@ toCompUnitGraph done roots = do
                 Just (True,_) -> return h
                 Just (False,af@(fp,hoh,idep,ho)) -> do
                     fp <- shortenPath fp
-                    isGood <- catch ( mapM_ cdep (hoDepends idep) >> mapM_ hvalid (hoModDepends idep) >> return True) (\_ -> return False)
+                    isGood <- iocatch ( mapM_ cdep (hoDepends idep) >> mapM_ hvalid (hoModDepends idep) >> return True) (\_ -> return False)
                     let isStale = not . null $ map (show . fst) (hoDepends idep) `intersect` optStale options
                         libsGood = all (\ (p,h) -> fmap (libHash) (Map.lookup p (loadedLibraries done)) == Just h) (hohLibDeps hoh)
                         noGood forced = do

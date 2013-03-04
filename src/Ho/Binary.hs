@@ -17,6 +17,7 @@ import Name.Binary()
 import Options
 import Support.CFF
 import Support.MapBinaryInstance
+import GenUtil (iocatch)
 
 current_version :: Int
 current_version = 11
@@ -52,7 +53,7 @@ recordHoFile ho idep fs header = do
             fs' <- mapM shortenPath fs
             putErrLn $ "Skipping Writing Ho Files: " ++ show fs'
       else do
-    let removeLink' fn = catch  (removeLink fn)  (\_ -> return ())
+    let removeLink' fn = iocatch  (removeLink fn)  (\_ -> return ())
     let g (fn:fs) = do
             f fn
             mapM_ (l fn) fs
