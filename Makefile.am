@@ -56,7 +56,13 @@ GHCLANG= -XTypeFamilies -XViewPatterns -XUndecidableInstances -XOverlappingInsta
 	-XRecordWildCards -XRecursiveDo -XTupleSections -XParallelListComp \
 	-XGeneralizedNewtypeDeriving -XScopedTypeVariables -XFlexibleInstances \
 	-XTypeSynonymInstances -XMultiParamTypeClasses -XDeriveDataTypeable \
-	-fglasgow-exts -XNoMonoLocalBinds -XNamedFieldPuns
+	-XNoMonoLocalBinds -XNamedFieldPuns \
+	-XForeignFunctionInterface -XUnliftedFFITypes -XImplicitParams -XUnboxedTuples \
+	-XStandaloneDeriving -XDeriveFunctor -XDeriveFoldable -XDeriveTraversable -XDeriveGeneric \
+	-XFlexibleContexts -XConstrainedClassMethods -XFunctionalDependencies -XMagicHash \
+	-XPolymorphicComponents -XExistentialQuantification -XUnicodeSyntax -XPostfixOperators \
+	-XPatternGuards -XLiberalTypeSynonyms -XRankNTypes -XTypeOperators \
+	-XEmptyDataDecls -XKindSignatures
 
 GHCOPTS= $(HSOPTS) -XBangPatterns -O @GHCFLAGS@ $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 

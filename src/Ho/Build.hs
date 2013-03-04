@@ -1,4 +1,4 @@
-{-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE DoRec #-}
 module Ho.Build (
     module Ho.Type,
     dumpHoFile,
