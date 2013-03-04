@@ -66,7 +66,7 @@ data Occurance =
     deriving(Show,Eq,Ord)
 
 data UseInfo = UseInfo {
-    useOccurance :: {-# UNPACK #-} !Occurance,   -- ^ occurance Info
+    useOccurance :: !Occurance,   -- ^ occurance Info
     minimumArgs  :: {-# UNPACK #-} !Int          -- ^ minimum number of args that are ever passed to this function (if used)
     }
     deriving(Show,Eq,Ord,Typeable)
@@ -283,9 +283,9 @@ orMany xs = f (filter ((/= Unused) . useOccurance) xs) where
         ui x = UseInfo { minimumArgs =  minimum (map minimumArgs xs), useOccurance = x }
 
 data SimplifyOpts = SimpOpts {
-    so_noInlining :: {-# UNPACK #-} !Bool, -- ^ this inhibits all inlining inside functions which will always be inlined
-    so_finalPhase :: {-# UNPACK #-} !Bool, -- ^ no rules and don't inhibit inlining
-    so_postLift   :: {-# UNPACK #-} !Bool, -- ^ don't inline anything that was lifted out
+    so_noInlining :: !Bool, -- ^ this inhibits all inlining inside functions which will always be inlined
+    so_finalPhase :: !Bool, -- ^ no rules and don't inhibit inlining
+    so_postLift   :: !Bool, -- ^ don't inline anything that was lifted out
     so_boundVars :: IdMap Comb,            -- ^ bound variables
     so_forwardVars :: IdSet,               -- ^ variables that we know will exist, but might not yet.
 
@@ -322,11 +322,11 @@ data Forced = ForceInline | ForceNoinline | NotForced
 data Binding
     = NotAmong [Name]
     | IsBoundTo {
-        bindingOccurance :: {-# UNPACK #-} !Occurance,
+        bindingOccurance :: !Occurance,
         bindingE :: OutE,
-        bindingCheap :: {-# UNPACK #-} !Bool,
-        inlineForced :: {-# UNPACK #-} !Forced,
-        bindingAtomic :: {-# UNPACK #-} !Bool
+        bindingCheap :: !Bool,
+        inlineForced :: !Forced,
+        bindingAtomic :: !Bool
         }
     | NotKnown
     deriving(Ord,Eq,Show)

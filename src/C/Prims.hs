@@ -72,13 +72,13 @@ data Prim =
     | PrimTypeInfo {
         primArgTy :: Op.Ty,
         primRetTy :: Op.Ty,
-        primTypeInfo :: {-# UNPACK #-} !PrimTypeInfo
+        primTypeInfo :: !PrimTypeInfo
         }
     | PrimString !PackedString  -- address of a raw string. encoded in utf8.
     | PrimDotNet {
-        primStatic :: {-# UNPACK #-} !Bool,
+        primStatic :: !Bool,
         primDotNet :: !DotNetPrim,
-        primIOLike :: {-# UNPACK #-} !Bool,
+        primIOLike :: !Bool,
         primAssembly :: !PackedString,
         primDotNetName :: !PackedString
         }

@@ -122,7 +122,7 @@ instance Monoid KindConstraint where
 data Kindvar = Kindvar {
     kvarUniq       :: {-# UNPACK #-} !Int,
     kvarRef        :: {-# UNPACK #-} !(IORef (Maybe Kind)),
-    kvarConstraint :: {-# UNPACK #-} !KindConstraint
+    kvarConstraint :: !KindConstraint
     }
 
 instance Binary Kindvar where
