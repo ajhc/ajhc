@@ -76,7 +76,9 @@ instance TypeNames Type where
     tCharzh = TCon (Tycon tc_Char_ kindHash)
 
 instance Ord (IORef a)
-instance Binary (IORef a)
+instance Binary (IORef a) where
+  put = error "Binary.put: not impl."
+  get = error "Binary.get: not impl."
 
 tList :: Type
 tList = TCon (Tycon tc_List (Kfun kindStar kindStar))

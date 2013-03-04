@@ -47,7 +47,7 @@ instance SetLike BitSet where
         f w n r = if even w || not (fn n) then f w1 n1 r else f w1 n1 (setBit r n) where
             !n1 = n + 1
             !w1 = w `shiftR` 1
-
+    spartition = error "BitSet.spartition: not impl."
 
 instance IsEmpty BitSet where
     isEmpty (BitSet n) = n == 0
@@ -106,7 +106,8 @@ instance Enum a => SetLike (EnumBitSet a) where
     member (fromEnum -> i) (EBS v) = member i v
     insert (fromEnum -> i) (EBS v) = EBS $ insert i v
     sfilter f (EBS v) = EBS $ sfilter (f . toEnum) v
-
+    keys = error "EnumBitSet.keys: not impl."
+    spartition = error "EnumBitSet.spartition: not impl."
 
 {-
 instance Enum a => BuildSet a (EnumBitSet a) where
