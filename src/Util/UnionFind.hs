@@ -17,7 +17,7 @@ import Data.IORef
 import Data.Unique
 import Control.Monad (when)
 
-data Element w a = Element a {-# UNPACK #-} !Unique !(IORef (Link w a))
+data Element w a = Element a !Unique {-# UNPACK #-} !(IORef (Link w a))
 data Link w a = Weight {-# UNPACK #-} !Int w | Next (Element w a)
 
 type T = Element

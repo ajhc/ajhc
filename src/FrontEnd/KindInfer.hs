@@ -21,7 +21,7 @@ import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Data.Binary
-import Data.Generics(Typeable, everything, mkQ, Data)
+import Data.Generics(Typeable, everything, mkQ)
 import Data.IORef
 import Data.List
 import System.IO.Unsafe
@@ -43,7 +43,6 @@ import Options
 import Support.FreeVars
 import Support.MapBinaryInstance
 import Util.ContextMonad
-import Util.Gen
 import Util.HasSize
 import qualified FlagDump as FD
 import qualified Util.Seq as Seq

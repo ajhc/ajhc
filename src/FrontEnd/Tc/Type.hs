@@ -14,16 +14,13 @@ module FrontEnd.Tc.Type(
     kindUTuple,
     unfoldKind,
     fn,
-    followTaus,
     fromTAp,
     fromTArrow,
     module FrontEnd.Tc.Type,
     prettyPrintType,
-    readMetaVar,
     tForAll,
     tList,
     Constraint(..),
-    applyTyvarMap,
     Class(),
     Kindvar(..),
     tTTuple,
@@ -37,7 +34,6 @@ import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.IORef
 import Data.List
-import Data.Monoid
 import qualified Data.Map as Map
 import qualified Data.Set as S
 
@@ -48,8 +44,6 @@ import FrontEnd.SrcLoc
 import FrontEnd.Tc.Kind
 import Name.Name
 import Name.Names
-import Name.VConsts
-import Support.CanType
 import Support.FreeVars
 import Support.Tickle
 

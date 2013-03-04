@@ -53,13 +53,12 @@ import Support.TempDir
 import Util.Gen
 import Util.SetLike
 import Util.YAML
-import Version.Config(revision,version)
+import Version.Config(version)
 import Version.Version(versionString)
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Support.MD5 as MD5
 import qualified Util.Graph as G
-import GenUtil (iocatch)
 
 -- Ho File Format
 --

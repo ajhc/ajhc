@@ -23,8 +23,7 @@ import FrontEnd.Tc.Kind
 import FrontEnd.Tc.Monad hiding(listenPreds)
 import FrontEnd.Tc.Type
 import FrontEnd.Tc.Unify
-import FrontEnd.Utils
-import FrontEnd.Utils(getDeclName)
+import FrontEnd.Utils(getDeclName,maybeGetDeclName)
 import FrontEnd.Warning
 import GenUtil
 import Name.Name

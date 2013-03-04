@@ -27,7 +27,6 @@ import E.Values
 import GenUtil hiding(replicateM_)
 import Info.Types
 import Name.Id
-import Support.CanType
 import Support.FreeVars
 import Util.NameMonad
 import Util.SetLike

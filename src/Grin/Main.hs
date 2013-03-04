@@ -34,7 +34,6 @@ import Util.Gen
 import qualified C.FromGrin2 as FG2
 import qualified FlagDump as FD
 import qualified Stats
-import GenUtil (iocatch)
 
 {-# NOINLINE compileToGrin #-}
 compileToGrin prog = do

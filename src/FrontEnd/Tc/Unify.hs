@@ -8,7 +8,7 @@ module FrontEnd.Tc.Unify(
 
 import Control.Monad
 import Control.Monad.Trans
-import Control.Monad.Writer(Monoid(..),Writer(..))
+import Control.Monad.Writer(Monoid(..))
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 

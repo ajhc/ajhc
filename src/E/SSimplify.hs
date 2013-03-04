@@ -29,7 +29,7 @@ import E.PrimOpt
 import E.Program
 import E.Rules
 import E.Subst
-import E.Traverse(runRename)
+--import E.Traverse(runRename)
 import E.TypeCheck
 import E.Values
 import GenUtil hiding (split)
@@ -245,7 +245,7 @@ collectDs ds (OMap fve) = do
             False -> case  (tvrIdent t `member` exp) of
                 True -> noUseInfo
                 False | Just r <- mlookup (tvrIdent t) fids -> r
-            _ -> error "SSimplify.collectDs: bad."
+                _ -> error "SSimplify.collectDs: bad."
         ds''' = [ combHead_s (calcStrictInfo $ annbind ffids (combHead comb)) comb | (comb,_) <- ds'']
         froo comb = (combHead_s (combHead comb) {tvrType = t' } comb,fvs) where
             (t',fvs) = collectOccurance' (tvrType $ combHead comb)

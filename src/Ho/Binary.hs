@@ -17,7 +17,6 @@ import Name.Binary()
 import Options
 import Support.CFF
 import Support.MapBinaryInstance
-import GenUtil (iocatch)
 
 current_version :: Int
 current_version = 11

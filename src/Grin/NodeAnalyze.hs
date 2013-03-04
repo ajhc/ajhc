@@ -7,7 +7,6 @@ module Grin.NodeAnalyze(nodeAnalyze) where
 
 import Control.Monad.Identity hiding(join)
 import Control.Monad.RWS hiding(join)
-import Control.Monad.Trans
 import Data.Maybe
 import Text.Printf
 import qualified Data.Map as Map

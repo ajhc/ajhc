@@ -39,7 +39,6 @@ import Util.YAML
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Support.MD5 as MD5
-import GenUtil (iocatch)
 
 libModMap = hoModuleMap . libHoLib
 libHash  = hohHash . libHoHeader
