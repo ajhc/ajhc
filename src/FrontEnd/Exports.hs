@@ -136,7 +136,7 @@ determineExports' owns doneMods todoMods = mdo
 		Nothing -> [TypeConstructor,ClassName]
 		Just nt -> [nt]
 	    ss = concat $ concat [ maybeToList (Map.lookup x ownsMap) | x <- Set.toList $ range rdl ]
-	    cd n = [toName DataConstructor n, toName Val n, toName FieldLabel n ]
+	    --cd n = [toName DataConstructor n, toName Val n, toName FieldLabel n ]
 	    rdl = (restrictDomain (`elem` map (`toName` n) ct) rel)
 	f _ (HsEQualified t n) = f (Just t) n
 

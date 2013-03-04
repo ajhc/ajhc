@@ -270,8 +270,8 @@ data WhatToDo
     | WhatConstant Val
     | WhatSubs Ty (Val -> Exp) (Val -> Exp)
 
-isWhatUnchanged WhatUnchanged = True
-isWhatUnchanged _ = False
+--isWhatUnchanged WhatUnchanged = True
+--isWhatUnchanged _ = False
 
 transformFuncs :: (Atom -> [Ty] -> Maybe [Ty] -> (Maybe [WhatToDo],Maybe [WhatToDo])) -> Grin -> Grin
 transformFuncs fn grin = grin'' where

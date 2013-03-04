@@ -655,7 +655,7 @@ tcMiscDecl d = withContext (locMsg (srcLoc d) "in the declaration" "") $ f d whe
         ch <- getClassHierarchy
         ke <- getKindEnv
         let supers = asksClassRecord ch hsClassHead classSupers
-            (ctx,(cn,[a])) = chToClassHead ke cHead
+            (ctx,(_,[a])) = chToClassHead ke cHead
         assertEntailment ctx [ IsIn s a | s <- supers]
         return []
 
@@ -794,7 +794,7 @@ restricted monomorphismRestriction bs = any isHsActionDecl bs || (monomorphismRe
    isSimpleDecl (HsPatBind _sloc _pat _rhs _wheres) = True
    isSimpleDecl _ = False
 
-getBindGroupName (expl,impls) =  map getDeclName (snds expl ++ concat (rights impls) ++ lefts impls)
+--getBindGroupName (expl,impls) =  map getDeclName (snds expl ++ concat (rights impls) ++ lefts impls)
 
 tiProgram ::  [BindGroup] -> [HsDecl] -> Tc [HsDecl]
 tiProgram bgs es = ans where

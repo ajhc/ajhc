@@ -351,7 +351,8 @@ binopFunc (TyBits b _) _ bop = g b =<< f bop where
     f FPwr = Just "pow"
     f FAtan2 = Just "atan2"
     f _ = Nothing
-binopFunc TyBool _ bop = Nothing where
+binopFunc TyBool _ bop = Nothing
+binopFunc _ _ _ = error "Op.binopFunc: bad."
 
 binopInfix :: BinOp -> Maybe (String,Int)
 binopInfix UDiv = Just ("/",8)

@@ -4,7 +4,6 @@ module C.FromGrin2(compileGrin) where
 
 import Control.Monad.Identity
 import Control.Monad.RWS(asks,tell,local,get,runRWST,RWST,MonadState(..),MonadWriter(..),MonadReader(..))
-import Control.Monad
 import Data.Char
 import Data.List
 import Data.Maybe
@@ -565,7 +564,7 @@ convertExp (Prim Func { primArgTypes = as, primRetType = r, primRetArgs = rs@(_:
     tell mempty { wRequires = primRequires }
     vs' <- mapM convertVal vs
     rt <- mapM convertType ty
-    let rrs = map basicType' (r:rs)
+    --let rrs = map basicType' (r:rs)
     ras <- mapM (newVar . basicType') rs
     (stmt,rv) <- basicType' r `newTmpVar` (functionCall (name $ unpackPS funcName) ([ cast (basicType' t) v | v <- vs' | t <- as ] ++ map reference ras))
     return $ (stmt, structAnon (zip (rv:ras) rt))
@@ -635,15 +634,17 @@ convertExp Alloc { expValue = v, expCount = c, expRegion = r } |
 
 convertExp e = return (err (show e),err "nothing")
 
+{-
 ccaf :: (Var,Val) -> P.Doc
 ccaf (v,val) = text "/* " <> text (show v) <> text " = " <>
     (text $ P.render (pprint val)) <> text "*/\n" <>
      text "static node_t _" <> tshow (varName v) <> text ";\n" <>
      text "#define " <> tshow (varName v) <+>  text "(MKLAZY_C(&_" <>
      tshow (varName v) <> text "))\n";
+-}
 
 buildConstants cpr grin fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
-    tyenv = grinTypeEnv grin
+    --tyenv = grinTypeEnv grin
     comm nn = text "/* " <> tshow (nn) <> text " */"
     cc nn@(HcNode a zs,i) = comm nn $$ cd $$ def where
         cd = text "static const struct" <+> tshow (nodeStructName a) <+> text "_c" <> tshow i <+> text "= {" <> hsep (punctuate P.comma (ntag ++ rs)) <> text "};"
@@ -921,7 +922,7 @@ gc_roots vs   = case length vs of
 --    1 ->  functionCall (name "gc_frame1") (v_gc:vs)
 --    2 ->  functionCall (name "gc_frame2") (v_gc:vs)
     lvs -> functionCall (name "gc_frame0") (v_gc:constant (number (fromIntegral lvs)):vs)
-gc_end        = functionCall (name "gc_end") []
+--gc_end        = functionCall (name "gc_end") []
 tbsize sz = functionCall (name "TO_BLOCKS") [sz]
 
 jhc_malloc_atomic sz | fopts FO.Jgc = functionCall (name "gc_array_alloc_atomic") [v_gc,nullPtr, sz, toExpression (0::Int)]
@@ -950,11 +951,11 @@ f_promote e   = functionCall (name "promote") [e]
 f_PROMOTE e   = functionCall (name "PROMOTE") [e]
 f_FETCH_TAG e = functionCall (name "FETCH_TAG") [e]
 f_FETCH_RAW_TAG e = functionCall (name "FETCH_RAW_TAG") [e]
-f_FETCH_MEM_TAG e = functionCall (name "FETCH_MEM_TAG") [e]
+--f_FETCH_MEM_TAG e = functionCall (name "FETCH_MEM_TAG") [e]
 f_SET_RAW_TAG e   = functionCall (name "SET_RAW_TAG") [e]
 f_SET_MEM_TAG e v = functionCall (name "SET_MEM_TAG") [e,v]
 f_demote e    = functionCall (name "demote") [e]
-f_follow e    = functionCall (name "follow") [e]
+--f_follow e    = functionCall (name "follow") [e]
 f_update x y  = functionCall (name "update") [x,y]
 
 arg i = name $ 'a':show i

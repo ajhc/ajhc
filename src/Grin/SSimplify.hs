@@ -37,8 +37,8 @@ import qualified Stats
 data SEnv = SEnv {
     envSubst :: IM.IntMap Val,   -- renaming substitution
     envCSE   :: Map.Map Exp (Atom,Exp),
-    envPapp  :: IM.IntMap (Atom,[Val]),
-    envPush  :: IM.IntMap Exp
+    envPapp  :: IM.IntMap (Atom,[Val])
+    --envPush  :: IM.IntMap Exp
     }
     {-! derive: Monoid !-}
 
@@ -50,11 +50,13 @@ data SCol = SCol {
     }
     {-! derive: Monoid !-}
 
+{-
 data ExpInfo = ExpInfo {
     expFreeVars :: GSet Var,
     expUnboxing :: UnboxingResult,
     expType     :: [Ty]
     }
+-}
 
 newtype S a = S (RWS SEnv SCol SState a)
     deriving(Monad,Functor,MonadWriter SCol, MonadReader SEnv,MonadState SState)

@@ -428,10 +428,10 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
                     rv <- zipWithM marshallFromC vs rets
                     return $ eTuple' rv
                 return (id,fun)
-            _ -> invalidDecl "foreign declaration is of incorrect form."
+            -- _ -> invalidDecl "foreign declaration is of incorrect form."
 
-    isExtTypeRaw ExtTypeRaw {} = True
-    isExtTypeRaw _ = False
+    --isExtTypeRaw ExtTypeRaw {} = True
+    --isExtTypeRaw _ = False
 
     cDecl,cDecl' :: HsDecl -> C [(Name,TVr,E)]
     cDecl' d = withSrcLoc (srcLoc d) $ catchError (cDecl d) (\(_ :: IOError) -> return [])

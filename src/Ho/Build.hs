@@ -270,11 +270,13 @@ instance ProvidesModules CompUnit where
     providesModules (CompSources ss) = concatMap providesModules ss
     providesModules (CompLibrary ho libr) = libProvides (hoModuleGroup ho) libr
     providesModules CompDummy = []
+    providesModules (CompTCed _) = error "providesModules: bad1."
 
 instance ProvidesModules CompLink where
     providesModules (CompLinkUnit cu) = providesModules cu
     providesModules (CompCollected _ cu) = providesModules cu
     providesModules (CompTcCollected _ cu) = providesModules cu
+    providesModules (CompLinkLib _ _) = error "providesModules: bad2c."
 
 instance ProvidesModules SourceCode where
     providesModules sp = [sourceModName (sourceInfo sp)]
@@ -335,6 +337,7 @@ toCompUnitGraph done roots = do
                 writeIORef (lmods mg) (Right myHash)
                 modifyIORef cug_ref ((myHash,(deps,CompLibrary ho lib)):)
                 return myHash
+        g _ = error "Build.toCompUnitGraph: bad."
         pm :: [HoHash] -> IO HoHash -> IO HoHash
         pm [] els = els
         pm (h:hs) els = hvalid h `catch` (\_ -> pm hs els)
@@ -481,6 +484,7 @@ printModProgress fmtLen maxModules tickProgress ms = f "[" ms where
         case ms of
             [x] -> g curModule bl "]" x
             (x:xs) -> do g curModule bl "-" x; putErrLn ""; f "-" xs
+            _ -> error "Build.printModProgress: bad."
     g curModule bl el modName = putErr $ printf "%s%*d of %*d%s %-17s" bl fmtLen curModule fmtLen maxModules el (show $ hsModuleName modName)
 
 countNodes cn = do
@@ -496,6 +500,7 @@ countNodes cn = do
             CompLinkUnit cu      -> return $ f cu
             CompTcCollected _ cu -> return $ f cu
             CompCollected _ cu   -> return $ f cu
+            CompLinkLib _ _      -> error "Build.countNodes: bad."
         f cu = case cu of
             CompTCed (_,_,_,ss) -> Set.fromList ss
             CompSources sc      -> Set.fromList (map sourceIdent sc)
@@ -546,6 +551,8 @@ typeCheckGraph modOpt cn = do
                         let ctc' = htc `mappend` ctc
                         writeIORef ref (CompTcCollected ctc' (CompTCed ((htc,tidata,[ (x,y) | (x,y,_) <- modules],map (sourceHoName . sourceInfo) sc))))
                         return ctc'
+                    _ -> error "Build.typeCheckGraph: bad1."
+            _ -> error "Build.typeCheckGraph: bad2."
         showProgress ms = printModProgress fmtLen maxModules tickProgress ms
         fmtLen = ceiling (logBase 10 (fromIntegral maxModules+1) :: Double) :: Int
         tickProgress = modifyMVar cur $ \val -> return (val+1,val)
@@ -569,6 +576,7 @@ compileCompNode ifunc func ksm cn = do
                 CompCollected ch _ -> return ch
                 CompTcCollected _ cl -> h cl
                 CompLinkUnit cu -> h cu
+                _ -> error "Build.compileCompNode: bad."
             h cu = do
                 deps' <- randomPermuteIO deps
                 cho <- mconcat `fmap` mapM f deps'
@@ -665,6 +673,7 @@ buildLibrary ifunc func = ans where
                 case cl of
                     CompLinkLib l _ -> return l
                     CompCollected _ y -> g hs cd ref y
+                    _ -> error "Build.buildLibrary: bad1."
             g hh deps ref cn = do
                 deps <- mapM f deps
                 let (mg,mll) = case cn of
@@ -679,6 +688,7 @@ buildLibrary ifunc func = ans where
                                     )) where
                                         mg = hoModuleGroup ho
                                         ho' = mapHoBodies eraseE ho
+                        _ -> error "Build.buildLibrary: bad2."
                     res = (mg,mconcat (snds deps) `mappend` mll)
                 writeIORef ref (CompLinkLib res cn)
                 return res

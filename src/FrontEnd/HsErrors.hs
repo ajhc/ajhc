@@ -22,7 +22,7 @@ hsType :: (MonadSrcLoc m, MonadWarn m) => HsType -> m ()
 --    hsQualType (hsTypeType x)
 hsType x = traverseHsType (\x -> hsType x >> return x) x >> return ()
 
-hsQualType x  = hsType (hsQualTypeType x)
+--hsQualType x  = hsType (hsQualTypeType x)
 
 data Context = InClass [HsType] | InInstance [HsType] | TopLevel | Local
     deriving(Eq)
@@ -47,7 +47,7 @@ hsDecl cntx decl = f cntx decl where
         let ds = map (toName ClassName) ds'
 --        when (null cs) $ warn sl "h98-emptydata" "data types with no constructors are a non-haskell98 feature"
         checkDeriving sl False ds
-        let isEnum = all (\x ->  null (hsConDeclArgs x)) cs
+--        let isEnum = all (\x ->  null (hsConDeclArgs x)) cs
 --        when (not isEnum && class_Enum `elem` ds) $ warn sl "derive-enum" "Cannot derive enum from non enumeration type"
 --        when (not isEnum && length cs /= 1 && class_Bounded `elem` ds) $ warn sl "derive-bounded" "Cannot derive bounded from non enumeration or unary type"
         return ()
@@ -73,15 +73,16 @@ hsDecl cntx decl = f cntx decl where
 
     f _ _ = return ()
 
-fetchQtArgs sl HsQualType { hsQualTypeType = t } | (HsTyCon {},args@(_:_)) <- fromHsTypeApp t = return args
-fetchQtArgs sl _ = warn sl InvalidDecl "invalid head in class or instance decl" >> return []
+--fetchQtArgs sl HsQualType { hsQualTypeType = t } | (HsTyCon {},args@(_:_)) <- fromHsTypeApp t = return args
+--fetchQtArgs sl _ = warn sl InvalidDecl "invalid head in class or instance decl" >> return []
 
 checkDeriving _ _ xs | all (`elem` derivableClasses) xs = return ()
 --checkDeriving sl True _ = warn sl "h98-newtypederiv" "arbitrary newtype derivations are a non-haskell98 feature"
 checkDeriving sl False xs
   = let nonDerivable = filter (`notElem` derivableClasses) xs
     in warn sl (UnknownDeriving nonDerivable) ("attempt to derive from a non-derivable class: " ++ unwords (map show nonDerivable))
+checkDeriving _ True _ = error "HsErrors.checkDeriving: bad."
 
-fromHsTypeApp t = f t [] where
-    f (HsTyApp a b) rs = f a (b:rs)
-    f t rs = (t,rs)
+--fromHsTypeApp t = f t [] where
+--    f (HsTyApp a b) rs = f a (b:rs)
+--    f t rs = (t,rs)

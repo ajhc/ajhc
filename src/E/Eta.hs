@@ -89,10 +89,12 @@ expandPis dataTable e = f (followAliases dataTable e) where
     f (EPi v r) = EPi v (f (followAliases dataTable r))
     f e = e
 
+{-
 fromPi' :: DataTable ->  E -> (E,[TVr])
 fromPi' dataTable e = f [] (followAliases dataTable e) where
     f as (EPi v e) = f (v:as) (followAliases dataTable e)
     f as e  =  (e,reverse as)
+-}
 
 -- this annotates, but only expands top-level definitions
 etaExpandProgram :: Stats.MonadStats m => Program -> m Program
@@ -122,6 +124,7 @@ etaReduce e = f e where
         f e = e
 
 -- | only reduce if all lambdas can be discarded. otherwise leave them in place
+{-
 etaReduce' :: E -> (E,Int)
 etaReduce' e = case f e 0 of
         (ELam {},_) -> (e,0)
@@ -129,13 +132,14 @@ etaReduce' e = case f e 0 of
     where
         f (ELam t (EAp x (EVar t'))) n | n `seq` True, t == t' && (tvrIdent t `notMember` (freeVars x :: IdSet)) = f x (n + 1)
         f e n = (e,n)
+-}
 
 etaExpandDef' dataTable n t e = etaExpandDef dataTable n t e >>= \x -> case x of
     Nothing -> return (tvrInfo_u (annotateArity e) t,e)
     Just x -> return x
 
-collectIds :: E -> IdSet
-collectIds e = execWriter $ annotate mempty (\id nfo -> tell (singleton id) >> return nfo) (\_ -> return) (\_ -> return) e
+--collectIds :: E -> IdSet
+--collectIds e = execWriter $ annotate mempty (\id nfo -> tell (singleton id) >> return nfo) (\_ -> return) (\_ -> return) e
 -- | eta expand a definition
 etaExpandDef :: (NameMonad Id m,Stats.MonadStats m)
     => DataTable

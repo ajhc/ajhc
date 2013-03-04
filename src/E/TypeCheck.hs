@@ -420,9 +420,9 @@ typeInfer' dataTable ds e = case runContextEither $ typeInfer'' dataTable ds e o
     Right v -> v
 
 data TcEnv = TcEnv {
-    tcDefns :: [(TVr,E)],
-    tcContext :: [String],
-    tcDataTable :: DataTable
+    --tcDefns :: [(TVr,E)],
+    tcContext :: [String]
+    --tcDataTable :: DataTable
     }
    {-! derive: update !-}
 
@@ -433,6 +433,7 @@ instance ContextMonad Tc where
     type ContextOf Tc = String
     withContext s = local (tcContext_u (s:))
 
+{-
 tcE :: E -> Tc E
 tcE e = rfc e where
     rfc e =  withContextDoc (text "tcE:" </> ePretty e) (fc e >>=  strong')
@@ -467,6 +468,7 @@ tcE e = rfc e where
         strong' ty
     fc Unknown = return Unknown
     fc e = failDoc $ text "what's this? " </> (ePretty e)
+-}
 
 typeInfer'' :: (ContextMonad m, ContextOf m ~ String) => DataTable -> [(TVr,E)] -> E -> m E
 typeInfer'' dataTable ds e = rfc e where
