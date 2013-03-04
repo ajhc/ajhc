@@ -369,7 +369,10 @@ data Env = Env {
     envInScope :: IdMap Binding,
     envInScopeCache :: IdMap E
     }
-    {-! derive: Monoid, update !-}
+    {-! derive: Monoid !-}
+
+envSubst_u f r@Env{envSubst  = x} = r{envSubst = f x}
+envSubst_s v =  envSubst_u  (const v)
 
 susp:: E -> Subst -> Range
 susp e sub =  Susp e sub
@@ -1067,7 +1070,7 @@ instance NameMonad Id SM where
 --        (used,bound) <- getIds
         newNameFrom $ candidateIds seed -- (size used + 10000*size bound)
 
-smUsedNames = SM $ gets idsUsed
+--smUsedNames = SM $ gets idsUsed
 --smBoundNames = SM $ gets idsBound
 
 smAddNamesIdSet nset = --trace ("addNamesIdSet: "++ show (size nset)) $

@@ -70,7 +70,9 @@ data Env = Env {
     rConst :: Set.Set Atom,
     rGrin :: Grin
     }
-    {-! derive: update !-}
+
+rEMap_u f r@Env{rEMap  = x} = r{rEMap = f x}
+rInscope_u f r@Env{rInscope  = x} = r{rInscope = f x}
 
 newtype C a = C (RWST Env Written HcHash Uniq a)
     deriving(Monad,UniqueProducer,MonadState HcHash,MonadWriter Written,MonadReader Env,Functor)

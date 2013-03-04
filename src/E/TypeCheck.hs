@@ -424,7 +424,8 @@ data TcEnv = TcEnv {
     tcContext :: [String]
     --tcDataTable :: DataTable
     }
-   {-! derive: update !-}
+
+tcContext_u f r@TcEnv{tcContext  = x} = r{tcContext = f x}
 
 newtype Tc a = Tc (Reader TcEnv a)
     deriving(Monad,Functor,MonadReader TcEnv)

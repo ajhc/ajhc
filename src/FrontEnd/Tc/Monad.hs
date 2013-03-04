@@ -99,7 +99,11 @@ data TcEnv = TcEnv {
     tcInstanceEnv       :: InstanceEnv,
     tcOptions           :: Opt  -- module specific options
     }
-   {-! derive: update !-}
+
+tcConcreteEnv_u    f r@TcEnv{tcConcreteEnv  = x} = r{tcConcreteEnv = f x}
+tcDiagnostics_u    f r@TcEnv{tcDiagnostics  = x} = r{tcDiagnostics = f x}
+tcMutableEnv_u     f r@TcEnv{tcMutableEnv  = x}  = r{tcMutableEnv = f x}
+tcRecursiveCalls_u f r@TcEnv{tcRecursiveCalls  = x} = r{tcRecursiveCalls = f x}
 
 data Output = Output {
     collectedPreds   :: !Preds,
@@ -110,7 +114,7 @@ data Output = Output {
     tcWarnings       :: !(Seq.Seq Warning),
     outKnots         :: [(Name,Name)]
     }
-   {-! derive: update, Monoid !-}
+   {-! derive: Monoid !-}
 
 newtype Tc a = Tc (ReaderT TcEnv (WriterT Output IO) a)
     deriving(MonadFix,MonadIO,MonadReader TcEnv,MonadWriter Output,Functor)

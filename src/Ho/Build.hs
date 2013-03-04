@@ -112,7 +112,12 @@ data Done = Done {
     hosEncountered  :: Map.Map HoHash     (FilePath,HoHeader,HoIDeps,Ho),
     modEncountered  :: Map.Map Module     ModDone
     }
-    {-! derive: update !-}
+
+hosEncountered_u f r@Done{hosEncountered  = x} = r{hosEncountered = f x}
+knownSourceMap_u f r@Done{knownSourceMap  = x} = r{knownSourceMap = f x}
+loadedLibraries_u f r@Done{loadedLibraries  = x} = r{loadedLibraries = f x}
+modEncountered_u f r@Done{modEncountered  = x} = r{modEncountered = f x}
+validSources_u f r@Done{validSources  = x} = r{validSources = f x}
 
 replaceSuffix suffix fp = reverse (dropWhile ('.' /=) (reverse fp)) ++ suffix
 

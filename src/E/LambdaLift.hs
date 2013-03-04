@@ -86,7 +86,10 @@ data S = S {
     isStrict :: Bool,
     declEnv :: [(TVr,E)]
     }
-    {-! derive: update !-}
+
+isStrict_u f r@S{isStrict  = x} = r{isStrict = f x}
+topVars_u f r@S{topVars  = x} = r{topVars = f x}
+isStrict_s v =  isStrict_u  (const v)
 
 {-
 etaReduce :: E -> (E,Int)
