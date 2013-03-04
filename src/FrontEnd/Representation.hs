@@ -99,6 +99,7 @@ instance Eq Type where
     _ == _ = False
 
 tassocToAp TAssoc { typeCon = con, typeClassArgs = cas, typeExtraArgs = eas } = foldl tAp (TCon con) (cas ++ eas)
+tassocToAp _ = error "Representation.tassocToAp: bad."
 
 -- Unquantified type variables
 
@@ -252,7 +253,7 @@ prettyPrintTypePrec n t  = unparse $ zup (runIdentity (runVarNameT (f t))) where
         t2 <- f t2
         return $ t1 `arr` t2
     f (TMetaVar mv) = return $ atom $ pprint mv
-    f tv = return $ atom $ parens $ text ("FrontEnd.Tc.Type.pp: " ++ show tv)
+    --f tv = return $ atom $ parens $ text ("FrontEnd.Tc.Type.pp: " ++ show tv)
 
 instance DocLike d => PPrint d MetaVarType where
     pprint  t = case t of

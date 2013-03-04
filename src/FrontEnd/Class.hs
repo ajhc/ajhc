@@ -236,12 +236,15 @@ chToClassHead kt qt@HsClassHead { .. }  =
 createClassAssocs kt decls = [ Assoc (ctc n) False (map ct as) (ctype t) | HsTypeDecl { hsDeclName = n, hsDeclTArgs = as, hsDeclType = t } <- decls ] where
     ctc n = let nn = toName TypeConstructor n in Tycon nn (kindOf nn kt)
     ct (HsTyVar n) = let nn = toName TypeVal n in tyvar nn (kindOf nn kt)
+    ct _ = error "Class.createClassAssocs: bad1."
     ctype HsTyAssoc = kindStar
+    ctype _ = error "Class.createClassAssocs: bad2."
 --    ctype t = Just $ runIdentity $ hsTypeToType kt t
 
 createInstAssocs kt decls = [ (ctc n,map ct (czas ca),map ct as,ctype t) | HsTypeDecl { hsDeclName = n, hsDeclTArgs = (ca:as), hsDeclType = t } <- decls ] where
     ctc n = let nn = toName TypeConstructor n in Tycon nn (kindOf nn kt)
     ct (HsTyVar n) = let nn = toName TypeVal n in tyvar nn (kindOf nn kt)
+    ct _ = error "Class.createInstAssocs: bad."
     czas ca = let (HsTyCon {},zas) = fromHsTypeApp ca in zas
     ctype HsTyAssoc = Nothing
     ctype t = Just $ runIdentity $ hsTypeToType kt t
@@ -320,6 +323,7 @@ renameOneDecl newName (HsFunBind matches)
 -- (ie no compound patterns)
 renameOneDecl newName (HsPatBind sloc (HsPVar patName) rhs wheres)
    = HsPatBind sloc (HsPVar (nameName newName)) rhs wheres
+renameOneDecl _ _ = error "Class.renameOneDecl"
 
 renameOneMatch :: Name -> HsMatch -> HsMatch
 renameOneMatch newName (HsMatch sloc oldName pats rhs wheres)

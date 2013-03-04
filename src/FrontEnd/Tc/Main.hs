@@ -63,6 +63,7 @@ tcKnownApp e coerce vname as typ = do
         f lt [] = do
             fc <- lt `subsumes` typ
             return ([],fc)
+        f _ _ = error "Main.tcKnownApp: bad."
     (nas,CTId) <- f rt as
     return (e',nas)
 
@@ -728,6 +729,8 @@ tcDecl decl@(HsFunBind matches) typ = withContext (declDiagnostic decl) $ do
     matches' <- mapM (`tcMatch` typ) matches
     return (HsFunBind matches', Map.singleton (getDeclName decl) typ)
 
+tcDecl _ _ = error "Main.tcDecl: bad."
+
 tcMatch ::  HsMatch -> Sigma -> Tc HsMatch
 tcMatch (HsMatch sloc funName pats rhs wheres) typ = withContext (locMsg sloc "in" $ show funName) $ do
     let lam (p:ps) (TMetaVar mv) rs = do -- ABS2
@@ -766,6 +769,7 @@ declDiagnostic ::  (HsDecl) -> Diagnostic
 declDiagnostic decl@(HsPatBind sloc (HsPVar {}) _ _) = locMsg sloc "in the declaration" $ render $ ppHsDecl decl
 declDiagnostic decl@(HsPatBind sloc pat _ _) = locMsg sloc "in the pattern binding" $ render $ ppHsDecl decl
 declDiagnostic decl@(HsFunBind matches) = locMsg (srcLoc decl) "in the function binding" $ render $ ppHsDecl decl
+declDiagnostic _ = error "Main.declDiagnostic: bad."
 
 tiExpl ::  Expl -> Tc (HsDecl,TypeEnv)
 tiExpl (sc, decl@HsForeignDecl {}) = do return (decl,Map.empty)
@@ -840,6 +844,7 @@ tiLit (HsFrac _) = do
 
 tiLit (HsStringPrim _)  = return (TCon (Tycon tc_BitsPtr kindHash))
 tiLit (HsString _)  = return tString
+tiLit _ = error "Main.tiLit: bad."
 
 ------------------------------------------
 -- Binding analysis and program generation

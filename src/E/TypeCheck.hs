@@ -340,7 +340,7 @@ inferType dataTable ds e = rfc e where
         withContext "checking pattern equality" $ eqAll (et:ps)
         return ect
     fc Unknown = return Unknown
-    fc e = failDoc $ text "what's this? " </> (prettyE e)
+    --fc e = failDoc $ text "what's this? " </> (prettyE e)
     calt (EVar v) (Alt l e) = do
         let nv =  followAliases undefined (patToLitEE l)
         rfc (subst' v nv e)
@@ -506,7 +506,7 @@ typeInfer'' dataTable ds e = rfc e where
     fc ECase { eCaseType = ty } = do
         strong' ty
     fc Unknown = return Unknown
-    fc e = failDoc $ text "what's this? " </> (ePretty e)
+    --fc e = failDoc $ text "what's this? " </> (ePretty e)
 
 -- | find substitution that will transform the left term into the right one,
 -- only substituting for the vars in the list
@@ -558,3 +558,4 @@ match lup vs = \e1 e2 -> liftM Seq.toList $ execWriterT (un e1 e2 etherealIds) w
     lam va ea vb eb (c:cs) = do
         un (tvrType va) (tvrType vb) (c:cs)
         un (subst va (EVar va { tvrIdent = c }) ea) (subst vb (EVar vb { tvrIdent = c }) eb) cs
+    lam _ _ _ _ _ = error "TypeCheck.match: bad."

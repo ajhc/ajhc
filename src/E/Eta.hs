@@ -46,6 +46,7 @@ instance Show ArityType where
 arity at = f at 0 where
     f (AFun _ a) n = f a $! (1 + n)
     f x n | n `seq` x `seq` True = (x,n)
+    f _ _ = error "Eta.arity: bad."
 
 getArityInfo tvr
     | Just at <- Info.lookup (tvrInfo tvr) = arity at

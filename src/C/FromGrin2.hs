@@ -182,6 +182,7 @@ compileGrin grin = (LBS.fromChunks code, req)  where
                 text "static node_t _" <> tshow (varName v) <> text " = { .head = " <> ef <> text " };\n" <>
                 text "#define " <> tshow (varName v) <+>  text "(MKLAZY_C(&_" <> tshow (varName v) <> text "))\n";
         return ts
+    convertCAF _ = error "FromGrin2.compileGrin: bad."
 
 convertFunc :: Maybe FfiExport -> (Atom,Lam) -> C [Function]
 convertFunc ffie (n,as :-> body) = do
@@ -312,6 +313,7 @@ tyToC dh (Op.TyBits b h) = f b h where
         (Op.Bits 128) -> "__float128"
         _ -> error "tyToC: unknown"
     f _ _ = error "tyToC: unknown"
+tyToC _ _ = error "FromGrin2.tToC: bad."
 
 opTyToCh hint opty = basicType (tyToC hint opty)
 opTyToC opty = basicType (tyToC Op.HintUnsigned opty)

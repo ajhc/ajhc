@@ -245,6 +245,7 @@ collectDs ds (OMap fve) = do
             False -> case  (tvrIdent t `member` exp) of
                 True -> noUseInfo
                 False | Just r <- mlookup (tvrIdent t) fids -> r
+            _ -> error "SSimplify.collectDs: bad."
         ds''' = [ combHead_s (calcStrictInfo $ annbind ffids (combHead comb)) comb | (comb,_) <- ds'']
         froo comb = (combHead_s (combHead comb) {tvrType = t' } comb,fvs) where
             (t',fvs) = collectOccurance' (tvrType $ combHead comb)
@@ -351,6 +352,7 @@ instance Monoid Forced where
 
 fixInline finalPhase v bt@IsBoundTo {} = bt {
     inlineForced = inlineForced bt `mappend` calcForced finalPhase v }
+fixInline _ _ _ = error "SSimplify.fixInline: bad."
 
 calcForced finalPhase v =
     let props = getProperties v in
@@ -841,11 +843,11 @@ simplifyDs prog sopts dsIn = ans where
     hFunc e xs' = do app (e,xs')
     didInline ::OutE -> [OutE] -> SM OutE
     didInline z zs = return (foldl EAp z zs)
-    didInline z zs = do
-        used <- smUsedNames
-        let (ne,nn) = runRename used (foldl EAp z zs)
-        smAddNamesIdSet nn
-        return ne
+    --didInline z zs = do
+    --    used <- smUsedNames
+    --    let (ne,nn) = runRename used (foldl EAp z zs)
+    --    smAddNamesIdSet nn
+    --    return ne
     appVar v xs | so_postLift sopts = app (EVar v,xs)
     appVar v xs = do
         me <- etaExpandAp (progDataTable prog) v xs
@@ -965,6 +967,7 @@ exprSize max e discount known = f max e >>= \n -> return (max - n) where
     f n ELetRec {eDefs = ds, eBody = e } = do
         n <- foldM f n (snds ds)
         f n e
+    f _ Unknown = error "SSimplify.exprSize: bad."
 
 noSizeIncrease e xs = f e xs where
     currentSize = 1 + length xs
