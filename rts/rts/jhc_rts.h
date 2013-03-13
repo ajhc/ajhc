@@ -95,3 +95,13 @@ bool jhc_valid_lazy(sptr_t s);
 #endif
 
 #endif
+
+/*
+ * Detail:
+ * http://communities.mentor.com/community/cs/archives/arm-gnu/msg01904.html
+ */
+#ifdef _JHC_ARM_STAY_IN_THUMB_MODE
+#define SET_THUMB_BIT(fn)    TO_SPTR(0x1,(sptr_t)fn)
+#else
+#define SET_THUMB_BIT(fn)    (fn)
+#endif
