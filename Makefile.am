@@ -77,7 +77,7 @@ EXTRA_DIST = src/data rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
 	     examples/Primes.hs src/FlagOpts.flags src/FlagDump.flags lib/ext compat
 
 dist-hook: $(BUILT_SOURCES)
-	if test -f _darcs; then \
+	if test -f .git; then \
 		rm -f $(srcdir)/ChangeLog $(srcdir)/src/data/shortchange.txt; \
 		$(MAKE) ChangeLog src/data/shortchange.txt src/RawFiles.hs;   \
 		cp -f $(srcdir)/ChangeLog $(destdir)/ChangeLog; \
@@ -173,13 +173,13 @@ src/RawFiles.hs: $(RAWFILES)
 src/FrontEnd/HsParser.hs: src/FrontEnd/HsParser.y
 	happy -a -g -c $< -o $@
 
-.SECONDARY: _darcs/hashed_inventory src/data/shortchange.txt
+.SECONDARY: src/data/shortchange.txt
 
 ChangeLog:
 	git log fork-jhc-0.8.0-darcs20120314..HEAD > $@
 
 src/data/shortchange.txt: ChangeLog
-	echo -n "`sed -ne 's/^  tagged \(.*\)/\1/p' $<`-`grep -c '^  \*' $<`"  > $@
+	echo -n "`head -1 $< | sed -ne 's/^commit \(.*\)/\1/p'`"  > $@
 
 BINDISTDIR=$(PACKAGE)-$(VERSION)-$(host)
 
@@ -252,6 +252,9 @@ CLEANFILES+= src/FlagDump.hs src/FlagOpts.hs src/FrontEnd/HsParser.hs src/Info/P
 
 publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/index.shtml docs/ajhc.shtml manual.html docs/manual.css
 	cp -- $^ /home/john/public_html/computer/ajhc
+
+publish_ajhc: manual.html manual_ja.html docs/manual.css
+	cp -- $^ /home/kiwamu/doc/ajhc.github.com/
 
 manual.mkd: $(AJHC_MANUAL_FILES)
 	perl $(srcdir)/utils/stitch.prl $^ > $@
