@@ -58,14 +58,14 @@ import qualified Version.Config as VC
 
 # Basics
 
-Unlike many other compilers, jhc is a native cross compiler. What this means is
-that every compile of jhc is able to create code for all possible target
+Unlike many other compilers, Ajhc is a native cross compiler. What this means is
+that every compile of Ajhc is able to create code for all possible target
 systems. This leads to many simplifications when it comes to cross compiling
-with jhc. Basically in order to cross compile, you need only pass the flag
-'--cross' to jhc, and pass an appropriate '-m' option to tell jhc what machine
+with Ajhc. Basically in order to cross compile, you need only pass the flag
+'--cross' to Ajhc, and pass an appropriate '-m' option to tell Ajhc what machine
 you are targetting. An example would be
 
-    ; jhc --cross -mwin32 test/HelloWorld.hs
+    ; ajhc --cross -mwin32 test/HelloWorld.hs
 
 The targets list is extensible at run-time via the targets.ini file explained
 below.
@@ -95,17 +95,17 @@ An example describing how to cross compile for windows is as follows:
 This sets the compiler to use as well as a few other options then jumps to the
 generic i686 routine. The special target [default] is always read before all
 other targets. If '--cross' is specified on the command line then this is the
-only implicitly included configuration, otherwise jhc will assume you are
+only implicitly included configuration, otherwise Ajhc will assume you are
 compiling for the current architecture and choose an appropriate target to
 include in addition to default.
 
-jhc will attempt to read several targets.ini files in order. they are
+Ajhc will attempt to read several targets.ini files in order. they are
 
 $PREFIX/etc/ajhc-\$VERSION/targets.ini
-: this is the targets.ini that is included with jhc and contains the default options.
+: this is the targets.ini that is included with Ajhc and contains the default options.
 
 $PREFIX/etc/ajhc-\$VERSION/targets-local.ini
-: jhc will read this if it exists, it is used to specify custom system wide configuration options, such as the name of local compilers.
+: Ajhc will read this if it exists, it is used to specify custom system wide configuration options, such as the name of local compilers.
 
 $HOME/.ajhc/targets.ini
 : this is where a users local configuration information goes.
@@ -253,7 +253,7 @@ theoptions =
     , Option []    ["version-context"] (NoArg  (optMode_s VersionCtx))       "print version context info and exit"
     , Option []    ["help"]            (NoArg  (optMode_s ShowHelp))         "print help information and exit"
     , Option []    ["info"]            (NoArg  (optMode_s ShowConfig))       "show compiler configuration information and exit"
-    , Option []    ["purge-cache"]     (NoArg  (optMode_s PurgeCache))       "clean out jhc compilation cache"
+    , Option []    ["purge-cache"]     (NoArg  (optMode_s PurgeCache))       "clean out Ajhc compilation cache"
     , Option ['v'] ["verbose"]         (NoArg  (optVerbose_u (+1)))          "chatty output on stderr"
     , Option ['z'] []                  (NoArg  (optStatLevel_u (+1)))        "Increase verbosity of statistics"
     , Option ['d'] []                  (ReqArg (optDump_u . (:))  "[no-]flag") "dump specified data during compilation"
@@ -286,7 +286,7 @@ theoptions =
     , Option []    ["ignore-cache"]    (NoArg  (optIgnoreHo_s True))         "Ignore existing compilation cache entries."
     , Option []    ["readonly-cache"]  (NoArg  (optNoWriteHo_s True))        "Do not write new information to the compilation cache."
     , Option []    ["no-cache"]        (NoArg  (optNoWriteHo_s True . optIgnoreHo_s True)) "Do not use or update the cache."
-    , Option []    ["cache-dir"]       (ReqArg (optHoCache_s . Just ) "JHC_CACHE")  "Use a global cache located in the directory passed as an argument."
+    , Option []    ["cache-dir"]       (ReqArg (optHoCache_s . Just ) "AJHC_CACHE")  "Use a global cache located in the directory passed as an argument."
 --    , Option []    ["ho-dir"]          (ReqArg (optHoDir_s . Just ) "<dir>")    "Where to place and look for ho files"
     , Option []    ["stale"]           (ReqArg (optStale_u . idu) "Module")  "Treat these modules as stale, even if they exist in the cache"
     , Option []    ["list-libraries"]  (NoArg  (optMode_s ListLibraries))    "List of installed libraries"

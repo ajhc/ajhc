@@ -2,7 +2,7 @@
 
 # Dumping Debugging Information
 
-You can have jhc print out a variety of things while running as Controlled by
+You can have Ajhc print out a variety of things while running as Controlled by
 the '-d' flag. The following is a list of possible parameters you can pass to
 '-d'.
 

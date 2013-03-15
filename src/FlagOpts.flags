@@ -2,7 +2,7 @@
 
 # Code Options
 
-Various options affecting how jhc interprets and compiles code can be
+Various options affecting how Ajhc interprets and compiles code can be
 controlled with the '-f' flag, the following options are availible, you can
 negate any particular one by prepending 'no-' to it.
 

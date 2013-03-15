@@ -2,9 +2,9 @@
 
 # Module Search Path
 
-Modules in jhc are searched for based on their name as in other Haskell
+Modules in Ajhc are searched for based on their name as in other Haskell
 compilers. However in addition to searching for 'Data/Foo.hs' for the module
-'Data.Foo', jhc will also search for 'Data.Foo.hs'.
+'Data.Foo', Ajhc will also search for 'Data.Foo.hs'.
 
 # extensions to the FFI
 
@@ -36,7 +36,7 @@ foreign import ccall "math.h frexp"  c_frexp2 :: Double -> (# Double, CInt #)
 The 'capi' calling convention may be used instead of 'ccall' for static
 imports. The convention means that the foreign function may not be addressable
 as an address, but rather may be implemnted as a macro, builtin, or other
-compiler specific feature. jhc will ensure that the routine is never used as a
+compiler specific feature. Ajhc will ensure that the routine is never used as a
 pointer and the headers specified in the dependency string are included
 anywhere the imported function appears. This differs from 'ccall' in that ccall
 makes no guarentees the given header file will be in scope and that a linker
@@ -46,13 +46,13 @@ symbol of the exact name is exported.
 
 dependecies in a foreign import may be written as p:foo.c or p:foo.h, this
 means that the file should be interpreted as part of the internal
-implementation of the package. jhc willl ensure the files do not clash with
+implementation of the package. Ajhc willl ensure the files do not clash with
 those of other packages that may have the same name. The files should be listed
 in the c-files and c-headers sections of the library config file.
 
 # Explicit namespaces in import/export lists
 
-jhc allows explicit namespaces in import and export lists. These may be used to
+Ajhc allows explicit namespaces in import and export lists. These may be used to
 restrict or modiy what is imported/exported by a declaration.
 
     * 'type' - The name is a type, as in something defined by 'type', 'newtype',
@@ -67,7 +67,7 @@ conflict.
 
 # user defined kinds
 
-Jhc allows users to define custom kinds when the -fuser-kinds extension is
+Ajhc allows users to define custom kinds when the -fuser-kinds extension is
 enabled. The syntax is:
 
 ~~~~
@@ -80,11 +80,11 @@ values, So they have no run-time representation (notably, not even ⊥)
 
 # Standalone deriving
 
-Jhc supports a standalone deriving mechanism under certain circumstances.
+Ajhc supports a standalone deriving mechanism under certain circumstances.
 
 # Rank-N Polymorphism
 
-Jhc supports higher ranked polymorphism. jhc will never infer types of higher
+Ajhc supports higher ranked polymorphism. Ajhc will never infer types of higher
 rank, however when the context unambiguously specifies a higher ranked type, it
 will be used. For instance, user supplied type annotations and arguments to
 data constructors defined to by polymorphic will get the correct polymorphic
@@ -92,12 +92,12 @@ type.
 
 # Existential types
 
-Jhc supports first class existential types, using the 'exists' keyword. It also
+Ajhc supports first class existential types, using the 'exists' keyword. It also
 supports existential data types in a similar fashion to ghc.
 
 # Unboxed Values
 
-Unboxed values in jhc are specified in a similar fashion to GHC however the
+Unboxed values in Ajhc are specified in a similar fashion to GHC however the
 lexical syntax is not changed to allow # in identifiers. # is still used in the
 syntax for various unboxed constructs, but normal Haskell rules apply to
 haskell identifiers. The convention is to suffix such types with '_' to
@@ -107,7 +107,7 @@ MagicHash extension name also turns on unboxed-values.
 
 ## Unboxed Tuples
 
-Jhc supports unboxed tuples with the same syntax as GHC, (# 2, 4 #) is an
+Ajhc supports unboxed tuples with the same syntax as GHC, (# 2, 4 #) is an
 unboxed tuple of two numbers. Unboxed tuples are enabled with -funboxed-tuples.
 Unboxed tuples are kind-polymorphic, able to hold both boxed and unboxed values.
 (but not another unboxed tuple)
@@ -122,12 +122,12 @@ have types 'BitsPtr_'.
 
 Unboxed characters can be expressed by putting a hash after a normal character
 literal. Unboxed characters are of type Char_ which is a newtype of Bits32_ and
-defined in Jhc.Prim.Bits
+defined in Ajhc.Prim.Bits
 
 ## Unboxed Numbers
 
 Unboxed numbers are enabled with the -funboxed-values flag. They are postpended
-with a '#' such as in 3# or 4#. Jhc supports a limited form of type inference
+with a '#' such as in 3# or 4#. Ajhc supports a limited form of type inference
 for unboxed numbers, if the type is fully specified by the environment and it
 is a suitable unboxed numeric type then that type is used. Otherwise it
 defaults to Int__. Whether the type is fully specifed follows the same rules as

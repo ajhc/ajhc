@@ -36,10 +36,10 @@ import {-# SOURCE #-} E.Show
 
 {-@Internals
 
-# Jhc Core Type System
+# Ajhc Core Type System
 
-Jhc's core is based on a pure type system. A pure type system (also called a
-PTS) is actually a parameterized set of type systems. Jhc's version is
+Ajhc's core is based on a pure type system. A pure type system (also called a
+PTS) is actually a parameterized set of type systems. Ajhc's version is
 described by the following.
 
     Sorts  = (*, !, **, #, (#), ##, □)

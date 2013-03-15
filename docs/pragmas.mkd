@@ -1,7 +1,7 @@
 {-#Pragmas
 
 Pragmas are special compiler directives that change its behavior in certain
-ways. In general, each compiler is free to define its own pragmas however jhc
+ways. In general, each compiler is free to define its own pragmas however Ajhc
 does try to implement the same ones as other compilers when it makes sense.
 pragmas appear in source code  as {-# PRAGMANAME ... #-}
 
@@ -22,7 +22,7 @@ _VCONSTRUCTOR_     Treat the function as a virtual constructor. CPR analysis and
 
 Pragma
 ------             ---------------------------------------------------
-_NOETA_            By default, jhc eta-expands all class methods to help enable optimizations. This disables this behavior.
+_NOETA_            By default, Ajhc eta-expands all class methods to help enable optimizations. This disables this behavior.
 
 # Rules/Specializations
 

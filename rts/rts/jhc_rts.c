@@ -2,7 +2,7 @@
 
 # The Run Time System
 
-Jhc is very minimalist in that it does not have a precompiled run time system,
+Ajhc is very minimalist in that it does not have a precompiled run time system,
 but rather generates what is needed as part of the compilation process.
 However, back ends do have specific run-time representations of data, which can
 be affected by things like the choice of garbage collector. The following
@@ -25,7 +25,7 @@ heap. It may be on the stack, heap, or even embedded within the smart pointer
 itself. Being boxed only means that the object may be represented by a smart
 pointer, which may or may not actually be a pointer in the traditional sense.
 
-A boxed value in jhc is represented by a 'smart pointer' of c type sptr_t. a
+A boxed value in Ajhc is represented by a 'smart pointer' of c type sptr_t. a
 smart pointer is the size of a native pointer, but can take on different roles
 depending on a pair of tag bits, called the ptype.
 
