@@ -143,8 +143,8 @@ Define                             Meaning
 \_JHC\_JGC\_NAIVEGC                run gc when have no more blocks.
 \_JHC\_JGC\_STACKGROW              number of stack entry growed when run short of it.
 \_JHC\_JGC\_FIXED\_MEGABLOCK       use a single megablock without allocation megablock.
-\_JHC\_JGC\_BLOCK\_SHIFT           bit shift to specify block size as -D_JHC_JGC_BLOCK_SHIFT=9.
-\_JHC\_JGC\_MEGABLOCK\_SHIFT       bit shift to specify megablock size as -D_JHC_JGC_MEGABLOCK_SHIFT=14.
+\_JHC\_JGC\_BLOCK\_SHIFT           bit shift to specify block size. Use it internally like this: (1 << (_JHC_JGC_BLOCK_SHIFT)).
+\_JHC\_JGC\_MEGABLOCK\_SHIFT       bit shift to specify megablock size. Use it internally like this: (1 << (_JHC_JGC_MEGABLOCK_SHIFT)).
 
 -}
 
