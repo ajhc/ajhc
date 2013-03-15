@@ -122,7 +122,7 @@ have types 'BitsPtr_'.
 
 Unboxed characters can be expressed by putting a hash after a normal character
 literal. Unboxed characters are of type Char_ which is a newtype of Bits32_ and
-defined in Ajhc.Prim.Bits
+defined in Jhc.Prim.Bits
 
 ## Unboxed Numbers
 

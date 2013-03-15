@@ -7,8 +7,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
-"POT-Creation-Date: 2013-03-02 18:06+0900\n"
-"PO-Revision-Date: 2013-03-02 18:17+0900\n"
+"POT-Creation-Date: 2013-03-15 14:26+0900\n"
+"PO-Revision-Date: 2013-03-15 14:27+0900\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "Language: \n"
@@ -36,12 +36,12 @@ msgstr "## プロジェクトをビルドする"
 #. type: Plain text
 #: manual.mkd:14
 msgid ""
-"Jhc does its own dependency chasing to track down source files, you need "
+"Ajhc does its own dependency chasing to track down source files, you need "
 "only provide it with the file containing your 'main' function on the command "
 "line.  For instance, if you had a program 'HelloWorld.hs', the following "
 "would compile it to an executable named 'hello'."
 msgstr ""
-"Jhcはソースコードの依存関係を独自に解析してくれるため、\n"
+"Ajhcはソースコードの依存関係を独自に解析してくれるため、\n"
 "コマンドラインから'main'関数を含んだファイルを指定するだけでソースコード全体"
 "をコンパイルできる。\n"
 "例えばソースコード'HelloWorld.hs'をコンパイルしたければ、次のようにコンパイル"
@@ -50,25 +50,25 @@ msgstr ""
 #. type: Plain text
 #: manual.mkd:16
 #, no-wrap
-msgid "    ; jhc HelloWorld.hs -o hello\n"
-msgstr "    ; jhc HelloWorld.hs -o hello\n"
+msgid "    ; ajhc HelloWorld.hs -o hello\n"
+msgstr "    ; ajhc HelloWorld.hs -o hello\n"
 
 #. type: Plain text
 #: manual.mkd:22
 msgid ""
-"Jhc searches for modules in its search path, which defaults to the current "
+"Ajhc searches for modules in its search path, which defaults to the current "
 "directory. Modules are searched for based on their names. For instance, the "
 "module Data.Foo will be searched for in 'Data/Foo.hs' and 'Data.Foo.hs'.  "
 "The search path may be modifed with the '-i' command line option, or by "
-"setting the 'JHC_PATH' environment variable."
+"setting the 'AJHC_PATH' environment variable."
 msgstr ""
-"Jhcはサーチパスからモジュールを探す。\n"
+"Ajhcはサーチパスからモジュールを探す。\n"
 "そのサーチパスは既定値ではカレントディレクトリである。\n"
 "モジュールは名前にもとづいて検索される。\n"
 "例えばData.Fooモジュールは'Data/Foo.hs'もしくは'Data.Foo.hs'のパスから探され"
 "ることになる。\n"
 "このサーチパスは'-i'コマンドラインオプションを使って指定できる。\n"
-"また、'JHC_PATH'環境変数を使って指定することもできる。"
+"また、'AJHC_PATH'環境変数を使って指定することもできる。"
 
 #. type: Plain text
 #: manual.mkd:24
@@ -78,19 +78,19 @@ msgstr "## ライブラリを使う"
 #. type: Plain text
 #: manual.mkd:31
 msgid ""
-"jhc libraries are distributed as files with an 'hl' suffix, such as "
+"Ajhc libraries are distributed as files with an 'hl' suffix, such as "
 "'base-1.0.hl'. In order to use a haskell library you simply need to place "
-"the file in a directory that jhc will search for it. For instance, $HOME/lib/"
-"jhc.  You may set the environment variable JHC_LIBRARY_PATH to specify "
+"the file in a directory that Ajhc will search for it. For instance, $HOME/"
+"lib/ajhc.  You may set the environment variable AJHC_LIBRARY_PATH to specify "
 "alternate locations to search for libraries or specify directory to search "
 "with the -L command line option. -L- will clear the search path."
 msgstr ""
-"jhcライブラリは、例えば'base-1.0.hl'のような、'hl'という拡張子を持つ単一の"
+"Ajhcライブラリは、例えば'base-1.0.hl'のような、'hl'という拡張子を持つ単一の"
 "ファイルである。\n"
-"何かHaskellライブラリを使うためには、jhcの検索するディレクトリにこのファイル"
+"何かHaskellライブラリを使うためには、Ajhcの検索するディレクトリにこのファイル"
 "を置くだけで良い。\n"
-"例えば $HOME/lib/jhc などだ。\n"
-"JHC_LIBRARY_PATH環境変数を定義することで、別の位置をライブラリのサーチパスと"
+"例えば $HOME/lib/ajhc などだ。\n"
+"AJHC_LIBRARY_PATH環境変数を定義することで、別の位置をライブラリのサーチパスと"
 "して指定することができる。\n"
 "また、-Lコマンドラインオプションを使ってもサーチパスを指定できる。\n"
 "さらに-L-オプションを使えばサーチパスの設定を既定値に戻すことさえできる。"
@@ -110,14 +110,14 @@ msgstr ""
 #. type: Plain text
 #: manual.mkd:37
 #, no-wrap
-msgid "    ; jhc -p mylibrary MyProgram.hs -o myprogram\n"
-msgstr "    ; jhc -p mylibrary MyProgram.hs -o myprogram\n"
+msgid "    ; ajhc -p mylibrary MyProgram.hs -o myprogram\n"
+msgstr "    ; ajhc -p mylibrary MyProgram.hs -o myprogram\n"
 
 #. type: Plain text
 #: manual.mkd:41
 msgid ""
 "You can list all available libraries by passing the --list-libraries option "
-"to jhc. If you include '-v' for verbose output, you will get detailed "
+"to Ajhc. If you include '-v' for verbose output, you will get detailed "
 "information about the libraries in a YAML format suitable for processing by "
 "external tools."
 msgstr ""
@@ -134,32 +134,35 @@ msgstr "## 環境変数"
 
 #. type: Plain text
 #: manual.mkd:45
-msgid "Jhc's behavior is modified by several enviornment variables."
-msgstr "Jhcの挙動はいくつかの環境変数によって制御される。"
+msgid "Ajhc's behavior is modified by several enviornment variables."
+msgstr "Ajhcの挙動はいくつかの環境変数によって制御される。"
 
 #. type: Plain text
 #: manual.mkd:48
 msgid ""
-"JHC_OPTS : this is read and appended to the command line of jhc invocations."
-msgstr "JHC_OPTS : jhcのコマンドライン直後に挿入されるオプション群"
+"AJHC_OPTS : this is read and appended to the command line of Ajhc "
+"invocations."
+msgstr "AJHC_OPTS : jhcのコマンドライン直後に挿入されるオプション群"
 
 #. type: Plain text
 #: manual.mkd:51
-msgid "JHC_PATH : This specifies the path to search for modules."
-msgstr "JHC_PATH : モジュールの検索パス"
+msgid "AJHC_PATH : This specifies the path to search for modules."
+msgstr "AJHC_PATH : モジュールの検索パス"
 
 #. type: Plain text
 #: manual.mkd:54
-msgid "JHC_LIBRARY_PATH : This specifies the path to search for libraries."
-msgstr "JHC_LIBRARY_PATH : ライブラリの検索パス"
+msgid "AJHC_LIBRARY_PATH : This specifies the path to search for libraries."
+msgstr "AJHC_LIBRARY_PATH : ライブラリの検索パス"
 
 #. type: Plain text
 #: manual.mkd:58
 msgid ""
-"JHC_CACHE : This specified the directory jhc will use to cache values. "
-"having a valid cache is essential for jhc performance. It defaults to ~/."
+"AJHC_CACHE : This specified the directory Ajhc will use to cache values. "
+"having a valid cache is essential for Ajhc performance. It defaults to ~/."
 "ajhc/cache."
-msgstr "AJHC_CACHE : jhcがキャッシュとして使用するディレクトリ。キャッシュはjhcのパフォーマンス向上にはかかせない。既定値は~/.ajhc/cache。"
+msgstr ""
+"AJHC_CACHE : Ajhcがキャッシュとして使用するディレクトリ。キャッシュはAjhcのパ"
+"フォーマンス向上にはかかせない。既定値は~/.ajhc/cache。"
 
 #. type: Plain text
 #: manual.mkd:60
@@ -169,7 +172,7 @@ msgstr "## Haskellライブラリをビルドする"
 #. type: Plain text
 #: manual.mkd:63
 msgid ""
-"Libraries are built by passing jhc a file describing the library via the --"
+"Libraries are built by passing Ajhc a file describing the library via the --"
 "build-hl option. The library file format is a stadard YAML file."
 msgstr ""
 "ライブラリは--build-hlオプションで指定されたライブラリファイルの内容にもとづ"
@@ -179,8 +182,8 @@ msgstr ""
 #. type: Plain text
 #: manual.mkd:65
 #, no-wrap
-msgid "    ; jhc --build-hl mylibrary.yaml\n"
-msgstr "    ; jhc --build-hl mylibrary.yaml\n"
+msgid "    ; ajhc --build-hl mylibrary.yaml\n"
+msgstr "    ; ajhc --build-hl mylibrary.yaml\n"
 
 #. type: Plain text
 #: manual.mkd:67
@@ -190,11 +193,11 @@ msgstr "### ライブラリファイルのフォーマット"
 #. type: Plain text
 #: manual.mkd:70
 msgid ""
-"The library file is a YAML document, jhc will recognize several fields and "
+"The library file is a YAML document, Ajhc will recognize several fields and "
 "ignore unknown ones."
 msgstr ""
-"ライブラリファイルはYAMLフォーマットで、jhcは自分の理解できるフィールドだけを"
-"解釈し、残りは無視する。"
+"ライブラリファイルはYAMLフォーマットで、Ajhcは自分の理解できるフィールドだけ"
+"を解釈し、残りは無視する。"
 
 #. type: Plain text
 #: manual.mkd:73
@@ -206,10 +209,11 @@ msgstr "Name : ライブラリの名前"
 msgid ""
 "Version : The version of your library, The version number is used to "
 "differentiate different versions of the library passed to the '-p' command "
-"line option but is not otherwise special to jhc."
+"line option but is not otherwise special to Ajhc."
 msgstr ""
 "Version : ライブラリのバージョン。バージョン番号は'-p'コマンドラインオプショ"
-"ンを使う際に区別するために使われる。しかし、それ以外の用途にはjhcは使わない。"
+"ンを使う際に区別するために使われる。しかし、それ以外の用途にはAjhcは使わな"
+"い。"
 
 #. type: Plain text
 #: manual.mkd:83
@@ -227,28 +231,28 @@ msgstr ""
 #: manual.mkd:89
 msgid ""
 "Hidden-Modules : A list of modules that the library may use internally but "
-"that should not be exposed to the user. Jhc may optimize based on this "
-"information. If this list is not exhaustive jhc will still build your "
+"that should not be exposed to the user. Ajhc may optimize based on this "
+"information. If this list is not exhaustive Ajhc will still build your "
 "library, but it will print out a warning."
 msgstr ""
 "Hidden-Modules : ライブラリ内部で使用されるかもしれないが、公開インターフェイ"
-"スにはならない一連のモジュール。jhcはこの情報を元にして最適化を行なう。このリ"
-"ストがライブラリのビルドに網羅的でなければ、jhcはワーニングメッセージを出力す"
-"る。"
+"スにはならない一連のモジュール。Ajhcはこの情報を元にして最適化を行なう。この"
+"リストがライブラリのビルドに網羅的でなければ、Ajhcはワーニングメッセージを出"
+"力する。"
 
 #. type: Plain text
 #: manual.mkd:94
 msgid ""
 "Extensions : A list of extensions which should be enabled during compilation "
-"of this module. When possible, jhc will match ghc extensions to their "
-"closest jhc counterparts."
+"of this module. When possible, Ajhc will match ghc extensions to their "
+"closest Ajhc counterparts."
 msgstr ""
-"Extensions : このモジュールをコンパイルするのに必要な拡張のリスト。jhcはでき"
+"Extensions : このモジュールをコンパイルするのに必要な拡張のリスト。Ajhcはでき"
 "うるかぎりghc拡張と似た拡張を提供するつもりである。"
 
 #. type: Plain text
 #: manual.mkd:97
-msgid "Options : Extra command line options to jhc for this library build."
+msgid "Options : Extra command line options to Ajhc for this library build."
 msgstr "Options : ライブラリビルド時に使うその他のコマンドラインオプション"
 
 #. type: Plain text
@@ -321,16 +325,16 @@ msgstr "## 依存情報"
 #. type: Plain text
 #: manual.mkd:129
 msgid ""
-"Jhc can output dependency information describing how source files and "
+"Ajhc can output dependency information describing how source files and "
 "libraries depend on each other while compiling code. The dependency "
-"information is generated when the --deps name.yaml option is passed to jhc. "
+"information is generated when the --deps name.yaml option is passed to Ajhc. "
 "It is presented in the standard YAML format and its fields are as described "
 "below."
 msgstr ""
-"jhcは依存情報を出力できる。\n"
+"Ajhcは依存情報を出力できる。\n"
 "この依存情報はソースコードとライブラリがコンパイル時にその他の要素にどのよう"
 "に依存しているかを表現している。\n"
-"依存情報は--deps name.yamlオプションをjhcに入力するとname.yamlファイルに出力"
+"依存情報は--deps name.yamlオプションをAjhcに入力するとname.yamlファイルに出力"
 "される。\n"
 "この依存情報もまたYAMLフォーマットで、各項目な以下のような意味を持っている。"
 
@@ -385,7 +389,7 @@ msgid ""
 "                        --version-context         print version context info and exit\n"
 "                        --help                    print help information and exit\n"
 "                        --info                    show compiler configuration information and exit\n"
-"                        --purge-cache             clean out jhc compilation cache\n"
+"                        --purge-cache             clean out Ajhc compilation cache\n"
 "      -v                --verbose                 chatty output on stderr\n"
 "      -z                                          Increase verbosity of statistics\n"
 "      -d [no-]flag                                dump specified data during compilation\n"
@@ -417,7 +421,7 @@ msgid ""
 "                        --ignore-cache            Ignore existing compilation cache entries.\n"
 "                        --readonly-cache          Do not write new information to the compilation cache.\n"
 "                        --no-cache                Do not use or update the cache.\n"
-"                        --cache-dir=JHC_CACHE     Use a global cache located in the directory passed as an argument.\n"
+"                        --cache-dir=AJHC_CACHE    Use a global cache located in the directory passed as an argument.\n"
 "                        --stale=Module            Treat these modules as stale, even if they exist in the cache\n"
 "                        --list-libraries          List of installed libraries\n"
 "                        --tdir=dir/               specify the directory where all intermediate files/dumps will be placed.\n"
@@ -459,7 +463,7 @@ msgstr ""
 "                        --ignore-cache            コンパイルキャッシュを無視する\n"
 "                        --readonly-cache          コンパイルキャッシュに追加情報を書き込まない\n"
 "                        --no-cache                コンパイルキャッシュを使わず、書き込みも行なわない\n"
-"                        --cache-dir=AJHC_CACHE     指定したディレクトリをコンパイルキャッシュとして使う\n"
+"                        --cache-dir=AJHC_CACHE    指定したディレクトリをコンパイルキャッシュとして使う\n"
 "                        --stale=Module            指定したモジュールがコンパイルキャッシュにあっても古い情報として扱う\n"
 "                        --list-libraries          インストール済みライブラリを表示\n"
 "                        --tdir=dir/               中間生成物を出力するディレクトリを指定する\n"
@@ -510,11 +514,11 @@ msgstr "## コードオプション"
 #. type: Plain text
 #: manual.mkd:203
 msgid ""
-"Various options affecting how jhc interprets and compiles code can be "
+"Various options affecting how Ajhc interprets and compiles code can be "
 "controlled with the '-f' flag, the following options are availible, you can "
 "negate any particular one by prepending 'no-' to it."
 msgstr ""
-"jhcの解釈やコンパイルは'-f'フラグでコントロールできる。\n"
+"Ajhcの解釈やコンパイルは'-f'フラグでコントロールできる。\n"
 "これらのオプションを以下に列挙する。また、その効力は'no-'をフラグ名に付けるこ"
 "とで無効化できる。"
 
@@ -642,11 +646,11 @@ msgstr "## デバッグ情報のダンプ"
 #. type: Plain text
 #: manual.mkd:257
 msgid ""
-"You can have jhc print out a variety of things while running as Controlled "
+"You can have Ajhc print out a variety of things while running as Controlled "
 "by the '-d' flag. The following is a list of possible parameters you can "
 "pass to '-d'."
 msgstr ""
-"'-d'フラグ付きでjhcを起動することで各種パラメータを出力できる。\n"
+"'-d'フラグ付きでAjhcを起動することで各種パラメータを出力できる。\n"
 "次に挙げるのは'-d'フラグに渡すことができるパラメータのリストである。"
 
 #. type: Plain text
@@ -843,13 +847,13 @@ msgstr "# プラグマ"
 msgid ""
 "Pragmas are special compiler directives that change its behavior in certain "
 "ways. In general, each compiler is free to define its own pragmas however "
-"jhc does try to implement the same ones as other compilers when it makes "
+"Ajhc does try to implement the same ones as other compilers when it makes "
 "sense.  pragmas appear in source code as {-# PRAGMANAME ... #-}"
 msgstr ""
 "プラグマは特別なコンパイラへの指示で、コンパイラの挙動に特定の影響を与え"
 "る。\n"
 "一般的には、コンパイラは自由に独自のプラグを定義できる。\n"
-"しかしjhcでは他のコンパイラでも使われているものを実装しようと努めている。\n"
+"しかしAjhcでは他のコンパイラでも使われているものを実装しようと努めている。\n"
 "プラグマはソースコード中で {-# PRAGMANAME ... #-} のような形式で使われる。"
 
 #. type: Plain text
@@ -897,11 +901,11 @@ msgstr "## クラスプラグマ"
 msgid ""
 "Pragma\n"
 "------             ---------------------------------------------------\n"
-"_NOETA_            By default, jhc eta-expands all class methods to help enable optimizations. This disables this behavior.\n"
+"_NOETA_            By default, Ajhc eta-expands all class methods to help enable optimizations. This disables this behavior.\n"
 msgstr ""
 "プラグマ\n"
 "------             ---------------------------------------------------\n"
-"_NOETA_            デフォルトではjhcは最適化のために全てのクラスメソッドをイータ変換する。このプラグマはこの挙動を無効化する\n"
+"_NOETA_            デフォルトではAjhcは最適化のために全てのクラスメソッドをイータ変換する。このプラグマはこの挙動を無効化する\n"
 
 #. type: Plain text
 #: manual.mkd:365
@@ -1000,13 +1004,13 @@ msgstr "## モジュールのサーチパス"
 #. type: Plain text
 #: manual.mkd:406
 msgid ""
-"Modules in jhc are searched for based on their name as in other Haskell "
+"Modules in Ajhc are searched for based on their name as in other Haskell "
 "compilers. However in addition to searching for 'Data/Foo.hs' for the module "
-"'Data.Foo', jhc will also search for 'Data.Foo.hs'."
+"'Data.Foo', Ajhc will also search for 'Data.Foo.hs'."
 msgstr ""
-"他のHaskellコンパイラと同じように、jhcでのモジュールはその名前にもとづいて検"
+"他のHaskellコンパイラと同じように、Ajhcでのモジュールはその名前にもとづいて検"
 "索される。\n"
-"'Data.Foo'モジュールを検索するとjhcは'Data/Foo.hs'ファイルも検索するが、\n"
+"'Data.Foo'モジュールを検索するとAjhcは'Data/Foo.hs'ファイルも検索するが、\n"
 "'Data.Foo.hs'も同じく検索対象になる。\n"
 
 #. type: Plain text
@@ -1088,7 +1092,7 @@ msgid ""
 "The 'capi' calling convention may be used instead of 'ccall' for static "
 "imports. The convention means that the foreign function may not be "
 "addressable as an address, but rather may be implemnted as a macro, builtin, "
-"or other compiler specific feature. jhc will ensure that the routine is "
+"or other compiler specific feature. Ajhc will ensure that the routine is "
 "never used as a pointer and the headers specified in the dependency string "
 "are included anywhere the imported function appears. This differs from "
 "'ccall' in that ccall makes no guarentees the given header file will be in "
@@ -1097,8 +1101,8 @@ msgstr ""
 "呼び出し規約'capi'は'ccall'を使ってたimportのかわりに使われる。\n"
 "この規約を使うことで、foreignする対象はアドレス空間に実体がなくても良い。\n"
 "マクロやビルドイン関数もしくはその他コンパイラ独自の機能であっても良い。\n"
-"jhcはルーチンが決してポインタとしては使用されないこと、依存するヘッダをインク"
-"ルードすること保証する。\n"
+"Ajhcはルーチンが決してポインタとしては使用されないこと、依存するヘッダをイン"
+"クルードすること保証する。\n"
 "これは'ccall'と異なる。ccallはヘッダがスコープに入っているか、正しい名前のリ"
 "ンカのためのシンボルがエクスポートされているか、なんの保証もしない。"
 
@@ -1112,14 +1116,14 @@ msgstr "### パッケージに関連した依存"
 msgid ""
 "dependecies in a foreign import may be written as p:foo.c or p:foo.h, this "
 "means that the file should be interpreted as part of the internal "
-"implementation of the package. jhc willl ensure the files do not clash with "
+"implementation of the package. Ajhc willl ensure the files do not clash with "
 "those of other packages that may have the same name. The files should be "
 "listed in the c-files and c-headers sections of the library config file."
 msgstr ""
 "p:foo.c や p:foo.h と書かれたforeign importはそのファイルがパッケージ内部実装"
 "の一部として解釈されることを意味している。\n"
-"jhcはそれらのファイルが同じ名前を持っていても他のパッケージと衝突しないことを"
-"保証する。\n"
+"Ajhcはそれらのファイルが同じ名前を持っていても他のパッケージと衝突しないこと"
+"を保証する。\n"
 "それらのファイルはライブラリファイルのc-filesとc-headersの項目に列挙されるべ"
 "きである。"
 
@@ -1131,10 +1135,10 @@ msgstr "## import/exportされる名前空間"
 #. type: Plain text
 #: manual.mkd:455
 msgid ""
-"jhc allows explicit namespaces in import and export lists. These may be used "
-"to restrict or modiy what is imported/exported by a declaration."
+"Ajhc allows explicit namespaces in import and export lists. These may be "
+"used to restrict or modiy what is imported/exported by a declaration."
 msgstr ""
-"jhcはimportやexportする際の名前空間を持つ。\n"
+"Ajhcはimportやexportする際の名前空間を持つ。\n"
 "これらはimport/export宣言によって制限されたり修正されたりする。"
 
 #. type: Plain text
@@ -1170,10 +1174,10 @@ msgstr "## ユーザ定義された種"
 #. type: Plain text
 #: manual.mkd:470
 msgid ""
-"Jhc allows users to define custom kinds when the -fuser-kinds extension is "
+"Ajhc allows users to define custom kinds when the -fuser-kinds extension is "
 "enabled. The syntax is:"
 msgstr ""
-"-fuser-kindsオプションが有効な場合、jhcはユーザ定義の種を使用可能にする。\n"
+"-fuser-kindsオプションが有効な場合、Ajhcはユーザ定義の種を使用可能にする。\n"
 "その文法は:"
 
 #. type: Plain text
@@ -1204,8 +1208,8 @@ msgstr "## 独立deriving"
 #. type: Plain text
 #: manual.mkd:482
 msgid ""
-"Jhc supports a standalone deriving mechanism under certain circumstances."
-msgstr "jhcはある環境下にて独立derivingをサポートする。"
+"Ajhc supports a standalone deriving mechanism under certain circumstances."
+msgstr "Ajhcはある環境下にて独立derivingをサポートする。"
 
 #. type: Plain text
 #: manual.mkd:484
@@ -1215,14 +1219,15 @@ msgstr "## ランクN多相性"
 #. type: Plain text
 #: manual.mkd:490
 msgid ""
-"Jhc supports higher ranked polymorphism. jhc will never infer types of "
+"Ajhc supports higher ranked polymorphism. Ajhc will never infer types of "
 "higher rank, however when the context unambiguously specifies a higher "
 "ranked type, it will be used. For instance, user supplied type annotations "
 "and arguments to data constructors defined to by polymorphic will get the "
 "correct polymorphic type."
 msgstr ""
-"jhcは高ランク多相性をサポートする。\n"
-"文脈が高ランク多相型を明確に指定しても、jhcは高ランクの型推論を行なわない。\n"
+"Ajhcは高ランク多相性をサポートする。\n"
+"文脈が高ランク多相型を明確に指定しても、Ajhcは高ランクの型推論を行なわな"
+"い。\n"
 "例えば、型注釈と多相として定義されたデータコンストラクタへの引数を与えれば、"
 "正しい多相型が手に入る。"
 
@@ -1234,10 +1239,10 @@ msgstr "## 存在型"
 #. type: Plain text
 #: manual.mkd:495
 msgid ""
-"Jhc supports first class existential types, using the 'exists' keyword. It "
+"Ajhc supports first class existential types, using the 'exists' keyword. It "
 "also supports existential data types in a similar fashion to ghc."
 msgstr ""
-"jhcはファーストスラスの存在型をサポートする。\n"
+"Ajhcはファーストスラスの存在型をサポートする。\n"
 "それは'exists'キーワードで使用できる。\n"
 "また存在データ型はghcと似た方法でサポートしている。"
 
@@ -1249,7 +1254,7 @@ msgstr "## アンボックス化された値"
 #. type: Plain text
 #: manual.mkd:505
 msgid ""
-"Unboxed values in jhc are specified in a similar fashion to GHC however the "
+"Unboxed values in Ajhc are specified in a similar fashion to GHC however the "
 "lexical syntax is not changed to allow # in identifiers. # is still used in "
 "the syntax for various unboxed constructs, but normal Haskell rules apply to "
 "haskell identifiers. The convention is to suffix such types with '_' to "
@@ -1257,7 +1262,7 @@ msgid ""
 "tuples are enabled by the -funboxed-value flag. For compatibility with GHC, "
 "the MagicHash extension name also turns on unboxed-values."
 msgstr ""
-"jhcでのアンボックス化された値はGHCと同様に指定できる。\n"
+"Ajhcでのアンボックス化された値はGHCと同様に指定できる。\n"
 "ただし、# をその識別子としては使用しない。\n"
 "各種アンボックス化されたコンストラクタのための構文として # はまだ使われている"
 "が、\n"
@@ -1276,12 +1281,12 @@ msgstr "### アンボックス化タプル"
 #. type: Plain text
 #: manual.mkd:512
 msgid ""
-"Jhc supports unboxed tuples with the same syntax as GHC, (# 2, 4 #) is an "
+"Ajhc supports unboxed tuples with the same syntax as GHC, (# 2, 4 #) is an "
 "unboxed tuple of two numbers. Unboxed tuples are enabled with -funboxed-"
 "tuples.  Unboxed tuples are kind-polymorphic, able to hold both boxed and "
 "unboxed values.  (but not another unboxed tuple)"
 msgstr ""
-"jhcはGHCと同じ文法でアンボックス化タプルをサポートする。(# 2, 4 #) は2つの数"
+"AjhcはGHCと同じ文法でアンボックス化タプルをサポートする。(# 2, 4 #) は2つの数"
 "値を持つアンボックス化タプルである。\n"
 "アンボックス化タプルは-funboxed-tuplesオプションによって有効にできる。\n"
 "アンボックス化タプルは種多相であり、ボックス化とアンボックス化の両方おん値を"
@@ -1329,7 +1334,7 @@ msgstr "### アンボックス化数値"
 #: manual.mkd:534
 msgid ""
 "Unboxed numbers are enabled with the -funboxed-values flag. They are "
-"postpended with a '#' such as in 3# or 4#. Jhc supports a limited form of "
+"postpended with a '#' such as in 3# or 4#. Ajhc supports a limited form of "
 "type inference for unboxed numbers, if the type is fully specified by the "
 "environment and it is a suitable unboxed numeric type then that type is "
 "used. Otherwise it defaults to Int__. Whether the type is fully specifed "
@@ -1340,7 +1345,7 @@ msgstr ""
 "アンボックス化数値は-funboxed-valuesフラグによって有効になる。\n"
 "それらは 3# や 4# のように'#'を付けて表現する。\n"
 "もし型が環境によって完全に指定されてて、かつそれが適切なアンボックス化数値型"
-"であるなら、jhcは型推論を限定的にサポートする。\n"
+"であるなら、Ajhcは型推論を限定的にサポートする。\n"
 "そうでない場合にはInt__をデフォルトとして使用する。\n"
 "型が完全に指定されているかどうかにかかわらず、ランクN型として同じルールが適用"
 "される。\n"
@@ -1721,26 +1726,26 @@ msgstr "## 基本"
 #. type: Plain text
 #: manual.mkd:698
 msgid ""
-"Unlike many other compilers, jhc is a native cross compiler. What this means "
-"is that every compile of jhc is able to create code for all possible target "
-"systems. This leads to many simplifications when it comes to cross compiling "
-"with jhc. Basically in order to cross compile, you need only pass the flag "
-"'--cross' to jhc, and pass an appropriate '-m' option to tell jhc what "
-"machine you are targetting. An example would be"
+"Unlike many other compilers, Ajhc is a native cross compiler. What this "
+"means is that every compile of Ajhc is able to create code for all possible "
+"target systems. This leads to many simplifications when it comes to cross "
+"compiling with Ajhc. Basically in order to cross compile, you need only pass "
+"the flag '--cross' to Ajhc, and pass an appropriate '-m' option to tell Ajhc "
+"what machine you are targetting. An example would be"
 msgstr ""
-"他の多くのコンパイラと異なり、jhcは生来のクロスコンパイラである。\n"
-"これが意味することは、jhcによるコンパイルによって、どんなターゲットシステムの"
-"ためのコードも生成できるということである。\n"
-"これにより、jhcを利用したクロスコンパイルが非常に簡単になる。\n"
-"基本的には、クロスコンパイルを行うためにはjhcに '--cross' フラグと、\n"
+"他の多くのコンパイラと異なり、Ajhcは生来のクロスコンパイラである。\n"
+"これが意味することは、Ajhcによるコンパイルによって、どんなターゲットシステム"
+"のためのコードも生成できるということである。\n"
+"これにより、Ajhcを利用したクロスコンパイルが非常に簡単になる。\n"
+"基本的には、クロスコンパイルを行うためにはAjhcに '--cross' フラグと、\n"
 "ターゲットマシンを指定するオプション '-m'を渡せば良い。\n"
 "以下がその例である。"
 
 #. type: Plain text
 #: manual.mkd:700
 #, no-wrap
-msgid "    ; jhc --cross -mwin32 test/HelloWorld.hs\n"
-msgstr "    ; jhc --cross -mwin32 test/HelloWorld.hs\n"
+msgid "    ; ajhc --cross -mwin32 test/HelloWorld.hs\n"
+msgstr "    ; ajhc --cross -mwin32 test/HelloWorld.hs\n"
 
 #. type: Plain text
 #: manual.mkd:703
@@ -1820,38 +1825,43 @@ msgid ""
 "This sets the compiler to use as well as a few other options then jumps to "
 "the generic i686 routine. The special target [default] is always read before "
 "all other targets. If '--cross' is specified on the command line then this "
-"is the only implicitly included configuration, otherwise jhc will assume you "
-"are compiling for the current architecture and choose an appropriate target "
-"to include in addition to default."
+"is the only implicitly included configuration, otherwise Ajhc will assume "
+"you are compiling for the current architecture and choose an appropriate "
+"target to include in addition to default."
 msgstr ""
 "上記は一般のi686設定を使って少々の他のオプションをコンパイラに設定してい"
 "る。\n"
 "特別なターゲットである[default]は常に他のターゲットより先に読み込まれる。\n"
 "もしコマンドラインから'--cross'が指定されたら暗黙にこの設定を読み込む。\n"
-"さもなければjhcは現アーキティクチャをコンパイル対象としてみなして、\n"
+"さもなければAjhcは現アーキティクチャをコンパイル対象としてみなして、\n"
 "defaultに追加して適切なターゲットを選択する。"
 
 #. type: Plain text
 #: manual.mkd:734
-msgid "jhc will attempt to read several targets.ini files in order. they are"
+msgid "Ajhc will attempt to read several targets.ini files in order. they are"
 msgstr ""
-"jhcは複数のtargets.iniファイルを順に読み込もう試みる。\n"
+"Ajhcは複数のtargets.iniファイルを順に読み込もう試みる。\n"
 "それらのファイルは以下である。"
 
 #. type: Plain text
 #: manual.mkd:737
 msgid ""
 "$PREFIX/etc/ajhc-\\$VERSION/targets.ini : this is the targets.ini that is "
-"included with jhc and contains the default options."
-msgstr "$PREFIX/etc/ajhc-\\$VERSION/targets.ini : このtargets.iniファイルはjhcによって読み込まれ、既定のオプションを含む。"
+"included with Ajhc and contains the default options."
+msgstr ""
+"$PREFIX/etc/ajhc-\\$VERSION/targets.ini : このtargets.iniファイルはAjhcによっ"
+"て読み込まれ、既定のオプションを含む。"
 
 #. type: Plain text
 #: manual.mkd:740
 msgid ""
-"$PREFIX/etc/ajhc-\\$VERSION/targets-local.ini : jhc will read this if it "
+"$PREFIX/etc/ajhc-\\$VERSION/targets-local.ini : Ajhc will read this if it "
 "exists, it is used to specify custom system wide configuration options, such "
 "as the name of local compilers."
-msgstr "$PREFIX/etc/ajhc-\\$VERSION/targets-local.ini : jhcは存在すればこのファイルを読み込む。このファイルはローカルのコンパイラのようなシステムグローバルのカスタム設定を含む。"
+msgstr ""
+"$PREFIX/etc/ajhc-\\$VERSION/targets-local.ini : Ajhcは存在すればこのファイル"
+"を読み込む。このファイルはローカルのコンパイラのようなシステムグローバルのカ"
+"スタム設定を含む。"
 
 #. type: Plain text
 #: manual.mkd:743
@@ -1865,7 +1875,9 @@ msgstr "$HOME/.ajhc/targets.ini : ユーザローカルの設定"
 msgid ""
 "$HOME/etc/ajhc/targets.ini : this is simply for people that prefer to not "
 "use hidden directories for configuration"
-msgstr "$HOME/etc/ajhc/targets.ini : このファイルは隠し属性のディレクトリを嫌う人向けのものである"
+msgstr ""
+"$HOME/etc/ajhc/targets.ini : このファイルは隠し属性のディレクトリを嫌う人向け"
+"のものである"
 
 #. type: Plain text
 #: manual.mkd:750
@@ -1920,19 +1932,38 @@ msgstr ""
 "_arch_                    gccに渡すアーキティクチャ名\n"
 
 #. type: Plain text
-#: manual.mkd:771
+#: manual.mkd:770
+msgid "## Special defines to set cflags"
+msgstr ""
+
+#. type: Plain text
+#: manual.mkd:779
+#, no-wrap
+msgid ""
+"Define                             Meaning\n"
+"------                             ---------------------------------------------------------------------------\n"
+"\\_JHC\\_ARM\\_STAY\\_IN\\_THUMB\\_MODE  set bit0 to any function pointers, for Cortex-M*. ([more detail](http://communities.mentor.com/community/cs/archives/arm-gnu/msg01904.html))\n"
+"\\_JHC\\_JGC\\_NAIVEGC                run gc when have no more blocks.\n"
+"\\_JHC\\_JGC\\_STACKGROW              number of stack entry growed when run short of it.\n"
+"\\_JHC\\_JGC\\_FIXED\\_MEGABLOCK       use a single megablock without allocation megablock.\n"
+"\\_JHC\\_JGC\\_BLOCK\\_SHIFT           bit shift to specify block size. Use it internally like this: (1 << (_JHC_JGC_BLOCK_SHIFT)).\n"
+"\\_JHC\\_JGC\\_MEGABLOCK\\_SHIFT       bit shift to specify megablock size. Use it internally like this: (1 << (_JHC_JGC_MEGABLOCK_SHIFT)).\n"
+msgstr ""
+
+#. type: Plain text
+#: manual.mkd:782
 msgid "# Internals"
 msgstr "# 内部設計"
 
 #. type: Plain text
-#: manual.mkd:774
+#: manual.mkd:785
 msgid "## The Run Time System"
 msgstr "## ランタイムシステム"
 
 #. type: Plain text
-#: manual.mkd:783
+#: manual.mkd:794
 msgid ""
-"Jhc is very minimalist in that it does not have a precompiled run time "
+"Ajhc is very minimalist in that it does not have a precompiled run time "
 "system, but rather generates what is needed as part of the compilation "
 "process.  However, back ends do have specific run-time representations of "
 "data, which can be affected by things like the choice of garbage collector. "
@@ -1941,7 +1972,7 @@ msgid ""
 "program analysis, will affect which features are used and whether certain "
 "optimized layouts are possible."
 msgstr ""
-"jhcは強いミニマリストであり、あらかじめコンパイルされたランタイムを持たな"
+"Ajhcは強いミニマリストであり、あらかじめコンパイルされたランタイムを持たな"
 "い。\n"
 "ランタイムはコンパイル時に必要になった際に生成される。\n"
 "けれどもバックエンドは、GCの選択のように、ランタイム特定のデータ表現を持"
@@ -1951,7 +1982,7 @@ msgstr ""
 "われて、最適化されたレイアウトが使用できるかに影響を及ぼす。"
 
 #. type: Plain text
-#: manual.mkd:791
+#: manual.mkd:802
 msgid ""
 "Unboxed values directly translate to values in the target language, an "
 "unboxed Int will translate directly into an 'int' as an argument and an "
@@ -1972,7 +2003,7 @@ msgstr ""
 "値を取り扱うのは悪い考えではない。"
 
 #. type: Plain text
-#: manual.mkd:797
+#: manual.mkd:808
 msgid ""
 "Boxed values have a standard representation and can be followed. Unlike some "
 "other implementation, being boxed does not imply the object is located on "
@@ -1991,25 +2022,25 @@ msgstr ""
 "実際には伝統的なポインタであるかもしれないのだ。"
 
 #. type: Plain text
-#: manual.mkd:801
+#: manual.mkd:812
 msgid ""
-"A boxed value in jhc is represented by a 'smart pointer' of c type sptr_t. a "
-"smart pointer is the size of a native pointer, but can take on different "
+"A boxed value in Ajhc is represented by a 'smart pointer' of c type sptr_t. "
+"a smart pointer is the size of a native pointer, but can take on different "
 "roles depending on a pair of tag bits, called the ptype."
 msgstr ""
-"jhcにおけるボックス化された値はC言語型のsptr_tという'スマートポインタ'であ"
+"Ajhcにおけるボックス化された値はC言語型のsptr_tという'スマートポインタ'であ"
 "る。\n"
 "スマートポインタは通常のポインタと同じサイズを持つが、\n"
 "1つのペアのタグビットで表わされる別の役割もおっている。\n"
 "それはptypeと呼ばれる。"
 
 #. type: Plain text
-#: manual.mkd:803
+#: manual.mkd:814
 msgid "smart pointers take on a general form as follows:"
 msgstr "スマートポインタは一般に以下の形をしている:"
 
 #. type: Plain text
-#: manual.mkd:807
+#: manual.mkd:818
 #, no-wrap
 msgid ""
 "    -------------------------\n"
@@ -2021,7 +2052,7 @@ msgstr ""
 "    -------------------------\n"
 
 #. type: Plain text
-#: manual.mkd:810
+#: manual.mkd:821
 #, no-wrap
 msgid ""
 "      G - if set, then the garbage collector should not treat value as a pointer to be followed\n"
@@ -2031,37 +2062,37 @@ msgstr ""
 "      L - 遅延。このビットがセットされると値はWHNFではないことを示す\n"
 
 #. type: Plain text
-#: manual.mkd:812
+#: manual.mkd:823
 msgid ""
 "A sptr_t on its own in the wild can only take on one of the following forms:"
 msgstr "sptr_tは以下の形の内どれか一つの状態にある:"
 
 #. type: Plain text
-#: manual.mkd:816
-#, no-wrap
-msgid ""
-"    -------------------------\n"
-"    |    whnf raw value | 10|\n"
-"    -------------------------\n"
-msgstr ""
-"    -------------------------\n"
-"    |    whnf raw value | 10|\n"
-"    -------------------------\n"
-
-#. type: Plain text
-#: manual.mkd:820
-#, no-wrap
-msgid ""
-"    -------------------------\n"
-"    |    whnf location  | 00|\n"
-"    -------------------------\n"
-msgstr ""
-"    -------------------------\n"
-"    |    whnf location  | 00|\n"
-"    -------------------------\n"
-
-#. type: Plain text
 #: manual.mkd:827
+#, no-wrap
+msgid ""
+"    -------------------------\n"
+"    |    whnf raw value | 10|\n"
+"    -------------------------\n"
+msgstr ""
+"    -------------------------\n"
+"    |    whnf raw value | 10|\n"
+"    -------------------------\n"
+
+#. type: Plain text
+#: manual.mkd:831
+#, no-wrap
+msgid ""
+"    -------------------------\n"
+"    |    whnf location  | 00|\n"
+"    -------------------------\n"
+msgstr ""
+"    -------------------------\n"
+"    |    whnf location  | 00|\n"
+"    -------------------------\n"
+
+#. type: Plain text
+#: manual.mkd:838
 msgid ""
 "WHNF stands for 'Weak Head Normal Form' and means that the value is not a "
 "suspended function and hence not a pointer to a thunk. It may be directly "
@@ -2078,7 +2109,7 @@ msgstr ""
 "値がWHNFであり高価な'eval'をスキップできるかどうかを静的に知ることができる。"
 
 #. type: Plain text
-#: manual.mkd:833
+#: manual.mkd:844
 msgid ""
 "The difference between the raw value and the whnf location is that the first "
 "contains uninterpreted bits, while the second is a pointer to a location on "
@@ -2094,7 +2125,7 @@ msgstr ""
 "いちがいに決まってはいない。"
 
 #. type: Plain text
-#: manual.mkd:837
+#: manual.mkd:848
 msgid ""
 "Partial (unsaturated) applications are normal WHNF values. Saturated "
 "applications which may be 'eval'ed and updated are called thunks and must "
@@ -2106,7 +2137,7 @@ msgstr ""
 "これらの表現は以下である。"
 
 #. type: Plain text
-#: manual.mkd:841
+#: manual.mkd:852
 #, no-wrap
 msgid ""
 "    -------------------------\n"
@@ -2118,7 +2149,7 @@ msgstr ""
 "    -------------------------\n"
 
 #. type: Plain text
-#: manual.mkd:847
+#: manual.mkd:858
 msgid ""
 "A lazy location points to either a thunk, or a redirection to a WHNF value. "
 "A lazy location is always a pointer to an allocated block of memory which "
@@ -2135,7 +2166,7 @@ msgstr ""
 "それらはオブジェクトとして流通することはない。"
 
 #. type: Plain text
-#: manual.mkd:852
+#: manual.mkd:863
 msgid ""
 "A fptr_t may be a whnf value or a code pointer. If a fptr_t is a whnf value "
 "(of one of the two forms given above) then it is called a redirection, the "
@@ -2149,7 +2180,7 @@ msgstr ""
 "これは評価済みサンクへのリダイレクトとして使われる。"
 
 #. type: Plain text
-#: manual.mkd:858
+#: manual.mkd:869
 msgid ""
 "A fptr_t may also be a 'code pointer' in which case the lazy location is "
 "called a thunk. A code pointer is a pointer to executable machine code that "
@@ -2167,7 +2198,7 @@ msgstr ""
 "指示されたコードはこのリダイレクションを実行する責任がある。"
 
 #. type: Plain text
-#: manual.mkd:863
+#: manual.mkd:874
 #, no-wrap
 msgid ""
 "    -------------------------\n"
@@ -2181,7 +2212,7 @@ msgstr ""
 "    |     data ...          |\n"
 
 #. type: Plain text
-#: manual.mkd:866
+#: manual.mkd:877
 msgid ""
 "When debugging, the special code pointer BLACK_HOLE is also sometimes stored "
 "in a fptr_t to detect certain run-time errors."
@@ -2190,7 +2221,7 @@ msgstr ""
 "これはある種のランタイムエラーを検出する。"
 
 #. type: Plain text
-#: manual.mkd:870
+#: manual.mkd:881
 msgid ""
 "Note that unlike other implementations, a fptr_t may _not_ be another lazy "
 "location. you can not have chained redirections, a redirection is always a "
@@ -2201,7 +2232,7 @@ msgstr ""
 "リダイレクションは常にWHNF値へのリダイレクションでなければならない。"
 
 #. type: Plain text
-#: manual.mkd:874
+#: manual.mkd:885
 #, no-wrap
 msgid ""
 "    sptr_t - a tagged smart pointer, may contain a whnf value or a lazy location.\n"
@@ -2213,23 +2244,23 @@ msgstr ""
 "    fptr_t - タグ付けされたスマートポインタ。リダイレクションを示すWHNF値かサンクを示すコードポインタを保持する。\n"
 
 #. type: Plain text
-#: manual.mkd:878
-msgid "## Jhc Core Type System"
-msgstr "## jhcコア型システム"
+#: manual.mkd:889
+msgid "## Ajhc Core Type System"
+msgstr "## Ajhcコア型システム"
 
 #. type: Plain text
-#: manual.mkd:882
+#: manual.mkd:893
 msgid ""
-"Jhc's core is based on a pure type system. A pure type system (also called a "
-"PTS) is actually a parameterized set of type systems. Jhc's version is "
+"Ajhc's core is based on a pure type system. A pure type system (also called "
+"a PTS) is actually a parameterized set of type systems. Ajhc's version is "
 "described by the following."
 msgstr ""
-"jhcのコアは純粋なpure type systemにもとづいている。\n"
+"Ajhcのコアは純粋なpure type systemにもとづいている。\n"
 "pure type system (PTS)は型システムのパラメータ化されたセットである。\n"
-"jhcのPTSについて以下で解説する。"
+"AjhcのPTSについて以下で解説する。"
 
 #. type: Plain text
-#: manual.mkd:885
+#: manual.mkd:896
 #, no-wrap
 msgid ""
 "    Sorts  = (*, !, **, #, (#), ##, □)\n"
@@ -2239,7 +2270,7 @@ msgstr ""
 "    公理 = (*:**, #:##, !:**, **:□, ##:□)\n"
 
 #. type: Plain text
-#: manual.mkd:896
+#: manual.mkd:907
 #, no-wrap
 msgid ""
 "    -- sort kind\n"
@@ -2265,13 +2296,13 @@ msgstr ""
 "    □   superkindの存在位置\n"
 
 #. type: Plain text
-#: manual.mkd:898
+#: manual.mkd:909
 #, no-wrap
 msgid "    in addition there exist user defined kinds, which are always of supersort ##\n"
 msgstr "    ユーザ定義の種の存在に加えて、supersort ##が存在する。\n"
 
 #. type: Plain text
-#: manual.mkd:903
+#: manual.mkd:914
 msgid ""
 "The following Rules table shows what sort of abstractions are allowed, a "
 "rule of the form (A,B,C) means you can have functions of things of sort A to "
@@ -2284,7 +2315,7 @@ msgstr ""
 "この文脈での _関数_ は項と型レベルの抽象を含んでいる。"
 
 #. type: Plain text
-#: manual.mkd:908
+#: manual.mkd:919
 msgid ""
 "Notice that functions are always boxed, but may be strict if they take an "
 "unboxed tuple as an argument.  When a function is strict it means that it is "
@@ -2297,7 +2328,7 @@ msgstr ""
 "関数の評価が中断された値であることはありえない。"
 
 #. type: Plain text
-#: manual.mkd:915
+#: manual.mkd:926
 msgid ""
 "These type system rules apply to lambda abstractions. It is possible that "
 "data constructors might exist that cannot be given a type on their own with "
@@ -2314,7 +2345,7 @@ msgstr ""
 "を正しく推論するのは困難ではない。"
 
 #. type: Plain text
-#: manual.mkd:918
+#: manual.mkd:929
 #, no-wrap
 msgid ""
 "    as a shortcut we will use *# to mean every combination involving * and #, and so forth.\n"
@@ -2324,7 +2355,7 @@ msgstr ""
 "    例えば、 (*#,*#,*) は (*,*,*) (#,*,*) (*,#,*) (#,#,*) のセットを意味している。\n"
 
 #. type: Plain text
-#: manual.mkd:930
+#: manual.mkd:941
 #, no-wrap
 msgid ""
 "    Rules =\n"
@@ -2352,30 +2383,30 @@ msgstr ""
 "       (##,##,##)  -- Complex_ :: # -> #\n"
 
 #. type: Plain text
-#: manual.mkd:932
+#: manual.mkd:943
 #, no-wrap
 msgid "    The defining feature of boxed values is\n"
 msgstr "    ボックス化値の定義は以下である。\n"
 
 #. type: Plain text
-#: manual.mkd:934
+#: manual.mkd:945
 #, no-wrap
 msgid "    _|_ :: t iff t::*\n"
 msgstr "    _|_ :: t iff t::*\n"
 
 #. type: Plain text
-#: manual.mkd:936
+#: manual.mkd:947
 #, no-wrap
 msgid "    This PTS is functional but not injective\n"
 msgstr "    このPTSは関数的であるが単射ではない。\n"
 
 #. type: Plain text
-#: manual.mkd:938
+#: manual.mkd:949
 msgid "The PTS can be considered stratified into the following levels"
 msgstr "このPTSは次のレベルに階層化されている。"
 
 #. type: Plain text
-#: manual.mkd:944
+#: manual.mkd:955
 #, no-wrap
 msgid ""
 "    □                - sort box\n"
@@ -2391,12 +2422,12 @@ msgstr ""
 "    3,True,\"bob\"     - 種類value(値)\n"
 
 #. type: Plain text
-#: manual.mkd:946
+#: manual.mkd:957
 msgid "### On boxed kinds"
 msgstr "### ボックス化kind(種)について"
 
 #. type: Plain text
-#: manual.mkd:950
+#: manual.mkd:961
 msgid ""
 "The boxed kinds (* and !) represent types that have a uniform run time "
 "representation. Due to this, functions may be written that are polymorphic "
@@ -2409,7 +2440,7 @@ msgstr ""
 "ことができる。"
 
 #. type: Plain text
-#: manual.mkd:954
+#: manual.mkd:965
 msgid ""
 "the unboxed kind # is inhabited with types that have their own specific run "
 "time representation. Hence you cannot write functions that are polymorphic "
@@ -2419,12 +2450,12 @@ msgstr ""
 "アンボックス化型を多相的に使う関数を書くことはできない。"
 
 #. type: Plain text
-#: manual.mkd:956
+#: manual.mkd:967
 msgid "### On sort box, the unboxed tuple, and friends"
 msgstr "### 種類box、アンボックス化タプルとその同類について"
 
 #. type: Plain text
-#: manual.mkd:962
+#: manual.mkd:973
 msgid ""
 "Although sort box does not appear in the code, it is useful from a "
 "theoretical point of view to talk about certain types such as the types of "
@@ -2442,13 +2473,13 @@ msgstr ""
 "(これはアンボックス化2タプルのケースである)"
 
 #. type: Plain text
-#: manual.mkd:964
+#: manual.mkd:975
 #, no-wrap
 msgid "    ∀s1:□ ∀s2:□ ∀k1:s1 ∀k2:s2 ∀t1:k1 ∀t2:k2 . (# t1, t2 #)\n"
 msgstr "    ∀s1:□ ∀s2:□ ∀k1:s1 ∀k2:s2 ∀t1:k1 ∀t2:k2 . (# t1, t2 #)\n"
 
 #. type: Plain text
-#: manual.mkd:970
+#: manual.mkd:981
 msgid ""
 "However, although this is a valid typing of what it would mean if a unboxed "
 "tuple were not fully applied, since we do not have any rules of form "
@@ -2463,12 +2494,12 @@ msgstr ""
 "のコード表現もまた不要になる。"
 
 #. type: Plain text
-#: manual.mkd:972
+#: manual.mkd:983
 msgid "#### Do we need a superbox?"
 msgstr "#### superboxは必要か？"
 
 #. type: Plain text
-#: manual.mkd:975
+#: manual.mkd:986
 msgid ""
 "You will notice that if you look at the axioms involving the sorts, you end "
 "up with a disjoint graph"
@@ -2477,7 +2508,7 @@ msgstr ""
 "れない。"
 
 #. type: Plain text
-#: manual.mkd:981
+#: manual.mkd:992
 #, no-wrap
 msgid ""
 "             □             - the box\n"
@@ -2493,7 +2524,7 @@ msgstr ""
 "         *  !     #   (#)  - kind(種)\n"
 
 #. type: Plain text
-#: manual.mkd:986
+#: manual.mkd:997
 msgid ""
 "This is simply due to the fact that nothing is polymorphic in unboxed tuples "
 "of kind (#) so we never need to refer to any super-sorts of them. We can add "
@@ -2506,7 +2537,7 @@ msgstr ""
 "これらの種類は決してコードや論文には現われないが、気にしないことにする。"
 
 #. type: Plain text
-#: manual.mkd:994
+#: manual.mkd:1005
 #, no-wrap
 msgid ""
 "               □□            - sort superbox\n"
