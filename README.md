@@ -24,3 +24,27 @@ Please use the arafura branch, rather than master branch.
 
 * [master branch](https://github.com/ajhc/ajhc/tree/master): Do not touch me, mirror of [jhc's darcs repository](http://repetae.net/dw/darcsweb.cgi?r=jhc).
 * [arafura branch](https://github.com/ajhc/ajhc/tree/arafura): For developing Ajhc.
+
+## Future plan
+
+### Done
+
+* Try to rewrite a part of NetBSD bootloader.
+  http://www.youtube.com/watch?v=JMyxy5Qo2m8
+* Translate Jhc User’s Manual to Japanese.
+  http://metasepi.masterq.net/posts/2013-01-12-jhc_manual_ja.html
+* Fix bug that run stm32f3-discovery demo. It causes Ajhc RTS heep impl.
+  https://github.com/ajhc/demo-cortex-m3/tree/master/stm32f3-discovery
+
+### Yet
+
+* Rewrite Cortex-M3 base library with Ajhc.
+* Pass all regress test, and enable regress fail setting on travis-ci.
+  https://travis-ci.org/ajhc/ajhc
+* Analyze jhc internal (Japanese doc).
+  http://metasepi.masterq.net/posts/2013-01-31-jhc_internal_overview.html
+  http://metasepi.masterq.net/posts/2013-02-14-jhc_grin_to_c.html
+* Find critical region of Ajhc for reentrant and thread safe.
+* Understand jhc's region inference.
+* Find the method to implement GC that can be interrupted.
+* Rewrite NetBSD kernel with Ajhc.
