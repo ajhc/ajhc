@@ -1,3 +1,6 @@
+branches:
+  except:
+    - master
 before_install:
   - date
   - uname -a
