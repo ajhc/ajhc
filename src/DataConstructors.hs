@@ -412,6 +412,10 @@ lookupExtTypeInfo dataTable oe = f Set.empty oe where
             Just (ExtTypeBoxed _ _ (ExtType et)) -> return $ ExtTypeBoxed b t (ExtType $ et `mappend` "*")
             Just (ExtTypeRaw (ExtType et)) -> return $ ExtTypeBoxed b t (ExtType $ et `mappend` "*")
             _ -> return $ ExtTypeBoxed b t "HsPtr"
+    f seen e@(ELit LitCons { litName = c, litArgs = [ta] }) | c == tc_Complex = do
+        case f seen ta of
+            Just (ExtTypeRaw (ExtType et)) -> return $ ExtTypeRaw (ExtType $ "_Complex " `mappend` et)
+            _ -> fail "invalid _Complex type"
     f seen e@(ELit LitCons { litName = c }) | Just (conCTYPE -> Just et) <- getConstructor c dataTable = do
         return $ case g seen e of
             Just (ExtTypeBoxed b t _) -> ExtTypeBoxed b t et
