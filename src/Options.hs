@@ -135,6 +135,17 @@ _bits_                    the number of bits a pointer contains on this architec
 _bits\_max_               the number of bits in the largest integral type. should be the number of bits in the 'intmax_t' C type.
 _arch_                    what to pass to gcc as the architecture
 
+# Special defines to set cflags
+
+Define                             Meaning
+------                             ---------------------------------------------------------------------------
+\_JHC\_ARM\_STAY\_IN\_THUMB\_MODE  set bit0 to any function pointers, for Cortex-M*. ([more detail](http://communities.mentor.com/community/cs/archives/arm-gnu/msg01904.html))
+\_JHC\_JGC\_NAIVEGC                run gc when have no more blocks.
+\_JHC\_JGC\_STACKGROW              number of stack entry growed when run short of it.
+\_JHC\_JGC\_FIXED\_MEGABLOCK       use a single megablock without allocation megablock.
+\_JHC\_JGC\_BLOCK\_SHIFT           bit shift to specify block size. Use it internally like this: (1 << (_JHC_JGC_BLOCK_SHIFT)).
+\_JHC\_JGC\_MEGABLOCK\_SHIFT       bit shift to specify megablock size. Use it internally like this: (1 << (_JHC_JGC_MEGABLOCK_SHIFT)).
+
 -}
 
 data Mode = BuildHl FilePath         -- ^ Build the specified hl-file given a description file.
