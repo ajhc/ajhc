@@ -1,0 +1,2521 @@
+# SOME DESCRIPTIVE TITLE
+# Copyright (C) YEAR Free Software Foundation, Inc.
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"POT-Creation-Date: 2013-01-10 13:29+0900\n"
+"PO-Revision-Date: 2013-01-15 18:08+0900\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. type: Plain text
+#: manual.mkd:3
+msgid "% Jhc User's Manual % John Meacham"
+msgstr ""
+"% Jhcユーザーズマニュアル\n"
+"% John Meacham"
+
+#. type: Plain text
+#: manual.mkd:6
+msgid "# Using"
+msgstr "# 使い方"
+
+#. type: Plain text
+#: manual.mkd:9
+msgid "## Building Projects"
+msgstr "## プロジェクトをビルドする"
+
+#. type: Plain text
+#: manual.mkd:14
+msgid ""
+"Jhc does its own dependency chasing to track down source files, you need "
+"only provide it with the file containing your 'main' function on the command "
+"line.  For instance, if you had a program 'HelloWorld.hs', the following "
+"would compile it to an executable named 'hello'."
+msgstr ""
+"Jhcはソースコードの依存関係を独自に解析してくれるため、\n"
+"コマンドラインから'main'関数を含んだファイルを指定するだけでソースコード全体をコンパイルできる。\n"
+"例えばソースコード'HelloWorld.hs'をコンパイルしたければ、次のようにコンパイルすれば'hello'という名前の実行バイナリが生成される。"
+
+#. type: Plain text
+#: manual.mkd:16
+#, no-wrap
+msgid "    ; jhc HelloWorld.hs -o hello\n"
+msgstr "    ; jhc HelloWorld.hs -o hello\n"
+
+#. type: Plain text
+#: manual.mkd:22
+msgid ""
+"Jhc searches for modules in its search path, which defaults to the current "
+"directory. Modules are searched for based on their names. For instance, the "
+"module Data.Foo will be searched for in 'Data/Foo.hs' and 'Data.Foo.hs'.  "
+"The search path may be modifed with the '-i' command line option, or by "
+"setting the 'JHC_PATH' environment variable."
+msgstr ""
+"Jhcはサーチパスからモジュールを探す。\n"
+"そのサーチパスは既定値ではカレントディレクトリである。\n"
+"モジュールは名前にもとづいて検索される。\n"
+"例えばData.Fooモジュールは'Data/Foo.hs'もしくは'Data.Foo.hs'のパスから探されることになる。\n"
+"このサーチパスは'-i'コマンドラインオプションを使って指定できる。\n"
+"また、'JHC_PATH'環境変数を使って指定することもできる。"
+
+#. type: Plain text
+#: manual.mkd:24
+msgid "## Using Libraries"
+msgstr "## ライブラリを使う"
+
+#. type: Plain text
+#: manual.mkd:31
+msgid ""
+"jhc libraries are distributed as files with an 'hl' suffix, such as "
+"'base-1.0.hl'. In order to use a haskell library you simply need to place "
+"the file in a directory that jhc will search for it. For instance, "
+"$HOME/lib/jhc.  You may set the environment variable JHC_LIBRARY_PATH to "
+"specify alternate locations to search for libraries or specify directory to "
+"search with the -L command line option. -L- will clear the search path."
+msgstr ""
+"jhcライブラリは、例えば'base-1.0.hl'のような、'hl'という拡張子を持つ単一のファイルである。\n"
+"何かHaskellライブラリを使うためには、jhcの検索するディレクトリにこのファイルを置くだけで良い。\n"
+"例えば $HOME/lib/jhc などだ。\n"
+"JHC_LIBRARY_PATH環境変数を定義することで、別の位置をライブラリのサーチパスとして指定することができる。\n"
+"また、-Lコマンドラインオプションを使ってもサーチパスを指定できる。\n"
+"さらに-L-オプションを使えばサーチパスの設定を既定値に戻すことさえできる。"
+
+#. type: Plain text
+#: manual.mkd:35
+msgid ""
+"You can then use libraries with the '-p' command line option, for instance "
+"if you had a library 'mylibrary-1.0.hl' in your search path, the following "
+"would use it."
+msgstr ""
+"'hl'ファイルが適切な位置に置かれていれば、'-p'コマンドラインオプションを使って使用するライブラリを指定することができる。\n"
+"例えば'mylibrary-1.0.hl'を既にサーチパスに配置済みであれば、以下のように使うことができる。"
+
+#. type: Plain text
+#: manual.mkd:37
+#, no-wrap
+msgid "    ; jhc -p mylibrary MyProgram.hs -o myprogram\n"
+msgstr "    ; jhc -p mylibrary MyProgram.hs -o myprogram\n"
+
+#. type: Plain text
+#: manual.mkd:41
+msgid ""
+"You can list all available libraries by passing the --list-libraries option "
+"to jhc. If you include '-v' for verbose output, you will get detailed "
+"information about the libraries in a YAML format suitable for processing by "
+"external tools."
+msgstr ""
+"--list-librariesオプションを使えば全ての使用可能なライブラリのリストを得られる。\n"
+"さらに'-v'オプションを追加することで、各ライブラリに関する詳細な情報を得ることもできる。\n"
+"これらの情報はYAMLフォーマットを使って生成されたものである。"
+
+#. type: Plain text
+#: manual.mkd:43
+msgid "## Environment Variables"
+msgstr "## 環境変数"
+
+#. type: Plain text
+#: manual.mkd:45
+msgid "Jhc's behavior is modified by several enviornment variables."
+msgstr "Jhcの挙動はいくつかの環境変数によって制御される。"
+
+#. type: Plain text
+#: manual.mkd:48
+msgid "JHC_OPTS : this is read and appended to the command line of jhc invocations."
+msgstr "JHC_OPTS : jhcのコマンドライン直後に挿入されるオプション群"
+
+#. type: Plain text
+#: manual.mkd:51
+msgid "JHC_PATH : This specifies the path to search for modules."
+msgstr "JHC_PATH : モジュールの検索パス"
+
+#. type: Plain text
+#: manual.mkd:54
+msgid "JHC_LIBRARY_PATH : This specifies the path to search for libraries."
+msgstr "JHC_LIBRARY_PATH : ライブラリの検索パス"
+
+#. type: Plain text
+#: manual.mkd:58
+msgid ""
+"JHC_CACHE : This specified the directory jhc will use to cache "
+"values. having a valid cache is essential for jhc performance. It defaults "
+"to ~/.jhc/cache."
+msgstr "JHC_CACHE : jhcがキャッシュとして使用するディレクトリ。キャッシュはjhcのパフォーマンス向上にはかかせない。既定値は~/.jhc/cache。"
+
+#. type: Plain text
+#: manual.mkd:60
+msgid "## Building Haskell Libraries"
+msgstr "## Haskellライブラリをビルドする"
+
+#. type: Plain text
+#: manual.mkd:63
+msgid ""
+"Libraries are built by passing jhc a file describing the library via the "
+"--build-hl option. The library file format is a stadard YAML file."
+msgstr ""
+"ライブラリは--build-hlオプションで指定されたライブラリファイルの内容にもとづいてビルドされる。\n"
+"このライブラリファイルのフォーマットはYAMLである。"
+
+#. type: Plain text
+#: manual.mkd:65
+#, no-wrap
+msgid "    ; jhc --build-hl mylibrary.yaml\n"
+msgstr "    ; jhc --build-hl mylibrary.yaml\n"
+
+#. type: Plain text
+#: manual.mkd:67
+msgid "### Library File Format"
+msgstr "### ライブラリファイルのフォーマット"
+
+#. type: Plain text
+#: manual.mkd:70
+msgid ""
+"The library file is a YAML document, jhc will recognize several fields and "
+"ignore unknown ones."
+msgstr "ライブラリファイルはYAMLフォーマットで、jhcは自分の理解できるフィールドだけを解釈し、残りは無視する。"
+
+#. type: Plain text
+#: manual.mkd:73
+msgid "Name : The name of your library"
+msgstr "Name : ライブラリの名前"
+
+#. type: Plain text
+#: manual.mkd:78
+msgid ""
+"Version : The version of your library, The version number is used to "
+"differentiate different versions of the library passed to the '-p' command "
+"line option but is not otherwise special to jhc."
+msgstr "Version : ライブラリのバージョン。バージョン番号は'-p'コマンドラインオプションを使う際に区別するために使われる。しかし、それ以外の用途にはjhcは使わない。"
+
+#. type: Plain text
+#: manual.mkd:83
+msgid ""
+"Exposed-Modules : A list of modules to be included in the library and "
+"exposed to users of the library as its public interface. This may include "
+"modules that are part of another library, they will be re-exported by the "
+"current library."
+msgstr "Exposed-Modules : ライブラリに含まれ、ライブラリの利用者への公開インターフェイスとなる一連のモジュール。この欄が他のライブラリ内のモジュールを含んでいた場合、再度このライブラリでも公開インターフェイス扱いされることになる。"
+
+#. type: Plain text
+#: manual.mkd:89
+msgid ""
+"Hidden-Modules : A list of modules that the library may use internally but "
+"that should not be exposed to the user. Jhc may optimize based on this "
+"information. If this list is not exhaustive jhc will still build your "
+"library, but it will print out a warning."
+msgstr "Hidden-Modules : ライブラリ内部で使用されるかもしれないが、公開インターフェイスにはならない一連のモジュール。jhcはこの情報を元にして最適化を行なう。このリストがライブラリのビルドに網羅的でなければ、jhcはワーニングメッセージを出力する。"
+
+#. type: Plain text
+#: manual.mkd:94
+msgid ""
+"Extensions : A list of extensions which should be enabled during compilation "
+"of this module. When possible, jhc will match ghc extensions to their "
+"closest jhc counterparts."
+msgstr "Extensions : このモジュールをコンパイルするのに必要な拡張のリスト。jhcはできうるかぎりghc拡張と似た拡張を提供するつもりである。"
+
+#. type: Plain text
+#: manual.mkd:97
+msgid "Options : Extra command line options to jhc for this library build."
+msgstr "Options : ライブラリビルド時に使うその他のコマンドラインオプション"
+
+#. type: Plain text
+#: manual.mkd:101
+msgid ""
+"Build-Depends : libraries to include, in the same format as passed to the "
+"'-p' command line option"
+msgstr "Build-Depends : ビルドに必要になるライブラリ。'-p'コマンドラインオプションと同じフォーマットで指定する。"
+
+#. type: Plain text
+#: manual.mkd:107
+msgid ""
+"Hs-Source-Dirs : Directory to search for Haskell source files in, this "
+"differs from the '-i' command line option in that the directory in this "
+"field is relative to the directory the library description .yaml file is "
+"located while the '-i' option is always relative to the current working "
+"directory."
+msgstr "Hs-Source-Dirs : Haskellソースコードを探すディレクトリ。'-i'コマンドラインオプションと異なり、この欄にはライブラリ詳細を記載した.yamlファイルからの相対パスを記載する。'-i'オプションを使う際にはカレントワーキングディレクトリからの相対パスを記載すること。"
+
+#. type: Plain text
+#: manual.mkd:112
+msgid ""
+"Include-Dirs : directories to be included in the preprocessor search path as "
+"if via '-I'.  The directories are interpreted relative to the directory that "
+"contains the yaml file."
+msgstr "Include-Dirs : プリプロセッサが'-I'オプションで検索するディレクトリ。このディレクトリもyamlファイルが置かれたディレクトリからの相対パスとして指定すること。"
+
+#. type: Plain text
+#: manual.mkd:115
+msgid ""
+"C-Sources : C files that should be linked into programs that utilize this "
+"library."
+msgstr "C-Sources : このライブラリを使うプログラムにリンクされるべきC言語ソースコードファイル群。"
+
+#. type: Plain text
+#: manual.mkd:119
+msgid ""
+"Include-Sources : files that should be made available for inclusion when "
+"compiling the generated C code but don't need to be linked into the "
+"executable."
+msgstr "Include-Sources : このライブラリを使ったプログラムのビルドに必要なC言語のヘッダを指定する。これらのヘッダはビルド時にincludeされることはあっても、実行ファイルにリンクされることはない。"
+
+#. type: Plain text
+#: manual.mkd:121
+msgid "example library files can be seen in lib/jhc/jhc.yaml and lib/base/base.yaml"
+msgstr "ライブラリファイルの例としてlib/jhc/jhc.yamlとlib/base/base.yamlを参考のこと。"
+
+#. type: Plain text
+#: manual.mkd:124
+msgid "## Dependency Information"
+msgstr "## 依存情報"
+
+#. type: Plain text
+#: manual.mkd:129
+msgid ""
+"Jhc can output dependency information describing how source files and "
+"libraries depend on each other while compiling code. The dependency "
+"information is generated when the --deps name.yaml option is passed to "
+"jhc. It is presented in the standard YAML format and its fields are as "
+"described below."
+msgstr ""
+"jhcは依存情報を出力できる。\n"
+"この依存情報はソースコードとライブラリがコンパイル時にその他の要素にどのように依存しているかを表現している。\n"
+"依存情報は--deps name.yamlオプションをjhcに入力するとname.yamlファイルに出力される。\n"
+"この依存情報もまたYAMLフォーマットで、各項目な以下のような意味を持っている。"
+
+#. type: Bullet: '  - '
+#: manual.mkd:134
+msgid ""
+"LibraryDeps: the libraries that are dependend on. It is a hash of library "
+"ids to the specific filename of the library used."
+msgstr "LibraryDeps: 依存しているライブラリ。使用しているライブラリのファイル名と同時にハッシュ値も列挙する。"
+
+#. type: Bullet: '  - '
+#: manual.mkd:134
+msgid ""
+"LibraryDesc: if building a library, this field contains the name of the "
+"library description file used."
+msgstr "LibraryDesc: ライブラリをビルドした際、この項目は使っているライブラリファイルの名前を含む。"
+
+#. type: Bullet: '  - '
+#: manual.mkd:134
+msgid ""
+"ModuleDeps: a hash of module names to the list of modules that are directly "
+"dependend on by said module."
+msgstr "ModuleDeps: 直接依存しているモジュール名のリスト"
+
+#. type: Bullet: '  - '
+#: manual.mkd:134
+msgid "ModuleSouce: a hash of module name to the haskell source file used."
+msgstr "ModuleSouce: 使用しているソースコードファイル名に対応するモジュール名"
+
+#. type: Plain text
+#: manual.mkd:136
+msgid ""
+"An example tool to processs the deps.yaml file and spit out appropriate "
+"Makefile rules is included as 'utils/deps_to_make.prl'."
+msgstr "deps.yamlを扱うサンプルとして'utils/deps_to_make.prl'を参照のこと。"
+
+#. type: Plain text
+#: manual.mkd:138
+msgid "# Options"
+msgstr "# オプション"
+
+#. type: Plain text
+#: manual.mkd:180
+#, no-wrap
+msgid ""
+"    Usage: jhc [OPTION...] Main.hs\n"
+"      -V                --version                 print version info and "
+"exit\n"
+"                        --version-context         print version context info "
+"and exit\n"
+"                        --help                    print help information and "
+"exit\n"
+"                        --info                    show compiler "
+"configuration information and exit\n"
+"                        --purge-cache             clean out jhc compilation "
+"cache\n"
+"      -v                --verbose                 chatty output on stderr\n"
+"      -z                                          Increase verbosity of "
+"statistics\n"
+"      -d [no-]flag                                dump specified data during "
+"compilation\n"
+"      -f [no-]flag                                set or clear compilation "
+"options\n"
+"      -X ExtensionName                            enable the given language "
+"extension\n"
+"      -o FILE           --output=FILE             output to FILE\n"
+"      -i DIR            --include=DIR             where to look for source "
+"files\n"
+"      -I DIR                                      add to preprocessor "
+"include path\n"
+"      -D NAME=VALUE                               add new definitions to set "
+"in preprocessor\n"
+"                        --optc=option             extra options to pass to c "
+"compiler\n"
+"      -c                                          just compile the modules, "
+"caching the results.\n"
+"      -C                                          compile to C code\n"
+"      -E                                          preprocess the input and "
+"print result to stdout\n"
+"      -k                --keepgoing               keep going on errors\n"
+"                        --cross                   enable cross-compilation, "
+"choose target with the -m flag\n"
+"                        --stop=parse/typecheck/c  stop after the given pass, "
+"parse/typecheck/c\n"
+"                        --width=COLUMNS           width of screen for "
+"debugging output\n"
+"                        --main=Main.main          main entry point\n"
+"      -m arch           --arch=arch               target architecture "
+"options\n"
+"                        --entry=<expr>            main entry point, showable "
+"expression\n"
+"                        --show-ho=file.ho         Show ho file\n"
+"                        --noauto                  Don't automatically load "
+"base and haskell98 packages\n"
+"      -p package                                  Load given haskell library "
+"package\n"
+"      -L path                                     Look for haskell libraries "
+"in the given directory\n"
+"                        --build-hl=desc.yaml      Build hakell library from "
+"given library description file\n"
+"                        --annotate-source=<dir>   Write preprocessed and "
+"annotated source code to the directory specified\n"
+"                        --deps=<file.yaml>        Write dependency "
+"information to file specified\n"
+"                        --interactive             run interactivly                                                             "
+"( for debugging only)\n"
+"                        --ignore-cache            Ignore existing "
+"compilation cache entries.\n"
+"                        --readonly-cache          Do not write new "
+"information to the compilation cache.\n"
+"                        --no-cache                Do not use or update the "
+"cache.\n"
+"                        --cache-dir=JHC_CACHE     Use a global cache located "
+"in the directory passed as an argument.\n"
+"                        --stale=Module            Treat these modules as "
+"stale, even if they exist in the cache\n"
+"                        --list-libraries          List of installed "
+"libraries\n"
+"                        --tdir=dir/               specify the directory "
+"where all intermediate files/dumps will be placed.\n"
+msgstr ""
+"    Usage: jhc [OPTION...] Main.hs\n"
+"      -V                --version                 バージョン表示\n"
+"                        --version-context         バージョン履歴表示\n"
+"                        --help                    ヘルプメッセージ表示\n"
+"                        --info                    コンパイラ設定表示\n"
+"                        --purge-cache             コンパイルキャッッシュの削除\n"
+"      -v                --verbose                 stderrに冗長なメッセージ表示\n"
+"      -z                                          冗長な統計情報を表示\n"
+"      -d [no-]flag                                コンパイルパイプラインの特定の情報をダンプ\n"
+"      -f [no-]flag                                コンパイルフラグの有効/無効\n"
+"      -X ExtensionName                            言語拡張の有効化\n"
+"      -o FILE           --output=FILE             出力ファイル名を指定\n"
+"      -i DIR            --include=DIR             ソースファイル検索パス\n"
+"      -I DIR                                      プリプロセッサのインクルードパスを追加\n"
+"      -D NAME=VALUE                               プリプロセッサに渡すdefineを追加\n"
+"                        --optc=option             Cコンパイラに渡すその他のオプション\n"
+"      -c                                          モジュールを単体でコンパイル\n"
+"      -C                                          C言語コードへコンパイル\n"
+"      -E                                          ソースコードをプリプロセッサにかけてstdoutへ出力\n"
+"      -k                --keepgoing               エラーを無視してコンパイルを続行\n"
+"                        --cross                   クロスコンパイルを有効に、-mオプションでターゲットを指定すること\n"
+"                        --stop=parse/typecheck/c  parse/typecheck/cの直後で停止する\n"
+"                        --width=COLUMNS           デバッグ出力のスクリーン幅を変更\n"
+"                        --main=Main.main          mainエントリポイントを指定\n"
+"      -m arch           --arch=arch               クロスコンパイルターゲットを指定\n"
+"                        --entry=<expr>            mainエントリポイントを式を使って指定\n"
+"                        --show-ho=file.ho         hoファイルの概要をダンプ\n"
+"                        --noauto                  haskell98パッケージを自動的に読み込まない\n"
+"      -p package                                  指定したライブラリを使用する\n"
+"      -L path                                     ライブラリを指定したパスから検索する\n"
+"                        --build-hl=desc.yaml      指定したライブラリファイルからHaskellライブラリをビルド\n"
+"                        --annotate-source=<dir>   指定したディレクトリにプリプロセス済みソースコードを出力\n"
+"                        --deps=<file.yaml>        依存情報を指定したファイルに書き込む\n"
+"                        --interactive             インタラクティブ実行                                                     (デバッグ用途)\n"
+"                        --ignore-cache            コンパイルキャッシュを無視する\n"
+"                        --readonly-cache          コンパイルキャッシュに追加情報を書き込まない\n"
+"                        --no-cache                コンパイルキャッシュを使わず、書き込みも行なわない\n"
+"                        --cache-dir=JHC_CACHE     指定したディレクトリをコンパイルキャッシュとして使う\n"
+"                        --stale=Module            指定したモジュールがコンパイルキャッシュにあっても古い情報として扱う\n"
+"                        --list-libraries          インストール済みライブラリを表示\n"
+"                        --tdir=dir/               中間生成物を出力するディレクトリを指定する\n"
+
+#. type: Plain text
+#: manual.mkd:189
+#, no-wrap
+msgid ""
+"    valid -d arguments: 'help' for more info\n"
+"        all-types, aspats, atom, bindgroups, boxy-steps, c, class, "
+"class-summary, core, core-afterlift\n"
+"        core-beforelift, core-initial, core-mangled, core-mini, core-pass, "
+"core-steps, datatable\n"
+"        datatable-builtin, dcons, decls, defs, derived, e-alias, e-info, "
+"e-size, e-verbose, exports, grin\n"
+"        grin-datalog, grin-final, grin-graph, grin-initial, grin-normalized, "
+"grin-posteval, grin-preeval\n"
+"        imports, ini, instance, kind, kind-steps, optimization-stats, "
+"parsed, preprocessed, program\n"
+"        progress, renamed, rules, rules-spec, scc-modules, sigenv, srcsigs, "
+"stats, steps, tags, the\n"
+"        types, verbose, veryverbose\n"
+msgstr ""
+"    -dオプションの引数: '-d help'オプションで詳細\n"
+"        all-types, aspats, atom, bindgroups, boxy-steps, c, class, class-summary, core, core-afterlift\n"
+"        core-beforelift, core-initial, core-mangled, core-mini, core-pass, core-steps, datatable\n"
+"        datatable-builtin, dcons, decls, defs, derived, e-alias, e-info, e-size, e-verbose, exports, grin\n"
+"        grin-datalog, grin-final, grin-graph, grin-initial, grin-normalized, grin-posteval, grin-preeval\n"
+"        imports, ini, instance, kind, kind-steps, optimization-stats, parsed, preprocessed, program\n"
+"        progress, renamed, rules, rules-spec, scc-modules, sigenv, srcsigs, stats, steps, tags, the\n"
+"        types, verbose, veryverbose\n"
+
+#. type: Plain text
+#: manual.mkd:195
+#, no-wrap
+msgid ""
+"    valid -f arguments: 'help' for more info\n"
+"        bang-patterns, boehm, controlled, cpp, debug, default, defaulting, "
+"exists, ffi, forall, full-int\n"
+"        glasgow-exts, global-optimize, inline-pragmas, jgc, lint, m4, "
+"monomorphism-restriction, negate\n"
+"        prelude, profile, raw, rules, standalone, type-analysis, "
+"type-families, unboxed-tuples\n"
+"        unboxed-values, user-kinds, wrapper\n"
+msgstr ""
+"    -fオプションの引数: '-f help'オプションで詳細\n"
+"        bang-patterns, boehm, controlled, cpp, debug, default, defaulting, exists, ffi, forall, full-int\n"
+"        glasgow-exts, global-optimize, inline-pragmas, jgc, lint, m4, monomorphism-restriction, negate\n"
+"        prelude, profile, raw, rules, standalone, type-analysis, type-families, unboxed-tuples\n"
+"        unboxed-values, user-kinds, wrapper\n"
+
+#. type: Plain text
+#: manual.mkd:199
+msgid "## Code Options"
+msgstr "## コードオプション"
+
+#. type: Plain text
+#: manual.mkd:203
+msgid ""
+"Various options affecting how jhc interprets and compiles code can be "
+"controlled with the '-f' flag, the following options are availible, you can "
+"negate any particular one by prepending 'no-' to it."
+msgstr ""
+"jhcの解釈やコンパイルは'-f'フラグでコントロールできる。\n"
+"これらのオプションを以下に列挙する。また、その効力は'no-'をフラグ名に付けることで無効化できる。"
+
+#. type: Plain text
+#: manual.mkd:218
+#, no-wrap
+msgid ""
+"Code options              \n"
+"------                    "
+"---------------------------------------------------------------------------\n"
+"_bang-patterns_           - bang patterns\n"
+"_cpp_                     pass haskell source through c preprocessor\n"
+"_exists_                  - exists keyword for existential types "
+"recognized\n"
+"_ffi_                     support foreign function declarations\n"
+"_forall_                  - forall keyword for rank-n types and explicit "
+"quantification\n"
+"_m4_                      pass haskell source through m4 preprocessor\n"
+"_prelude_                 implicitly import Prelude\n"
+"_type-families_           type/data family support\n"
+"_unboxed-tuples_          allow unboxed tuple syntax to be recognized\n"
+"_unboxed-values_          allow unboxed value syntax\n"
+"_user-kinds_              user defined kinds\n"
+msgstr ""
+"コードオプション\n"
+"------                    ---------------------------------------------------------------------------\n"
+"_bang-patterns_           - バン！パターン(強制正格評価パターン)\n"
+"_cpp_                     HaskellコードをCプリプロセッサにかけてからコンパイル\n"
+"_exists_                  - existsキーワードを存在型の解釈に使う\n"
+"_ffi_                     他言語関数インタフェース(FFI)を使う\n"
+"_forall_                  - forallキーワードをランクN多相と明白な量化に用いる\n"
+"_m4_                      Haskellコードをm4プリプロセッサにかけてからコンパイル\n"
+"_prelude_                 Preludeを暗黙の内にimportする\n"
+"_type-families_           Type Families(型族)を使う\n"
+"_unboxed-tuples_          アンボックス化タプル文法を許容する\n"
+"_unboxed-values_          アンボックス化値文法を許容する\n"
+"_user-kinds_              ユーザ定義の種を使う\n"
+
+#. type: Plain text
+#: manual.mkd:223
+#, no-wrap
+msgid ""
+"Typechecking              \n"
+"------                    "
+"---------------------------------------------------------------------------\n"
+"_defaulting_              perform defaulting of ambiguous types\n"
+"_monomorphism-restriction_ enforce monomorphism restriction\n"
+msgstr ""
+"型検査\n"
+"------                    ---------------------------------------------------------------------------\n"
+"_defaulting_              型のデフォルト化を行なう\n"
+"_monomorphism-restriction_ 単相性制限を強制する\n"
+
+#. type: Plain text
+#: manual.mkd:227
+#, no-wrap
+msgid ""
+"Debugging                 \n"
+"------                    "
+"---------------------------------------------------------------------------\n"
+"_lint_                    perform lots of extra type checks\n"
+msgstr ""
+"デバッグ\n"
+"------                    ---------------------------------------------------------------------------\n"
+"_lint_                    より多くの型検査を行なう\n"
+
+#. type: Plain text
+#: manual.mkd:234
+#, no-wrap
+msgid ""
+"Optimization Options      \n"
+"------                    "
+"---------------------------------------------------------------------------\n"
+"_global-optimize_         perform whole program E optimization\n"
+"_inline-pragmas_          use inline pragmas\n"
+"_rules_                   use rules\n"
+"_type-analysis_           perform a basic points-to analysis on types right "
+"after method generation\n"
+msgstr ""
+"最適化オプション\n"
+"------                    ---------------------------------------------------------------------------\n"
+"_global-optimize_         Eによってプログラム全体を最適化する\n"
+"_inline-pragmas_          inlineプラグマを使う\n"
+"_rules_                   rulesプラグマを使う\n"
+"_type-analysis_           メソッド生成直後に型に対する基本的なpoints-to analysisを適用する\n"
+
+#. type: Plain text
+#: manual.mkd:245
+#, no-wrap
+msgid ""
+"Code Generation           \n"
+"------                    "
+"---------------------------------------------------------------------------\n"
+"_boehm_                   use Boehm garbage collector\n"
+"_debug_                   enable debugging code in generated executable\n"
+"_full-int_                extend Int and Word to 32 bits on a 32 bit machine "
+"(rather than 30)\n"
+"_jgc_                     use the jgc garbage collector\n"
+"_profile_                 enable profiling code in generated executable\n"
+"_raw_                     just evaluate main to WHNF and nothing else.\n"
+"_standalone_              compile to a standalone executable\n"
+"_wrapper_                 wrap main in exception handler\n"
+msgstr ""
+"コード生成\n"
+"------                    ---------------------------------------------------------------------------\n"
+"_boehm_                   Boehm GCを使う\n"
+"_debug_                   実行バイナリ中のデバッグコードを有効に\n"
+"_full-int_                32bitマシンでIntとWordを32bitに拡張する\n"
+"_jgc_                     jgcガーベッジコレクタを使う\n"
+"_profile_                 実行バイナリ中のプロファイルコードを有効に\n"
+"_raw_                     main関数をWHNFとして評価する\n"
+"_standalone_              単独実行可能にコンパイル\n"
+"_wrapper_                 main関数を例外ハンドラで包む\n"
+
+#. type: Plain text
+#: manual.mkd:250
+#, no-wrap
+msgid ""
+"Default settings          \n"
+"------                    "
+"---------------------------------------------------------------------------\n"
+"_default_                 inline-pragmas rules wrapper defaulting "
+"type-analysis monomorphism-restriction global-optimize full-int prelude\n"
+"_glasgow-exts_            forall ffi unboxed-tuples\n"
+msgstr ""
+"設定既定値\n"
+"------                    ---------------------------------------------------------------------------\n"
+"_default_                 inline-pragmas rules wrapper defaulting type-analysis monomorphism-restriction global-optimize full-int prelude\n"
+"_glasgow-exts_            forall ffi unboxed-tuples\n"
+
+#. type: Plain text
+#: manual.mkd:253
+msgid "## Dumping Debugging Information"
+msgstr "## デバッグ情報のダンプ"
+
+#. type: Plain text
+#: manual.mkd:257
+msgid ""
+"You can have jhc print out a variety of things while running as Controlled "
+"by the '-d' flag. The following is a list of possible parameters you can "
+"pass to '-d'."
+msgstr ""
+"'-d'フラグ付きでjhcを起動することで各種パラメータを出力できる。\n"
+"次に挙げるのは'-d'フラグに渡すことができるパラメータのリストである。"
+
+#. type: Plain text
+#: manual.mkd:270
+#, no-wrap
+msgid ""
+"Front End                 \n"
+"------                    "
+"---------------------------------------------------------------------------\n"
+"_defs_                    Show all defined names in a module\n"
+"_derived_                 show generated derived instances\n"
+"_exports_                 show which names are exported from each module\n"
+"_imports_                 show in scope names for each module\n"
+"_ini_                     all ini configuration options\n"
+"_parsed_                  parsed code\n"
+"_preprocessed_            code after preprocessing/deliting\n"
+"_renamed_                 code after uniqueness renaming\n"
+"_scc-modules_             show strongly connected modules in dependency "
+"order\n"
+msgstr ""
+"フロントエンド\n"
+"------                    ---------------------------------------------------------------------------\n"
+"_defs_                    モジュール内で定義された名前を列挙する(?)\n"
+"_derived_                 自動導出されたインスタンスを表示する\n"
+"_exports_                 モジュールからエクスポートされている名前を列挙する\n"
+"_imports_                 モジュールがインポートしている名前を列挙する\n"
+"_ini_                     iniファイルのオプションを表示\n"
+"_parsed_                  パース済みコードを出力\n"
+"_preprocessed_            プリプロセス後のコードを出力\n"
+"_renamed_                 renaming後のコードを出力\n"
+"_scc-modules_             強結合したモジュールを依存度順に表示\n"
+
+#. type: Plain text
+#: manual.mkd:288
+#, no-wrap
+msgid ""
+"Type Checker              \n"
+"------                    "
+"---------------------------------------------------------------------------\n"
+"_all-types_               show unified type table, after everything has been "
+"typechecked\n"
+"_aspats_                  show as patterns\n"
+"_bindgroups_              show bindgroups\n"
+"_boxy-steps_              show step by step what the type inferencer is "
+"doing\n"
+"_class_                   detailed information on each class\n"
+"_class-summary_           summary of all classes\n"
+"_dcons_                   data constructors\n"
+"_decls_                   processed declarations\n"
+"_instance_                show instances\n"
+"_kind_                    show results of kind inference for each module\n"
+"_kind-steps_              show steps of kind inference\n"
+"_program_                 impl expls, the whole shebang.\n"
+"_sigenv_                  initial signature environment\n"
+"_srcsigs_                 processed signatures from source code\n"
+"_types_                   display unified type table containing all defined "
+"names\n"
+msgstr ""
+"型検査\n"
+"------                    ---------------------------------------------------------------------------\n"
+"_all-types_               型検査完了後に型テーブルを表示\n"
+"_aspats_                  アズパターンを表示\n"
+"_bindgroups_              束縛グループを表示\n"
+"_boxy-steps_              型推論の挙動をステップバイステップで表示\n"
+"_class_                   個々の型クラスの詳細情報を表示\n"
+"_class-summary_           型クラス群の概要を表示\n"
+"_dcons_                   データコンストラクタを表示\n"
+"_decls_                   処理済みの宣言を表示\n"
+"_instance_                インスタンスを表示\n"
+"_kind_                    モジュールへの種推論の結果を表示\n"
+"_kind-steps_              種推論のステップを表示\n"
+"_program_                 プログラム全体の構造\n"
+"_sigenv_                  型シグニチャ初期状態の表示\n"
+"_srcsigs_                 renaming後の型シグニチャを表示\n"
+"_types_                   定義された全ての名前を含んでいる型テーブルを表示\n"
+
+#. type: Plain text
+#: manual.mkd:308
+#, no-wrap
+msgid ""
+"Intermediate code         \n"
+"------                    "
+"---------------------------------------------------------------------------\n"
+"_core_                    show intermediate core code\n"
+"_core-afterlift_          show final core before writing ho file\n"
+"_core-beforelift_         show core before lambda lifting\n"
+"_core-initial_            show core right after E.FromHs conversion\n"
+"_core-mangled_            de-typed core right before it is converted to "
+"grin\n"
+"_core-mini_               show details even when optimizing individual "
+"functions\n"
+"_core-pass_               show each iteration of code while transforming\n"
+"_core-steps_              show what happens in each pass\n"
+"_datatable_               show data table of constructors\n"
+"_datatable-builtin_       show data table entries for some built in types\n"
+"_e-alias_                 show expanded aliases\n"
+"_e-info_                  show info tags on all bound variables\n"
+"_e-size_                  print the size of E after each pass\n"
+"_e-verbose_               print very verbose version of E code always\n"
+"_optimization-stats_      show combined stats of optimization passes\n"
+"_rules_                   show all user rules and catalysts\n"
+"_rules-spec_              show specialization rules\n"
+msgstr ""
+"中間コード\n"
+"------                    ---------------------------------------------------------------------------\n"
+"_core_                    core言語コードを表示\n"
+"_core-afterlift_          hoファイルに書き込む直前のcoreコードを表示\n"
+"_core-beforelift_         lambda lifting直前のcoreコードを表示\n"
+"_core-initial_            E.FromHs転換直前のcoreコードを表示\n"
+"_core-mangled_            grinにかける前の型なしcoreコードを表示\n"
+"_core-mini_               個々の関数の最適化の詳細を表示\n"
+"_core-pass_               コード変形の経過を表示\n"
+"_core-steps_              コンパイルパスそれぞれのステップについて表示\n"
+"_datatable_               コンストラクタのデータテーブルを表示\n"
+"_datatable-builtin_       ビルドイン型のデータテーブルを表示\n"
+"_e-alias_                 展開済みエイリアスを表示\n"
+"_e-info_                  束縛された値のタグ情報を表示\n"
+"_e-size_                  コンパイルパスそれぞれでのEのサイズを表示\n"
+"_e-verbose_               Eコードに冗長なメッセージを表示させる\n"
+"_optimization-stats_      最適化パスのスタティクスを表示\n"
+"_rules_                   ユーザ定義の書き換え規則を表示する\n"
+"_rules-spec_              特殊化書き換え規則を表示する\n"
+
+#. type: Plain text
+#: manual.mkd:321
+#, no-wrap
+msgid ""
+"Grin code                 \n"
+"------                    "
+"---------------------------------------------------------------------------\n"
+"_grin_                    dump all grin to the screen\n"
+"_grin-datalog_            print out grin information in a format suitable "
+"for loading into a database\n"
+"_grin-final_              final grin before conversion to C\n"
+"_grin-graph_              print dot file of final grin code to "
+"outputname_grin.dot\n"
+"_grin-initial_            grin right after conversion from core\n"
+"_grin-normalized_         grin right after first normalization\n"
+"_grin-posteval_           show grin code just before eval/apply inlining\n"
+"_grin-preeval_            show grin code just before eval/apply inlining\n"
+"_steps_                   show interpreter go\n"
+"_tags_                    list of all tags and their types\n"
+msgstr ""
+"Grinコード\n"
+"------                    ---------------------------------------------------------------------------\n"
+"_grin_                    grinコードを表示する\n"
+"_grin-datalog_            データベースに適したフォーマットでgrinの情報を印字する\n"
+"_grin-final_              C言語への変換直前のgrinコードを表示\n"
+"_grin-graph_              最終的なgrinコードをdotファイルをoutputname_grin.dotに出力する\n"
+"_grin-initial_            core言語から変換された直後のgrinコード\n"
+"_grin-normalized_         最初の正規化を行なった直後のgrinコード\n"
+"_grin-posteval_           eval/applyインライン化直後のgrinコード\n"
+"_grin-preeval_            eval/applyインライン化直前のgrinコード\n"
+"_steps_                   インタープリタの実行を表示\n"
+"_tags_                    タグと型を列挙する\n"
+
+#. type: Plain text
+#: manual.mkd:325
+#, no-wrap
+msgid ""
+"Backend code              \n"
+"------                    "
+"---------------------------------------------------------------------------\n"
+"_c_                       don't delete C source file after compilation\n"
+msgstr ""
+"バックエンドコード\n"
+"------                    ---------------------------------------------------------------------------\n"
+"_c_                       コンパイル時に生成したC言語ソースファイルを削除しない\n"
+
+#. type: Plain text
+#: manual.mkd:329
+#, no-wrap
+msgid ""
+"Internal                  \n"
+"------                    "
+"---------------------------------------------------------------------------\n"
+"_atom_                    dump atom table on exit\n"
+msgstr ""
+"内部\n"
+"------                    ---------------------------------------------------------------------------\n"
+"_atom_                    終了時にatomテーブルをダンプする\n"
+
+#. type: Plain text
+#: manual.mkd:336
+#, no-wrap
+msgid ""
+"General                   \n"
+"------                    "
+"---------------------------------------------------------------------------\n"
+"_progress_                show basic progress indicators\n"
+"_stats_                   show extra information about stuff\n"
+"_verbose_                 progress\n"
+"_veryverbose_             progress stats\n"
+msgstr ""
+"一般\n"
+"------                    ---------------------------------------------------------------------------\n"
+"_progress_                通常のプログレス表示を行なう\n"
+"_stats_                   その他の情報を表示する\n"
+"_verbose_                 冗長なプログレス表示\n"
+"_veryverbose_             スタティクスを含む冗長なプログレス表示\n"
+
+#. type: Plain text
+#: manual.mkd:338
+msgid "# Pragmas"
+msgstr "# プラグマ"
+
+#. type: Plain text
+#: manual.mkd:344
+msgid ""
+"Pragmas are special compiler directives that change its behavior in certain "
+"ways. In general, each compiler is free to define its own pragmas however "
+"jhc does try to implement the same ones as other compilers when it makes "
+"sense.  pragmas appear in source code as {-# PRAGMANAME ... #-}"
+msgstr ""
+"プラグマは特別なコンパイラへの指示で、コンパイラの挙動に特定の影響を与える。\n"
+"一般的には、コンパイラは自由に独自のプラグを定義できる。\n"
+"しかしjhcでは他のコンパイラでも使われているものを実装しようと努めている。\n"
+"プラグマはソースコード中で {-# PRAGMANAME ... #-} のような形式で使われる。"
+
+#. type: Plain text
+#: manual.mkd:346
+msgid "## Function Properties"
+msgstr "## 関数の属性"
+
+#. type: Plain text
+#: manual.mkd:350
+msgid ""
+"These must appear in the same file as the definition of a function. To apply "
+"one to a instance or class method, you must place it in the where clause of "
+"the instance or class declaration."
+msgstr ""
+"これらのプラグマは関数定義のあるファイルと同じファイル中に記述すべき。\n"
+"インスタンスやクラスの関数に適用するためには、\n"
+"これらのプラグマをインスタンスやクラスの宣言の節に配置しなければならない。"
+
+#. type: Plain text
+#: manual.mkd:357
+#, no-wrap
+msgid ""
+"Pragma\n"
+"------             ----------------------------------------------------\n"
+"_NOINLINE_         Do not inline the given function during core "
+"transformations. The function _may_ be inlined during grin "
+"transformations.\n"
+"_INLINE_           Inline this function whenever possible\n"
+"_SUPERINLINE_      Always inline no matter what, even if it means making a "
+"local copy of the functions body.\n"
+"_VCONSTRUCTOR_     Treat the function as a virtual constructor. CPR analysis "
+"and the worker/wrapper transforms will treat the function application as if "
+"it were a constructor. This implies 'NOINLINE'.\n"
+msgstr ""
+"プラグマ\n"
+"------             ----------------------------------------------------\n"
+"_NOINLINE_         core変形中のインライン化を抑制する。当該関数はgrin変形中にインライン化される _かもしれない_ 。\n"
+"_INLINE_           可能であれば関数をインライン化する\n"
+"_SUPERINLINE_      関数本体を単に複製することになったとしても、とにかくインライン化を行なう\n"
+"_VCONSTRUCTOR_     関数を仮想コンストラクタとして扱う。CPR解析とworker/wrapper変換は関数をコンストラクタとして扱うことがある。これは'NOINLINE'で実装される。\n"
+
+#. type: Plain text
+#: manual.mkd:359
+msgid "## Class Pragmas"
+msgstr "## クラスプラグマ"
+
+#. type: Plain text
+#: manual.mkd:363
+#, no-wrap
+msgid ""
+"Pragma\n"
+"------             ---------------------------------------------------\n"
+"_NOETA_            By default, jhc eta-expands all class methods to help "
+"enable optimizations. This disables this behavior.\n"
+msgstr ""
+"プラグマ\n"
+"------             ---------------------------------------------------\n"
+"_NOETA_            デフォルトではjhcは最適化のために全てのクラスメソッドをイータ変換する。このプラグマはこの挙動を無効化する\n"
+
+#. type: Plain text
+#: manual.mkd:365
+msgid "## Rules/Specializations"
+msgstr "## 書き換え規則と特殊化"
+
+#. type: Plain text
+#: manual.mkd:372
+#, no-wrap
+msgid ""
+"Pragma\n"
+"------              ---------------------------------------------------\n"
+"_RULES_             rewrite rules. These have the same syntax and behave "
+"similarly to GHC's rewrite rules, except 'phase' information is not "
+"allowed.\n"
+"_CATALYST_          A special type of rewrite rule that only fires if it "
+"enables the use of another RULE, so a CATALYST may allow optimizations that "
+"require passing through a non-optimal intermediate stage.\n"
+"_SPECIALIZE_        create a version of a function that is specialized for a "
+"given type\n"
+"_SUPERSPECIALIZE_   has the same effect as SPECIALIZE, but also places a "
+"run-time check in the generic version of the function to determine whether "
+"to call the specialized version.\n"
+msgstr ""
+"プラグマ\n"
+"------              ---------------------------------------------------\n"
+"_RULES_             書き換え規則。GHCの書き換え規則と同様の構文で同様の振舞いをする。ただし、'phase'を使うことはできない。\n"
+"_CATALYST_          特殊な書き換え規則で、他のRULESの使用中でのみ発火する。そのためCATALYSTは最良でない中間ステージを要求する最適化を許す。\n"
+"_SPECIALIZE_        指定された型で特殊化された関数を生成する\n"
+"_SUPERSPECIALIZE_   SPECIALIZEと同じ効力がある。しかし一般化された関数にて特殊化された呼び出しかどうかランタイムでの検査を行なう。\n"
+
+#. type: Plain text
+#: manual.mkd:374
+msgid "## Type Pragmas"
+msgstr "## 型プラグマ"
+
+#. type: Plain text
+#: manual.mkd:383
+#, no-wrap
+msgid ""
+"Pragma\n"
+"------             ---------------------------------------------------\n"
+"_CTYPE_            Specify the external type that a data or newtype should "
+"use for foreign function interfaces.\n"
+"                   The type must be a newtype or unary data constructor of a "
+"type that is already foreignable.\n"
+"                   Example\n"
+"                   ~~~\n"
+"                   data {-# CTYPE \"unsigned short\" #-} CUShort = CUShort "
+"Word16\n"
+"                   ~~~\n"
+msgstr ""
+"プラグマ\n"
+"------             ---------------------------------------------------\n"
+"_CTYPE_            FFIでdataもしくはnewtypeを使うたえに、外部の型を指定する。\n"
+"                   この型はnewtypeかforeign宣言された型の単項コンストラクタでなければならない。\n"
+"                   例えば\n"
+"                   ~~~\n"
+"                   data {-# CTYPE \"unsigned short\" #-} CUShort = CUShort Word16\n"
+"                   ~~~\n"
+
+#. type: Plain text
+#: manual.mkd:385
+msgid "## Header Pragmas"
+msgstr "## ヘッダプラグマ"
+
+#. type: Plain text
+#: manual.mkd:389
+msgid ""
+"These pragmas are only valid in the 'head' of a file, meaning they must come "
+"before the initial 'module' definition and in the first 4096 bytes of the "
+"file and must be preceded by and contain only characters in the ASCII "
+"character set."
+msgstr ""
+"これらのプラグマはファイルの'先頭'でのみ有効である。\n"
+"つまりこれらは最初の'module'宣言の前に置かれなければならず、\n"
+"ファイルの先頭4096バイト以内に配置されねばらなず、\n"
+"そしてASCII文字セットのみしか使ってはならない。\n"
+
+#. type: Plain text
+#: manual.mkd:394
+msgid ""
+"OPTIONS_JHC : Specify extra options to use when processing this file. The "
+"options available are equivalent to the command line options, though, not "
+"all may have meaning when applied to a single file."
+msgstr "OPTIONS_JHC : その他のオプションを指定する。これらのオプションはコマンドラインオプションとしても利用できるが、単一のファイルにのみ影響を与えたい場合に重宝する。"
+
+#. type: Plain text
+#: manual.mkd:397
+msgid "LANGUAGE : Specify various language options"
+msgstr "LANGUAGE : 言語拡張のオプションを指定する"
+
+#. type: Plain text
+#: manual.mkd:399
+msgid "# Extensions"
+msgstr "# 拡張"
+
+#. type: Plain text
+#: manual.mkd:402
+msgid "## Module Search Path"
+msgstr "## モジュールのサーチパス"
+
+#. type: Plain text
+#: manual.mkd:406
+msgid ""
+"Modules in jhc are searched for based on their name as in other Haskell "
+"compilers. However in addition to searching for 'Data/Foo.hs' for the module "
+"'Data.Foo', jhc will also search for 'Data.Foo.hs'."
+msgstr ""
+"他のHaskellコンパイラと同じように、jhcでのモジュールはその名前にもとづいて検索される。\n"
+"'Data.Foo'モジュールを検索するとjhcは'Data/Foo.hs'ファイルも検索するが、\n"
+"'Data.Foo.hs'も同じく検索対象になる。\n"
+
+#. type: Plain text
+#: manual.mkd:408
+msgid "## extensions to the FFI"
+msgstr "## FFIへの拡張"
+
+#. type: Plain text
+#: manual.mkd:410
+msgid "### foreign imports with multiple return values."
+msgstr "### 複数の返値をともなうforeign import"
+
+#. type: Plain text
+#: manual.mkd:415
+msgid ""
+"foreign C imports may return multiple values. To indicate this is the case, "
+"use an unboxed tuple as the return value. The first return value will be the "
+"value the function directly returns, the rest will be passed as pointers at "
+"the end of the functions argument list. Only pure (non IO) functions may "
+"return multiple values."
+msgstr ""
+"foreign C importは複数の値を返すことがある。\n"
+"このような場合、アンボックス化タプルを返値として使う。\n"
+"最初の返値は関数から直接返された値であり、\n"
+"残りは関数の引数リストの終端へのポインタが返ってくる。\n"
+"純粋な(IOではない)関数でのみ複数の値を返値として使うことができる。\n"
+
+#. type: Plain text
+#: manual.mkd:421
+msgid ""
+"~~~~ -- frexp has C prototype -- double frexp(double x, int *exp); -- so it "
+"would normally have an import like so, requiring the IO module and -- "
+"Storable to call what is otherwise a pure function."
+msgstr ""
+"~~~~\n"
+"-- frexpはC言語のプロトタイプ宣言として\n"
+"-- double frexp(double x, int *exp);\n"
+"-- を持つ。そのため、IOとして通常のimportをすることができ、\n"
+"-- 他の純粋な関数へ渡すにはStorableを使うことになる。"
+
+#. type: Plain text
+#: manual.mkd:423
+msgid ""
+"foreign import ccall \"math.h frexp\" c_frexp :: Double -> Ptr CInt -> IO "
+"Double"
+msgstr "foreign import ccall \"math.h frexp\" c_frexp :: Double -> Ptr CInt -> IO Double"
+
+#. type: Plain text
+#: manual.mkd:426
+msgid ""
+"-- This extension allows it to be declared as so foreign import ccall "
+"\"math.h frexp\" c_frexp2 :: Double -> (# Double, CInt #)"
+msgstr ""
+"-- この拡張を使うと以下のように宣言できる。\n"
+"foreign import ccall \"math.h frexp\" c_frexp2 :: Double -> (# Double, CInt #)"
+
+#. type: Plain text
+#: manual.mkd:431
+msgid ""
+"-- The second return value is added as the last 'exp' parameter then read "
+"out -- of the allocated memory. The contents of the memory passed into the "
+"function -- is undefined.  ~~~~"
+msgstr ""
+"-- 二番目の返値は最後の'exp'パラメータによって追加されて、アロケートされた\n"
+"-- メモリから読み出される。関数に渡されるメモリの内容は未定義である。\n"
+"~~~~"
+
+#. type: Plain text
+#: manual.mkd:433
+msgid "### 'capi' calling convention"
+msgstr "### 呼び出し規約'capi'"
+
+#. type: Plain text
+#: manual.mkd:442
+msgid ""
+"The 'capi' calling convention may be used instead of 'ccall' for static "
+"imports. The convention means that the foreign function may not be "
+"addressable as an address, but rather may be implemnted as a macro, builtin, "
+"or other compiler specific feature. jhc will ensure that the routine is "
+"never used as a pointer and the headers specified in the dependency string "
+"are included anywhere the imported function appears. This differs from "
+"'ccall' in that ccall makes no guarentees the given header file will be in "
+"scope and that a linker symbol of the exact name is exported."
+msgstr ""
+"呼び出し規約'capi'は'ccall'を使ってたimportのかわりに使われる。\n"
+"この規約を使うことで、foreignする対象はアドレス空間に実体がなくても良い。\n"
+"マクロやビルドイン関数もしくはその他コンパイラ独自の機能であっても良い。\n"
+"jhcはルーチンが決してポインタとしては使用されないこと、依存するヘッダをインクルードすること保証する。\n"
+"これは'ccall'と異なる。ccallはヘッダがスコープに入っているか、正しい名前のリンカのためのシンボルがエクスポートされているか、なんの保証もしない。"
+
+#. type: Plain text
+#: manual.mkd:444
+msgid "### package relative dependencies"
+msgstr "### パッケージに関連した依存"
+
+#. type: Plain text
+#: manual.mkd:450
+msgid ""
+"dependecies in a foreign import may be written as p:foo.c or p:foo.h, this "
+"means that the file should be interpreted as part of the internal "
+"implementation of the package. jhc willl ensure the files do not clash with "
+"those of other packages that may have the same name. The files should be "
+"listed in the c-files and c-headers sections of the library config file."
+msgstr ""
+"p:foo.c や p:foo.h と書かれたforeign importはそのファイルがパッケージ内部実装の一部として解釈されることを意味している。\n"
+"jhcはそれらのファイルが同じ名前を持っていても他のパッケージと衝突しないことを保証する。\n"
+"それらのファイルはライブラリファイルのc-filesとc-headersの項目に列挙されるべきである。"
+
+#. type: Plain text
+#: manual.mkd:452
+msgid "## Explicit namespaces in import/export lists"
+msgstr "## import/exportされる名前空間"
+
+#. type: Plain text
+#: manual.mkd:455
+msgid ""
+"jhc allows explicit namespaces in import and export lists. These may be used "
+"to restrict or modiy what is imported/exported by a declaration."
+msgstr ""
+"jhcはimportやexportする際の名前空間を持つ。\n"
+"これらはimport/export宣言によって制限されたり修正されたりする。"
+
+#. type: Plain text
+#: manual.mkd:461
+#, no-wrap
+msgid ""
+"    * 'type' - The name is a type, as in something defined by 'type', "
+"'newtype',\n"
+"       or 'data', or the constructors of a kind declaration.\n"
+"    * 'class' - Specifies that the name is that of a class.\n"
+"    * 'data'  - Specifies that the name is a data constructor.\n"
+"    * 'kind'  - specifies that the name is a user defined kind.\n"
+msgstr ""
+"    * 'type' - 名前が型シノニムであり、'type'や'newtype','data',種宣言のコンストラクタで定義されている\n"
+"    * 'class' - 名前がクラスであることを指定\n"
+"    * 'data'  - 名前がデータコンストラクタであることを指定\n"
+"    * 'kind'  - 名前がユーザ定義の種であることを指定\n"
+
+#. type: Plain text
+#: manual.mkd:465
+msgid ""
+"In addition, another extension is that classes and types are in independent "
+"namespaces, so a type and a class of the same name may be in scope and not "
+"conflict."
+msgstr ""
+"型クラスと型シノニムは独立した名前空間にあるので、\n"
+"同じ名前の型シノニムと型クラスが同じスコープに存在しても問題ない。"
+
+#. type: Plain text
+#: manual.mkd:467
+msgid "## user defined kinds"
+msgstr "## ユーザ定義された種"
+
+#. type: Plain text
+#: manual.mkd:470
+msgid ""
+"Jhc allows users to define custom kinds when the -fuser-kinds extension is "
+"enabled. The syntax is:"
+msgstr ""
+"-fuser-kindsオプションが有効な場合、jhcはユーザ定義の種を使用可能にする。\n"
+"その文法は:"
+
+#. type: Plain text
+#: manual.mkd:474
+msgid "~~~~ data kind Nat = Z | S Nat ~~~~"
+msgstr ""
+"~~~~\n"
+"data kind Nat = Z | S Nat \n"
+"~~~~"
+
+#. type: Plain text
+#: manual.mkd:478
+msgid ""
+"This will define a new kind 'Nat' and two types 'Z' and 'S' which inhabit "
+"it.  The types introduced by kind declarations represent unboxed values with "
+"no values, So they have no run-time representation (notably, not even ⊥)"
+msgstr ""
+"ここでは新しい種'Nat'と、その種に存在する2つの型'Zと'S'を定義している。\n"
+"これらの型は値を持たないアンボックス化された値として表現された種の宣言によって定義されている。\n"
+"そのためこれらはランタイムでの表現を持たない。(当然、⊥でさえない)"
+
+#. type: Plain text
+#: manual.mkd:480
+msgid "## Standalone deriving"
+msgstr "## 独立deriving"
+
+#. type: Plain text
+#: manual.mkd:482
+msgid "Jhc supports a standalone deriving mechanism under certain circumstances."
+msgstr "jhcはある環境下にて独立derivingをサポートする。"
+
+#. type: Plain text
+#: manual.mkd:484
+msgid "## Rank-N Polymorphism"
+msgstr "## ランクN多相性"
+
+#. type: Plain text
+#: manual.mkd:490
+msgid ""
+"Jhc supports higher ranked polymorphism. jhc will never infer types of "
+"higher rank, however when the context unambiguously specifies a higher "
+"ranked type, it will be used. For instance, user supplied type annotations "
+"and arguments to data constructors defined to by polymorphic will get the "
+"correct polymorphic type."
+msgstr ""
+"jhcは高ランク多相性をサポートする。\n"
+"文脈が高ランク多相型を明確に指定しても、jhcは高ランクの型推論を行なわない。\n"
+"例えば、型注釈と多相として定義されたデータコンストラクタへの引数を与えれば、正しい多相型が手に入る。"
+
+#. type: Plain text
+#: manual.mkd:492
+msgid "## Existential types"
+msgstr "## 存在型"
+
+#. type: Plain text
+#: manual.mkd:495
+msgid ""
+"Jhc supports first class existential types, using the 'exists' keyword. It "
+"also supports existential data types in a similar fashion to ghc."
+msgstr ""
+"jhcはファーストスラスの存在型をサポートする。\n"
+"それは'exists'キーワードで使用できる。\n"
+"また存在データ型はghcと似た方法でサポートしている。"
+
+#. type: Plain text
+#: manual.mkd:497
+msgid "## Unboxed Values"
+msgstr "## アンボックス化された値"
+
+#. type: Plain text
+#: manual.mkd:505
+msgid ""
+"Unboxed values in jhc are specified in a similar fashion to GHC however the "
+"lexical syntax is not changed to allow # in identifiers. # is still used in "
+"the syntax for various unboxed constructs, but normal Haskell rules apply to "
+"haskell identifiers. The convention is to suffix such types with '_' to "
+"indicate their status as unboxed. All unboxed values other than unboxed "
+"tuples are enabled by the -funboxed-value flag. For compatibility with GHC, "
+"the MagicHash extension name also turns on unboxed-values."
+msgstr ""
+"jhcでのアンボックス化された値はGHCと同様に指定できる。\n"
+"ただし、# をその識別子としては使用しない。\n"
+"各種アンボックス化されたコンストラクタのための構文として # はまだ使われているが、\n"
+"通常のHaskellのルールをがHaskellの識別子に使われる。\n"
+"コンベンションとして'_'の接尾辞の付いた型はアンボックス化された状態にあることを示している。\n"
+"アンボックス化タプル以外の全てのアンボックス化された値は、-funboxed-valueフラグによって有効になる。\n"
+"GHCとの互換性のため、MagicHash拡張でもアンボックス化型を有効にできる。"
+
+#. type: Plain text
+#: manual.mkd:507
+msgid "### Unboxed Tuples"
+msgstr "### アンボックス化タプル"
+
+#. type: Plain text
+#: manual.mkd:512
+msgid ""
+"Jhc supports unboxed tuples with the same syntax as GHC, (# 2, 4 #) is an "
+"unboxed tuple of two numbers. Unboxed tuples are enabled with "
+"-funboxed-tuples.  Unboxed tuples are kind-polymorphic, able to hold both "
+"boxed and unboxed values.  (but not another unboxed tuple)"
+msgstr ""
+"jhcはGHCと同じ文法でアンボックス化タプルをサポートする。(# 2, 4 #) は2つの数値を持つアンボックス化タプルである。\n"
+"アンボックス化タプルは-funboxed-tuplesオプションによって有効にできる。\n"
+"アンボックス化タプルは種多相であり、ボックス化とアンボックス化の両方おん値を保持することができる。\n"
+"(しかし他のアンボックス化タプルを保持することはできない)"
+
+#. type: Plain text
+#: manual.mkd:514
+msgid "### Unboxed Strings"
+msgstr "### アンボックス化文字列"
+
+#. type: Plain text
+#: manual.mkd:518
+msgid ""
+"Unboxed strings are enabled with the -funboxed-values flag. They are "
+"specified like a normal string but have a '#' at the end. Unboxed strings "
+"have types 'BitsPtr_'."
+msgstr ""
+"アンボックス化文字列は-funboxed-valuesフラグによって有効になる。\n"
+"通常の文字列と異なり、その名前は'#'で終わる。\n"
+"アンボックス化文字列は'BitsPtr_'型である。"
+
+#. type: Plain text
+#: manual.mkd:520
+msgid "### Unboxed Characters"
+msgstr "### アンボックス化文字"
+
+#. type: Plain text
+#: manual.mkd:524
+msgid ""
+"Unboxed characters can be expressed by putting a hash after a normal "
+"character literal. Unboxed characters are of type Char_ which is a newtype "
+"of Bits32_ and defined in Jhc.Prim.Bits"
+msgstr ""
+"アンボックス化文字は通常の文字リテラルの後に # を付けて表現する。\n"
+"アンボックス化文字はChar_型であり、さらにJhc.Prim.Bitsに定義のあるBits32_のnewtypeでもある。"
+
+#. type: Plain text
+#: manual.mkd:526
+msgid "### Unboxed Numbers"
+msgstr "### アンボックス化数値"
+
+#. type: Plain text
+#: manual.mkd:534
+msgid ""
+"Unboxed numbers are enabled with the -funboxed-values flag. They are "
+"postpended with a '#' such as in 3# or 4#. Jhc supports a limited form of "
+"type inference for unboxed numbers, if the type is fully specified by the "
+"environment and it is a suitable unboxed numeric type then that type is "
+"used. Otherwise it defaults to Int__. Whether the type is fully specifed "
+"follows the same rules as rank-n types. Unboxed numbers do the right thing "
+"for enumerations, so 0# can be used for the unboxed False value and the "
+"appropriate type will be infered."
+msgstr ""
+"アンボックス化数値は-funboxed-valuesフラグによって有効になる。\n"
+"それらは 3# や 4# のように'#'を付けて表現する。\n"
+"もし型が環境によって完全に指定されてて、かつそれが適切なアンボックス化数値型であるなら、jhcは型推論を限定的にサポートする。\n"
+"そうでない場合にはInt__をデフォルトとして使用する。\n"
+"型が完全に指定されているかどうかにかかわらず、ランクN型として同じルールが適用される。\n"
+"アンボックス化数値は列挙可能である。\n"
+"そのため 0# はアンボックス化されたFalse値として使うことができる。\n"
+"そして型推論も行なわれる。"
+
+#. type: Plain text
+#: manual.mkd:536
+msgid "### Operations on unboxed values"
+msgstr "### アンボックス化された値の取り扱い"
+
+#. type: Plain text
+#: manual.mkd:547
+msgid ""
+"To operate on unboxed vaules you need to bring the appropriate primitive "
+"operators into scope. You can do this via the special form of FFI "
+"declaration for importing primitives.  Any C-- primitive may be imported as "
+"well as a variety of utility routines. the primitive import mechanism is "
+"'smart' in that it will dig through newtypes and take care of "
+"boxing/unboxing values as needed.  So you can import a primitive on Char and "
+"it will take care of boxing the value up in the 'Char' constructor as well "
+"as the Char_ newtype for Bits32_, ultimately choosing the right Bits32_ "
+"primitive. imported primitives are normal haskell declarations so may be "
+"exported/imported from modules or passed as higher order functions like "
+"normal."
+msgstr ""
+"アンボックス化値を取り扱うために、適切なプリミティブの演算子をスコープ内に用意する必要がある。\n"
+"プリミティブのimportのために特殊なFFI宣言を使うことができる。\n"
+"全てのC--プリミティブはユーティリティ関数と同様にimportできる。\n"
+"プリミティブimportはのしくみは'スマート'で、newtype宣言を通りぬけ、ボックス化/アンボックス化値が必要か面倒をみてくれる。\n"
+"だからあなたがプリミティブをCharにimportしたなら、\n"
+"それが'Char'コンストラクタをボックス化されていると認識し、\n"
+"Char_がBits32_のnewtypeであることも認識してくれる。\n"
+"そして遂には正しいBits32_プリミティブを選択してくれるのだ。\n"
+"importされたプリミティブは通常のHaskell宣言である。\n"
+"だからモジュールからexport/importできるし、通常の高階関数としても扱える。"
+
+#. type: Plain text
+#: manual.mkd:550
+msgid "## Foreign Primitives"
+msgstr "## Foreignプリミティブ"
+
+#. type: Plain text
+#: manual.mkd:557
+msgid ""
+"In addition to foreign imports of external functions as described in the FFI "
+"spec. Jhc supports 'primitive' imports that let you communicate primitives "
+"directly to the compiler. In general, these should not be used other than in "
+"the implementation of the standard libraries. They generally do little error "
+"checking as it is assumed you know what you are doing if you use them. All "
+"haskell visible entities are introduced via foreign declarations in jhc."
+msgstr ""
+"FFIの仕様であるforeign importに加えてjhcは'primitive' importをサポートしていて、\n"
+"あなたはこれを用いてコンパイラと直接通信することができる。\n"
+"一般的にこれらは基盤ライブラリの実装以外の用途に使われるべきではない。\n"
+"一般にこれらは少ないエラーチェックしか行なわない。\n"
+"jhc内では、すべてのHaskellのエントリはforeign宣言によって形づくられている。"
+
+#. type: Plain text
+#: manual.mkd:559
+msgid "They all have the form"
+msgstr "それらは以下の形を取る。"
+
+#. type: Plain text
+#: manual.mkd:561
+#, no-wrap
+msgid "    foreign import primitive \"specification\" haskell_name :: type\n"
+msgstr ""
+
+#. type: Plain text
+#: manual.mkd:563
+msgid "where \"specification\" is one of the following"
+msgstr "\"specification\"には以下を選択できる。"
+
+#. type: Plain text
+#: manual.mkd:566
+msgid "seq : evaluate first argument to WHNF, then return the second argument"
+msgstr "seq : 最初の引数をWHNFとして評価し、二番目の引数を返す"
+
+#. type: Plain text
+#: manual.mkd:569
+msgid "zero,one : the values zero and one of any primitive type."
+msgstr "zero,one : 0か1の値をプリミティブ型に使う"
+
+#. type: Plain text
+#: manual.mkd:572
+msgid ""
+"const.C_CONSTANT : the text following const is directly inserted into the "
+"resulting C file"
+msgstr "const.C_CONSTANT : constに続くテキストをコンパイル結果のC言語ソースコードに直接埋め込む"
+
+#. type: Plain text
+#: manual.mkd:575
+msgid "peek.TYPE : the peek primitive for raw value TYPE"
+msgstr "peek.TYPE : TYPE型の値の読み込みプリミティブ"
+
+#. type: Plain text
+#: manual.mkd:578
+msgid "poke.TYPE : the poke primitive for raw value TYPE"
+msgstr "poke.TYPE : TYPE型の値の書き込みプリミティブ"
+
+#. type: Plain text
+#: manual.mkd:581
+msgid ""
+"sizeOf.TYPE, alignmentOf.TYPE, minBound.TYPE, maxBound.TYPE, umaxBound.TYPE "
+": various properties of a given internal type."
+msgstr "sizeOf.TYPE, alignmentOf.TYPE, minBound.TYPE, maxBound.TYPE, umaxBound.TYPE : 内部型TYPEの各種属性"
+
+#. type: Plain text
+#: manual.mkd:584
+msgid "error.MESSAGE : results in an error with constant message MESSAGE."
+msgstr "error.MESSAGE : results in an error with constant message MESSAGE."
+
+#. type: Plain text
+#: manual.mkd:587
+msgid ""
+"constPeekByte : peek of a constant value specialized to bytes, used "
+"internally by Jhc.String"
+msgstr "constPeekByte : 指定したバイト数、定数値を読み込み、Jhc.Stringとして使う"
+
+#. type: Plain text
+#: manual.mkd:590
+msgid ""
+"box : take an unboxed value and box it, the shape of the box is determined "
+"by the type at which this is imported"
+msgstr "box : アンボックス化値を取り、それをボックス化する。ボックス化された形はimportされた型によって決まる"
+
+#. type: Plain text
+#: manual.mkd:593
+msgid ""
+"unbox : take an boxed value and unbox it, the shape of the box is determined "
+"by the type at which this is imported"
+msgstr "unbox : ボックス化値を取り、アンボックス化する。ボックスの形はimportされた型によいって決まる"
+
+#. type: Plain text
+#: manual.mkd:596
+msgid ""
+"increment, decrement : increment or decrement a numerical integral primitive "
+"value"
+msgstr "increment, decrement : 整数のプリミティブ値を増減させる"
+
+#. type: Plain text
+#: manual.mkd:599
+msgid ""
+"fincrement, fdecrement : increment or decrement a numerical floating point "
+"primitive value"
+msgstr "fincrement, fdecrement : 浮動小数点のプリミティブ値を増減させる"
+
+#. type: Plain text
+#: manual.mkd:602
+msgid "exitFailure__ : abort the program immediately"
+msgstr "exitFailure__ : プログラムを即時abortさせる"
+
+#. type: Plain text
+#: manual.mkd:605
+msgid "C-- Primitive : any C-- primitive may be imported in this manner."
+msgstr "C-- Primitive : C--プリミティブはこの作法でimportする"
+
+#. type: Plain text
+#: manual.mkd:608
+msgid "# Differences"
+msgstr "# 差異"
+
+#. type: Plain text
+#: manual.mkd:611
+msgid "## Differences from Haskell 98"
+msgstr "## Haskell 98との違い"
+
+#. type: Plain text
+#: manual.mkd:613
+msgid "### Language Differences"
+msgstr "### 言語差分"
+
+#. type: Bullet: '* '
+#: manual.mkd:615
+msgid "Class contexts on data types are silently ignored."
+msgstr "データタイプ内のクラス文脈は単に無視される。"
+
+#. type: Bullet: '* '
+#: manual.mkd:620
+msgid ""
+"Class methods are fully 'eta expanded' out to the argument count specified "
+"by the type. This is often beneficial as instances that need to share "
+"partial applications are rare. This behavior can be turned off with the "
+"NOETA pragma for specific methods."
+msgstr ""
+"クラスメソッドはイータ変換されて引数の数は型によって指定される。\n"
+"部分適用することがめったにないインスタンスではこれはしばしば有益だ。\n"
+"この挙動はNOETAプラグマによって無効にできる。"
+
+#. type: Plain text
+#: manual.mkd:622
+msgid "### Library Changes"
+msgstr "### ライブラリへの変更"
+
+#. type: Plain text
+#: manual.mkd:627
+msgid ""
+"In addition to a larger set of base libraries roughly modeled on GHC's "
+"base.  Jhc provides a number of extensions/minor modifications to the "
+"standard libraries. These are designed to be mostly backwards compatible and "
+"most are to the class system."
+msgstr ""
+"GHCのbaseにおおざっぱに沿ったbaseライブラリに加えて、\n"
+"jhcはいくつかの拡張とマイナーな修正を標準ライブラリに施している。\n"
+"これらは大部分は後方互換性とクラスシステムのためにデザインされている。"
+
+#. type: Plain text
+#: manual.mkd:636
+#, no-wrap
+msgid ""
+"* Data.Bits\n"
+"    * Num is no longer a super class of Data.Bits. It never should have "
+"been.\n"
+"    * There are new methods logicalShiftR and arithmeticShiftR that do a "
+"logical and\n"
+"      arithmetic shift respectively. shiftR will always map to one of those "
+"as\n"
+"      appropriate.\n"
+"    * shiftR and shiftL do not check for negative arguments, if you might "
+"want\n"
+"      negative arguments, use the general 'shift' routine. 'shift' also "
+"comes\n"
+"      in logical and arithmetic varieties.\n"
+msgstr ""
+"* Data.Bits\n"
+"    * NumはData.Bitsのスーパークラスではない。\n"
+"    * logicalShiftRとarithmeticShiftR関数を追加した。それぞれ論理的、算術的なシフトを行なう。\n"
+"    * shiftRとshiftL関数は負の引数をチェックしない。\n"
+"      もし負の引数を使うならば一般的な'shift'ルーチンを使うこと。\n"
+"      'shift'にはまた論理的と算術的なバリエーションがある。\n"
+
+#. type: Plain text
+#: manual.mkd:639
+msgid "### Library Additions"
+msgstr "### ライブラリの追加"
+
+#. type: Plain text
+#: manual.mkd:643
+msgid ""
+"There are many other additional libraries provided with jhc, here I list "
+"only changes that affect modules that are defined by the haskell 98 or FFI "
+"specifications."
+msgstr ""
+"jhcはその他多くの追加ライブラリを提供している。\n"
+"ここではHaskell98もしくはFFIの仕様で定義されているモジュールに影響する変更だけを挙げるにとどめる。"
+
+#. type: Plain text
+#: manual.mkd:647
+#, no-wrap
+msgid ""
+"* Data.Int and Data.Word provide WordPtr, WordMax, IntPtr, and IntMax that\n"
+"   correspond to the C types uintptr_t, uintmax_t, intptr_t, and intmax_t\n"
+"   respectively.\n"
+msgstr ""
+"* Data.IntとData.Wordは左記を提供するWordPtr, WordMax, IntPtr, IntMax。\n"
+"   これらはそれぞれC言語のuintptr_t, uintmax_t, intptr_t, intmax_t型に該当する。\n"
+
+#. type: Plain text
+#: manual.mkd:650
+#, no-wrap
+msgid ""
+"* fromInt,toInt,fromDouble,toDouble have been added\n"
+"   alongside Integer and Rational routines in their respective classes.\n"
+msgstr ""
+"* IntegerとRationalクラスの実装近くのにfromInt,toInt,fromDouble,toDouble\n"
+"   が追加された。\n"
+
+#. type: Plain text
+#: manual.mkd:654
+#, no-wrap
+msgid ""
+"* floating point truncation and rounding functions have varieties that "
+"don't\n"
+"   return an integral type, but rather return something of the same type\n"
+"   as its argument. These have the same name but end in 'f'.\n"
+msgstr ""
+"* 浮動小数点の切り捨てと丸める関数に相違がある。\n"
+"   それらは整数型を返さず、引数と同じ型をかわりに返す。\n"
+"   これらの関数名には'f'という接尾辞が付いている。\n"
+
+#. type: Plain text
+#: manual.mkd:656
+msgid "## Notable Differences from GHC"
+msgstr "## GHCとの注目すべき差異"
+
+#. type: Plain text
+#: manual.mkd:659
+msgid ""
+"Jhc differs from GHC in certain ways that are allowed by Haskell 98, but "
+"might come as a surprise to some."
+msgstr "jhcはHaskell 98には準拠しているがGHCとの差異がある。"
+
+#. type: Bullet: ' * '
+#: manual.mkd:664
+msgid ""
+"An Int may be only 30 bits and may not observe simple binary truncation on "
+"overflow. If you need known bit width and binary semantics for your numbers "
+"then use the types in Data.Int and Data.Word. Overflow on Int or Word has "
+"undefined results."
+msgstr ""
+"Intは30ビットしか保持せず、切り捨ては検知できない。\n"
+"もし数値にビット幅とバイナリの意味論が必要な場合、Data.IntかData.Wordの型を使用すること。\n"
+"IntやWordがあふれた場合の結果は未定義である。"
+
+#. type: Bullet: ' * '
+#: manual.mkd:667
+msgid ""
+"A Char may only preserve values within the Unicode range. Storing values "
+"greater than 0x10FFFF has undefined results."
+msgstr ""
+"文字はUnicode幅の値しか保持できない。\n"
+"そのため0x10FFFFより多きな保存されている値は未定義な結果をもたらす。"
+
+#. type: Bullet: ' * '
+#: manual.mkd:669
+msgid "The Int and Word types are at most 32 bits, even on 64 bit architectures."
+msgstr "例え64ビットアーキティクチャ上でもIntとWord型は最大でも32ビット幅である。"
+
+#. type: Bullet: ' * '
+#: manual.mkd:674
+msgid ""
+"All text based IO is performed according to the current locale. This means "
+"that Unicode works seamlessly, but older programs that assumed IO was "
+"performed by simple truncation of chars down to 8 bits will fail. Use the "
+"explicit binary routines if you need binary IO."
+msgstr ""
+"テキストベースのIOは現在のロケールで実行される。\n"
+"つまりUnicodeについてはうまく使用できるが、\n"
+"IOが8ビット文字を仮定する古いプログラムは異常なふるまいになる。\n"
+"もしバイナリのIOが必要であれば、バイナリのルーチンを明示的に使うこと。"
+
+#. type: Plain text
+#: manual.mkd:677
+msgid "## Differences That are Considered Misfeatures"
+msgstr "## 仕様の欠陥"
+
+#. type: Plain text
+#: manual.mkd:679
+msgid "These misfeatures will be fixed at some point."
+msgstr "これらの仕様の欠陥は将来修正される予定である。"
+
+#. type: Bullet: ' * '
+#: manual.mkd:683
+msgid ""
+"Integer corresponds to IntMax rather than an arbitrary precision type. As "
+"soon as a suitable arbitrary precision library emerges, it will be replaced."
+msgstr ""
+"Integer型は任意精度型ではなく、IntMax型と同じ精度である。\n"
+"適切な任意精度ライブラリが見つかれば、この問題は修正されるだろう。"
+
+#. type: Bullet: ' * '
+#: manual.mkd:685
+msgid "Ix is not derivable."
+msgstr "Ix型は自動導出できない。"
+
+#. type: Plain text
+#: manual.mkd:688
+msgid "# CrossCompilation"
+msgstr "# クロスコンパイル"
+
+#. type: Plain text
+#: manual.mkd:691
+msgid "## Basics"
+msgstr "## 基本"
+
+#. type: Plain text
+#: manual.mkd:698
+msgid ""
+"Unlike many other compilers, jhc is a native cross compiler. What this means "
+"is that every compile of jhc is able to create code for all possible target "
+"systems. This leads to many simplifications when it comes to cross compiling "
+"with jhc. Basically in order to cross compile, you need only pass the flag "
+"'--cross' to jhc, and pass an appropriate '-m' option to tell jhc what "
+"machine you are targetting. An example would be"
+msgstr ""
+"他の多くのコンパイラと異なり、jhcは生来のクロスコンパイラである。\n"
+"これが意味することは、jhcによるコンパイルによって、どんなターゲットシステムのためのコードも生成できるということである。\n"
+"これにより、jhcを利用したクロスコンパイルが非常に簡単になる。\n"
+"基本的には、クロスコンパイルを行うためにはjhcに '--cross' フラグと、\n"
+"ターゲットマシンを指定するオプション '-m'を渡せば良い。\n"
+"以下がその例である。"
+
+#. type: Plain text
+#: manual.mkd:700
+#, no-wrap
+msgid "    ; jhc --cross -mwin32 test/HelloWorld.hs\n"
+msgstr "    ; jhc --cross -mwin32 test/HelloWorld.hs\n"
+
+#. type: Plain text
+#: manual.mkd:703
+msgid ""
+"The targets list is extensible at run-time via the targets.ini file "
+"explained below."
+msgstr "targets.iniファイルに以下のような表記を追加すれば、ターゲットのリストを拡張できる。"
+
+#. type: Plain text
+#: manual.mkd:705
+msgid "## targets.ini"
+msgstr "## targets.ini"
+
+#. type: Plain text
+#: manual.mkd:707
+msgid ""
+"This file determines what targets are available. The format consists of "
+"entries as follows."
+msgstr ""
+"このファイルは利用可能なターゲットを列挙する。\n"
+"フォーマットは以下のエントリから成り立っている。"
+
+#. type: Plain text
+#: manual.mkd:713
+#, no-wrap
+msgid ""
+"    [targetname]\n"
+"    key1=value\n"
+"    key2=value\n"
+"    key3+=value\n"
+"    merge=targetname2\n"
+msgstr ""
+"    [targetname]\n"
+"    key1=value\n"
+"    key2=value\n"
+"    key3+=value\n"
+"    merge=targetname2\n"
+
+#. type: Plain text
+#: manual.mkd:717
+msgid ""
+"merge is a special key meaning to merge the contents of another target into "
+"the current one. The configuration file is read in order, and the final "
+"value set for a given key is the one that is used."
+msgstr ""
+"mergeは特別なキーで他のターゲットから現在のターゲットへ内容をマージしていることを意味する。\n"
+"設定ファイルは先頭から順に読み込まれ、\n"
+"与えられたキーに対応する最後の値が実際に使われる。"
+
+#. type: Plain text
+#: manual.mkd:719
+msgid "An example describing how to cross compile for windows is as follows:"
+msgstr "次に示すのはWindowsクロスコンパイルの例である:"
+
+#. type: Plain text
+#: manual.mkd:725
+#, no-wrap
+msgid ""
+"    [win32]\n"
+"    cc=i386-mingw32-gcc\n"
+"    cflags+=-mwindows -mno-cygwin\n"
+"    executable_extension=.exe\n"
+"    merge=i686\n"
+msgstr ""
+"    [win32]\n"
+"    cc=i386-mingw32-gcc\n"
+"    cflags+=-mwindows -mno-cygwin\n"
+"    executable_extension=.exe\n"
+"    merge=i686\n"
+
+#. type: Plain text
+#: manual.mkd:732
+msgid ""
+"This sets the compiler to use as well as a few other options then jumps to "
+"the generic i686 routine. The special target [default] is always read before "
+"all other targets. If '--cross' is specified on the command line then this "
+"is the only implicitly included configuration, otherwise jhc will assume you "
+"are compiling for the current architecture and choose an appropriate target "
+"to include in addition to default."
+msgstr ""
+"上記は一般のi686設定を使って少々の他のオプションをコンパイラに設定している。\n"
+"特別なターゲットである[default]は常に他のターゲットより先に読み込まれる。\n"
+"もしコマンドラインから'--cross'が指定されたら暗黙にこの設定を読み込む。\n"
+"さもなければjhcは現アーキティクチャをコンパイル対象としてみなして、\n"
+"defaultに追加して適切なターゲットを選択する。"
+
+#. type: Plain text
+#: manual.mkd:734
+msgid "jhc will attempt to read several targets.ini files in order. they are"
+msgstr ""
+"jhcは複数のtargets.iniファイルを順に読み込もう試みる。\n"
+"それらのファイルは以下である。"
+
+#. type: Plain text
+#: manual.mkd:737
+msgid ""
+"$PREFIX/etc/jhc-\\$VERSION/targets.ini : this is the targets.ini that is "
+"included with jhc and contains the default options."
+msgstr "$PREFIX/etc/jhc-\\$VERSION/targets.ini : このtargets.iniファイルはjhcによって読み込まれ、既定のオプションを含む。"
+
+#. type: Plain text
+#: manual.mkd:740
+msgid ""
+"$PREFIX/etc/jhc-\\$VERSION/targets-local.ini : jhc will read this if it "
+"exists, it is used to specify custom system wide configuration options, such "
+"as the name of local compilers."
+msgstr "$PREFIX/etc/jhc-\\$VERSION/targets-local.ini : jhcは存在すればこのファイルを読み込む。このファイルはローカルのコンパイラのようなシステムグローバルのカスタム設定を含む。"
+
+#. type: Plain text
+#: manual.mkd:743
+msgid ""
+"$HOME/.jhc/targets.ini : this is where a users local configuration "
+"information goes."
+msgstr "$HOME/.jhc/targets.ini : ユーザローカルの設定"
+
+#. type: Plain text
+#: manual.mkd:746
+msgid ""
+"$HOME/etc/jhc/targets.ini : this is simply for people that prefer to not use "
+"hidden directories for configuration"
+msgstr "$HOME/etc/jhc/targets.ini : このファイルは隠し属性のディレクトリを嫌う人向けのものである"
+
+#. type: Plain text
+#: manual.mkd:750
+msgid ""
+"The last value specified for an option is the one used, so a users local "
+"configuration overrides the system local version which overrides the built "
+"in options."
+msgstr ""
+"オプションについて有効とみなされるのは最後の値である。\n"
+"ユーザ定義のローカル設定はシステムグローバルのローカル設定を上書きする。\n"
+"またシステムグローバルのローカル設定は組み込みのオプションを上書きする。"
+
+#. type: Plain text
+#: manual.mkd:752
+msgid "## Options available"
+msgstr "## 利用可能なオプション"
+
+#. type: Plain text
+#: manual.mkd:768
+#, no-wrap
+msgid ""
+"Option                    Meaning\n"
+"------                    "
+"---------------------------------------------------------------------------\n"
+"_cc_                      what c compiler to use. generally this will be gcc "
+"for local builds and something like $ARCH-$HOST-gcc for cross compiles\n"
+"_byteorder_               one of *le* or *be* for little or big endian\n"
+"_gc_                      what garbage collector to use. It should be one of "
+"*static* or *boehm*.\n"
+"_cflags_                  options to pass to the c compiler\n"
+"_cflags\\_debug_           options to pass to the c compiler only when "
+"debugging is enabled\n"
+"_cflags\\_nodebug_         options to pass to the c compiler only when "
+"debugging is disabled\n"
+"_profile_                 whether to include profiling code in the generated "
+"executable\n"
+"_autoload_                what haskell libraries to autoload, seperated by "
+"commas.\n"
+"_executable\\_extension_   specifies an extension that should be appended to "
+"executable files, (i.e. .EXE on windows)\n"
+"_merge_                   a special option that merges the contents of "
+"another configuration target into the currrent one.\n"
+"_bits_                    the number of bits a pointer contains on this "
+"architecture\n"
+"_bits\\_max_               the number of bits in the largest integral "
+"type. should be the number of bits in the 'intmax_t' C type.\n"
+"_arch_                    what to pass to gcc as the architecture\n"
+msgstr ""
+"オプション                意味\n"
+"------                    ---------------------------------------------------------------------------\n"
+"_cc_                      Cコンパイラを指定。一般に手元でのコンパイルにはgccを指定し、クロスコンパイルには$ARCH-$HOST-gccを指定する。\n"
+"_byteorder_               リトル/ビッグエンディアンのために *le* もしくは *be* を指定する\n"
+"_gc_                      GCを使う。*static* もしくは *boehm* を指定する。\n"
+"_cflags_                  Cコンパイラに渡すオプション\n"
+"_cflags\\_debug_           デバッグが有効な場合のにみCコンパイラに渡すオプション\n"
+"_cflags\\_nodebug_         デバッグが無効な場合のにみCコンパイラに渡すオプション\n"
+"_profile_                 プロファイルコードを実行バイナリに出力する\n"
+"_autoload_                自動読み込みされるHaskellライブラリを指定。コンマで区切る。\n"
+"_executable\\_extension_   実行バイナリファイルの拡張子を指定する (すなわちWindowsでは.EXEとなる)\n"
+"_merge_                   他の設定ターゲットの内容を現ターゲットにマージする特別なオプション\n"
+"_bits_                    このアーキティクチャでポインタが保有するビット数\n"
+"_bits\\_max_               整数型の最大値が保有するビット数。これは'intmax_t'のC言語型と同じビット数でなければならない。\n"
+"_arch_                    gccに渡すアーキティクチャ名\n"
+
+#. type: Plain text
+#: manual.mkd:771
+msgid "# Internals"
+msgstr "# 内部設計"
+
+#. type: Plain text
+#: manual.mkd:774
+msgid "## The Run Time System"
+msgstr "## ランタイムシステム"
+
+#. type: Plain text
+#: manual.mkd:783
+msgid ""
+"Jhc is very minimalist in that it does not have a precompiled run time "
+"system, but rather generates what is needed as part of the compilation "
+"process.  However, back ends do have specific run-time representations of "
+"data, which can be affected by things like the choice of garbage "
+"collector. The following describes the general layout for the C based "
+"back-ends, but compiler options such as garbage collection method or whether "
+"we do full program analysis, will affect which features are used and whether "
+"certain optimized layouts are possible."
+msgstr ""
+"jhcは強いミニマリストであり、あらかじめコンパイルされたランタイムを持たない。\n"
+"ランタイムはコンパイル時に必要になった際に生成される。\n"
+"けれどもバックエンドは、GCの選択のように、ランタイム特定のデータ表現を持つ。\n"
+"C言語ベースのバックエンドのための一般レイアウトを次に示す。\n"
+"しかしGC種別のようなコンパイラオプションやプログラム全体解析は、どの機能が使われて、最適化されたレイアウトが使用できるかに影響を及ぼす。"
+
+#. type: Plain text
+#: manual.mkd:791
+msgid ""
+"Unboxed values directly translate to values in the target language, an "
+"unboxed Int will translate directly into an 'int' as an argument and an "
+"unboxed pointer will be a raw pointer. Unboxed values have no special "
+"interpretation and are _not_ followed by the garbage collector. If the "
+"target language does not support a feature such as multiple return values, "
+"it will have to be simulated.  It would not be wrong to think of Grin code "
+"that only deals with unboxed values to be isomorphic to C-- or C augmented "
+"with multiple return values."
+msgstr ""
+"アンボックス化値はターゲットの言語の値に直接翻訳される。\n"
+"アンボックス化Intは引数として直接'int'に翻訳される。\n"
+"またアンボックス化ポインタは生のポインタになる。\n"
+"アンボックス化値は特別な解釈を持たず、 _GCは面倒をみてくれない_ 。\n"
+"もしターゲットの言語が複数返値のような機能をサポートしていない場合、シミュレーションする必要がある。\n"
+"grinコードが複数返値が補強されたC--もしくはCへの同型としてのみアンボックス化値を取り扱うのは悪い考えではない。"
+
+#. type: Plain text
+#: manual.mkd:797
+msgid ""
+"Boxed values have a standard representation and can be followed. Unlike some "
+"other implementation, being boxed does not imply the object is located on "
+"the heap. It may be on the stack, heap, or even embedded within the smart "
+"pointer itself. Being boxed only means that the object may be represented by "
+"a smart pointer, which may or may not actually be a pointer in the "
+"traditional sense."
+msgstr ""
+"ボックス化された値は標準の表現を持っている。\n"
+"他の実装と異なり、ボックス化されることがオブジェクトがヒープに配置されることを意味しない。\n"
+"それはスタックやヒープに確保されるかもしれない。\n"
+"さらにはスマートポインタの中に組み込まれているかもしれない。\n"
+"ボックス化されていることはオブジェクトがスマートポインタによって表現されているか、\n"
+"実際には伝統的なポインタであるかもしれないのだ。"
+
+#. type: Plain text
+#: manual.mkd:801
+msgid ""
+"A boxed value in jhc is represented by a 'smart pointer' of c type sptr_t. a "
+"smart pointer is the size of a native pointer, but can take on different "
+"roles depending on a pair of tag bits, called the ptype."
+msgstr ""
+"jhcにおけるボックス化された値はC言語型のsptr_tという'スマートポインタ'である。\n"
+"スマートポインタは通常のポインタと同じサイズを持つが、\n"
+"1つのペアのタグビットで表わされる別の役割もおっている。\n"
+"それはptypeと呼ばれる。"
+
+#. type: Plain text
+#: manual.mkd:803
+msgid "smart pointers take on a general form as follows:"
+msgstr "スマートポインタは一般に以下の形をしている:"
+
+#. type: Plain text
+#: manual.mkd:807
+#, no-wrap
+msgid ""
+"    -------------------------\n"
+"    |    payload        | GL|\n"
+"    -------------------------\n"
+msgstr ""
+"    -------------------------\n"
+"    |    payload        | GL|\n"
+"    -------------------------\n"
+
+#. type: Plain text
+#: manual.mkd:810
+#, no-wrap
+msgid ""
+"      G - if set, then the garbage collector should not treat value as a "
+"pointer to be followed\n"
+"      L - lazy, this bit being set means the value is potentially not in "
+"WHNF\n"
+msgstr ""
+"      G - セットされると、GCは値をポインタとして取り扱わない\n"
+"      L - 遅延。このビットがセットされると値はWHNFではないことを示す\n"
+
+#. type: Plain text
+#: manual.mkd:812
+msgid "A sptr_t on its own in the wild can only take on one of the following forms:"
+msgstr "sptr_tは以下の形の内どれか一つの状態にある:"
+
+#. type: Plain text
+#: manual.mkd:816
+#, no-wrap
+msgid ""
+"    -------------------------\n"
+"    |    whnf raw value | 10|\n"
+"    -------------------------\n"
+msgstr ""
+"    -------------------------\n"
+"    |    whnf raw value | 10|\n"
+"    -------------------------\n"
+
+#. type: Plain text
+#: manual.mkd:820
+#, no-wrap
+msgid ""
+"    -------------------------\n"
+"    |    whnf location  | 00|\n"
+"    -------------------------\n"
+msgstr ""
+"    -------------------------\n"
+"    |    whnf location  | 00|\n"
+"    -------------------------\n"
+
+#. type: Plain text
+#: manual.mkd:827
+msgid ""
+"WHNF stands for 'Weak Head Normal Form' and means that the value is not a "
+"suspended function and hence not a pointer to a thunk. It may be directly "
+"examined and need not be evaluated. wptr_t is an alias for sptr_t that is "
+"guarenteed to be of one of the above forms. It is used to improve safety for "
+"when we can statically know that a value is WHNF and hence we can skip the "
+"expensive 'eval'."
+msgstr ""
+"WHNFは'Weak Head Normal Form'を表わしている。\n"
+"さらにその値は中断された関数ではなく、それゆえサンクへのポインタでもない。\n"
+"それは直接検査されるかもしれず、また評価される必要がないかもしれない。\n"
+"wptr_tはsptr_tの別名で、上記の形式を取っていることを保証するためにある。\n"
+"これは安全性を向上させるために使われ、\n"
+"値がWHNFであり高価な'eval'をスキップできるかどうかを静的に知ることができる。"
+
+#. type: Plain text
+#: manual.mkd:833
+msgid ""
+"The difference between the raw value and the whnf location is that the first "
+"contains uninterpreted bits, while the second is a pointer to a location on "
+"the heap or stack and hence the garbage collector should follow it. The "
+"format of the memory pointed to by the whnf location is unspecified and "
+"dependent on the actual type being represented."
+msgstr ""
+"生の値とWHNF配置の違いは、\n"
+"前者は未解釈のビットを保持しているが、\n"
+"後者はヒープやスタックへのポインターであるためにGCが回収する必要があるということだ。\n"
+"WHNF配置によって指し示されたメモリのフォーマットは実際の型表現に依存していていちがいに決まってはいない。"
+
+#. type: Plain text
+#: manual.mkd:837
+msgid ""
+"Partial (unsaturated) applications are normal WHNF values. Saturated "
+"applications which may be 'eval'ed and updated are called thunks and must "
+"not be pointed to by WHNF pointers. Their representation follows."
+msgstr ""
+"部分適用された関数は通常のWHNF値である。\n"
+"'eval'されたか更新された全適用された関数はサンクと呼ばれ、WHNFのポインタから指示されない。\n"
+"これらの表現は以下である。"
+
+#. type: Plain text
+#: manual.mkd:841
+#, no-wrap
+msgid ""
+"    -------------------------\n"
+"    |   lazy location   | 01|\n"
+"    -------------------------\n"
+msgstr ""
+"    -------------------------\n"
+"    |   lazy location   | 01|\n"
+"    -------------------------\n"
+
+#. type: Plain text
+#: manual.mkd:847
+msgid ""
+"A lazy location points to either a thunk, or a redirection to a WHNF "
+"value. A lazy location is always a pointer to an allocated block of memory "
+"which always begins with a restricted smart pointer. This restricted smart "
+"pointer is represented by the C type alias 'fptr_t'. fptr_t's only occur as "
+"the first entry in a lazy location, they never are passed around as objects "
+"in their own right."
+msgstr ""
+"遅延配置はサンクもしくはWHNFへのリダイレクトトを指し示す。\n"
+"遅延配置は必ずアロケートされたメモリ領域を差し、\n"
+"その領域の先頭は制限されたスマートポインタである。\n"
+"この制限されたスマートポインタはC言語の'fptr_t'型で表現される。\n"
+"fptr_tは遅延配置の先頭エントリのためだけに存在し、\n"
+"それらはオブジェクトとして流通することはない。"
+
+#. type: Plain text
+#: manual.mkd:852
+msgid ""
+"A fptr_t may be a whnf value or a code pointer. If a fptr_t is a whnf value "
+"(of one of the two forms given above) then it is called a redirection, the "
+"lazy location should be treated exactly as if it were the whnf given. This "
+"is used to redirect an evaluated thunk to its computed value."
+msgstr ""
+"fptr_tはWHNF値もしくはコードへのポインタである可能性がある。\n"
+"もしfptr_tが(上図2種類の内の一つのような)WHNF値ならそれはリダイレクションと呼ばれる。\n"
+"遅延配置はそれがWHNFによるものだと厳密に取り扱わなければならない。\n"
+"これは評価済みサンクへのリダイレクトとして使われる。"
+
+#. type: Plain text
+#: manual.mkd:858
+msgid ""
+"A fptr_t may also be a 'code pointer' in which case the lazy location is "
+"called a thunk. A code pointer is a pointer to executable machine code that "
+"evaluates a closure and returns a wptr_t, the returned wptr_t is then "
+"generally written over the code pointer, turning the thunk into a "
+"redirection. It is the responsibility of the code pointed to to perform this "
+"redirection."
+msgstr ""
+"fptr_tはまた'コードポインタ'である可能性があり、\n"
+"この場合遅延配置はサンクと呼ばれる。\n"
+"コードポインタは実行可能な機械語へのポインタで、それはクロージャを評価してwptr_tを返す。\n"
+"返却されたwptr_tは通常、サンクをリダイレクションに変更するために、コードポインタを書きつぶす。\n"
+"指示されたコードはこのリダイレクションを実行する責任がある。"
+
+#. type: Plain text
+#: manual.mkd:863
+#, no-wrap
+msgid ""
+"    -------------------------\n"
+"    |    code pointer   | 11|\n"
+"    -------------------------\n"
+"    |     data ...          |\n"
+msgstr ""
+"    -------------------------\n"
+"    |    code pointer   | 11|\n"
+"    -------------------------\n"
+"    |     data ...          |\n"
+
+#. type: Plain text
+#: manual.mkd:866
+msgid ""
+"When debugging, the special code pointer BLACK_HOLE is also sometimes stored "
+"in a fptr_t to detect certain run-time errors."
+msgstr ""
+"デバッグ時には特殊なコードポインタBLACK_HOLEが時々fptr_tに格納されている。\n"
+"これはある種のランタイムエラーを検出する。"
+
+#. type: Plain text
+#: manual.mkd:870
+msgid ""
+"Note that unlike other implementations, a fptr_t may _not_ be another lazy "
+"location. you can not have chained redirections, a redirection is always a "
+"redirection to a whnf value."
+msgstr ""
+"他の実装と異なりfptr_tは遅延配置の別の形では _ない_ ことに注意すること。\n"
+"あなたはリダイレクションをチェーンしてはいけない。\n"
+"リダイレクションは常にWHNF値へのリダイレクションでなければならない。"
+
+#. type: Plain text
+#: manual.mkd:874
+#, no-wrap
+msgid ""
+"    sptr_t - a tagged smart pointer, may contain a whnf value or a lazy "
+"location.\n"
+"    wptr_t - a tagged smart pointer that contains a whnf value (either raw "
+"or a location)\n"
+"    fptr_t - a tagged smart pointer, may contain a whnf value indicating a "
+"redirection, or a code pointer indicating a thunk.\n"
+msgstr ""
+"    sptr_t - タグ付けされたスマートポインタ。WHNF値か遅延配置を保持する。\n"
+"    wptr_t - タグ付けされたスマートポインタ。生か配置情報のWNHF値を保持する。\n"
+"    fptr_t - タグ付けされたスマートポインタ。リダイレクションを示すWHNF値かサンクを示すコードポインタを保持する。\n"
+
+#. type: Plain text
+#: manual.mkd:878
+msgid "## Jhc Core Type System"
+msgstr "## jhcコア型システム"
+
+#. type: Plain text
+#: manual.mkd:882
+msgid ""
+"Jhc's core is based on a pure type system. A pure type system (also called a "
+"PTS) is actually a parameterized set of type systems. Jhc's version is "
+"described by the following."
+msgstr ""
+"jhcのコアは純粋なpure type systemにもとづいている。\n"
+"pure type system (PTS)は型システムのパラメータ化されたセットである。\n"
+"jhcのPTSについて以下で解説する。"
+
+#. type: Plain text
+#: manual.mkd:885
+#, no-wrap
+msgid ""
+"    Sorts  = (*, !, **, #, (#), ##, □)\n"
+"    Axioms = (*:**, #:##, !:**, **:□, ##:□)\n"
+msgstr ""
+"    種類 = (*, !, **, #, (#), ##, □)\n"
+"    公理 = (*:**, #:##, !:**, **:□, ##:□)\n"
+
+#. type: Plain text
+#: manual.mkd:896
+#, no-wrap
+msgid ""
+"    -- sort kind\n"
+"    *   is the kind of boxed values\n"
+"    !   is the kind of boxed strict values\n"
+"    #   is the kind of unboxed values\n"
+"    (#) is the kind of unboxed tuples\n"
+"    -- sort superkind\n"
+"    **  is the superkind of all boxed value\n"
+"    ##  is the superkind of all unboxed values\n"
+"    -- sort box\n"
+"    □   superkinds inhabit this\n"
+msgstr ""
+"    -- 種類kind(種)\n"
+"    *   ボックス化値の種\n"
+"    !   ボックス化された正格値の種\n"
+"    #   アンボックス化された種\n"
+"    (#) アンボックス化タプルの種\n"
+"    -- 種類superkind\n"
+"    **  全てのボックス化値のsuperkind\n"
+"    ##  全てのアンボックス化値のsuperkind\n"
+"    -- 種類box\n"
+"    □   superkindの存在位置\n"
+
+#. type: Plain text
+#: manual.mkd:898
+#, no-wrap
+msgid ""
+"    in addition there exist user defined kinds, which are always of "
+"supersort ##\n"
+msgstr "    ユーザ定義の種の存在に加えて、supersort ##が存在する。\n"
+
+#. type: Plain text
+#: manual.mkd:903
+msgid ""
+"The following Rules table shows what sort of abstractions are allowed, a "
+"rule of the form (A,B,C) means you can have functions of things of sort A to "
+"things of sort B and the result is something of sort C. _Function_ in this "
+"context subsumes both term and type level abstractions."
+msgstr ""
+"次に示すルール表は抽象の種類を表現している。\n"
+"(A,B,C)の形をもつルールは種類Aから種類Bへの関数で結果が種類Cであることを意味している。\n"
+"この文脈での _関数_ は項と型レベルの抽象を含んでいる。"
+
+#. type: Plain text
+#: manual.mkd:908
+msgid ""
+"Notice that functions are always boxed, but may be strict if they take an "
+"unboxed tuple as an argument.  When a function is strict it means that it is "
+"represented by a pointer to code directly, it cannot be a suspended value "
+"that evaluates to a function."
+msgstr ""
+"アンボックス化タプルを引数に取り正格であるかもしれないが、\n"
+"関数はいつもボックス化されていることに注意すること。\n"
+"コードを直接指示するポインタによって表現され、関数が正格であるなら、\n"
+"関数の評価が中断された値であることはありえない。"
+
+#. type: Plain text
+#: manual.mkd:915
+msgid ""
+"These type system rules apply to lambda abstractions. It is possible that "
+"data constructors might exist that cannot be given a type on their own with "
+"these rules, even though when fully applied it has a well formed type. An "
+"example would be unboxed tuples. This presents no difficulty as one "
+"concludes correctly that it is a type error for these constructors to ever "
+"appear when not fully saturated with arguments."
+msgstr ""
+"これらの型システムのルールはλ抽象に適用される。\n"
+"これらのルールによって、与えられた型を取れないデータコンストラクタが存在してしまうかもしれないが、それは許容できる。\n"
+"例としてはアンボックス化タプルがある。\n"
+"部分適用された関数であったとしてもそれらのコンストラクタが型エラーであることを正しく推論するのは困難ではない。"
+
+#. type: Plain text
+#: manual.mkd:918
+#, no-wrap
+msgid ""
+"    as a shortcut we will use *# to mean every combination involving * and "
+"#, and so forth.\n"
+"    for instance, (*#,*#,*) means the set (*,*,*) (#,*,*) (*,#,*) (#,#,*)\n"
+msgstr ""
+"    ショートカットとしてここでは *# を * と # の組み合わせをとして使う。\n"
+"    例えば、 (*#,*#,*) は (*,*,*) (#,*,*) (*,#,*) (#,#,*) のセットを意味している。\n"
+
+#. type: Plain text
+#: manual.mkd:930
+#, no-wrap
+msgid ""
+"    Rules =\n"
+"       (*#!,*#!,*)  -- functions from values to values are boxed and lazy\n"
+"       (*#!,(#),*)  -- functions from values to unboxed tuples are boxed and "
+"lazy\n"
+"       ((#),*#!,!)  -- functions from unboxed tuples to values are boxed and "
+"strict\n"
+"       ((#),(#),!)  -- functions from unboxed tuples to unboxed tuples are "
+"boxed and strict\n"
+"       (**,*,*)     -- may have a function from an unboxed type to a value\n"
+"       (**,#,*)\n"
+"       (**,!,*)\n"
+"       (**,**,**)  -- we have functions from types to types\n"
+"       (**,##,##)  -- MutArray_ :: * -> #\n"
+"       (##,##,##)  -- Complex_ :: # -> #\n"
+msgstr ""
+"    ルール =\n"
+"       (*#!,*#!,*)  -- 値から値への関数で、ボックス化されていて非正格\n"
+"       (*#!,(#),*)  -- 値からアンボックス化タプルへの関数で、ボックス化されていて非正格\n"
+"       ((#),*#!,!)  -- アンボックス化タプルから値への関数で、ボックス化されていて正格\n"
+"       ((#),(#),!)  -- アンボックス化タプルからアンボックス化タプルへの関数で、ボックス化されていて正格\n"
+"       (**,*,*)     -- アンボックス化型から値への関数を保持している可能性がある\n"
+"       (**,#,*)\n"
+"       (**,!,*)\n"
+"       (**,**,**)  -- 型から型への関数を持てる\n"
+"       (**,##,##)  -- MutArray_ :: * -> #\n"
+"       (##,##,##)  -- Complex_ :: # -> #\n"
+
+#. type: Plain text
+#: manual.mkd:932
+#, no-wrap
+msgid "    The defining feature of boxed values is\n"
+msgstr "    ボックス化値の定義は以下である。\n"
+
+#. type: Plain text
+#: manual.mkd:934
+#, no-wrap
+msgid "    _|_ :: t iff t::*\n"
+msgstr "    _|_ :: t iff t::*\n"
+
+#. type: Plain text
+#: manual.mkd:936
+#, no-wrap
+msgid "    This PTS is functional but not injective\n"
+msgstr "    このPTSは関数的であるが単射ではない。\n"
+
+#. type: Plain text
+#: manual.mkd:938
+msgid "The PTS can be considered stratified into the following levels"
+msgstr "このPTSは次のレベルに階層化されている。"
+
+#. type: Plain text
+#: manual.mkd:944
+#, no-wrap
+msgid ""
+"    □                - sort box\n"
+"    **,##,           - sort superkind\n"
+"    *,#,(#),!        - sort kind\n"
+"    Int,Bits32_,Char - sort type\n"
+"    3,True,\"bob\"     - sort value\n"
+msgstr ""
+"    □               - 種類box\n"
+"    **,##,           - 種類superkind\n"
+"    *,#,(#),!        - 種類kind(種)\n"
+"    Int,Bits32_,Char - 種類type(型)\n"
+"    3,True,\"bob\"     - 種類value(値)\n"
+
+#. type: Plain text
+#: manual.mkd:946
+msgid "### On boxed kinds"
+msgstr "### ボックス化kind(種)について"
+
+#. type: Plain text
+#: manual.mkd:950
+msgid ""
+"The boxed kinds (* and !) represent types that have a uniform run time "
+"representation. Due to this, functions may be written that are polymorphic "
+"in types of these kinds.  Hence the rules of the form (**,?,?), allowing "
+"taking types of boxed kinds as arguments."
+msgstr ""
+"ボックス化kind(* や !)は同型のランタイム表現を持つ型を表現する。\n"
+"このため、関数はこれらのkindの型で多相的に記述することができる。\n"
+"(**,?,?)という形のルールがあるため、ボックス化されたkindの型を引数として取ることができる。"
+
+#. type: Plain text
+#: manual.mkd:954
+msgid ""
+"the unboxed kind # is inhabited with types that have their own specific run "
+"time representation. Hence you cannot write functions that are polymorphic "
+"in unboxed types"
+msgstr ""
+"アンボックス化されたkind # は独自のランタイム表現を持つ型に存在する。\n"
+"アンボックス化型を多相的に使う関数を書くことはできない。"
+
+#. type: Plain text
+#: manual.mkd:956
+msgid "### On sort box, the unboxed tuple, and friends"
+msgstr "### 種類box、アンボックス化タプルとその同類について"
+
+#. type: Plain text
+#: manual.mkd:962
+msgid ""
+"Although sort box does not appear in the code, it is useful from a "
+"theoretical point of view to talk about certain types such as the types of "
+"unboxed tuples.  Unboxed tuples may have boxed and unboxed arguments, "
+"without sort box it would be impossible to express this since it must be "
+"superkind polymorphic. sort box allows one to express this as (in the case "
+"of the unboxed 2-tuple)"
+msgstr ""
+"種類boxはコード中に現われないけれど、アンボックス化タプルのようなある種の型について理論的な視点から有用である。\n"
+"アンボックス化タプルはボックス化/アンボックス化どちらの引数も取れる。\n"
+"これを表現することは種類boxなしにそれは不可能だ。\n"
+"なぜならsuperkind多相でなければならないから。\n"
+"種類boxは次のような表現を許す。\n"
+"(これはアンボックス化2タプルのケースである)"
+
+#. type: Plain text
+#: manual.mkd:964
+#, no-wrap
+msgid "    ∀s1:□ ∀s2:□ ∀k1:s1 ∀k2:s2 ∀t1:k1 ∀t2:k2 . (# t1, t2 #)\n"
+msgstr "    ∀s1:□ ∀s2:□ ∀k1:s1 ∀k2:s2 ∀t1:k1 ∀t2:k2 . (# t1, t2 #)\n"
+
+#. type: Plain text
+#: manual.mkd:970
+msgid ""
+"However, although this is a valid typing of what it would mean if a unboxed "
+"tuple were not fully applied, since we do not have any rules of form "
+"(##,?,?) or (□,?,?) this type obviously does not typecheck. Which is what "
+"enforces the invarient that unboxed tuples are always fully applied, and is "
+"also why we do not need a code representation of sort box."
+msgstr ""
+"たとえアンボックス化タプルが部分適用されることが妥当な型付けでも (##,?,?) もしくは (□,?,?) の形のルールは許容しないのだから、\n"
+"この型は明らかに型検査されない。\n"
+"アンボックス化タプルがいつも全適用されるという不変条件が強制されるなら種類boxのコード表現もまた不要になる。"
+
+#. type: Plain text
+#: manual.mkd:972
+msgid "#### Do we need a superbox?"
+msgstr "#### superboxは必要か？"
+
+#. type: Plain text
+#: manual.mkd:975
+msgid ""
+"You will notice that if you look at the axioms involving the sorts, you end "
+"up with a disjoint graph"
+msgstr "種類の公理を見て接続の不足したグラフになっていることに、あなたは気付くかもしれない。"
+
+#. type: Plain text
+#: manual.mkd:981
+#, no-wrap
+msgid ""
+"             □             - the box\n"
+"            / \\\n"
+"          **   ##          - superkind\n"
+"          /\\     \\\n"
+"         *  !     #   (#)  - kind\n"
+msgstr ""
+"             □            - box\n"
+"            / \\\n"
+"          **   ##          - superkind\n"
+"          /\\     \\\n"
+"         *  !     #   (#)  - kind(種)\n"
+
+#. type: Plain text
+#: manual.mkd:986
+msgid ""
+"This is simply due to the fact that nothing is polymorphic in unboxed tuples "
+"of kind (#) so we never need to refer to any super-sorts of them. We can add "
+"sorts (##),(□) and □□ to fill in the gaps, but since these sorts will never "
+"appear in code or discourse, we will ignore them from now on."
+msgstr ""
+"これは単に、それらのsuper-sort(種類)は本来不要であるが、kind (#) のアンボックス化タプルが多相性を欠如していることにに起因する。\n"
+"このギャップを埋めるために(##)と(□)、□□の種類を導入できる。\n"
+"これらの種類は決してコードや論文には現われないが、気にしないことにする。"
+
+#. type: Plain text
+#: manual.mkd:994
+#, no-wrap
+msgid ""
+"               □□            - sort superbox\n"
+"              /  \\\n"
+"             □    (□)        - sort box\n"
+"            / \\      \\\n"
+"          **   ##     (##)   - sort superkind\n"
+"          /\\     \\    |\n"
+"         *  !     #   (#)    - sort kind\n"
+msgstr ""
+"               □□          - 種類superbox\n"
+"              /  \\\n"
+"             □    (□)      - 種類box\n"
+"            / \\      \\\n"
+"          **   ##     (##)   - 種類superkind\n"
+"          /\\     \\    |\n"
+"         *  !     #   (#)    - 種類kind(種)\n"

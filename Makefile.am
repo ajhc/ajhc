@@ -22,9 +22,9 @@ HSFILES=src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/
 	src/FrontEnd/HsPretty.hs src/FrontEnd/Infix.hs src/FrontEnd/Lexer.hs src/FrontEnd/ParseMonad.hs src/FrontEnd/ParseUtils.hs \
 	src/FrontEnd/Rename.hs src/FrontEnd/Syn/Options.hs src/FrontEnd/Syn/Traverse.hs src/FrontEnd/Tc/Class.hs src/FrontEnd/Tc/Main.hs \
 	src/FrontEnd/Tc/Module.hs src/FrontEnd/Tc/Type.hs src/FrontEnd/Tc/Unify.hs src/FrontEnd/TypeSigs.hs src/FrontEnd/TypeSynonyms.hs\
-       	src/FrontEnd/TypeSyns.hs src/FrontEnd/Unlit.hs src/FrontEnd/Utils.hs src/FrontEnd/Warning.hs src/GenUtil.hs src/Grin/DeadCode.hs\
-       	src/Grin/Devolve.hs src/Grin/EvalInline.hs src/Grin/FromE.hs src/Grin/Grin.hs src/Grin/HashConst.hs src/Grin/Lint.hs\
-       	src/Grin/NodeAnalyze.hs src/Grin/Noodle.hs src/Grin/Optimize.hs src/Grin/Show.hs src/Grin/Val.hs \
+	src/FrontEnd/TypeSyns.hs src/FrontEnd/Unlit.hs src/FrontEnd/Utils.hs src/FrontEnd/Warning.hs src/GenUtil.hs src/Grin/DeadCode.hs\
+	src/Grin/Devolve.hs src/Grin/EvalInline.hs src/Grin/FromE.hs src/Grin/Grin.hs src/Grin/HashConst.hs src/Grin/Lint.hs\
+	src/Grin/NodeAnalyze.hs src/Grin/Noodle.hs src/Grin/Optimize.hs src/Grin/Show.hs src/Grin/Val.hs \
 	src/Grin/Whiz.hs src/Ho/Binary.hs src/Ho/Collected.hs src/Ho/Library.hs src/Info/Binary.hs src/Info/Info.hs src/Info/Properties.hs \
 	src/Info/Types.hs src/Interactive.hs src/Main.hs src/Name/Binary.hs src/Name/Id.hs src/Name/Name.hs src/Name/Names.hs \
 	src/Name/Prim.hs src/Options.hs src/PackedString.hs src/Ho/ReadSource.hs \
@@ -215,7 +215,7 @@ lint:
 hlint:
 	hlint `darcs wh -s | sed -e 's/^..//' -e 's/ .*$$//' | grep '.hs$$'`
 
-.PHONY: ho-clean hl-clean built-sources i manual man
+.PHONY: ho-clean hl-clean built-sources i manual man manual_ja
 
 ho-clean:
 	rm -f -- `find -name \*.ho -print`
@@ -254,6 +254,15 @@ manual.mkd: $(JHC_MANUAL_FILES)
 	perl $(srcdir)/utils/stitch.prl $^ > $@
 
 manual: manual.mkd
+	pandoc $< --toc -s -f markdown -t html -s -c manual.css -o $@.html
+
+updatepo: manual.mkd
+	po4a-updatepo -M utf8 -f text -m manual.mkd -p po/ja.po
+
+manual_ja.mkd: manual.mkd po/ja.po
+	po4a-translate -M utf8 -f text -m manual.mkd -p po/ja.po -l manual_ja.mkd
+
+manual_ja: manual_ja.mkd
 	pandoc $< --toc -s -f markdown -t html -s -c manual.css -o $@.html
 
 $(firstword $(JHC_MANUAL_FILES)): utils/stitch.prl docs/man_header.mkd
