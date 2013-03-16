@@ -25,6 +25,17 @@ Please use the arafura branch, rather than master branch.
 * [master branch](https://github.com/ajhc/ajhc/tree/master): Do not touch me, mirror of [jhc's darcs repository](http://repetae.net/dw/darcsweb.cgi?r=jhc).
 * [arafura branch](https://github.com/ajhc/ajhc/tree/arafura): For developing Ajhc.
 
+You should send patch to jhc, if testing on Ajhc is good.
+
+    $ darcs get http://repetae.net/repos/jhc
+    $ cd jhc/
+    $ patch -p1 < ~/yourfile.patch
+    $ darcs record -a
+    $ darcs send
+
+The command [darcs send](http://darcs.net/Using/Send) sends email the patch to
+jhc author (= [John Meacham](http://repetae.net/)).
+
 ## Future plan
 
 ### Done
