@@ -25,6 +25,7 @@ import System.IO.Unsafe
 import System.Posix.Signals
 import Text.Printf
 import qualified Data.Set as Set
+import GenUtil (iocatch)
 
 data TempDir = TempDir {
     tempDirClean   :: Bool,  -- ^ whether to delete the directory afterwords.
@@ -147,7 +148,7 @@ wrapMain main = E.catch (main >> cleanUp) f where
 -------------------
 
 ignoreError :: IO () -> IO ()
-ignoreError action = Prelude.catch action (\_ -> return ())
+ignoreError action = iocatch action (\_ -> return ())
 
 {-# NOINLINE tdRef #-}
 tdRef :: IORef TempDir

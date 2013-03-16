@@ -349,6 +349,7 @@ renameKindHsCon HsConDecl { .. } = do
         f e = addWarn InvalidDecl "invalid argument in kind declaration" >> return e
     hsConDeclConArg <- mapM bt hsConDeclConArg
     return HsConDecl { .. }
+renameKindHsCon _ = error "Rename.renameKindHsCon: bad."
 
 instance Rename HsBangType where
     rename (HsBangedTy t) = HsBangedTy `fmap` rename t

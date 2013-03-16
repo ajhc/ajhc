@@ -55,6 +55,7 @@ getBindGroups ns toName getDeps = filter (not . null) (map (concatMap f) $ Scc.s
 --
 -- Create a list of edges from a list of nodes.
 --
+{-
 buildNameEdges :: [node]           ->    -- List of nodes
                   (node -> name)   ->    -- Function to convert nodes to a unique name
                   (node -> [name]) ->    -- Function to return dependencies of this node
@@ -65,6 +66,7 @@ buildNameEdges (n:ns) getName getDeps
 	= map mapFunc (getDeps n) ++ (buildNameEdges ns getName getDeps)
 	where
 	mapFunc = ( \ s -> (getName n, s) )
+-}
 
 --
 -- Create a list of groups from a list of names.
@@ -125,15 +127,18 @@ mapOnTuple fm ((a1,a2):as)
 --
 -- Display bind group information in a human readable (or as close to) form.
 --
+{-
 showBindGroups :: [[node]]        ->     -- List of nodes
 		  (node->String)  ->     -- Function to convert a node to a string
                   String                 -- Printable string
 showBindGroups ns getAlias
 	= showBindGroups_ ns getAlias 0
+-}
 
 --
 -- Recursive function which does the work of showBindGroups.
 --
+{-
 showBindGroups_ :: [[node]]        ->     -- List of nodes
 		   (node->String)  ->     -- Function to convert a node to a string
                    Int             ->     -- Bind group number
@@ -146,6 +151,7 @@ showBindGroups_ (n:ns) getAlias groupNum
 	  ++ showBindGroups_ ns getAlias (groupNum + 1)
 	where
 	bgString = wrapString "EMPTY" (listToString n getAlias)
+-}
 
 --------------------------------------------------------------------------------
 -- debugBindGroups

@@ -65,7 +65,7 @@ processFiles :: [String] -> IO ()
 processFiles cs = f cs (optMainFunc options) where
     f [] Nothing  = do
         int <- Interactive.isInteractive
-        when (not int) $ putErrDie "jhc: no input files"
+        when (not int) $ putErrDie "ajhc: no input files"
         g [Left preludeModule]
     f [] (Just (b,m)) = do
         m <- getModule (parseName Val m)

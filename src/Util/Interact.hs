@@ -146,8 +146,8 @@ runInteraction act s = do
             [":version"] -> putStrLn (interactVersion act) >> return act
             [":echo"] -> putStrLn arg >> return act
             [":addhist"] -> addHistory arg >> return act
-            [":cd"] -> catch (setCurrentDirectory arg) (\_ -> putStrLn $ "Could not change to directory: " ++ arg) >> return act
-            [":pwd"] -> (catch getCurrentDirectory (\_ -> putStrLn "Could not get current directory." >> return "") >>= putStrLn)  >> return act
+            [":cd"] -> iocatch (setCurrentDirectory arg) (\_ -> putStrLn $ "Could not change to directory: " ++ arg) >> return act
+            [":pwd"] -> (iocatch getCurrentDirectory (\_ -> putStrLn "Could not get current directory." >> return "") >>= putStrLn)  >> return act
             [":set"] -> case simpleUnquote arg of
                 [] -> showSet >> return act
                 rs -> do
@@ -156,11 +156,11 @@ runInteraction act s = do
                     return act { interactSet = Map.fromList [ x | x@(a,_) <- ts, a `elem` interactSettables act ] `Map.union` interactSet act }
             [":unset"] -> return act { interactSet = interactSet act Map.\\ Map.fromList [ (cleanupWhitespace rs,"") | rs <- simpleUnquote arg] }
             [":execfile"] -> do
-                fc <- catch (readFile arg) (\_ -> putStrLn ("Could not read file: " ++ arg) >> return "")
+                fc <- iocatch (readFile arg) (\_ -> putStrLn ("Could not read file: " ++ arg) >> return "")
                 act <- runInteractions act { interactEcho = True } (lines fc)
                 return act { interactEcho = False }
             [":execfile!"] -> do
-                fc <- catch (readFile arg) (\_ -> return "")
+                fc <- iocatch (readFile arg) (\_ -> return "")
                 runInteractions act { interactEcho = True } (lines fc)
             [":command"] -> return act { interactCommandMode = True }
             [":normal"] -> return act {interactCommandMode = False }
@@ -178,11 +178,11 @@ beginInteraction act = do
     hist <- case interactHistFile act of
         Nothing -> return Nothing
         Just fn -> do
-            ch <- catch (readFile fn >>= return . lines) (\_ -> return [])
+            ch <- iocatch (readFile fn >>= return . lines) (\_ -> return [])
             let cl = (map head $ group ch)
             mapM_ addHistory cl
             putStrLn $ show (length cl) ++ " lines of history added from " ++ fn
-            catch (openFile fn AppendMode >>= return . Just) (\_ -> return Nothing)
+            iocatch (openFile fn AppendMode >>= return . Just) (\_ -> return Nothing)
     go hist act
     where
     go hist act = do
@@ -192,7 +192,7 @@ beginInteraction act = do
         s <- readLine (thePrompt act) (return . expand)
         case (hist,s) of
             (Just h,(_:_)) -> do
-                catch (hPutStrLn h s >> hFlush h) (const (return ()))
+                iocatch (hPutStrLn h s >> hFlush h) (const (return ()))
             _ -> return ()
         act' <- runInteraction act s
         go hist act'

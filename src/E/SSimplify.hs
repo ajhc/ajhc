@@ -29,7 +29,7 @@ import E.PrimOpt
 import E.Program
 import E.Rules
 import E.Subst
-import E.Traverse(runRename)
+--import E.Traverse(runRename)
 import E.TypeCheck
 import E.Values
 import GenUtil hiding (split)
@@ -54,7 +54,7 @@ import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Info.Info as Info
 
-type Bind = (TVr,E)
+--type Bind = (TVr,E)
 
 data Occurance =
     Unused        -- ^ unused means a var is not used at the term level, but might be at the type level
@@ -66,7 +66,7 @@ data Occurance =
     deriving(Show,Eq,Ord)
 
 data UseInfo = UseInfo {
-    useOccurance :: {-# UNPACK #-} !Occurance,   -- ^ occurance Info
+    useOccurance :: !Occurance,   -- ^ occurance Info
     minimumArgs  :: {-# UNPACK #-} !Int          -- ^ minimum number of args that are ever passed to this function (if used)
     }
     deriving(Show,Eq,Ord,Typeable)
@@ -218,14 +218,14 @@ collectBinding comb = do
 
 unOMap (OMap x) = x
 
-collectCombs :: [Comb] -> OMap -> OM [Comb]
-collectCombs cs _ = return cs
+--collectCombs :: [Comb] -> OMap -> OM [Comb]
+--collectCombs cs _ = return cs
 
 collectDs :: [Comb] -> OMap -> OM [Comb]
 collectDs ds (OMap fve) = do
     ds' <- mapM (grump . collectBinding) ds
     exp <- ask
-    let (reachable',graph) = newGraphReachable ds' (\ ((comb,_),_) -> combIdent comb) (\ ((_,rv),fv) -> keys (fv `mappend` rv))
+    let (reachable',_) = newGraphReachable ds' (\ ((comb,_),_) -> combIdent comb) (\ ((_,rv),fv) -> keys (fv `mappend` rv))
         rds = reachable' (keys fve ++ [ combIdent t | t <- ds,  (combIdent t `member` exp)])
         -- ignore rules when calculating loopbreakers
         -- we must not simplify the expanded body of a rule without recalculating occurance info.
@@ -245,6 +245,7 @@ collectDs ds (OMap fve) = do
             False -> case  (tvrIdent t `member` exp) of
                 True -> noUseInfo
                 False | Just r <- mlookup (tvrIdent t) fids -> r
+                _ -> error "SSimplify.collectDs: bad."
         ds''' = [ combHead_s (calcStrictInfo $ annbind ffids (combHead comb)) comb | (comb,_) <- ds'']
         froo comb = (combHead_s (combHead comb) {tvrType = t' } comb,fvs) where
             (t',fvs) = collectOccurance' (tvrType $ combHead comb)
@@ -282,9 +283,9 @@ orMany xs = f (filter ((/= Unused) . useOccurance) xs) where
         ui x = UseInfo { minimumArgs =  minimum (map minimumArgs xs), useOccurance = x }
 
 data SimplifyOpts = SimpOpts {
-    so_noInlining :: {-# UNPACK #-} !Bool, -- ^ this inhibits all inlining inside functions which will always be inlined
-    so_finalPhase :: {-# UNPACK #-} !Bool, -- ^ no rules and don't inhibit inlining
-    so_postLift   :: {-# UNPACK #-} !Bool, -- ^ don't inline anything that was lifted out
+    so_noInlining :: !Bool, -- ^ this inhibits all inlining inside functions which will always be inlined
+    so_finalPhase :: !Bool, -- ^ no rules and don't inhibit inlining
+    so_postLift   :: !Bool, -- ^ don't inline anything that was lifted out
     so_boundVars :: IdMap Comb,            -- ^ bound variables
     so_forwardVars :: IdSet,               -- ^ variables that we know will exist, but might not yet.
 
@@ -321,11 +322,11 @@ data Forced = ForceInline | ForceNoinline | NotForced
 data Binding
     = NotAmong [Name]
     | IsBoundTo {
-        bindingOccurance :: {-# UNPACK #-} !Occurance,
+        bindingOccurance :: !Occurance,
         bindingE :: OutE,
-        bindingCheap :: {-# UNPACK #-} !Bool,
-        inlineForced :: {-# UNPACK #-} !Forced,
-        bindingAtomic :: {-# UNPACK #-} !Bool
+        bindingCheap :: !Bool,
+        inlineForced :: !Forced,
+        bindingAtomic :: !Bool
         }
     | NotKnown
     deriving(Ord,Eq,Show)
@@ -351,6 +352,7 @@ instance Monoid Forced where
 
 fixInline finalPhase v bt@IsBoundTo {} = bt {
     inlineForced = inlineForced bt `mappend` calcForced finalPhase v }
+fixInline _ _ _ = error "SSimplify.fixInline: bad."
 
 calcForced finalPhase v =
     let props = getProperties v in
@@ -367,18 +369,21 @@ data Env = Env {
     envInScope :: IdMap Binding,
     envInScopeCache :: IdMap E
     }
-    {-! derive: Monoid, update !-}
+    {-! derive: Monoid !-}
+
+envSubst_u f r@Env{envSubst  = x} = r{envSubst = f x}
+envSubst_s v =  envSubst_u  (const v)
 
 susp:: E -> Subst -> Range
 susp e sub =  Susp e sub
 
-insertSuspSubst :: TVr -> InE -> Env -> Env
-insertSuspSubst t e env = insertSuspSubst' (tvrIdent t) e env
+--insertSuspSubst :: TVr -> InE -> Env -> Env
+--insertSuspSubst t e env = insertSuspSubst' (tvrIdent t) e env
 
-insertSuspSubst' :: Id -> InE -> Env -> Env
-insertSuspSubst' z _e env | isEmptyId z = env
-insertSuspSubst' t e env = cacheSubst env {
-    envSubst = minsert t (susp e (envSubst env)) (envSubst env) }
+--insertSuspSubst' :: Id -> InE -> Env -> Env
+--insertSuspSubst' z _e env | isEmptyId z = env
+--insertSuspSubst' t e env = cacheSubst env {
+--    envSubst = minsert t (susp e (envSubst env)) (envSubst env) }
 
 insertRange :: Id -> Range -> Env -> Env
 insertRange z e env | isEmptyId z = env
@@ -465,8 +470,8 @@ data Cont =
         }-}
     deriving(Show)
 
-isApplyTo ApplyTo {} = True
-isApplyTo _ = False
+--isApplyTo ApplyTo {} = True
+--isApplyTo _ = False
 
 simplifyDs :: forall m . MonadStats m => Program -> SimplifyOpts -> [Comb] -> m [Comb]
 simplifyDs prog sopts dsIn = ans where
@@ -841,11 +846,11 @@ simplifyDs prog sopts dsIn = ans where
     hFunc e xs' = do app (e,xs')
     didInline ::OutE -> [OutE] -> SM OutE
     didInline z zs = return (foldl EAp z zs)
-    didInline z zs = do
-        used <- smUsedNames
-        let (ne,nn) = runRename used (foldl EAp z zs)
-        smAddNamesIdSet nn
-        return ne
+    --didInline z zs = do
+    --    used <- smUsedNames
+    --    let (ne,nn) = runRename used (foldl EAp z zs)
+    --    smAddNamesIdSet nn
+    --    return ne
     appVar v xs | so_postLift sopts = app (EVar v,xs)
     appVar v xs = do
         me <- etaExpandAp (progDataTable prog) v xs
@@ -965,6 +970,7 @@ exprSize max e discount known = f max e >>= \n -> return (max - n) where
     f n ELetRec {eDefs = ds, eBody = e } = do
         n <- foldM f n (snds ds)
         f n e
+    f _ Unknown = error "SSimplify.exprSize: bad."
 
 noSizeIncrease e xs = f e xs where
     currentSize = 1 + length xs
@@ -1030,6 +1036,7 @@ runSM env (SM x) = (r,s) where
 
 instance MonadStats SM where
    mticks' n k = SM $ tell (Stats.singleStat n k) >> return ()
+   mtickStat = error "MonadStats.mtickStat: not impl."
 
 modifyIds fn = SM $ modify f where
     f s@SmState { idsUsed = used, idsBound = bound } = case fn (used,bound) of (used',bound') -> s { idsUsed = used', idsBound = bound' }
@@ -1064,12 +1071,12 @@ instance NameMonad Id SM where
 --        (used,bound) <- getIds
         newNameFrom $ candidateIds seed -- (size used + 10000*size bound)
 
-smUsedNames = SM $ gets idsUsed
-smBoundNames = SM $ gets idsBound
+--smUsedNames = SM $ gets idsUsed
+--smBoundNames = SM $ gets idsBound
 
 smAddNamesIdSet nset = --trace ("addNamesIdSet: "++ show (size nset)) $
    do modifyIds (\ (used,bound) -> (nset `union` used, bound) )
 smAddBoundNamesIdSet nset = --trace ("addBoundNamesIdSet: "++show (size nset)) $
    do modifyIds (\ (used,bound) -> (nset `union` used, nset `union` bound) )
 
-smAddBoundNamesIdMap = smAddNamesIdSet . idMapToIdSet
+--smAddBoundNamesIdMap = smAddNamesIdSet . idMapToIdSet

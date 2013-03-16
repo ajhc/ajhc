@@ -475,6 +475,7 @@ instance CanType Exp where
     getType Call { expType = ty } = ty
     getType MkClosure { expType = ty } = ty
     getType GcRoots { expBody = body } = getType body
+    getType _ = error "Exp.getType: bad."
 
 instance CanType Val where
     type TypeOf Val = Ty
@@ -674,6 +675,7 @@ instance Show Ty where
     show (TyRegister t) = 'r':show t
     show (TyCall c as rt) = show c <> tupled (map show as) <+> "->" <+> show rt
     show TyUnknown = "?"
+    show _ = error "Ty.show: bad."
 
 instance Show Val where
     -- showsPrec _ s | Just st <- fromVal s = text $ show (st::String)

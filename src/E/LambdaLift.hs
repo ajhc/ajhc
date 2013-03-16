@@ -86,8 +86,12 @@ data S = S {
     isStrict :: Bool,
     declEnv :: [(TVr,E)]
     }
-    {-! derive: update !-}
 
+isStrict_u f r@S{isStrict  = x} = r{isStrict = f x}
+topVars_u f r@S{topVars  = x} = r{topVars = f x}
+isStrict_s v =  isStrict_u  (const v)
+
+{-
 etaReduce :: E -> (E,Int)
 etaReduce e = case f e 0 of
         (ELam {},_) -> (e,0)
@@ -95,6 +99,7 @@ etaReduce e = case f e 0 of
     where
         f (ELam t (EAp x (EVar t'))) n | n `seq` True, t == t' && not (tvrIdent t `member` (freeVars x :: IdSet)) = f x (n + 1)
         f e n = (e,n)
+-}
 
 -- | we do not lift functions that only appear in saturated strict contexts,
 -- as these functions will never have an escaping thunk or partial app

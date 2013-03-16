@@ -27,7 +27,6 @@ import Control.Monad.Trans
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Control.Monad.State
-import Data.Monoid
 
 
 

@@ -6,7 +6,11 @@ module Support.MD5(
 import Control.Monad
 import Data.Binary
 import Data.Char
-import Foreign
+import Data.Bits
+import System.IO.Unsafe (unsafePerformIO)
+import Foreign.Marshal
+import Foreign.Ptr
+import Foreign.Storable
 import Foreign.C
 import System.IO
 import qualified Data.ByteString as BS

@@ -53,10 +53,9 @@ import Control.Monad.Error
 import Control.Monad.Reader
 import Control.Monad.Writer.Strict
 import Data.IORef
-import Data.Monoid
 import List
 import System
-import Text.PrettyPrint.HughesPJ(Doc)
+--import Text.PrettyPrint.HughesPJ(Doc)
 import qualified Data.Foldable as T
 import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
@@ -83,7 +82,7 @@ import Support.Tickle
 import qualified FlagDump as FD
 import {-# SOURCE #-} FrontEnd.Tc.Class(simplify)
 
-data BindingType = RecursiveInfered | Supplied
+-- data BindingType = RecursiveInfered | Supplied
 type TypeEnv = Map.Map Name Sigma
 
 -- read only environment, set up before type checking.
@@ -100,7 +99,11 @@ data TcEnv = TcEnv {
     tcInstanceEnv       :: InstanceEnv,
     tcOptions           :: Opt  -- module specific options
     }
-   {-! derive: update !-}
+
+tcConcreteEnv_u    f r@TcEnv{tcConcreteEnv  = x} = r{tcConcreteEnv = f x}
+tcDiagnostics_u    f r@TcEnv{tcDiagnostics  = x} = r{tcDiagnostics = f x}
+tcMutableEnv_u     f r@TcEnv{tcMutableEnv  = x}  = r{tcMutableEnv = f x}
+tcRecursiveCalls_u f r@TcEnv{tcRecursiveCalls  = x} = r{tcRecursiveCalls = f x}
 
 data Output = Output {
     collectedPreds   :: !Preds,
@@ -111,7 +114,7 @@ data Output = Output {
     tcWarnings       :: !(Seq.Seq Warning),
     outKnots         :: [(Name,Name)]
     }
-   {-! derive: update, Monoid !-}
+   {-! derive: Monoid !-}
 
 newtype Tc a = Tc (ReaderT TcEnv (WriterT Output IO) a)
     deriving(MonadFix,MonadIO,MonadReader TcEnv,MonadWriter Output,Functor)
@@ -223,6 +226,7 @@ askCurrentEnv = do
     env2 <- asks tcMutableEnv
     return (env2 `Map.union` env1)
 
+{-
 dConScheme :: Name -> Tc Sigma
 dConScheme conName = do
     env <- askCurrentEnv
@@ -230,6 +234,7 @@ dConScheme conName = do
         Just s -> return s
         Nothing -> error $ "dConScheme: constructor not found: " ++ show conName ++
                               "\nin this environment:\n" ++ show env
+-}
 
 -- | returns a new box and a function to read said box.
 
@@ -281,7 +286,7 @@ instance Instantiate Type where
     inst mm ts (TMetaVar mv) | Just t <- Map.lookup (metaUniq mv) mm  = t
     inst mm ts (TMetaVar mv) = TMetaVar mv
     inst mm ts (TAssoc tc as bs) = TAssoc tc (map (inst mm ts) as) (map (inst mm ts) bs)
-    inst mm _ t = error $ "inst: " ++ show t
+    --inst mm _ t = error $ "inst: " ++ show t
 
 instance Instantiate a => Instantiate [a] where
   inst mm ts = map (inst mm ts)
@@ -307,8 +312,8 @@ addPreds ps = do
         constraints = Seq.fromList [ Equality { constraintSrcLoc = sl,
         constraintType1 = a, constraintType2 = b } | IsEq a b <- ps ] }
 
-addConstraints :: [Constraint] -> Tc ()
-addConstraints ps = Tc $ tell mempty { constraints = Seq.fromList ps }
+--addConstraints :: [Constraint] -> Tc ()
+--addConstraints ps = Tc $ tell mempty { constraints = Seq.fromList ps }
 
 listenPreds :: Tc a -> Tc (a,Preds)
 listenPreds action = censor (\x -> x { collectedPreds = mempty }) $
@@ -380,6 +385,7 @@ boxySpec (TForAll as qt@(ps :=> t)) = do
     (t',vs) <- runWriterT (f t as)
     addPreds $ inst mempty (Map.fromList [ (tyvarName bt,s) | (bt,s) <- vs ]) ps
     return (sortGroupUnderFG fst snd vs,t')
+boxySpec _ = error "boxySpec: bad."
 
 freeMetaVarsEnv :: Tc (Set.Set MetaVar)
 freeMetaVarsEnv = do
@@ -401,6 +407,7 @@ quantify_n vs ps rs | not $ any isBoxyMetaVar vs = do
 
     ch <- getClassHierarchy
     return $ [TForAll nvs (FrontEnd.Tc.Class.simplify ch ps :=> r) | r <- rs ]
+                    | otherwise = error "quantify_n: bad."
 
 quantify :: [MetaVar] -> [Pred] -> Rho -> Tc Sigma
 quantify vs ps r = do [s] <- quantify_n vs ps [r]; return s
@@ -489,6 +496,7 @@ readFilledBox mv | isBoxyMetaVar mv = zonkBox mv >>= \v -> case v of
     t -> return t
 readFilledBox mv = error $ "readFilledBox: nonboxy" ++ show mv
 
+{-
 elimBox :: MetaVar -> Tc Type
 elimBox mv | isBoxyMetaVar mv = do
     t <- readMetaVar mv
@@ -497,13 +505,14 @@ elimBox mv | isBoxyMetaVar mv = do
         Nothing -> newMetaVar Tau (getType mv)
 
 elimBox mv = error $ "elimBox: nonboxy" ++ show mv
+-}
 
 ----------------------------------------
 -- Declaration of instances, boilerplate
 ----------------------------------------
 
-pretty :: PPrint Doc a => a -> String
-pretty x = show (pprint x :: Doc)
+--pretty :: PPrint Doc a => a -> String
+--pretty x = show (pprint x :: Doc)
 
 instance Monad Tc where
     return a = Tc $ return a

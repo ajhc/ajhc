@@ -21,7 +21,7 @@ import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Data.Binary
-import Data.Generics(Typeable, everything, mkQ, Data)
+import Data.Generics(Typeable, everything, mkQ)
 import Data.IORef
 import Data.List
 import System.IO.Unsafe
@@ -43,7 +43,6 @@ import Options
 import Support.FreeVars
 import Support.MapBinaryInstance
 import Util.ContextMonad
-import Util.Gen
 import Util.HasSize
 import qualified FlagDump as FD
 import qualified Util.Seq as Seq
@@ -310,6 +309,7 @@ kiType k HsTyExists { hsTypeVars = vs, hsTypeType = HsQualType con t } = do
     mapM_ initTyVarBind vs
     mapM_ kiPred con
     kiType' k t
+kiType _ _ = error "KindInfer.kiType: bad."
 
 initTyVarBind HsTyVarBind { hsTyVarBindName = name, hsTyVarBindKind = kk } = do
     nk <- lookupKind KindSimple (toName TypeVal name)
@@ -338,6 +338,7 @@ kiApps ca args fk = f ca args fk where
         let nv = (KVar x `Kfun` KVar y)
         varBind var nv
         f nv as fk
+    f _ _ _ = error "KindInfer.kiApps: bad."
 
 kiApps' :: Kind -> [Kind] -> Kind -> Ki ()
 kiApps' ca args fk = f ca args fk where
@@ -352,6 +353,7 @@ kiApps' ca args fk = f ca args fk where
         let nv = (KVar x `Kfun` KVar y)
         varBind var nv
         f nv as fk
+    f _ _ _ = error "KindInfer.kiApps': bad."
 
 kiPred :: HsAsst -> Ki ()
 kiPred asst@(HsAsst n ns) = do
@@ -432,6 +434,7 @@ kiDecl d = withSrcLoc (srcLoc d) (f d) where
         let rn = Seq.toList $ everything (Seq.<>) (mkQ Seq.empty g) newClassBodies
             newClassBodies = map typeFromSig $ filter isHsTypeSig sigsAndDefaults
             typeFromSig (HsTypeSig _sloc _names qualType) = qualType
+            typeFromSig _ = error "KindInfer.typeFromSig: bad."
             g (HsTyVar n') | hsNameToOrig n' == hsNameToOrig classArg = Seq.single (toName TypeVal n')
             g _ = Seq.empty
         carg <- lookupKind KindSimple (toName TypeVal classArg)
@@ -569,6 +572,7 @@ hsAsstToPred kt (HsAsst className [varName])
    | isConstructorLike varName = IsIn  (toName ClassName className) (TCon (Tycon (toName TypeConstructor varName) (head $ kindOfClass (toName ClassName className) kt)))
    | otherwise = IsIn (toName ClassName className) (TVar $ tyvar (toName TypeVal varName) (head $ kindOfClass (toName ClassName className) kt))
 hsAsstToPred kt (HsAsstEq t1 t2) = IsEq (runIdentity $ hsTypeToType' kt t1) (runIdentity $ hsTypeToType' kt t2)
+hsAsstToPred _ _ = error "KindInfer.hsAsstToPred: bad."
 
 hsQualTypeToSigma kt qualType = hsQualTypeToType kt (Just []) qualType
 

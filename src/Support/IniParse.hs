@@ -110,7 +110,7 @@ parseIniFiles
     -> [String]      -- ^ the m-flags
     -> IO (Map.Map String String)
 parseIniFiles verbose raw fs ss = do
-    let rf fn = catch (do c <- parseIniFile fn; pverb ("reading " ++ fn); return c) (\_ -> return Seq.empty)
+    let rf fn = iocatch (do c <- parseIniFile fn; pverb ("reading " ++ fn); return c) (\_ -> return Seq.empty)
         pverb s = if verbose then putErrLn s else return ()
     rawp <- parseIniRaw "(builtin targets.ini)" raw
     fsc <- mapM rf fs

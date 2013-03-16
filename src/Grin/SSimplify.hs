@@ -37,8 +37,8 @@ import qualified Stats
 data SEnv = SEnv {
     envSubst :: IM.IntMap Val,   -- renaming substitution
     envCSE   :: Map.Map Exp (Atom,Exp),
-    envPapp  :: IM.IntMap (Atom,[Val]),
-    envPush  :: IM.IntMap Exp
+    envPapp  :: IM.IntMap (Atom,[Val])
+    --envPush  :: IM.IntMap Exp
     }
     {-! derive: Monoid !-}
 
@@ -50,11 +50,13 @@ data SCol = SCol {
     }
     {-! derive: Monoid !-}
 
+{-
 data ExpInfo = ExpInfo {
     expFreeVars :: GSet Var,
     expUnboxing :: UnboxingResult,
     expType     :: [Ty]
     }
+-}
 
 newtype S a = S (RWS SEnv SCol SState a)
     deriving(Monad,Functor,MonadWriter SCol, MonadReader SEnv,MonadState SState)
@@ -307,6 +309,7 @@ instance CanType Unbox where
     type TypeOf Unbox = Ty
     getType (UnConst v) = getType v
     getType (UnUnknown t) = t
+    getType _ = error "getType: bad."
 
 unboxRet :: UnboxingResult -> [Val] -> Exp
 unboxRet ur vs = f ur vs where
@@ -319,6 +322,7 @@ unboxRet ur vs = f ur vs where
     g [] vs = ([],vs)
     g (UnUnknown _:xs) (v:vs) = let (r,y) = g xs vs in (v:r,y)
     g (UnConst v:xs) vs = let (r,y) = g xs vs in (v:r,y)
+    g _ _ = error "SSimplify.unboxRet: bad."
 
 unboxTypes :: UnboxingResult -> Maybe [Ty]
 unboxTypes ur = f ur where
@@ -332,6 +336,7 @@ unboxTypes ur = f ur where
     f (UnDemote _) = Just [tyDNode]
     h (UnUnknown t) = [t]
     h (UnConst {}) = []
+    h _ = error "SSimplify.unboxTypes: bad."
 
 unboxModify :: UnboxingResult -> Exp -> Exp
 unboxModify ur = f ur where
@@ -342,12 +347,17 @@ unboxModify ur = f ur where
     f (UnReturn xs) = runIdentity . editTail nty (g xs)
     f (UnStore _ _ us) =runIdentity . editTail nty (z us)
     f (UnDemote _) =runIdentity . editTail nty y
+    f _ = error "SSimplify.unboxModify: bad1."
     g xs (Return ys) = return $ Return (concat $ zipWith h xs ys)
+    g _ _ = error "SSimplify.unboxModify: bad2."
     h (UnUnknown _) y = [y]
     h (UnConst {}) _ = []
+    h _ _ = error "SSimplify.unboxModify: bad3."
     z xs (BaseOp (StoreNode _) [NodeC _ ts]) = return . Return . concat $ zipWith h xs ts
+    z _ _ = error "SSimplify.unboxModify: bad4."
     y (BaseOp Demote [x]) = return $ Return [x]
     y (Return [Const v]) = return $ Return [v]
+    y _ = error "SSimplify.unboxModify: bad5."
     mApp f (App f' as tys) | f == f' = return $ Return as
     mApp f e  = error $ "mApp: " ++ show (f,e)
 

@@ -65,11 +65,12 @@ progressStep pr k = (pr { pTreap = ot, pBias = nb, pTotal = pTotal pr + pIncreme
     (ot,nb,ks) = f (pBias pr - pIncrement pr) itreap []
     f b t ks | b <= negate dec = f (b + dec) (insertWith (+) k dec t) (k:ks)
              | otherwise = (t,b,ks) where
-        Just (k,p,t') = extract t
+        Just (k,_,_) = extract t
 
 toPercent :: Double -> Double
 toPercent d = (/ 100) . fromInteger $ round (d * 10000)
 
+{-
 histogram :: Ord k => [k] -> (Int,[(k,Int)])
 histogram ks = mapSnd toListByPriority (foldr f (0,Nil) ks) where
     f k (n,t) = (n - 1,insertWith (+) k (-1) t)
@@ -89,12 +90,14 @@ toListByPriority :: Treap k p -> [(k,p)]
 toListByPriority t = f t [] where
     f Nil rs = rs
     f (Fork k p t1 t2) rs = f t1 ((k,p):f t2 rs)
+-}
 
 
 
 data Treap k p = Nil | Fork k p (Treap k p) (Treap k p)
     deriving(Show)
 
+{-
 lookup :: Ord k => k -> Treap k p -> Maybe p
 lookup k t = f t where
     f Nil = Nothing
@@ -102,6 +105,7 @@ lookup k t = f t where
         LT -> f t1
         GT -> f t2
         EQ -> Just p
+-}
 
 merge :: Ord p => Treap k p -> Treap k p -> Treap k p
 merge Nil t = t
@@ -114,8 +118,10 @@ extract :: (Ord k,Ord p) => Treap k p -> Maybe (k,p,Treap k p)
 extract Nil = Nothing
 extract (Fork kx x t1 t2) = Just (kx,x,merge t1 t2)
 
+{-
 fromList [] = Nil
 fromList ((k,p):rs) = insert k p (fromList rs)
+-}
 
 insertWith :: (Ord k,Ord p) => (p -> p -> p) -> k -> p -> Treap k p -> Treap k p
 insertWith fp k p t = f t where
@@ -130,8 +136,10 @@ insertWith fp k p t = f t where
     ins k p t1 (Fork k' p' l r) | p > p' = Fork k' p' (ins k p t1 l) r
     ins k p t1 t2 = Fork k p t1 t2
 
+{-
 insert :: (Ord k,Ord p) => k -> p -> Treap k p -> Treap k p
 insert k p t = insertWith const k p t
+-}
 
 
 

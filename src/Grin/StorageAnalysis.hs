@@ -64,6 +64,7 @@ storeAnalyze grin = do
     let cmap = Map.filterWithKey fm $ Map.map (lower . fromJust . flip Map.lookup res) rm
         lower (ResultJust _ j) = j
         lower ResultBounded { resultLB = Nothing } = S
+        lower _ = error "StorageAnalysis.storeAnalyze: bad."
         fm _ E = False
         fm (Vr _) _ = True
         fm (Va _ _) _ = True

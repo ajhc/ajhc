@@ -108,9 +108,9 @@ fetchAllLibraries = ans where
             byhashes = Map.unions byhashes'
         return (bynames,byhashes)
     f fp = do
-        fs <- flip catch (\_ -> return [] ) $ getDirectoryContents fp
+        fs <- flip iocatch (\_ -> return [] ) $ getDirectoryContents fp
         forM fs $ \e -> case reverse e of
-            ('l':'h':'.':r)  -> flip catch (\_ -> return mempty) $ do
+            ('l':'h':'.':r)  -> flip iocatch (\_ -> return mempty) $ do
                 lib <- readHlFile  (fp ++ "/" ++ e)
                 return (Map.singleton (libBaseName lib) [lib], Map.singleton (libHash lib) lib)
             _               -> return mempty
@@ -244,7 +244,7 @@ readDescFile fp = do
     let doYaml opt = do
             lbs <- LBS.readFile fp
             dt <- preprocess opt fp lbs
-            desc <- catch (parseYamlBytes $ BS.concat (LBS.toChunks dt))
+            desc <- iocatch (parseYamlBytes $ BS.concat (LBS.toChunks dt))
                 (\e -> putErrDie $ "Error parsing desc file '" ++ fp ++ "'\n" ++ show e)
             when verbose2 $ do
                 yaml <- emitYaml desc

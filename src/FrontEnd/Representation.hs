@@ -58,7 +58,7 @@ data MetaVar = MetaVar {
     metaUniq :: {-# UNPACK #-} !Int,
     metaKind :: Kind,
     metaRef :: {-# UNPACK #-} !(IORef (Maybe Type)),
-    metaType :: {-# UNPACK #-} !MetaVarType
+    metaType :: !MetaVarType
     }
     {-! derive: Binary !-}
 
@@ -76,7 +76,9 @@ instance TypeNames Type where
     tCharzh = TCon (Tycon tc_Char_ kindHash)
 
 instance Ord (IORef a)
-instance Binary (IORef a)
+instance Binary (IORef a) where
+  put = error "Binary.put: not impl."
+  get = error "Binary.get: not impl."
 
 tList :: Type
 tList = TCon (Tycon tc_List (Kfun kindStar kindStar))
@@ -99,6 +101,7 @@ instance Eq Type where
     _ == _ = False
 
 tassocToAp TAssoc { typeCon = con, typeClassArgs = cas, typeExtraArgs = eas } = foldl tAp (TCon con) (cas ++ eas)
+tassocToAp _ = error "Representation.tassocToAp: bad."
 
 -- Unquantified type variables
 
@@ -252,7 +255,7 @@ prettyPrintTypePrec n t  = unparse $ zup (runIdentity (runVarNameT (f t))) where
         t2 <- f t2
         return $ t1 `arr` t2
     f (TMetaVar mv) = return $ atom $ pprint mv
-    f tv = return $ atom $ parens $ text ("FrontEnd.Tc.Type.pp: " ++ show tv)
+    --f tv = return $ atom $ parens $ text ("FrontEnd.Tc.Type.pp: " ++ show tv)
 
 instance DocLike d => PPrint d MetaVarType where
     pprint  t = case t of

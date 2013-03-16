@@ -16,7 +16,7 @@ module E.Rules(
     rulesFromARules
     )where
 
-import Control.Monad.Writer(WriterT(..),execWriterT,liftM,tell)
+import Control.Monad.Writer(execWriterT,liftM,tell)
 import Data.Maybe
 import Data.Monoid(Monoid(..))
 import qualified Data.Traversable as T

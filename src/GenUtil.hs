@@ -113,6 +113,7 @@ module GenUtil(
     on,
     mapMsnd,
     mapMfst,
+    iocatch,
 
     -- * Classes
     UniqueProducer(..)
@@ -121,7 +122,10 @@ module GenUtil(
 import Char(isAlphaNum, isSpace, toLower, ord, chr)
 import List
 import Monad
-import qualified IO
+import qualified System.IO as IO
+import System.IO.Error (isDoesNotExistError)
+import Control.Exception
+import Prelude hiding (catch)
 import qualified System
 import Random(StdGen, newStdGen, Random(randomR))
 import Time
@@ -137,6 +141,10 @@ import CPUTime
 {-# RULES "sort/snub" forall x . sort (snub x) = snub x #-}
 {-# RULES "snub/[]" snub [] = [] #-}
 {-# RULES "snub/[x]" forall x . snub [x] = [x] #-}
+
+-- | catch function only for IOException
+iocatch :: IO a -> (IOException -> IO a) -> IO a
+iocatch = catch
 
 -- | sorted nub of list, much more efficient than nub, but doesnt preserve ordering.
 snub :: Ord a => [a] -> [a]
@@ -429,11 +437,11 @@ lefts xs = [x | Left x <- xs]
 
 -- | Trasform IO errors into the failing of an arbitrary monad.
 ioM :: Monad m => IO a -> IO (m a)
-ioM action = catch (fmap return action) (\e -> return (fail (show e)))
+ioM action = iocatch (fmap return action) (\e -> return (fail (show e)))
 
 -- | Trasform IO errors into the mzero of an arbitrary member of MonadPlus.
 ioMp :: MonadPlus m => IO a -> IO (m a)
-ioMp action = catch (fmap return action) (\_ -> return mzero)
+ioMp action = iocatch (fmap return action) (\_ -> return mzero)
 
 -- | reformat a string to not be wider than a given width, breaking it up
 -- between words.
@@ -542,7 +550,7 @@ shellQuote ss = unwords (map f ss) where
 -- | looks up an enviornment variable and returns it in an arbitrary Monad rather
 -- than raising an exception if the variable is not set.
 lookupEnv :: Monad m => String -> IO (m String)
-lookupEnv s = catch (fmap return $ System.getEnv s) (\e -> if IO.isDoesNotExistError e then return (fail (show e)) else ioError e)
+lookupEnv s = catch (fmap return $ System.getEnv s) (\e -> if isDoesNotExistError e then return (fail (show e)) else ioError e)
 
 {-# SPECIALIZE fmapLeft :: (a -> c) -> [(Either a b)] -> [(Either c b)] #-}
 fmapLeft :: Functor f => (a -> c) -> f (Either a b) -> f (Either c b)

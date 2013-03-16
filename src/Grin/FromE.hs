@@ -36,7 +36,6 @@ import Stats(mtick')
 import StringTable.Atom
 import Support.CanType
 import Support.FreeVars
-import Util.GMap
 import Util.Graph as G
 import Util.Once
 import Util.SetLike as SL
@@ -185,9 +184,9 @@ compile prog@Program { progDataTable = dataTable } = do
 
     -- FFI
     let tvrAtom t  = liftM convertName (fromId $ tvrIdent t)
-    let ef x = do n <- tvrAtom x
-                  return (n, [] :-> discardResult (App (scTag x) [] []))
-        ep x = do when verbose $ putStrLn ("EP FOR "++show x)
+    --let ef x = do n <- tvrAtom x
+    --           return (n, [] :-> discardResult (App (scTag x) [] []))
+    let ep x = do when verbose $ putStrLn ("EP FOR "++show x)
                   n <- tvrAtom x
                   case Info.lookup (tvrInfo x) of
                     Just l -> return [(n, l)]
@@ -207,9 +206,9 @@ compile prog@Program { progDataTable = dataTable } = do
         --initCafs = sequenceG_ [ BaseOp Overwrite [(Var v TyINode),node] | (v,node) <- cafs ]
         initCafs = Return []
         ds' = ds ++ fbaps
-        a @>> b = a :>>= ([] :-> b)
-        sequenceG_ [] = Return []
-        sequenceG_ (x:xs) = foldl (@>>) x xs
+        --a @>> b = a :>>= ([] :-> b)
+        --sequenceG_ [] = Return []
+        --sequenceG_ (x:xs) = foldl (@>>) x xs
     let grin = setGrinFunctions theFuncs emptyGrin {
             grinEntryPoints = minsert funcMain (FfiExport "_amain" Safe CCall [] "void") $
                                 fromList epv,
@@ -314,6 +313,7 @@ getName' dataTable v@LitCons { litName = n, litArgs = es }
     cn = convertName n
     cons = runIdentity $ getConstructor n dataTable
     nargs = length (conSlots cons)
+getName' _ _ = error "FromE.getName': bad."
 
 isDataAlias x = case x of
     DataAlias {} -> True
@@ -398,6 +398,7 @@ compile' cenv (tvr,as,e) = ans where
                         _ -> do
                             ee <- evalVar [TyNode] tvr
                             app fty ee as
+            _ -> error "FromE.ce: bad."
     ce e | Just z <- literal e = return (Return z)
     ce e | Just (Const z) <- constant e = return (Return $ keepIts [z])
     ce e | Just z <- constant e = return (gEval z)
@@ -442,8 +443,8 @@ compile' cenv (tvr,as,e) = ans where
 
     -- other primitives
     ce (EPrim ap xs ty) = do
-        let prim = ap
-            xs' = keepIts $ args xs
+        --let prim = ap
+        let xs' = keepIts $ args xs
             ty' = toTypes TyNode ty
 
         case ap of
@@ -535,6 +536,7 @@ compile' cenv (tvr,as,e) = ans where
     cp'' (Alt (LitInt i t) e) | Just ty <- toCmmTy t = do
         x <- ce e
         return ([Lit i $ TyPrim ty] :-> x)
+    cp'' _ = error "FromE.cp'': bad."
 
     getName x = getName' (dataTable cenv) x
 
@@ -710,8 +712,8 @@ compile' cenv (tvr,as,e) = ans where
 
     con _ = fail "not constructor"
 
-    scInfo tvr | Just n <- mlookup (tvrIdent tvr) (scMap cenv) = return n
-    scInfo tvr = fail $ "not a supercombinator:" <+> show tvr
+    --scInfo tvr | Just n <- mlookup (tvrIdent tvr) (scMap cenv) = return n
+    --scInfo tvr = fail $ "not a supercombinator:" <+> show tvr
     newNodeVar =  fmap (\x -> Var x TyNode) newVar
     newPrimVar ty =  fmap (\x -> Var x ty) newVar
     newNodePtrVar =  fmap (\x -> Var x TyINode) newVar

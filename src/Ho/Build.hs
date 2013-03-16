@@ -1,4 +1,4 @@
-{-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE DoRec #-}
 module Ho.Build (
     module Ho.Type,
     dumpHoFile,
@@ -10,15 +10,12 @@ module Ho.Build (
 
 import Control.Concurrent
 import Control.Monad.Identity
-import Data.Char
 import Data.IORef
 import Data.List hiding(union)
 import Data.Maybe
 import Data.Monoid(Monoid(..))
 import Data.Tree
 import Data.Version(Version,parseVersion,showVersion)
-import Data.Yaml.Syck
-import System.Directory (removeFile)
 import System.FilePath as FP
 import System.Mem
 import Text.Printf
@@ -40,12 +37,9 @@ import E.Traverse(emapE)
 import E.TypeCheck()
 import FrontEnd.Class
 import FrontEnd.FrontEnd
-import FrontEnd.HsParser
 import FrontEnd.HsSyn
 import FrontEnd.Infix
-import FrontEnd.ParseMonad
 import FrontEnd.SrcLoc
-import FrontEnd.Unlit
 import FrontEnd.Warning(warn,processIOErrors,WarnType(..))
 import Ho.Binary
 import Ho.Collected()
@@ -56,11 +50,10 @@ import Name.Name
 import Options
 import PackedString(PackedString,packString,unpackPS)
 import Support.TempDir
-import Util.FilterInput
 import Util.Gen
 import Util.SetLike
 import Util.YAML
-import Version.Config(revision,version)
+import Version.Config(version)
 import Version.Version(versionString)
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
@@ -101,7 +94,7 @@ type LibraryName = PackedString
 
 findFirstFile :: [FilePath] -> IO (LBS.ByteString,FilePath)
 findFirstFile [] = fail "findFirstFile: file not found"
-findFirstFile (x:xs) = flip catch (\e -> findFirstFile xs) $ do
+findFirstFile (x:xs) = flip iocatch (\e -> findFirstFile xs) $ do
     bs <- LBS.readFile x
     return (bs,x)
 
@@ -118,7 +111,12 @@ data Done = Done {
     hosEncountered  :: Map.Map HoHash     (FilePath,HoHeader,HoIDeps,Ho),
     modEncountered  :: Map.Map Module     ModDone
     }
-    {-! derive: update !-}
+
+hosEncountered_u f r@Done{hosEncountered  = x} = r{hosEncountered = f x}
+knownSourceMap_u f r@Done{knownSourceMap  = x} = r{knownSourceMap = f x}
+loadedLibraries_u f r@Done{loadedLibraries  = x} = r{loadedLibraries = f x}
+modEncountered_u f r@Done{modEncountered  = x} = r{modEncountered = f x}
+validSources_u f r@Done{validSources  = x} = r{validSources = f x}
 
 replaceSuffix suffix fp = reverse (dropWhile ('.' /=) (reverse fp)) ++ suffix
 
@@ -148,7 +146,7 @@ findHoFile done_ref fp mm sh = do
                 return (True,honame)
 
 onErr :: IO a -> IO b -> (b -> IO a) -> IO a
-onErr err good cont = join $ catch (good >>= return . cont) (\_ -> return err)
+onErr err good cont = join $ iocatch (good >>= return . cont) (\_ -> return err)
 
 fetchSource :: Opt -> IORef Done -> [FilePath] -> Maybe (Module,SrcLoc) -> IO Module
 fetchSource _ _ [] _ = fail "No files to load"
@@ -277,11 +275,13 @@ instance ProvidesModules CompUnit where
     providesModules (CompSources ss) = concatMap providesModules ss
     providesModules (CompLibrary ho libr) = libProvides (hoModuleGroup ho) libr
     providesModules CompDummy = []
+    providesModules (CompTCed _) = error "providesModules: bad1."
 
 instance ProvidesModules CompLink where
     providesModules (CompLinkUnit cu) = providesModules cu
     providesModules (CompCollected _ cu) = providesModules cu
     providesModules (CompTcCollected _ cu) = providesModules cu
+    providesModules (CompLinkLib _ _) = error "providesModules: bad2c."
 
 instance ProvidesModules SourceCode where
     providesModules sp = [sourceModName (sourceInfo sp)]
@@ -342,9 +342,10 @@ toCompUnitGraph done roots = do
                 writeIORef (lmods mg) (Right myHash)
                 modifyIORef cug_ref ((myHash,(deps,CompLibrary ho lib)):)
                 return myHash
+        g _ = error "Build.toCompUnitGraph: bad."
         pm :: [HoHash] -> IO HoHash -> IO HoHash
         pm [] els = els
-        pm (h:hs) els = hvalid h `catch` (\_ -> pm hs els)
+        pm (h:hs) els = hvalid h `iocatch` (\_ -> pm hs els)
         hvalid h = do
             ll <- Map.lookup h `fmap` readIORef hom_ref
             case ll of
@@ -352,7 +353,7 @@ toCompUnitGraph done roots = do
                 Just (True,_) -> return h
                 Just (False,af@(fp,hoh,idep,ho)) -> do
                     fp <- shortenPath fp
-                    isGood <- catch ( mapM_ cdep (hoDepends idep) >> mapM_ hvalid (hoModDepends idep) >> return True) (\_ -> return False)
+                    isGood <- iocatch ( mapM_ cdep (hoDepends idep) >> mapM_ hvalid (hoModDepends idep) >> return True) (\_ -> return False)
                     let isStale = not . null $ map (show . fst) (hoDepends idep) `intersect` optStale options
                         libsGood = all (\ (p,h) -> fmap (libHash) (Map.lookup p (loadedLibraries done)) == Just h) (hohLibDeps hoh)
                         noGood forced = do
@@ -488,6 +489,7 @@ printModProgress fmtLen maxModules tickProgress ms = f "[" ms where
         case ms of
             [x] -> g curModule bl "]" x
             (x:xs) -> do g curModule bl "-" x; putErrLn ""; f "-" xs
+            _ -> error "Build.printModProgress: bad."
     g curModule bl el modName = putErr $ printf "%s%*d of %*d%s %-17s" bl fmtLen curModule fmtLen maxModules el (show $ hsModuleName modName)
 
 countNodes cn = do
@@ -503,6 +505,7 @@ countNodes cn = do
             CompLinkUnit cu      -> return $ f cu
             CompTcCollected _ cu -> return $ f cu
             CompCollected _ cu   -> return $ f cu
+            CompLinkLib _ _      -> error "Build.countNodes: bad."
         f cu = case cu of
             CompTCed (_,_,_,ss) -> Set.fromList ss
             CompSources sc      -> Set.fromList (map sourceIdent sc)
@@ -553,6 +556,8 @@ typeCheckGraph modOpt cn = do
                         let ctc' = htc `mappend` ctc
                         writeIORef ref (CompTcCollected ctc' (CompTCed ((htc,tidata,[ (x,y) | (x,y,_) <- modules],map (sourceHoName . sourceInfo) sc))))
                         return ctc'
+                    _ -> error "Build.typeCheckGraph: bad1."
+            _ -> error "Build.typeCheckGraph: bad2."
         showProgress ms = printModProgress fmtLen maxModules tickProgress ms
         fmtLen = ceiling (logBase 10 (fromIntegral maxModules+1) :: Double) :: Int
         tickProgress = modifyMVar cur $ \val -> return (val+1,val)
@@ -576,6 +581,7 @@ compileCompNode ifunc func ksm cn = do
                 CompCollected ch _ -> return ch
                 CompTcCollected _ cl -> h cl
                 CompLinkUnit cu -> h cu
+                _ -> error "Build.compileCompNode: bad."
             h cu = do
                 deps' <- randomPermuteIO deps
                 cho <- mconcat `fmap` mapM f deps'
@@ -672,6 +678,7 @@ buildLibrary ifunc func = ans where
                 case cl of
                     CompLinkLib l _ -> return l
                     CompCollected _ y -> g hs cd ref y
+                    _ -> error "Build.buildLibrary: bad1."
             g hh deps ref cn = do
                 deps <- mapM f deps
                 let (mg,mll) = case cn of
@@ -686,6 +693,7 @@ buildLibrary ifunc func = ans where
                                     )) where
                                         mg = hoModuleGroup ho
                                         ho' = mapHoBodies eraseE ho
+                        _ -> error "Build.buildLibrary: bad2."
                     res = (mg,mconcat (snds deps) `mappend` mll)
                 writeIORef ref (CompLinkLib res cn)
                 return res

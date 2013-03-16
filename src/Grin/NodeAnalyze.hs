@@ -7,7 +7,6 @@ module Grin.NodeAnalyze(nodeAnalyze) where
 
 import Control.Monad.Identity hiding(join)
 import Control.Monad.RWS hiding(join)
-import Control.Monad.Trans
 import Data.Maybe
 import Text.Printf
 import qualified Data.Map as Map
@@ -270,8 +269,8 @@ data WhatToDo
     | WhatConstant Val
     | WhatSubs Ty (Val -> Exp) (Val -> Exp)
 
-isWhatUnchanged WhatUnchanged = True
-isWhatUnchanged _ = False
+--isWhatUnchanged WhatUnchanged = True
+--isWhatUnchanged _ = False
 
 transformFuncs :: (Atom -> [Ty] -> Maybe [Ty] -> (Maybe [WhatToDo],Maybe [WhatToDo])) -> Grin -> Grin
 transformFuncs fn grin = grin'' where
@@ -287,6 +286,7 @@ transformFuncs fn grin = grin'' where
             f (_,WhatDelete) = []
             f (_,WhatConstant _) = []
             f (Var v _,WhatSubs nty _ _) = [Var v nty]
+            f _ = error "NodeAnalyze.transformFuncs: f bad."
         e' =  g (zip p ats) (j e)
         g ((_,WhatUnchanged):xs) e = g xs e
         g ((_,WhatDelete):xs) e = g xs e
@@ -294,11 +294,14 @@ transformFuncs fn grin = grin'' where
         g ((Var v vt,WhatSubs nt _ ft):xs) e = ft (Var v nt) :>>= [Var v vt] :-> g xs e
         g [] e = e :>>= rvs :-> h (zip rvs rts) (drop (length (getType e)) [v1 .. ]) [] where
             rvs = zipWith Var [v1 .. ] (getType e)
+        g _ _ = error "NodeAnalyze.transformFuncs: g bad."
         h ((r,WhatUnchanged):xs) vs rs = h xs vs (r:rs)
         h ((r,WhatDelete):xs) vs rs = h xs vs rs
         h ((r,WhatConstant _):xs) vs rs = h xs vs rs
         h ((r,WhatSubs nty tt _):xs) (v:vs) rs = tt r :>>= [Var v nty] :-> h xs vs (Var v nty:rs)
         h [] _ rs = Return (reverse rs)
+        h _ _ _ = error "NodeAnalyze.transformFuncs: h bad."
+    f _ _ = error "NodeAnalyze.transformFuncs: f bad."
 
     j app@(BaseOp (StoreNode False) [NodeC a xs]) = res where
         res = if isNothing ats' then app else e'
@@ -312,6 +315,7 @@ transformFuncs fn grin = grin'' where
         f ((_,WhatConstant _):xs) rs = f xs rs
         f ((Var v oty,WhatSubs nty tt _):xs) rs = tt (Var v oty) :>>= [Var v nty] :-> f xs (Var v nty:rs)
         f [] rs = BaseOp (StoreNode False) [NodeC a (reverse rs)]
+        f _ _ = error "NodeAnalyze.transformFuncs: f bad."
 
     j app@(App a xs ts) = res where
         res = if isNothing ats' && isNothing rts'  then app else e'
@@ -326,12 +330,14 @@ transformFuncs fn grin = grin'' where
         f ((_,WhatConstant _):xs) rs = f xs rs
         f ((Var v oty,WhatSubs nty tt _):xs) rs = tt (Var v oty) :>>= [Var v nty] :-> f xs (Var v nty:rs)
         f [] rs = App a (reverse rs) ts' :>>= rvars :-> g (zip rvars' rts) rvars []
+        f _ _ = error "NodeAnalyze.transformFuncs: f bad."
 
         g [] [] rs = Return (reverse rs)
         g ((_,WhatUnchanged):xs) (n:ns) rs = g xs ns (n:rs)
         g ((v,WhatDelete):xs) vs rs = Return [ValUnknown (getType v)] :>>= [v] :-> g xs vs (v:rs)
         g ((v,WhatConstant c):xs) vs rs = Return [c] :>>= [v] :-> g xs vs (v:rs)
         g ((v,WhatSubs _ _ ft):xs) (n:ns) rs = ft n :>>= [v] :-> g xs ns (v:rs)
+        g _ _ _ = error "NodeAnalyze.transformFuncs: g bad."
 
         rvars = zipWith Var [ v1 .. ] ts'
         rvars' = zipWith Var (drop (length rvars) [ v1 .. ]) ts
@@ -365,6 +371,7 @@ fixupfs cmap tyEnv l = tickleM f (l::Lam) where
         Just ResultBounded { resultLB = Just lb } -> return lb
         Just ResultBounded { resultLB = Nothing } -> return bottom
         _ -> fail "lupVar"
+    lupVar _ = fail "lupVar2"
     pstuff x arg n@(N w t) = liftIO $ when verbose (printf "-- %s %s %s\n" x (show arg) (show n))
     f a@(BaseOp Eval [arg]) | Just n <- lupVar arg = case n of
         N WHNF _ -> do

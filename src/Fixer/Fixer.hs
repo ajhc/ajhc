@@ -111,7 +111,7 @@ instance Fixable a => Show (Value a) where
     showsPrec _ (IV a) = showString "<<" . shows (hashUnique $ ident a) . showString ">>"
 
 data RvValue a = RvValue {
-    ident :: {-# UNPACK #-} !Unique,
+    ident :: !Unique,
     action :: {-# UNPACK #-} !(IORef [a -> IO ()]),
     pending :: {-# UNPACK #-} !(IORef a),
     current :: {-# UNPACK #-} !(IORef a),

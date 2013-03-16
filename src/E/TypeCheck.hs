@@ -340,7 +340,7 @@ inferType dataTable ds e = rfc e where
         withContext "checking pattern equality" $ eqAll (et:ps)
         return ect
     fc Unknown = return Unknown
-    fc e = failDoc $ text "what's this? " </> (prettyE e)
+    --fc e = failDoc $ text "what's this? " </> (prettyE e)
     calt (EVar v) (Alt l e) = do
         let nv =  followAliases undefined (patToLitEE l)
         rfc (subst' v nv e)
@@ -420,11 +420,12 @@ typeInfer' dataTable ds e = case runContextEither $ typeInfer'' dataTable ds e o
     Right v -> v
 
 data TcEnv = TcEnv {
-    tcDefns :: [(TVr,E)],
-    tcContext :: [String],
-    tcDataTable :: DataTable
+    --tcDefns :: [(TVr,E)],
+    tcContext :: [String]
+    --tcDataTable :: DataTable
     }
-   {-! derive: update !-}
+
+tcContext_u f r@TcEnv{tcContext  = x} = r{tcContext = f x}
 
 newtype Tc a = Tc (Reader TcEnv a)
     deriving(Monad,Functor,MonadReader TcEnv)
@@ -433,6 +434,7 @@ instance ContextMonad Tc where
     type ContextOf Tc = String
     withContext s = local (tcContext_u (s:))
 
+{-
 tcE :: E -> Tc E
 tcE e = rfc e where
     rfc e =  withContextDoc (text "tcE:" </> ePretty e) (fc e >>=  strong')
@@ -467,6 +469,7 @@ tcE e = rfc e where
         strong' ty
     fc Unknown = return Unknown
     fc e = failDoc $ text "what's this? " </> (ePretty e)
+-}
 
 typeInfer'' :: (ContextMonad m, ContextOf m ~ String) => DataTable -> [(TVr,E)] -> E -> m E
 typeInfer'' dataTable ds e = rfc e where
@@ -504,7 +507,7 @@ typeInfer'' dataTable ds e = rfc e where
     fc ECase { eCaseType = ty } = do
         strong' ty
     fc Unknown = return Unknown
-    fc e = failDoc $ text "what's this? " </> (ePretty e)
+    --fc e = failDoc $ text "what's this? " </> (ePretty e)
 
 -- | find substitution that will transform the left term into the right one,
 -- only substituting for the vars in the list
@@ -556,3 +559,4 @@ match lup vs = \e1 e2 -> liftM Seq.toList $ execWriterT (un e1 e2 etherealIds) w
     lam va ea vb eb (c:cs) = do
         un (tvrType va) (tvrType vb) (c:cs)
         un (subst va (EVar va { tvrIdent = c }) ea) (subst vb (EVar vb { tvrIdent = c }) eb) cs
+    lam _ _ _ _ _ = error "TypeCheck.match: bad."

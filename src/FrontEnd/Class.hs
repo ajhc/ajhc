@@ -28,7 +28,7 @@ module FrontEnd.Class(
     ) where
 
 import Control.Monad.Identity
-import Control.Monad.Writer(Monoid(..),Writer(..))
+import Control.Monad.Writer(Monoid(..))
 import Data.Generics(mkQ,something)
 import Data.List(nub)
 import Data.Maybe
@@ -236,12 +236,15 @@ chToClassHead kt qt@HsClassHead { .. }  =
 createClassAssocs kt decls = [ Assoc (ctc n) False (map ct as) (ctype t) | HsTypeDecl { hsDeclName = n, hsDeclTArgs = as, hsDeclType = t } <- decls ] where
     ctc n = let nn = toName TypeConstructor n in Tycon nn (kindOf nn kt)
     ct (HsTyVar n) = let nn = toName TypeVal n in tyvar nn (kindOf nn kt)
+    ct _ = error "Class.createClassAssocs: bad1."
     ctype HsTyAssoc = kindStar
+    ctype _ = error "Class.createClassAssocs: bad2."
 --    ctype t = Just $ runIdentity $ hsTypeToType kt t
 
 createInstAssocs kt decls = [ (ctc n,map ct (czas ca),map ct as,ctype t) | HsTypeDecl { hsDeclName = n, hsDeclTArgs = (ca:as), hsDeclType = t } <- decls ] where
     ctc n = let nn = toName TypeConstructor n in Tycon nn (kindOf nn kt)
     ct (HsTyVar n) = let nn = toName TypeVal n in tyvar nn (kindOf nn kt)
+    ct _ = error "Class.createInstAssocs: bad."
     czas ca = let (HsTyCon {},zas) = fromHsTypeApp ca in zas
     ctype HsTyAssoc = Nothing
     ctype t = Just $ runIdentity $ hsTypeToType kt t
@@ -270,8 +273,8 @@ instanceToTopDecls _ _ _ = mempty
 
 instanceName n t = toName Val ("Instance@",'i':show n ++ "." ++ show t)
 defaultInstanceName n = toName Val ("Instance@",'i':show n ++ ".default")
-aliasDefaultInstanceName :: Name -> Class -> Name
-aliasDefaultInstanceName n ca = toName Val ("Instance@",'i':show n ++ ".default."++show ca)
+-- aliasDefaultInstanceName :: Name -> Class -> Name
+-- aliasDefaultInstanceName n ca = toName Val ("Instance@",'i':show n ++ ".default."++show ca)
 
 methodToTopDecls :: Monad m
     => KindEnv         -- ^ the kindenv
@@ -301,6 +304,7 @@ defaultMethodToTopDecls kt methodSigs HsClassHead { .. } (methodName, methodDecl
      --  = newMethodSig cntxt newMethodName sigFromClass argType
     renamedMethodDecls = renameOneDecl newMethodName methodDecls
 
+{-
 aliasDefaultMethodToTopDecls :: KindEnv -> [Assump] -> Class -> (Name, HsDecl) -> (HsDecl,Assump)
 aliasDefaultMethodToTopDecls kt methodSigs aliasName (methodName, methodDecls)
    = (renamedMethodDecls,(newMethodName,sigFromClass)) where
@@ -310,6 +314,7 @@ aliasDefaultMethodToTopDecls kt methodSigs aliasName (methodName, methodDecls)
          _ -> error $ "sigFromClass: " ++ show methodSigs ++ " " ++ show  methodName
       --  = newMethodSig cntxt newMethodName sigFromClass argType
      renamedMethodDecls = renameOneDecl newMethodName methodDecls
+-}
 
 renameOneDecl :: Name -> HsDecl -> HsDecl
 renameOneDecl newName (HsFunBind matches)
@@ -318,6 +323,7 @@ renameOneDecl newName (HsFunBind matches)
 -- (ie no compound patterns)
 renameOneDecl newName (HsPatBind sloc (HsPVar patName) rhs wheres)
    = HsPatBind sloc (HsPVar (nameName newName)) rhs wheres
+renameOneDecl _ _ = error "Class.renameOneDecl"
 
 renameOneMatch :: Name -> HsMatch -> HsMatch
 renameOneMatch newName (HsMatch sloc oldName pats rhs wheres)
@@ -355,8 +361,8 @@ newMethodSig' kt methodName newCntxt qt' instanceType  = newQualType where
 
 -- collect assumptions of all class methods
 
-classMethodAssumps :: ClassHierarchy -> [Assump]
-classMethodAssumps hierarchy = concatMap classAssumps $ classRecords hierarchy
+--classMethodAssumps :: ClassHierarchy -> [Assump]
+--classMethodAssumps hierarchy = concatMap classAssumps $ classRecords hierarchy
 
 --------------------------------------------------------------------------------
 
@@ -388,7 +394,7 @@ scatterInstancesOf cr = map extract (classClasses cr)
 -}
 --------------------------------------------------------------------------------
 
-failSl sl m = fail $ show sl ++ ": " ++ m
+--failSl sl m = fail $ show sl ++ ": " ++ m
 
 classHierarchyFromRecords rs =
     CH (Map.fromList [ (className x,x)| x <- rs ]) mempty
@@ -476,11 +482,13 @@ showListAndSepInWidth f width sep things = unlines $ groupStringsToWidth width n
 pretty  :: PPrint Doc a => a -> String
 pretty   = render . pprint
 
+{-
 nameOfTyCon :: NameType -> HsType -> Name
 nameOfTyCon t (HsTyCon n) = toName t n
 nameOfTyCon t (HsTyTuple xs) = nameTuple t (length xs)
 nameOfTyCon t (HsTyFun _ _) = tc_Arrow
 nameOfTyCon _ t = error $ "nameOfTyCon: " ++ show t
+-}
 
 groupEquations :: [HsDecl] -> [(Name, HsDecl)]
 groupEquations [] = []
@@ -518,6 +526,7 @@ noNewtypeDerivable = [
 
 -- classes that behave identically to their component when they have a single
 -- unary constructor but are not newtypes
+{-
 unaryPassDerivable :: [Name]
 unaryPassDerivable = [
     class_Ix,
@@ -525,3 +534,4 @@ unaryPassDerivable = [
     class_Ord,
     class_Bounded
     ]
+-}

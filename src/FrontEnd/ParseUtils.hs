@@ -90,7 +90,6 @@ checkAssertion t =  checkAssertion' [] t
 		checkAssertion' _ _ = fail "Illegal class assertion"
                 tast (a,[HsTyVar n]) = return (HsAsst a [n]) -- (a,n)
                 tast _ = fail "Invalid Class. multiparameter classes not yet supported"
-                tast _ = error "tast!"
 --checkAssertion = checkAssertion' []
 --	where	checkAssertion' ts (HsTyCon c) = return (c,ts)
 --		checkAssertion' ts (HsTyApp a t) = checkAssertion' (t:ts) a
@@ -110,6 +109,7 @@ checkSimple _kw (HsTyCon t)   xs = return (t,xs)
 checkSimple kw _ _ = fail ("Illegal " ++ kw ++ " declaration")
 --checkSimple kw t ts = fail ("Illegal " ++ kw ++ " declaration: " ++ show (t,ts))
 
+{-
 checkInstHeader :: HsQualType -> P (HsContext,Name,[HsType])
 checkInstHeader (HsQualType cs t) = do
 	(c,ts) <- checkInsts t []
@@ -119,6 +119,7 @@ checkInsts :: HsType -> [HsType] -> P ((Name,[HsType]))
 checkInsts (HsTyApp l t) ts = checkInsts l (t:ts)
 checkInsts (HsTyCon c)   ts = return (c,ts)
 checkInsts _ _ = fail "Illegal instance declaration"
+-}
 
 -----------------------------------------------------------------------------
 -- Checking Patterns.
@@ -232,8 +233,7 @@ checkExpr e = case e of
         HsAsPat _ _     -> fail "@ only valid in pattern"
         HsWildCard sl   -> return $ HsWildCard sl -- TODO check for strict mode
         HsIrrPat _      -> fail "~ only valid in pattern"
-
---	_                         -> fail "Parse error in expression"
+	_                         -> fail "Parse error in expression"
 
 -- type signature for polymorphic recursion!!
 check1Expr :: HsExp -> (HsExp -> a) -> P a
@@ -306,6 +306,7 @@ isFunLhs _ _ = Nothing
 -----------------------------------------------------------------------------
 -- In a class or instance body, a pattern binding must be of a variable.
 
+{-
 checkClassBody :: [HsDecl] -> P [HsDecl]
 checkClassBody decls = do
 	mapM_ checkMethodDef decls
@@ -316,6 +317,7 @@ checkMethodDef (HsPatBind _ (HsPVar _) _ _) = return ()
 checkMethodDef (HsPatBind loc _ _ _) =
 	fail "illegal method definition" `atSrcLoc` loc
 checkMethodDef _ = return ()
+-}
 
 -----------------------------------------------------------------------------
 -- Check that an identifier or symbol is unqualified.
@@ -343,6 +345,7 @@ mkRecConstrOrUpdate _         _        = fail "Empty record update"
 -- Reverse a list of declarations, merging adjacent HsFunBinds of the
 -- same name and checking that their arities match.
 
+{-
 checkRevDecls :: [HsDecl] -> P [HsDecl]
 checkRevDecls = mergeFunBinds []
     where
@@ -359,6 +362,7 @@ checkRevDecls = mergeFunBinds []
 			else mergeMatches (ms++ms') ds
 		mergeMatches ms' ds = mergeFunBinds (HsFunBind ms':revDs) ds
 	mergeFunBinds revDs (d:ds) = mergeFunBinds (d:revDs) ds
+-}
 
 -- this used to be done in post-process
 
@@ -398,6 +402,7 @@ doForeign srcLoc names ms qt = ans where
             f ("export":rs) cname = do
                 let (safe,conv) = pconv rs
                 return $ HsForeignExport srcLoc (FfiExport cname safe conv undefined undefined) vname qt
+            f _ _ = error "ParseUtils: bad."
         f (map show names') (maybe cname id mstring) where
     pconv rs = g Safe CCall rs where
         g _ cc ("safe":rs) = g Safe cc rs

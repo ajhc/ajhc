@@ -1,4 +1,4 @@
-{-# LANGUAGE RecursiveDo,NoMonoLocalBinds #-}
+{-# LANGUAGE DoRec,NoMonoLocalBinds #-}
 -- | determine export\/imports for modules via fixpoint recursion
 
 module FrontEnd.Exports(determineExports,ModInfo(..)) where
@@ -100,6 +100,7 @@ determineExports' owns doneMods todoMods = mdo
                 g x = Name.qualifyName m x
             f z = entSpec False is z
         return $ mapDomain toUnqualified (unions $ map f es)
+    getExports _ _ = error "Exports.getExports: bad."
 
     -- | determine what is visible in a module
     getImports :: Monad m => ModInfo -> (Module -> m (Rel Name Name)) -> m (Rel Name Name)
@@ -136,9 +137,10 @@ determineExports' owns doneMods todoMods = mdo
 		Nothing -> [TypeConstructor,ClassName]
 		Just nt -> [nt]
 	    ss = concat $ concat [ maybeToList (Map.lookup x ownsMap) | x <- Set.toList $ range rdl ]
-	    cd n = [toName DataConstructor n, toName Val n, toName FieldLabel n ]
+	    --cd n = [toName DataConstructor n, toName Val n, toName FieldLabel n ]
 	    rdl = (restrictDomain (`elem` map (`toName` n) ct) rel)
 	f _ (HsEQualified t n) = f (Just t) n
+        f _ _ = error "Export.determineExports': bad."
 
 defsToRel xs = fromList $ map f xs where
     f (n,_,_) = (toUnqualified n,n)

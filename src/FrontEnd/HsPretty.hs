@@ -405,6 +405,7 @@ ppHsTypePrec p HsTyExists { hsTypeVars = vs, hsTypeType = qt } = parensIf (p > 1
 ppHsTypePrec _ HsTyExpKind { hsTyLType = Located _ t, hsTyKind = k } = do
     t <- ppHsType t
     return $ DL.parens ( t DL.<+> DL.text "::" DL.<+> pprint k)
+ppHsTypePrec _ _ = error "HsPretty.ppHsTypePrec: bad."
 
 instance DL.DocLike d => P.PPrint d HsKind where
     pprint (HsKind k) = pprint k

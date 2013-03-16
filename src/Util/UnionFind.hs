@@ -15,9 +15,9 @@ module Util.UnionFind(
 import Control.Monad.Trans
 import Data.IORef
 import Data.Unique
-import Monad(when,liftM)
+import Control.Monad (when)
 
-data Element w a = Element a {-# UNPACK #-} !Unique {-# UNPACK #-} !(IORef (Link w a))
+data Element w a = Element a !Unique {-# UNPACK #-} !(IORef (Link w a))
 data Link w a = Weight {-# UNPACK #-} !Int w | Next (Element w a)
 
 type T = Element

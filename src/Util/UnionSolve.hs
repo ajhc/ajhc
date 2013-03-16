@@ -52,9 +52,11 @@ newtype C l v = C (S.Seq (CL l v))
 
 data Op = OpLte | OpEq | OpGte
 
+{-
 flipOp OpLte = OpGte
 flipOp OpGte = OpLte
 flipOp OpEq = OpEq
+-}
 
 instance Show Op where
     show OpEq  = " = "
@@ -164,6 +166,7 @@ solve putLog csp = do
                         OpEq  ->  doEq lvl xe (Ri xml xlb xmu xub) ye (Ri yml ylb ymu yub)
                         OpLte -> doLte lvl xe (Ri xml xlb xmu xub) ye (Ri yml ylb ymu yub)
                         OpGte -> doLte lvl ye (Ri yml ylb ymu yub) xe (Ri xml xlb xmu xub)
+                _ -> fail $ "UnionSolve: bad " ++  show (xw,yw)
         doEq lvl xe ~(Ri _ xlb _ xub) ye ~(Ri _ ylb _ yub) = do
             union const xe ye
             ne <- find xe
@@ -227,7 +230,7 @@ solve putLog csp = do
                     doUpdate (Ri nv lb mu ub) ve
                     unless (nv `eq` ml) $
                         mapM_ (\v -> doOp' v OpGte l') (Set.toList ub)
-                _ -> fail $ "UnionSolve: bad " ++  show (fromElement ve,vw,op,l)
+                -- _ -> fail $ "UnionSolve: bad " ++  show (fromElement ve,vw,op,l)
         testBoundLT Nothing _ = True
         testBoundLT (Just x) y = x `lte` y
         testBoundGT Nothing _ = True

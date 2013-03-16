@@ -73,8 +73,8 @@ module C.Generate(
 
 import Char
 import Control.Monad
-import Control.Monad.RWS(RWS(..),MonadState(..),MonadWriter(..),MonadReader(..),runRWS,asks,MonadFix(..))
-import Control.Monad.Writer(Writer(..),censor, runWriter)
+import Control.Monad.RWS(RWS,MonadState(..),MonadWriter(..),MonadReader(..),runRWS,asks,MonadFix(..))
+import Control.Monad.Writer(censor, runWriter)
 import Data.Monoid(Monoid(..))
 import Data.List(intersperse)
 import Data.Maybe(isNothing)
