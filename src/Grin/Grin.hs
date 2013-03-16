@@ -669,6 +669,9 @@ instance Show Var where
 instance Show Ty where
     showsPrec n (TyComplex ty) = showParen (n >= 9) $ text "Complex" <+> showsPrec 10 ty
     showsPrec n (TyVector v ty) = showParen (n >= 9) $ showsPrec 10 ty <> text "*" <> tshow v
+    showsPrec n (TyAttr t1 t2) = showParen (n >= 9) $ showsPrec 10 t1 <> text "#" <> showsPrec 10 t2
+    showsPrec n (TyAnd t1 t2) = showParen (n >= 9) $ showsPrec 10 t1 <> text " && " <> showsPrec 10 t2
+    showsPrec n (TyOr t1 t2) = showParen (n >= 9) $ showsPrec 10 t1 <> text " || " <> showsPrec 10 t2
     showsPrec _ t = showString (f t) where
         f TyNode = "N"
         f TyINode = "I"
@@ -680,6 +683,7 @@ instance Show Ty where
         f (TyRegister t) = 'r':show t
         f (TyCall c as rt) = show c <> tupled (map show as) <+> "->" <+> show rt
         f TyUnknown = "?"
+        f _ = "BADTYPE"
 
 instance Show Val where
     -- showsPrec _ s | Just st <- fromVal s = text $ show (st::String)
