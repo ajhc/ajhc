@@ -17,7 +17,7 @@ module IO (
     try, bracket, bracket_,
 
     -- ...and what the Prelude exports
-    IO, FilePath, IOError, ioError, userError, catch, interact,
+    IO, FilePath, IOError, ioError, userError, interact,
     putChar, putStr, putStrLn, print, getChar, getLine, getContents,
     readFile, writeFile, appendFile, readIO, readLn
   ) where
