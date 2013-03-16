@@ -182,6 +182,8 @@ data Ty =
     | TyGcContext                -- ^ the context for garbage collection
     | TyRegister Ty              -- ^ a register contains a mutable value, the register itself cannot be addressed,
                                  --   hence they may not be returned from functions or passed as arguments.
+    | TyComplex Ty               -- ^ A complex version of a basic type
+    | TyVector !Int Ty           -- ^ A vector of a basic type
     | TyUnknown                  -- ^ an unknown possibly undefined type, All of these must be eliminated by code generation
     deriving(Eq,Ord)
 
@@ -665,17 +667,19 @@ instance Show Var where
     showsPrec _ (V n) xs = 'v':shows n xs
 
 instance Show Ty where
-    show TyNode = "N"
-    show TyINode = "I"
-    show (TyPtr t) = '&':show t
-    show (TyUnit) = "()"
-    show (TyPrim t) = show t
-    show TyRegion = "M"
-    show TyGcContext = "GC"
-    show (TyRegister t) = 'r':show t
-    show (TyCall c as rt) = show c <> tupled (map show as) <+> "->" <+> show rt
-    show TyUnknown = "?"
-    show _ = error "Ty.show: bad."
+    showsPrec n (TyComplex ty) = showParen (n >= 9) $ text "Complex" <+> showsPrec 10 ty
+    showsPrec n (TyVector v ty) = showParen (n >= 9) $ showsPrec 10 ty <> text "*" <> tshow v
+    showsPrec _ t = showString (f t) where
+        f TyNode = "N"
+        f TyINode = "I"
+        f (TyPtr t) = '&':show t
+        f (TyUnit) = "()"
+        f (TyPrim t) = show t
+        f TyRegion = "M"
+        f TyGcContext = "GC"
+        f (TyRegister t) = 'r':show t
+        f (TyCall c as rt) = show c <> tupled (map show as) <+> "->" <+> show rt
+        f TyUnknown = "?"
 
 instance Show Val where
     -- showsPrec _ s | Just st <- fromVal s = text $ show (st::String)
