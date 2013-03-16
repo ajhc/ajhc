@@ -12,8 +12,19 @@ struct s_cache;
 typedef void* *gc_t;
 typedef void* heap_t;  // a pointer into the GCed heap.
 
-#define BLOCK_SIZE     (1UL << 12)
-#define MEGABLOCK_SIZE (1UL << 20)
+#if defined(_JHC_JGC_BLOCK_SHIFT) && defined(_JHC_JGC_MEGABLOCK_SHIFT)
+#if (_JHC_JGC_BLOCK_SHIFT) >= (_JHC_JGC_MEGABLOCK_SHIFT)
+#error "_JHC_JGC_MEGABLOCK_SHIFT should be larger than _JHC_JGC_BLOCK_SHIFT."
+#endif
+#elif defined(_JHC_JGC_BLOCK_SHIFT) || defined(_JHC_JGC_MEGABLOCK_SHIFT)
+#error "Should define both _JHC_JGC_BLOCK_SHIFT and _JHC_JGC_MEGABLOCK_SHIFT."
+#else
+#define _JHC_JGC_BLOCK_SHIFT     12
+#define _JHC_JGC_MEGABLOCK_SHIFT 20
+#endif /* defined(_JHC_JGC_BLOCK_SHIFT) && defined(_JHC_JGC_MEGABLOCK_SHIFT) */
+
+#define BLOCK_SIZE     (1UL << (_JHC_JGC_BLOCK_SHIFT))
+#define MEGABLOCK_SIZE (1UL << (_JHC_JGC_MEGABLOCK_SHIFT))
 #define S_BLOCK(val) ((struct s_block *)((uintptr_t)(val) & ~(BLOCK_SIZE - 1)))
 #define TO_BLOCKS(x) (((x) + sizeof(uintptr_t) - 1)/sizeof(uintptr_t))
 

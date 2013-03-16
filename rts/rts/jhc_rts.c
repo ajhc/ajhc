@@ -144,6 +144,7 @@ eval(sptr_t s)
 #if _JHC_DEBUG
                         GETHEAD(ds) = BLACK_HOLE;
 #endif
+                        fn = (eval_fn)SET_THUMB_BIT(fn);
 #if _JHC_GC == _JHC_GC_JGC
                         wptr_t r = (*fn)(gc,NODEP(ds));
 #else

@@ -7,6 +7,10 @@
 
 #if _JHC_GC == _JHC_GC_JGC
 
+#ifdef _JHC_JGC_FIXED_MEGABLOCK
+static char aligned_megablock_1[MEGABLOCK_SIZE] __attribute__ ((aligned(BLOCK_SIZE)));
+static char gc_stack_base_area[(1UL << 8)*sizeof(gc_t)];
+#endif
 gc_t saved_gc;
 struct s_arena *arena;
 static gc_t gc_stack_base;
@@ -56,7 +60,10 @@ stack_grow(struct stack *s, unsigned grow)
 inline static void
 stack_check(struct stack *s, unsigned n) {
         if(__predict_false(s->size - s->ptr < n)) {
-                stack_grow(s,n + 1024);
+#ifndef _JHC_JGC_STACKGROW
+#define _JHC_JGC_STACKGROW (1024)
+#endif
+                stack_grow(s,n + (_JHC_JGC_STACKGROW));
         }
 }
 
@@ -190,7 +197,11 @@ static struct s_cache *array_caches_atomic[GC_STATIC_ARRAY_NUM];
 void
 jhc_alloc_init(void) {
         VALGRIND_PRINTF("Jhc-Valgrind mode active.\n");
+#ifdef _JHC_JGC_FIXED_MEGABLOCK
+        saved_gc = gc_stack_base = (void *) gc_stack_base_area;
+#else
         saved_gc = gc_stack_base = malloc((1UL << 18)*sizeof(gc_stack_base[0]));
+#endif
         arena = new_arena();
         if(nh_stuff[0]) {
                 nh_end = nh_start = nh_stuff[0];
@@ -318,7 +329,16 @@ struct s_megablock *
 s_new_megablock(struct s_arena *arena)
 {
         struct s_megablock *mb = malloc(sizeof(*mb));
+#ifdef _JHC_JGC_FIXED_MEGABLOCK
+        static int count = 0;
+        if (count != 0) {
+                abort();
+        }
+        count++;
+        mb->base = aligned_megablock_1;
+#else
         mb->base = jhc_aligned_alloc(MEGABLOCK_SIZE);
+#endif
         VALGRIND_MAKE_MEM_NOACCESS(mb->base,MEGABLOCK_SIZE);
         mb->next_free = 0;
         return mb;
@@ -334,6 +354,7 @@ get_free_block(gc_t gc, struct s_arena *arena) {
                 SLIST_REMOVE_HEAD(&arena->free_blocks,link);
                 return pg;
         } else {
+#ifndef _JHC_JGC_NAIVEGC
                 if((arena->block_used >= arena->block_threshold)) {
                         gc_perform_gc(gc);
                         // if we are still using 80% of the heap after a gc, raise the threshold.
@@ -341,6 +362,7 @@ get_free_block(gc_t gc, struct s_arena *arena) {
                                 arena->block_threshold *= 2;
                         }
                 }
+#endif
                 if(__predict_false(!arena->current_megablock))
                         arena->current_megablock = s_new_megablock(arena);
                 struct s_megablock *mb = arena->current_megablock;
@@ -466,6 +488,11 @@ s_alloc(gc_t gc, struct s_cache *sc)
        sc->arena->number_allocs++;
 #endif
         struct s_block *pg = SLIST_FIRST(&sc->blocks);
+#ifdef _JHC_JGC_NAIVEGC
+        if(__predict_false(!pg)) {
+                gc_perform_gc(gc);
+        }
+#endif
         if(__predict_false(!pg)) {
                 pg = get_free_block(gc, sc->arena);
                 VALGRIND_MAKE_MEM_NOACCESS(pg, BLOCK_SIZE);
