@@ -434,7 +434,9 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
     --isExtTypeRaw _ = False
 
     cDecl,cDecl' :: HsDecl -> C [(Name,TVr,E)]
-    cDecl' d = withSrcLoc (srcLoc d) $ catchError (cDecl d) (\(_ :: IOError) -> return [])
+    cDecl' d = withSrcLoc (srcLoc d) $ catchError (cDecl d) $ \ (e :: IOError) -> do
+        warn (srcLoc d) InvalidDecl $ "caught error processing decl: " ++ show e
+        return []
     cDecl (HsForeignDecl sLoc (FfiSpec (Import cn req) _ Primitive) n _) = do
         let name      = toName Name.Val n
         (var,ty,lamt) <- convertValue name
