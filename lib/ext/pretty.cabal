@@ -1,7 +1,8 @@
 name:		pretty
-version:	1.0.1.1
+version:	1.0.1.2
 synopsis:	Pretty-printing library
 category:       Text
+options:        -fcpp
 description:
 	This package contains John Hughes's pretty-printing library,
         heavily modified by Simon Peyton Jones.

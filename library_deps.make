@@ -45,34 +45,33 @@ JHC_LIBS = jhc-prim-1.0.hl jhc-1.0.hl haskell-extras-0.8.1.hl haskell2010-0.8.1.
 containers-0.3.0.0.hl: lib/ext/containers.cabal haskell-extras-0.8.1.hl jhc-prim-1.0.hl jhc-1.0.hl applicative-1.0.hl \
     lib/ext/containers.patch
 	perl utils/build_extlibs.prl $<
-Diff-0.1.2.hl: lib/ext/Diff.cabal haskell-extras-0.8.1.hl jhc-prim-1.0.hl jhc-1.0.hl
+Diff-0.2.0.hl: lib/ext/Diff.cabal haskell-extras-0.8.1.hl jhc-prim-1.0.hl jhc-1.0.hl
 	perl utils/build_extlibs.prl $<
 html-1.0.1.2.hl: lib/ext/html.cabal haskell-extras-0.8.1.hl jhc-prim-1.0.hl jhc-1.0.hl
 	perl utils/build_extlibs.prl $<
-HUnit-1.2.2.1.hl: lib/ext/HUnit.cabal haskell-extras-0.8.1.hl jhc-prim-1.0.hl jhc-1.0.hl
+HUnit-1.2.5.1.hl: lib/ext/HUnit.cabal haskell-extras-0.8.1.hl jhc-prim-1.0.hl jhc-1.0.hl deepseq-1.2.0.1.hl
 	perl utils/build_extlibs.prl $<
 parsec-2.1.0.1.hl: lib/ext/parsec.cabal haskell-extras-0.8.1.hl jhc-prim-1.0.hl jhc-1.0.hl
 	perl utils/build_extlibs.prl $<
-pretty-1.0.1.1.hl: lib/ext/pretty.cabal haskell-extras-0.8.1.hl jhc-prim-1.0.hl jhc-1.0.hl
+pretty-1.0.1.2.hl: lib/ext/pretty.cabal haskell-extras-0.8.1.hl jhc-prim-1.0.hl jhc-1.0.hl
 	perl utils/build_extlibs.prl $<
-QuickCheck-1.2.0.0.hl: lib/ext/QuickCheck.cabal haskell-extras-0.8.1.hl jhc-prim-1.0.hl jhc-1.0.hl
+QuickCheck-1.2.0.1.hl: lib/ext/QuickCheck.cabal haskell-extras-0.8.1.hl jhc-prim-1.0.hl jhc-1.0.hl
 	perl utils/build_extlibs.prl $<
-safe-0.2.hl: lib/ext/safe.cabal haskell-extras-0.8.1.hl jhc-prim-1.0.hl jhc-1.0.hl
+safe-0.3.3.hl: lib/ext/safe.cabal haskell-extras-0.8.1.hl jhc-prim-1.0.hl jhc-1.0.hl
 	perl utils/build_extlibs.prl $<
-smallcheck-0.4.hl: lib/ext/smallcheck.cabal haskell-extras-0.8.1.hl haskell98-1.0.hl jhc-prim-1.0.hl jhc-1.0.hl \
-    lib/ext/smallcheck.patch
+smallcheck-0.6.1.hl: lib/ext/smallcheck.cabal haskell-extras-0.8.1.hl haskell98-1.0.hl jhc-prim-1.0.hl jhc-1.0.hl
 	perl utils/build_extlibs.prl $<
-xhtml-3000.2.0.1.hl: lib/ext/xhtml.cabal haskell-extras-0.8.1.hl jhc-prim-1.0.hl jhc-1.0.hl
+xhtml-3000.2.1.hl: lib/ext/xhtml.cabal haskell-extras-0.8.1.hl jhc-prim-1.0.hl jhc-1.0.hl
 	perl utils/build_extlibs.prl $<
 transformers-0.2.1.0.hl: lib/ext/transformers.cabal haskell-extras-0.8.1.hl jhc-prim-1.0.hl jhc-1.0.hl applicative-1.0.hl
 	perl utils/build_extlibs.prl $<
-filepath-1.2.0.0.hl: lib/ext/filepath.cabal haskell-extras-0.8.1.hl jhc-prim-1.0.hl jhc-1.0.hl
+filepath-1.3.0.1.hl: lib/ext/filepath.cabal haskell-extras-0.8.1.hl jhc-prim-1.0.hl jhc-1.0.hl
 	perl utils/build_extlibs.prl $<
-deepseq-1.1.0.2.hl: lib/ext/deepseq.cabal haskell-extras-0.8.1.hl jhc-prim-1.0.hl jhc-1.0.hl containers-0.3.0.0.hl \
+deepseq-1.2.0.1.hl: lib/ext/deepseq.cabal haskell-extras-0.8.1.hl jhc-prim-1.0.hl jhc-1.0.hl containers-0.3.0.0.hl \
     applicative-1.0.hl
 	perl utils/build_extlibs.prl $<
 bytestring-0.9.2.0.hl: lib/ext/bytestring.yaml haskell-extras-0.8.1.hl jhc-prim-1.0.hl jhc-1.0.hl lib/ext/bytestring.patch
 	perl utils/build_extlibs.prl $<
-JHC_EXT_LIBS = containers-0.3.0.0.hl Diff-0.1.2.hl html-1.0.1.2.hl HUnit-1.2.2.1.hl parsec-2.1.0.1.hl \
-    pretty-1.0.1.1.hl QuickCheck-1.2.0.0.hl safe-0.2.hl smallcheck-0.4.hl xhtml-3000.2.0.1.hl \
-    transformers-0.2.1.0.hl filepath-1.2.0.0.hl deepseq-1.1.0.2.hl 
+JHC_EXT_LIBS = containers-0.3.0.0.hl Diff-0.2.0.hl html-1.0.1.2.hl HUnit-1.2.5.1.hl parsec-2.1.0.1.hl \
+    pretty-1.0.1.2.hl QuickCheck-1.2.0.1.hl safe-0.3.3.hl smallcheck-0.6.1.hl xhtml-3000.2.1.hl \
+    transformers-0.2.1.0.hl filepath-1.3.0.1.hl deepseq-1.2.0.1.hl

@@ -1,5 +1,5 @@
 Name:          smallcheck
-Version:       0.4
+Version:       0.6.1
 Author:        Colin Runciman
 Synopsis:      Another lightweight testing library in Haskell.
 Description:   SmallCheck is similar to QuickCheck (Claessen and Hughes 2000-) but
@@ -7,5 +7,5 @@ Description:   SmallCheck is similar to QuickCheck (Claessen and Hughes 2000-) b
                tests properties for all the finitely many values up to some depth,
                progressively increasing the depth used.
 
-Build-Depends: haskell98
+Build-Depends: haskell98, haskell-extras
 Exposed-modules:    Test.SmallCheck

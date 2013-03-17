@@ -1,13 +1,13 @@
 Name:           safe
 Build-Type:     Simple
-Version:        0.2
+Version:        0.3.3
 License:        BSD3
 License-File:   LICENSE
 Copyright:      2007-8, Neil Mitchell
 Maintainer:     ndmitchell@gmail.com
 Author:         Neil Mitchell
 Homepage:       http://www-users.cs.york.ac.uk/~ndm/safe/
-Build-Depends:  haskell-extras
+Build-Depends:  haskell-extras, applicative
 Category:       Unclassified
 Synopsis:       Library for safe (pattern match free) functions
 Description:
@@ -19,3 +19,4 @@ Description:
     your code.
 Exposed-modules:
         Safe
+        Safe.Foldable
