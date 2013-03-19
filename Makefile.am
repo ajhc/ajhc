@@ -66,11 +66,11 @@ GHCLANG= -XTypeFamilies -XViewPatterns -XUndecidableInstances -XOverlappingInsta
 
 GHCOPTS= $(HSOPTS) -XBangPatterns -O @GHCFLAGS@ $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 
-LIB_OPTIONS=$(RTSOPTS) $(AJHC_TEST)  -L- -L.
+LIB_OPTIONS=$(RTSOPTS) $(JHC_TEST)  -L- -L.
 include library_deps.make
 
 EXTRA_DIST = src/data rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
-             lib/jhc lib/jhc-prim lib/haskell-extras lib/haskell98 lib/haskell2010 lib/flat-foreign $(AJHC_LIBS) $(AJHC_EXT_LIBS) \
+             lib/jhc lib/jhc-prim lib/haskell-extras lib/haskell98 lib/haskell2010 lib/flat-foreign $(JHC_LIBS) $(JHC_EXT_LIBS) \
 	     src/StringTable/StringTable_cbits.c src/StringTable/StringTable_cbits.h src/cbits/md5sum.c ajhc.1 \
 	     src/StringTable/Atom.hsc ajhc.spec src/cbits/lookup3.c \
 	     manual.html manual_ja.html lib/applicative examples/HelloWorld.hs examples/Calendar.hs \
@@ -85,13 +85,13 @@ dist-hook: $(BUILT_SOURCES)
 		cp -f $(srcdir)/src/RawFiles.hs $(destdir)/src/RawFiles.hs; \
 	fi
 
-all-local: $(AJHC_LIBS)
+all-local: $(JHC_LIBS)
 
-install-data-hook: $(AJHC_LIBS) $(AJHC_EXT_LIBS)
+install-data-hook: $(JHC_LIBS) $(JHC_EXT_LIBS)
 	$(INSTALL) -d $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@
 	$(INSTALL) -d $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/include
 	$(INSTALL) -d $(DESTDIR)$(sysconfdir)/@PACKAGE@-@SHORTVERSION@
-	for lib in $(AJHC_LIBS) $(AJHC_EXT_LIBS); do \
+	for lib in $(JHC_LIBS) $(JHC_EXT_LIBS); do \
 		test -f "$$lib" && $(INSTALL_DATA) $$lib $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@ ; \
 		test -f "$(srcdir)/$$lib" && $(INSTALL_DATA) "$(srcdir)/$$lib" $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@ ; \
 	done
@@ -100,7 +100,7 @@ install-data-hook: $(AJHC_LIBS) $(AJHC_EXT_LIBS)
 
 uninstall-hook:
 	rm -f -- "$(DESTDIR)$(bindir)/ajhci$(EXTEXT)"
-	for lib in $(AJHC_LIBS) $(AJHC_EXT_LIBS); do \
+	for lib in $(JHC_LIBS) $(JHC_EXT_LIBS); do \
 		rm -f -- "$(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/$$lib" ; \
 	done
 	rm -f -- "$(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/include/HsFFI.h"
@@ -228,7 +228,7 @@ clean-local:
 
 MAINTAINERCLEANFILES= $(BUILT_SOURCES) $(DRIFTFILES)
 
-CLEANFILES= $(AJHC_LIBS) $(AJHC_EXT_LIBS) HelloWorld Primes src/StringTable/Atom.hs src/RawFiles.hs
+CLEANFILES= $(JHC_LIBS) $(JHC_EXT_LIBS) HelloWorld Primes src/StringTable/Atom.hs src/RawFiles.hs
 CLEANFILES+= ajhc.spec manual.html manual.mkd manual_ja.html manual_ja.mkd docs/building.mkd src/FlagDump.mkd src/FlagOpts.mkd
 CLEANFILES+= ac-macros/install-sh ac-macros/missing src/data/shortchange.txt
 CLEANFILES+= src/FlagDump.hs src/FlagOpts.hs src/FrontEnd/HsParser.hs src/Info/Properties.hs src/Name/Prim.hs
@@ -256,7 +256,7 @@ publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/in
 publish_ajhc: manual.html manual_ja.html docs/manual.css
 	cp -- $^ /home/kiwamu/doc/ajhc.github.com/
 
-manual.mkd: $(AJHC_MANUAL_FILES)
+manual.mkd: $(JHC_MANUAL_FILES)
 	perl $(srcdir)/utils/stitch.prl $^ > $@
 
 manual: manual.mkd
@@ -271,10 +271,10 @@ manual_ja.mkd: manual.mkd po/ja.po
 manual_ja: manual_ja.mkd
 	pandoc $< --toc -s -f markdown -t html -s -c manual.css -o $@.html
 
-$(firstword $(AJHC_MANUAL_FILES)): utils/stitch.prl docs/man_header.mkd
+$(firstword $(JHC_MANUAL_FILES)): utils/stitch.prl docs/man_header.mkd
 	touch $@
 
-ajhc_man.mkd: $(AJHC_MANUAL_FILES)
+ajhc_man.mkd: $(JHC_MANUAL_FILES)
 	perl $(srcdir)/utils/stitch.prl -h $(srcdir)/docs/man_header.mkd -c Using,Options $^ > $@
 
 man: ajhc_man.mkd
@@ -298,17 +298,17 @@ manual_ja.html :
 	$(MAKE) manual_ja
 
 .PHONY: libs regress
-libs: $(AJHC_LIBS) $(AJHC_EXT_LIBS)
+libs: $(JHC_LIBS) $(JHC_EXT_LIBS)
 
 show_elibs: lib/ext/*.cabal  lib/ext/*.yaml
 	-perl utils/build_extlibs.prl -l $^
 
-%: examples/%.hs ajhc $(AJHC_LIBS)
-	./ajhc -L- -L$(srcdir) -L. --no-cache $(AJHC_TEST) $< -o $@ # 2>&1 | tee $@.log
+%: examples/%.hs ajhc $(JHC_LIBS)
+	./ajhc -L- -L$(srcdir) -L. --no-cache $(JHC_TEST) $< -o $@ # 2>&1 | tee $@.log
 
 TESTS=HelloWorld Primes
 
-AJHC_MANUAL_FILES = docs/make.mkd options.mkd docs/dependency_format.mkd docs/pragmas.mkd docs/differences.mkd \
+JHC_MANUAL_FILES = docs/make.mkd options.mkd docs/dependency_format.mkd docs/pragmas.mkd docs/differences.mkd \
 	docs/unboxed.mkd rts/rts/jhc_rts.c src/FlagOpts.mkd src/FlagDump.mkd src/E/PrimOpt.hs \
 	drift_processed/E/TypeCheck.hs drift_processed/Options.hs
 

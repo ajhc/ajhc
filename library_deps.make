@@ -40,7 +40,7 @@ haskell98-1.0.hl: lib/haskell98/haskell98.yaml lib/haskell98/System.hs lib/haske
 applicative-1.0.hl: lib/applicative/applicative.yaml lib/applicative/Control/Arrow.hs lib/applicative/Control/Applicative.hs lib/applicative/Data/Foldable.hs lib/applicative/Control/Category.hs \
     lib/applicative/Data/Traversable.hs haskell-extras-0.8.1.hl jhc-prim-1.0.hl jhc-1.0.hl
 	./ajhc $(LIB_OPTIONS) --build-hl $< -o $@
-AJHC_LIBS = jhc-prim-1.0.hl jhc-1.0.hl haskell-extras-0.8.1.hl haskell2010-0.8.1.hl flat-foreign-1.0.hl \
+JHC_LIBS = jhc-prim-1.0.hl jhc-1.0.hl haskell-extras-0.8.1.hl haskell2010-0.8.1.hl flat-foreign-1.0.hl \
     haskell98-1.0.hl applicative-1.0.hl
 containers-0.3.0.0.hl: lib/ext/containers.cabal haskell-extras-0.8.1.hl jhc-prim-1.0.hl jhc-1.0.hl applicative-1.0.hl \
     lib/ext/containers.patch
