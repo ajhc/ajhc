@@ -14,6 +14,7 @@ config.log
 config.status
 aclocal.m4
 drift_processed
+.ditz-config
 *.o
 *.hi
 *.hl
