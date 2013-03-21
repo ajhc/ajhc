@@ -54,8 +54,9 @@ jhc author (= [John Meacham](http://repetae.net/)).
   https://travis-ci.org/ajhc/ajhc
 * Analyze jhc internal (Japanese doc).
   http://metasepi.masterq.net/posts/2013-01-31-jhc_internal_overview.html
-  http://metasepi.masterq.net/posts/2013-02-14-jhc_grin_to_c.html
 * Find critical region of Ajhc for reentrant and thread safe.
+* Port Haskell libraries on haskell-platform to Ajhc.
 * Understand jhc's region inference.
 * Find the method to implement GC that can be interrupted.
-* Rewrite NetBSD kernel with Ajhc.
+* Get smaller RTS. Benchmark the RTS for running on custom FPGA CPU.
+* Start rewritng NetBSD kernel with Ajhc.
