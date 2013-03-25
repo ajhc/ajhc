@@ -14,9 +14,21 @@ class PrintJgcheapCommand (gdb.Command):
         block_used = _gpe('arena->block_used')
         block_threshold = _gpe('arena->block_threshold')
         number_gcs = _gpe('arena->number_gcs')
-        print 'block_used:     ', int(block_used)
-        print 'block_threshold:', int(block_threshold)
-        print 'number_gcs:     ', int(number_gcs)
+        print 'block_used:      %05s' % int(block_used)
+        print 'block_threshold: %05s' % int(block_threshold)
+        print 'number_gcs:      %05s' % int(number_gcs)
+
+    def _p_s_megablocks(self):
+        num = 0
+        current_megablock = _gpe('arena->current_megablock')
+        if int(str(current_megablock), 16) != 0:
+            num += 1
+        s_megablock = _gpe('arena->megablocks.slh_first')
+        while int(str(s_megablock), 16) != 0:
+            s_megablock_dref = s_megablock.dereference()
+            num += 1
+            s_megablock = s_megablock_dref['next']['sle_next']
+        print 'num_megablocks:  %05s' % num
 
     def _p_free_blocks(self):
         dict_normal = {}
@@ -89,16 +101,17 @@ class PrintJgcheapCommand (gdb.Command):
                                            'num_free': num_free_full}}))
             s_cache = s_cache_dref['next']['sle_next']
 
-        print "                       |         blocks         |       full_blocks"
-        print "           num_entries | num_blocks free_blocks | num_blocks free_blocks"
+        print "                       |       blocks       |     full_blocks"
+        print "           num_entries |    num free_blocks |    num free_blocks"
         for k, v in sorted(list_cache):
-            vp = '%011s %012s %011s %012s %011s' % \
+            vp = '%011s %08s %011s %08s %011s' % \
                 (v['num_entries'], v['blocks']['num'], v['blocks']['num_free'], \
                      v['full_blocks']['num'], v['full_blocks']['num_free'])
             print ' ', k, ':', vp
 
     def invoke (self, arg, from_tty):
         self._p_arena()
+        self._p_s_megablocks()
         self._p_free_blocks()
         self._p_s_cache()
 
