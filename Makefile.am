@@ -136,10 +136,10 @@ CFILES = src/StringTable/StringTable_cbits.o src/cbits/md5sum.o src/cbits/lookup
 	mkdir -p `echo $@ | sed -e 's@/[^/]*$$@@'`
 	$(HC) $(MY_CFLAGS) $< -c -o $@
 
-ajhc: src/Main.hs  $(HSFILES) $(BUILT_SOURCES) src/StringTable/Atom.hs $(CFILES)
+ajhc$(EXEEXT): src/Main.hs  $(HSFILES) $(BUILT_SOURCES) src/StringTable/Atom.hs $(CFILES)
 	$(BUILD_STOW) $(HC) $(GHCOPTS) --make $< $(CFILES) -o $@
 
-ajhcp: src/Main.hs $(BUILT_SOURCES) $(HSFILES) src/StringTable/Atom.hs $(CFILES)
+ajhcp$(EXEEXT): src/Main.hs $(BUILT_SOURCES) $(HSFILES) src/StringTable/Atom.hs $(CFILES)
 	$(HC) $(GHCOPTS) $(GHCPROFOPTS) --make $< $(CFILES) -o $@
 
 dist_man_MANS = ajhc.1
@@ -183,11 +183,11 @@ src/data/shortchange.txt: ChangeLog
 
 BINDISTDIR=$(PACKAGE)-$(VERSION)-$(host)
 
-bin-dist: ajhc
+bin-dist: ajhc$(EXEEXT)
 	rm -rf -- $(BINDISTDIR)
 	mkdir $(BINDISTDIR)
-	strip -- ajhc || true
-	cp -- ajhc $(BINDISTDIR)
+	strip -- ajhc$(EXEEXT) || true
+	cp -- ajhc$(EXEEXT) $(BINDISTDIR)
 	tar cvf $(BINDISTDIR).tar $(BINDISTDIR)
 	gzip -f -- $(BINDISTDIR).tar
 	rm -rf -- $(BINDISTDIR)
@@ -280,7 +280,7 @@ ajhc_man.mkd: $(JHC_MANUAL_FILES)
 man: ajhc_man.mkd
 	pandoc $< -s -f markdown -t man -s  -o ajhc.1
 
-options.mkd: drift_processed/Options.hs | ajhc
+options.mkd: drift_processed/Options.hs | ajhc$(EXEEXT)
 	echo "{-@Options 1" > $@
 	./ajhc --help | sed -e 's/^/    /'  >> $@
 
@@ -303,7 +303,7 @@ libs: $(JHC_LIBS) $(JHC_EXT_LIBS)
 show_elibs: lib/ext/*.cabal  lib/ext/*.yaml
 	-perl utils/build_extlibs.prl -l $^
 
-%: examples/%.hs ajhc $(JHC_LIBS)
+%: examples/%.hs ajhc$(EXEEXT) $(JHC_LIBS)
 	./ajhc -L- -L$(srcdir) -L. --no-cache $(JHC_TEST) $< -o $@ # 2>&1 | tee $@.log
 
 TESTS=HelloWorld Primes
