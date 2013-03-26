@@ -44,10 +44,12 @@ GHC_CHECK_MODULE(System.Time,old-time,,,[])
 GHC_CHECK_MODULE(Text.PrettyPrint.HughesPJ,pretty,,,[])
 GHC_CHECK_MODULE(System.Console.Readline,readline,,,[
      GHC_CHECK_MODULE(System.Console.Editline.Readline,editline,,
-         GHCFLAGS="$GHCFLAGS -DUSE_EDITLINE"
-         ,[
-          echo "no suitable readline found: install the 'readline' or 'editline' package."
-          exit 1
+         GHCFLAGS="$GHCFLAGS -DUSE_EDITLINE",[
+              GHC_CHECK_MODULE(System.Console.Haskeline,haskeline,,
+                  GHCFLAGS="$GHCFLAGS -DUSE_HASKELINE",[
+                   echo "no suitable readline found: install the 'readline', 'editline' or 'haskeline' package."
+                   exit 1
+            ])
       ])
 ])
 

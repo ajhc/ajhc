@@ -17,7 +17,11 @@ import Control.Monad.Identity
 import List
 import qualified Data.Map as Map
 import System
-#ifdef USE_EDITLINE
+#if defined(USE_HASKELINE)
+import System.Console.Haskeline
+import System.Console.Haskeline.IO
+import Control.Exception
+#elif defined(USE_EDITLINE)
 import System.Console.Editline.Readline
 #else
 import System.Console.Readline
@@ -28,6 +32,7 @@ import IO
 import GenUtil
 
 
+#ifndef USE_HASKELINE
 readLine :: String -> (String -> IO [String]) -> IO String
 readLine prompt tabExpand =  do
     setCompletionEntryFunction (Just (\s -> tabExpand s))
@@ -36,6 +41,7 @@ readLine prompt tabExpand =  do
         Nothing -> putStrLn "Bye!" >> exitSuccess
         Just cs | all isSpace cs -> return ""
         Just s -> addHistory s >> return s
+#endif
 
 
 --simpleCommand :: String -> IO (Maybe String)
@@ -50,7 +56,9 @@ commands = [
     (":execfile", "run sequence of commands from a file"),
 --    (":execfile!", "run sequence of commands from a file if it exists"),
     (":echo", "echo argument to screen"),
+#ifndef USE_HASKELINE
     (":addhist", "add argument to command line history"),
+#endif
     (":command", "enter command mode"),
     (":normal", "enter normal mode"),
     (":help", "print help table")
@@ -145,7 +153,9 @@ runInteraction act s = do
             [":help"] -> putStrLn help_text >> return act
             [":version"] -> putStrLn (interactVersion act) >> return act
             [":echo"] -> putStrLn arg >> return act
+#ifndef USE_HASKELINE
             [":addhist"] -> addHistory arg >> return act
+#endif
             [":cd"] -> iocatch (setCurrentDirectory arg) (\_ -> putStrLn $ "Could not change to directory: " ++ arg) >> return act
             [":pwd"] -> (iocatch getCurrentDirectory (\_ -> putStrLn "Could not get current directory." >> return "") >>= putStrLn)  >> return act
             [":set"] -> case simpleUnquote arg of
@@ -180,9 +190,26 @@ beginInteraction act = do
         Just fn -> do
             ch <- iocatch (readFile fn >>= return . lines) (\_ -> return [])
             let cl = (map head $ group ch)
+#ifndef USE_HASKELINE
             mapM_ addHistory cl
+#endif
             putStrLn $ show (length cl) ++ " lines of history added from " ++ fn
             iocatch (openFile fn AppendMode >>= return . Just) (\_ -> return Nothing)
+#if defined(USE_HASKELINE)
+    bracketOnError (initializeInput $ setComplete noCompletion defaultSettings)
+            cancelInput -- This will only be called if an exception such
+                            -- as a SigINT is received.
+            (\hd -> loop act hd >> closeInput hd)
+    where
+      loop :: Interact -> InputState -> IO ()
+      loop act hd = do
+        minput <- queryInput hd (getInputLine (thePrompt act))
+        case minput of
+          Nothing -> putStrLn "Bye!" >> exitSuccess
+          Just cs | all isSpace cs -> loop act hd
+          Just s -> do act' <- runInteraction act s
+                       loop act' hd
+#else
     go hist act
     where
     go hist act = do
@@ -196,5 +223,6 @@ beginInteraction act = do
             _ -> return ()
         act' <- runInteraction act s
         go hist act'
+#endif
 
 
