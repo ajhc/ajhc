@@ -5,7 +5,7 @@ module Ho.Binary(readHoFile,recordHoFile,readHlFile,recordHlFile) where
 import Codec.Compression.Zlib
 import Control.Monad
 import Data.Binary
-#ifndef USE_WIN32
+#ifndef mingw32_HOST_OS
 import System.Posix.Files
 #endif
 import System.Directory
@@ -25,7 +25,7 @@ import Support.MapBinaryInstance
 current_version :: Int
 current_version = 11
 
-#ifdef USE_WIN32
+#ifdef mingw32_HOST_OS
 createLink :: FilePath -> FilePath -> IO ()
 createLink = copyFile
 #endif

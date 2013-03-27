@@ -15,15 +15,14 @@ module Support.TempDir(
 import Control.Exception as E
 import Control.Monad
 import Data.IORef
-import Data.List
 import Data.Maybe
-import Foreign.C
 import System.Directory
 import System.Exit
 import System.FilePath as FP
 import System.IO
 import System.IO.Unsafe
-#ifdef USE_WIN32
+import System.IO.Temp
+#ifdef mingw32_HOST_OS
 import System.Win32.Console
 #else
 import System.Posix.Signals
@@ -65,7 +64,8 @@ getTempDir = do
     case tempDirPath td of
         Just fp -> return fp
         Nothing -> do
-            fp <- mkdtemp "/tmp/jhc_XXXXXX"
+            tmpdir <- getTemporaryDirectory
+            fp <- createTempDirectory tmpdir "jhc_"
             putLog $ printf "Created work directory '%s'" fp
             writeIORef tdRef td { tempDirPath = Just fp }
             return fp
@@ -136,7 +136,7 @@ addCleanup fp = do
 
 wrapMain :: IO () -> IO ()
 wrapMain main = E.catch (main >> cleanUp) f where
-#ifdef USE_WIN32
+#ifdef mingw32_HOST_OS
     panic = generateConsoleCtrlEvent cTRL_C_EVENT 0
 #else
     panic = raiseSignal sigINT
@@ -170,16 +170,6 @@ tdRef = unsafePerformIO $ newIORef TempDir {
     tempDirAtExit  = [],
     tempDirCleanup = Set.empty
     }
-
-foreign import ccall unsafe "stdlib.h mkdtemp"
-  c_mkdtemp :: CString -> IO CString
-
-mkdtemp :: FilePath -> IO FilePath
-mkdtemp template =
-      withCString (if "XXXXXX" `isSuffixOf` template then template
-        else (template ++ "XXXXXX")) $ \ ptr -> do
-            cname <- throwErrnoIfNull "mkdtemp" (c_mkdtemp ptr)
-            peekCString cname
 
 {-# NOINLINE stackRef #-}
 stackRef :: IORef [String]
