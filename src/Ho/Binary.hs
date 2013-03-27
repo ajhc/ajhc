@@ -1,10 +1,14 @@
-{-# LANGUAGE ImpredicativeTypes #-}
+{-# OPTIONS_GHC -cpp #-}
+{-# LANGUAGE CPP, ImpredicativeTypes #-}
 module Ho.Binary(readHoFile,recordHoFile,readHlFile,recordHlFile) where
 
 import Codec.Compression.Zlib
 import Control.Monad
 import Data.Binary
+#ifndef USE_WIN32
 import System.Posix.Files
+#endif
+import System.Directory
 import Text.Printf
 import Util.Gen
 import qualified Data.ByteString as BS
@@ -20,6 +24,11 @@ import Support.MapBinaryInstance
 
 current_version :: Int
 current_version = 11
+
+#ifdef USE_WIN32
+createLink :: FilePath -> FilePath -> IO ()
+createLink = copyFile
+#endif
 
 readHFile :: FilePath -> IO (FilePath,HoHeader,forall a . Binary a => ChunkType -> a)
 readHFile fn = do
@@ -52,7 +61,7 @@ recordHoFile ho idep fs header = do
             fs' <- mapM shortenPath fs
             putErrLn $ "Skipping Writing Ho Files: " ++ show fs'
       else do
-    let removeLink' fn = iocatch  (removeLink fn)  (\_ -> return ())
+    let removeLink' fn = iocatch  (removeFile fn)  (\_ -> return ())
     let g (fn:fs) = do
             f fn
             mapM_ (l fn) fs
@@ -68,7 +77,7 @@ recordHoFile ho idep fs header = do
             let tfn = fn' ++ ".tmp"
             removeLink' tfn
             createLink fn tfn
-            rename tfn fn'
+            renameFile tfn fn'
         f fn = do
             when verbose $ do
                 when (optNoWriteHo options) $ putErr "Skipping "
@@ -82,7 +91,7 @@ recordHoFile ho idep fs header = do
                     (cff_defs, compress $ encode $ hoTcInfo ho),
                     (cff_core, compress $ encode $ hoBuild ho)]
             LBS.writeFile tfn cfflbs
-            rename tfn fn
+            renameFile tfn fn
     g fs
 
 recordHlFile
@@ -98,7 +107,7 @@ recordHlFile l = do
             (cff_file, compress $ encode $ libExtraFiles l)]
     let tfp = libFileName l ++ ".tmp"
     LBS.writeFile tfp cfflbs
-    rename tfp $ libFileName l
+    renameFile tfp $ libFileName l
 
 readHlFile :: FilePath -> IO Library
 readHlFile fn = do

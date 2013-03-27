@@ -53,6 +53,16 @@ GHC_CHECK_MODULE(System.Console.Readline,readline,,,[
       ])
 ])
 
+GHC_CHECK_MODULE(System.Posix,unix,,
+    [GHC_UNIX_OR_WIN32="-package unix"],[
+        GHC_CHECK_MODULE(System.Win32,Win32,,
+            [GHC_UNIX_OR_WIN32="-package Win32"
+             GHCFLAGS="$GHCFLAGS -DUSE_WIN32"],[
+                 echo "not found unix and Win32 haskell package."
+                 exit 1
+        ])
+])
+
 GHC_CHECK_MODULE(System,base,,[] ,[ GHCINC="$GHCINC -i$srcdir/compat/haskell98"])
 
 AC_PROGRAM_REQUIRE(hsc2hs,hsc2hs,     [  --with-hsc2hs=<hsc2hs location>    Specify location of hsc2hs.])
@@ -81,6 +91,7 @@ dnl AX_CREATE_STDINT_H([cbits/_stdint.h])
 AC_SUBST(BYTE_ORDER)
 AC_SUBST(EXTRA_PACKAGES)
 AC_SUBST(GHCFLAGS)
+AC_SUBST(GHC_UNIX_OR_WIN32)
 AC_SUBST(GHCINC)
 AC_SUBST(HAS_MONOID_DOC)
 AC_SUBST(HC)

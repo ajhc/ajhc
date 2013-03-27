@@ -49,8 +49,8 @@ GHCINC=  -i @GHCINC@ -i$(srcdir)/drift_processed \
 
 PACKAGES= -hide-all-packages -package base -package fgl -package regex-compat -package random -package array -package directory \
           -package bytestring -package binary -package mtl -package containers \
-	  -package unix -package utf8-string -package zlib -package HsSyck \
-	  -package filepath -package process
+	  -package utf8-string -package zlib -package HsSyck \
+	  -package filepath -package process @GHC_UNIX_OR_WIN32@
 
 GHCLANG= -XTypeFamilies -XViewPatterns -XUndecidableInstances -XOverlappingInstances \
 	-XRecordWildCards -XRecursiveDo -XTupleSections -XParallelListComp \

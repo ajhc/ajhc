@@ -1,4 +1,5 @@
-{-# LANGUAGE ForeignFunctionInterface,ViewPatterns,RecordWildCards #-}
+{-# OPTIONS_GHC -cpp #-}
+{-# LANGUAGE CPP, ForeignFunctionInterface,ViewPatterns,RecordWildCards #-}
 -- Various routines for dealing with temporary directories and files.
 module Support.TempDir(
     getTempDir,
@@ -22,7 +23,11 @@ import System.Exit
 import System.FilePath as FP
 import System.IO
 import System.IO.Unsafe
+#ifdef USE_WIN32
+import System.Win32.Console
+#else
 import System.Posix.Signals
+#endif
 import Text.Printf
 import qualified Data.Set as Set
 import GenUtil (iocatch)
@@ -46,8 +51,9 @@ setTempDir :: FilePath -> IO ()
 setTempDir (FP.normalise -> fp) = do
     TempDir {..} <- readIORef tdRef
     when (isJust $ tempDirPath) $ do
-        fail $ printf "Cannot set temp directory to '%s'; \
-            \it is already set to '%s'." fp (fromJust tempDirPath)
+        fail $ printf
+          "Cannot set temp directory to '%s'; it is already set to '%s'."
+          fp (fromJust tempDirPath)
     putLog $ printf "Setting work directory to '%s'" fp
     createDirectoryIfMissing False fp
     writeIORef tdRef TempDir { tempDirPath = Just fp,  .. }
@@ -130,8 +136,13 @@ addCleanup fp = do
 
 wrapMain :: IO () -> IO ()
 wrapMain main = E.catch (main >> cleanUp) f where
+#ifdef USE_WIN32
+    panic = generateConsoleCtrlEvent cTRL_C_EVENT 0
+#else
+    panic = raiseSignal sigINT
+#endif
     f (fromException -> Just code) = cleanUp >> exitWith code
-    f (fromException -> Just UserInterrupt) = cleanUp >> raiseSignal sigINT
+    f (fromException -> Just UserInterrupt) = cleanUp >> panic
     f e = do
         ss <- readIORef stackRef
         td <- readIORef tdRef
