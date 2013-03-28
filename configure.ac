@@ -31,6 +31,9 @@ AC_ARG_WITH(hcflags,
 
 AC_PATH_PROG([DRIFTGHC],[DrIFT], [])
 if test -z "$DRIFTGHC"; then
+    AC_PATH_PROG([DRIFTGHC],[DrIFT-cabalized], [])
+fi
+if test -z "$DRIFTGHC"; then
     echo [DrIFT not found: using preprocessed files]
 fi
 
