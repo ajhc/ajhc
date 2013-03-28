@@ -40,7 +40,7 @@ HSFILES=src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/
         src/DerivingDrift/StandardRules.hs src/FrontEnd/Exports.hs
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
-GHCPROFOPTS= -prof -auto-all -osuf prof.o -hisuf prof.hi
+GHCPROFOPTS= -prof -fprof-auto-top -auto-all -osuf prof.o -hisuf prof.hi
 GHCSELFTESTOPTS= -osuf test.o -hisuf test.hi -DEXPORT_SELFTEST=,_selftest
 GHCNONSELFTESTOPTS= -DEXPORT_SELFTEST=
 GHCINC=  -i @GHCINC@ -i$(srcdir)/drift_processed \
@@ -139,6 +139,7 @@ CFILES = src/StringTable/StringTable_cbits.o src/cbits/md5sum.o src/cbits/lookup
 ajhc$(EXEEXT): src/Main.hs  $(HSFILES) $(BUILT_SOURCES) src/StringTable/Atom.hs $(CFILES)
 	$(BUILD_STOW) $(HC) $(GHCOPTS) --make $< $(CFILES) -o $@
 
+# You can see stacktrace with running "ajhcp Foo.hs +RTS -p -xc".
 ajhcp$(EXEEXT): src/Main.hs $(BUILT_SOURCES) $(HSFILES) src/StringTable/Atom.hs $(CFILES)
 	$(HC) $(GHCOPTS) $(GHCPROFOPTS) --make $< $(CFILES) -o $@
 
