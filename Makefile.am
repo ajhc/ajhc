@@ -128,7 +128,7 @@ DRIFTFILES = drift_processed/C/FFI.hs drift_processed/C/FromGrin2.hs drift_proce
 
 drift_processed/%: src/%
 	mkdir -p `echo $@ | sed -e 's@/[^/]*$$@@'`
-	DrIFT $< -o $@
+	$(DRIFTGHC) $< -o $@
 
 CFILES = src/StringTable/StringTable_cbits.o src/cbits/md5sum.o src/cbits/lookup3.o
 
