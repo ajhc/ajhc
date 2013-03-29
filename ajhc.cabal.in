@@ -1,0 +1,262 @@
+cabal-version: >= 1.6
+name:          ajhc
+build-type:    Simple
+version:       @VERSION@.0
+license:       GPL-2
+license-file:  COPYING
+category:      Compiler
+author:        John Meacham <john@repetae.net>
+maintainer:    Kiwamu Okabe <kiwamu@debian.or.jp>
+synopsis:      Haskell compiler that produce binary through C language
+description:   The jhc is a haskell compiler which aims to produce the most efficient
+               programs possible via whole program analysis and other optimizations.
+               .
+               The jhc is very minimalist in that it does not have a precompiled run time
+               system, but rather generates what is needed as part of the compilation
+               process. However, back ends do have specific run-time representations of
+               data, which can be affected by things like the choice of garbage collector.
+homepage:      http://ajhc.masterq.net/
+
+data-files:    README.md
+
+extra-source-files:
+    examples/BinaryTrees.hs, examples/Calendar.hs, examples/Forall.hs,
+    examples/HelloWorld.hs, examples/Options.hs, examples/Primes.hs
+
+source-repository head
+    type:     git
+    location: https://github.com/ajhc/ajhc.git
+
+executable ajhc
+    main-is:        Main.hs
+    hs-source-dirs: src
+
+    c-sources:
+        src/StringTable/StringTable_cbits.c
+        src/cbits/md5sum.c
+        src/cbits/lookup3.c
+        src/StringTable/StringTable_cbits.h
+        src/cbits/config.h
+        src/hs_src_config.h
+
+    include-dirs: src/StringTable, src/cbits, src/data, src
+    includes:
+        StringTable_cbits.h
+        config.h
+        hs_src_config.h
+    install-includes:
+        StringTable_cbits.h
+        config.h
+        hs_src_config.h
+
+    build-depends:
+        base >= 4.0 && < 5,
+        HsSyck,
+        array,
+        binary,
+        bytestring,
+        containers,
+        directory,
+        fgl,
+        filepath,
+        haskeline,
+        mtl,
+        old-time,
+        pretty,
+        process,
+        random,
+        regex-compat,
+        syb,
+        temporary,
+        utf8-string,
+        zlib
+
+    if os(windows)
+        build-depends: Win32
+    else
+        build-depends: unix
+
+    other-modules:
+        C.FFI
+        C.FromGrin2
+        C.Generate
+        C.Prims
+        Cmm.Number
+        Cmm.Op
+        Cmm.OpEval
+        DataConstructors
+        DerivingDrift.DataP
+        DerivingDrift.Drift
+        DerivingDrift.RuleUtils
+        DerivingDrift.StandardRules
+        Doc.Attr
+        Doc.Chars
+        Doc.DocLike
+        Doc.PPrint
+        Doc.Pretty
+        E.Annotate
+        E.Arbitrary
+        E.Binary
+        E.CPR
+        E.Demand
+        E.Diff
+        E.E
+        E.Eta
+        E.Eval
+        E.FreeVars
+        E.FromHs
+        E.Inline
+        E.LambdaLift
+        E.LetFloat
+        E.Lint
+        E.Main
+        E.PrimDecode
+        E.PrimOpt
+        E.Program
+        E.Rules
+        E.SSimplify
+        E.SStrictness
+        E.Show
+        E.Subst
+        E.ToHs
+        E.Traverse
+        E.Type
+        E.TypeAnalysis
+        E.TypeCheck
+        E.Values
+        E.WorkerWrapper
+        FindFixpoint
+        Fixer.Fixer
+        Fixer.Supply
+        Fixer.VMap
+        FlagDump
+        FlagOpts
+        FrontEnd.Class
+        FrontEnd.DataConsAssump
+        FrontEnd.DeclsDepends
+        FrontEnd.DependAnalysis
+        FrontEnd.Desugar
+        FrontEnd.Diagnostic
+        FrontEnd.Exports
+        FrontEnd.FrontEnd
+        FrontEnd.HsErrors
+        FrontEnd.HsParser
+        FrontEnd.HsPretty
+        FrontEnd.HsSyn
+        FrontEnd.Infix
+        FrontEnd.KindInfer
+        FrontEnd.Lexer
+        FrontEnd.ParseMonad
+        FrontEnd.ParseUtils
+        FrontEnd.Rename
+        FrontEnd.Representation
+        FrontEnd.SrcLoc
+        FrontEnd.Syn.Options
+        FrontEnd.Syn.Traverse
+        FrontEnd.Tc.Class
+        FrontEnd.Tc.Kind
+        FrontEnd.Tc.Main
+        FrontEnd.Tc.Module
+        FrontEnd.Tc.Monad
+        FrontEnd.Tc.Type
+        FrontEnd.Tc.Unify
+        FrontEnd.TypeSigs
+        FrontEnd.TypeSynonyms
+        FrontEnd.TypeSyns
+        FrontEnd.Unlit
+        FrontEnd.Utils
+        FrontEnd.Warning
+        GenUtil
+        Grin.Arity
+        Grin.DeadCode
+        Grin.Devolve
+        Grin.Embed
+        Grin.EvalInline
+        Grin.FromE
+        Grin.Grin
+        Grin.HashConst
+        Grin.Interpret
+        Grin.Lint
+        Grin.Main
+        Grin.NodeAnalyze
+        Grin.Noodle
+        Grin.Optimize
+        Grin.SSimplify
+        Grin.Show
+        Grin.StorageAnalysis
+        Grin.Unboxing
+        Grin.Val
+        Grin.Whiz
+        Ho.Binary
+        Ho.Build
+        Ho.Collected
+        Ho.Library
+        Ho.ReadSource
+        Ho.Type
+        Info.Binary
+        Info.Info
+        Info.Properties
+        Info.Types
+        Interactive
+        Main
+        Name.Binary
+        Name.Id
+        Name.Name
+        Name.Names
+        Name.Prim
+        Name.VConsts
+        Options
+        PackedString
+        RawFiles
+        Stats
+        StringTable.Atom
+        Support.CFF
+        Support.CanType
+        Support.Compat
+        Support.FreeVars
+        Support.IniParse
+        Support.MD5
+        Support.MapBinaryInstance
+        Support.ShowTable
+        Support.TempDir
+        Support.Tickle
+        Support.Transform
+        Support.Tuple
+        Support.Unparse
+        Util.BitSet
+        Util.BooleanSolver
+        Util.ContextMonad
+        Util.ExitCodes
+        Util.FilterInput
+        Util.GMap
+        Util.Gen
+        Util.Graph
+        Util.Graphviz
+        Util.HasSize
+        Util.Histogram
+        Util.Inst
+        Util.IntBag
+        Util.Interact
+        Util.NameMonad
+        Util.Once
+        Util.Perhaps
+        Util.Progress
+        Util.RWS
+        Util.ReaderWriter
+        Util.Relation
+        Util.SHA1
+        Util.SameShape
+        Util.Seq
+        Util.SetLike
+        Util.TrueSet
+        Util.UnionFind
+        Util.UnionSolve
+        Util.UniqueMonad
+        Util.Util
+        Util.VarName
+        Util.YAML
+        Version.Config
+        Version.Version
+
+    ghc-options:    -Wall
+    cc-options:     -std=c99

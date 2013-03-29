@@ -193,6 +193,9 @@ bin-dist: ajhc$(EXEEXT)
 	gzip -f -- $(BINDISTDIR).tar
 	rm -rf -- $(BINDISTDIR)
 
+cabal-dist: src/Main.hs  $(HSFILES) $(BUILT_SOURCES) src/StringTable/Atom.hs $(CFILES)
+	runhaskell Setup.hs sdist
+
 .INTERMEDIATE: deps.txt ajhc_man.mkd options.mkd
 .DELETE_ON_ERROR: deps.txt depend.make ChangeLog data/shortchange.txt manual.mkd ajhc_man.mkd options.mkd
 
