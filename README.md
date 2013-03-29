@@ -5,7 +5,7 @@ And also Haskell compiler.
 
 This project is founded by [Metasepi Project](http://metasepi.masterq.net/).
 
-## How to install
+## How to install on Debian flavor system
 
     $ sudo apt-get install make locales autoconf libreadline-dev \
       libwww-perl libconfig-yaml-perl graphviz haskell-platform drift pandoc \
@@ -20,7 +20,7 @@ This project is founded by [Metasepi Project](http://metasepi.masterq.net/).
 
 ## For developing
 
-Please use the arafura branch, rather than master branch.
+First, you should use the arafura branch, rather than master branch.
 
 * [master branch](https://github.com/ajhc/ajhc/tree/master): Do not touch me, mirror of [jhc's darcs repository](http://repetae.net/dw/darcsweb.cgi?r=jhc).
 * [arafura branch](https://github.com/ajhc/ajhc/tree/arafura): For developing Ajhc.
@@ -36,6 +36,56 @@ You should send patch to jhc, if testing on Ajhc is good.
 The command [darcs send](http://darcs.net/Using/Send) sends email the patch to
 jhc author (= [John Meacham](http://repetae.net/)).
 
+## Build on Windows
+
+### Install msys
+
+http://sourceforge.net/projects/mingw/files/Installer/mingw-get-inst/
+
+Install below.
+
+* MSYS Basic System
+* MinGW Developer ToolKit
+
+And needs more packages.
+
+    $ mingw-get install msys-unzip
+    $ mingw-get install msys-wget
+
+### Install Git for Windows
+
+http://msysgit.github.com/
+
+### Install Perl package from CPAN
+
+http://search.cpan.org/dist/libwww-perl/
+http://search.cpan.org/dist/YAML/
+
+    $ cpan
+    cpan> install LWP
+    cpan> install YAML
+
+### Install haskell-platform
+
+http://www.haskell.org/platform/windows.html
+
+Haskell-platform install path DO NOT include space and bracket character.
+Example: C:\HaskellPlatform\2012.4.0.0
+
+### Install Hackall packages
+
+    $ export LANG=C
+    $ cabal update
+    $ cabal install hssyck utf8-string temporary pandoc DrIFT-cabalized haskeline
+
+### Build Ajhc
+
+    $ git clone git://github.com/ajhc/ajhc.git
+    $ autoreconf -i
+    $ ./configure
+    $ make
+    $ make install
+
 ## Future plan
 
 ### Done
@@ -46,9 +96,11 @@ jhc author (= [John Meacham](http://repetae.net/)).
   http://metasepi.masterq.net/posts/2013-01-12-jhc_manual_ja.html
 * Fix bug that run stm32f3-discovery demo. It causes Ajhc RTS heep impl.
   https://github.com/ajhc/demo-cortex-m3/tree/master/stm32f3-discovery
+* Support to build on Windows.
 
 ### Yet
 
+* Cabalize Ajhc. Ajhc's hl files will be not controled with cabal.
 * Rewrite Cortex-M3 base library with Ajhc.
 * Pass all regress test, and enable regress fail setting on travis-ci.
   https://travis-ci.org/ajhc/ajhc
