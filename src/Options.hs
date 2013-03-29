@@ -482,7 +482,9 @@ initialLibIncludes :: [String]
 initialLibIncludes = unsafePerformIO $ do
     ps <- lookupEnv "AJHC_LIBRARY_PATH"
     h <- lookupEnv "HOME"
-    let paths = h ++ ["/usr/local","/usr"]
+    let paths = h ++ ["/usr/local","/usr",
+                      "/mingw/msys/1.0/local","/mingw/msys/1.0"]
+                      -- xxx ^ For Windows. But is it collect???
         bases = ["/lib","/share"]
         vers = ["/ajhc-" ++ shortVersion, "/ajhc"]
     return $ nub $ maybe [] (tokens (':' ==))  ps ++ [ p ++ b ++ v | p <- paths, v <- vers, b <- bases ]
