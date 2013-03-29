@@ -111,7 +111,14 @@ fileInTempDir (FP.normalise -> fp) action = do
     let nfp = FP.normalise (tdir </> fp)
     b <- addCleanup fp
     when b $ action nfp
+#ifdef mingw32_HOST_OS
+    -- Windows filepath backslash confuses jhc's lexer with escape code.
+    let replace :: Eq a => a -> a -> [a] -> [a]
+        replace x y = map (\z -> if z == x then y else z)
+    return $ replace '\\' '/' nfp
+#else
     return nfp
+#endif
 
 cleanUp :: IO ()
 cleanUp = do
