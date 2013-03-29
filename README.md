@@ -56,7 +56,7 @@ And needs more packages.
 
 http://msysgit.github.com/
 
-### Install Perl package from CPAN
+### Install Perl packages from CPAN
 
 http://search.cpan.org/dist/libwww-perl/
 http://search.cpan.org/dist/YAML/
@@ -65,7 +65,7 @@ http://search.cpan.org/dist/YAML/
     cpan> install LWP
     cpan> install YAML
 
-### Install haskell-platform
+### Install Haskell Platform
 
 http://www.haskell.org/platform/windows.html
 
