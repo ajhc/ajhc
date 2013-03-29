@@ -36,7 +36,7 @@ You should send patch to jhc, if testing on Ajhc is good.
 The command [darcs send](http://darcs.net/Using/Send) sends email the patch to
 jhc author (= [John Meacham](http://repetae.net/)).
 
-## Build on Windows
+## Build on Windows (in the make)
 
 ### Install msys
 
@@ -55,6 +55,8 @@ And needs more packages.
 ### Install Git for Windows
 
 http://msysgit.github.com/
+
+It's good choosing "Checkout as-is, commit as-is".
 
 ### Install Perl packages from CPAN
 
