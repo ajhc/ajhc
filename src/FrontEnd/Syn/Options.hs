@@ -1,7 +1,7 @@
 module FrontEnd.Syn.Options(parseOptions) where
 
-import Char
-import List
+import Data.Char
+import Data.List
 import Text.ParserCombinators.ReadP
 
 parseOptions :: String -> [(String,String)]

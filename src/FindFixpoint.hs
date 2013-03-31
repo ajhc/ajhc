@@ -1,6 +1,6 @@
 module FindFixpoint(Ms, getVal, solve) where
 
-import Array
+import Data.Array
 import Control.Monad.Writer
 import Data.Array.IO
 import Data.Graph
@@ -60,7 +60,7 @@ solve str' empty vs = do
             li (reverse xs) IntSet.empty
         li (i:rs) s = do
             b <- readArray arr i
-            b'<- fna Array.! i
+            b'<- fna Data.Array.! i
             case b == b' of
                 True -> li rs (IntSet.delete i s)
                 False -> do

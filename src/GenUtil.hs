@@ -39,7 +39,7 @@ module GenUtil(
     isLeft,isRight,
     fst3,snd3,thd3,
     -- ** System routines
-    exitSuccess, System.exitFailure, epoch, lookupEnv,endOfTime,
+    exitSuccess, exitFailure, epoch, lookupEnv,endOfTime,
     -- ** Random routines
     repMaybe,
     liftT2, liftT3, liftT4,
@@ -119,17 +119,18 @@ module GenUtil(
     UniqueProducer(..)
     ) where
 
-import Char(isAlphaNum, isSpace, toLower, ord, chr)
-import List
-import Monad
+import Data.Char(isAlphaNum, isSpace, toLower, ord, chr)
+import Data.List
+import Control.Monad (join, liftM, MonadPlus, mzero)
 import qualified System.IO as IO
 import System.IO.Error (isDoesNotExistError)
 import Control.Exception
 import Prelude hiding (catch)
-import qualified System
-import Random(StdGen, newStdGen, Random(randomR))
-import Time
-import CPUTime
+import System.Random(StdGen, newStdGen, Random(randomR))
+import System.Time
+import System.CPUTime
+import System.Exit
+import System.Environment
 
 {-# SPECIALIZE snub :: [String] -> [String] #-}
 {-# SPECIALIZE snub :: [Int] -> [Int] #-}
@@ -271,12 +272,7 @@ putErrLn s = IO.hFlush IO.stdout >> IO.hPutStrLn IO.stderr s
 -- | Flush stdout, write string and newline to standard error,
 -- then exit program with failure.
 putErrDie :: String -> IO a
-putErrDie s = putErrLn s >> System.exitFailure
-
--- | exit program successfully. 'exitFailure' is
--- also exported from System.
-exitSuccess :: IO a
-exitSuccess = System.exitWith System.ExitSuccess
+putErrDie s = putErrLn s >> exitFailure
 
 {-# INLINE fromRight #-}
 fromRight :: Either a b -> b
@@ -550,7 +546,7 @@ shellQuote ss = unwords (map f ss) where
 -- | looks up an enviornment variable and returns it in an arbitrary Monad rather
 -- than raising an exception if the variable is not set.
 lookupEnv :: Monad m => String -> IO (m String)
-lookupEnv s = catch (fmap return $ System.getEnv s) (\e -> if isDoesNotExistError e then return (fail (show e)) else ioError e)
+lookupEnv s = catch (fmap return $ getEnv s) (\e -> if isDoesNotExistError e then return (fail (show e)) else ioError e)
 
 {-# SPECIALIZE fmapLeft :: (a -> c) -> [(Either a b)] -> [(Either c b)] #-}
 fmapLeft :: Functor f => (a -> c) -> f (Either a b) -> f (Either c b)
@@ -573,10 +569,6 @@ isDisjoint, isConjoint :: Eq a => [a] -> [a] -> Bool
 isConjoint xs ys = or [x == y | x <- xs, y <- ys]
 isDisjoint xs ys = not (isConjoint xs ys)
 
--- | 'concat' composed with 'List.intersperse'. Can be used similarly to join in perl.
-intercalate :: [a] -> [[a]] -> [a]
-intercalate x xss = concat (intersperse x xss)
-
 -- | place spaces before each line in string.
 indentLines :: Int -> String -> String
 indentLines n s = unlines $ map (replicate n ' ' ++)$ lines s
@@ -595,12 +587,6 @@ buildTableLL :: [(String,String)] -> [String]
 buildTableLL ps = map f ps where
     f (x,y) = x ++ replicate (bs - length x) ' ' ++ replicate 4 ' ' ++ y
     bs = maximum (map (length . fst) ps)
-
-{-# INLINE foldl' #-}
--- | strict version of 'foldl'
-foldl' :: (a -> b -> a) -> a -> [b] -> a
-foldl' _ a []     = a
-foldl' f a (x:xs) = (foldl' f $! f a x) xs
 
 -- | count elements of list that have a given property
 count :: (a -> Bool) -> [a] -> Int
@@ -671,7 +657,7 @@ showDuration x = st "d" dayI ++ st "h" hourI ++ st "m" minI ++ show secI ++ "s" 
 
 getArgContents :: IO String
 getArgContents = do
-    as <- System.getArgs
+    as <- getArgs
     let f "-" = getContents
         f fn = readFile fn
     cs <- mapM f as
@@ -680,7 +666,7 @@ getArgContents = do
 -- | Combination of parseOpt and getArgContents.
 getOptContents :: String -> IO (String,[Char],[(Char,String)])
 getOptContents args = do
-    as <- System.getArgs
+    as <- getArgs
     (as,o1,o2) <- parseOpt args as
     let f "-" = getContents
         f fn = readFile fn

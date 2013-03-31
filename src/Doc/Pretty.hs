@@ -46,7 +46,7 @@ module Doc.Pretty
         , textProc, oob
         ) where
 
-import IO      (Handle,hPutStr,hPutChar,stdout)
+import System.IO      (Handle,hPutStr,hPutChar,stdout)
 import Doc.DocLike hiding(empty)
 import qualified Doc.DocLike as DocLike
 import Data.Monoid(Monoid(..))

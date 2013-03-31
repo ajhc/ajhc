@@ -8,8 +8,8 @@ module E.E(
     module E.FreeVars
     ) where
 
-import Char(chr)
-import Maybe
+import Data.Char(chr)
+import Data.Maybe
 import qualified Data.Traversable as T
 
 import C.Prims

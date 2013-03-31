@@ -1,7 +1,7 @@
 module Name.Binary() where
 
 import Data.Monoid
-import Maybe
+import Data.Maybe
 
 import Data.Binary
 import Name.Id

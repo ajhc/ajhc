@@ -2,8 +2,8 @@ module E.Values where
 
 import Control.Monad.Identity
 import Data.Monoid
-import List
-import Ratio
+import Data.List
+import Data.Ratio
 
 import C.Prims
 import E.E

@@ -1,7 +1,7 @@
 module E.WorkerWrapper(performWorkWrap,workWrapProgram) where
 
 import Control.Monad.Writer.Strict hiding(Product(..))
-import Maybe
+import Data.Maybe
 
 import DataConstructors
 import E.CPR

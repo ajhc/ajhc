@@ -9,8 +9,9 @@ import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Lazy.UTF8 as LBS
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import qualified System
 import qualified System.FilePath as FP
+import System.Process
+import System.Exit
 
 import C.Prims
 import Grin.DeadCode
@@ -135,8 +136,8 @@ compileGrinToC grin = do
     when (optStop options == StopC) $
         exitSuccess
     putProgressLn ("Running: " ++ comm)
-    r <- System.system comm
-    when (r /= System.ExitSuccess) $ fail "C code did not compile."
+    r <- system comm
+    when (r /= ExitSuccess) $ fail "C code did not compile."
     return ()
 
 grinParms = transformParms {

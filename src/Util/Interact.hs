@@ -12,11 +12,10 @@ module Util.Interact(
     runInteractions,
     emptyInteract) where
 
-import Char
+import Data.Char
 import Control.Monad.Identity
-import List
+import Data.List
 import qualified Data.Map as Map
-import System
 #if defined(USE_HASKELINE)
 import System.Console.Haskeline
 import System.Console.Haskeline.IO
@@ -27,7 +26,8 @@ import System.Console.Editline.Readline
 import System.Console.Readline
 #endif
 import System.Directory
-import IO
+import System.IO
+import System.Process
 
 import GenUtil
 
@@ -143,7 +143,7 @@ runInteraction act s = do
             when (not $ null setable) $ putStrLn "Setable options:" >> putStr (unlines setable)
     case basicParse (interactComment act) (if interactCommandMode act then ':':s else s) of
         Right "" -> return act
-        Right ('!':rest) -> System.system rest >> return act
+        Right ('!':rest) -> system rest >> return act
         Right s -> do
             when (interactEcho act) $ putStrLn $ (interactPrompt act) ++ s
             act' <- interactExpr act act s

@@ -5,7 +5,7 @@ module Util.Gen(module Util.Gen, module GenUtil, intercalate) where
 import Control.Monad.Writer
 import Data.List
 import Data.Maybe
-import Directory
+import System.Directory
 import Text.ParserCombinators.ReadP
 
 import GenUtil hiding(replicateM, intercalate)

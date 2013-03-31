@@ -14,8 +14,8 @@ module FrontEnd.Tc.Class(
 
 import Control.Monad.Trans
 import Data.Monoid
-import List
-import Monad
+import Data.List
+import Control.Monad
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -157,7 +157,7 @@ splitReduce fs gs ps = do
         wdump FD.BoxySteps $ liftIO $ putStrLn msg
         --addWarn "type-defaults" msg
     sequence_ [ varBind x y | (x,y) <- nub sub]
-    return (Set.toList gs List.\\ map fst sub, ds, rs')
+    return (Set.toList gs Data.List.\\ map fst sub, ds, rs')
 
 -- | Return retained predicates and a defaulting substitution
 genDefaults :: ClassHierarchy

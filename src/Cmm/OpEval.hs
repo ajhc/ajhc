@@ -8,7 +8,7 @@ module Cmm.OpEval(
     unOp
     ) where
 
-import Maybe
+import Data.Maybe
 import qualified Data.Map as Map
 
 import Cmm.Number

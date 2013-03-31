@@ -5,7 +5,7 @@ module FrontEnd.Unlit(unlit) where
 --   version 1.2, appendix C.
 
 
-import Char
+import Data.Char
 
 data Classified = Program String | Blank | Comment
                 | Include Int String | Pre String

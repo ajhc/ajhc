@@ -53,8 +53,7 @@ import Control.Monad.Error
 import Control.Monad.Reader
 import Control.Monad.Writer.Strict
 import Data.IORef
-import List
-import System
+import Data.List
 --import Text.PrettyPrint.HughesPJ(Doc)
 import qualified Data.Foldable as T
 import qualified Data.Map as Map
@@ -362,9 +361,9 @@ deconstructorInstantiate tfa@TForAll {} = do
     TForAll vs qt@(_ :=> t) <- freshSigma tfa
     let f (_ `TArrow` b) = f b
         f b = b
-        eqvs = vs List.\\ freeVars (f t)
+        eqvs = vs Data.List.\\ freeVars (f t)
     tell mempty { existentialVars = eqvs }
-    (_,t) <- freshInstance Sigma (TForAll (vs List.\\ eqvs) qt)
+    (_,t) <- freshInstance Sigma (TForAll (vs Data.List.\\ eqvs) qt)
     return t
 deconstructorInstantiate x = return x
 
@@ -378,7 +377,7 @@ boxySpec (TForAll as qt@(ps :=> t)) = do
         f (TAp a b) vs = liftM2 tAp (f a vs) (f b vs)
         f (TArrow a b) vs = liftM2 TArrow (f a vs) (f b vs)
         f (TForAll as (ps :=> t)) vs = do
-            t' <- f t (vs List.\\ as)
+            t' <- f t (vs Data.List.\\ as)
             return (TForAll as (ps :=> t'))
         f t _ = return t
         -- f t _ = error $ "boxySpec: " ++ show t

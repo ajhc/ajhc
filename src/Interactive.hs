@@ -4,10 +4,10 @@ import Control.Exception as CE
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Data.Monoid
-import IO(stdout)
-import List(sort,isPrefixOf)
-import Maybe
-import System
+import System.IO(stdout)
+import System.Environment
+import Data.List(sort,isPrefixOf)
+import Data.Maybe
 import Text.Regex
 import qualified Data.Map as Map
 
@@ -244,7 +244,7 @@ calcImports ho qual mod = case Map.lookup mod (hoExports ho) of
 
 isInteractive :: IO Bool
 isInteractive = do
-    pn <- System.getProgName
+    pn <- getProgName
     return $ (optMode options == Interactive)
           || "ichj" `isPrefixOf` reverse pn
           || not (null $ optStmts options)

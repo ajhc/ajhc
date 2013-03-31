@@ -2,9 +2,9 @@ module Util.FilterInput (filterInput,readSystem) where
 
 import Control.Monad (when)
 import Data.List
-import System
 import System.IO
 import System.Process
+import System.Exit
 import Text.Printf
 import Util.Gen
 import qualified Data.ByteString.Lazy.Char8 as LBS

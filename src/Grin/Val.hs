@@ -13,7 +13,7 @@ module Grin.Val(
     region_block
     ) where
 
-import Char
+import Data.Char
 
 import Cmm.Number
 import Grin.Grin

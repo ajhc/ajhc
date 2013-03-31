@@ -10,7 +10,6 @@ import Control.Monad.Writer
 import System.Mem
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import qualified List
 
 import Data.List
 import DataConstructors
@@ -83,7 +82,7 @@ processInitialHo accumho aho = withStackStatus "processInitialHo" $ do
         nrules = map ruleUpdate . combRules $ findWithDefault emptyComb emptyId choCombinators'
         reRule :: Comb -> Comb
         reRule comb = combRules_u f comb where
-            f rs = List.union  rs [ x | x <- nrules, ruleHead x == combHead comb]
+            f rs = Data.List.union  rs [ x | x <- nrules, ruleHead x == combHead comb]
 
     let choCombs = sfilter (\(k,_) -> k /= emptyId) choCombinators'
     return $ updateChoHo mempty {
@@ -154,7 +153,7 @@ processDecls cho ho' tiData = withStackStatus "processDecls" $  do
     -- now we must attach rules to the existing chos, as well as the current ones
     let addRule c = case mlookup (combIdent c) rules' of
             Nothing -> c
-            Just rs -> combRules_u (map ruleUpdate . List.union rs) c
+            Just rs -> combRules_u (map ruleUpdate . Data.List.union rs) c
     prog <- return $ progCombinators_u (map addRule) prog
     cho <- return $ updateChoHo $ choCombinators_u (fmap addRule) cho
 

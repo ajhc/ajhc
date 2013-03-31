@@ -2,7 +2,7 @@ module FrontEnd.TypeSyns( expandTypeSyns, expandTypeSynsStmt ) where
 
 import Control.Monad.State
 import Control.Monad.Writer
-import List
+import Data.List
 import qualified Data.Traversable as T
 
 import FrontEnd.HsSyn
@@ -503,8 +503,8 @@ getHsNamesFromHsType (HsTyTuple hsTypes) = concat $ map getHsNamesFromHsType hsT
 getHsNamesFromHsType (HsTyUnboxedTuple hsTypes) = concat $ map getHsNamesFromHsType hsTypes
 getHsNamesFromHsType (HsTyApp hsType1 hsType2) = (getHsNamesFromHsType hsType1) ++ (getHsNamesFromHsType hsType2)
 getHsNamesFromHsType (HsTyVar hsName) = [hsName]
-getHsNamesFromHsType (HsTyForall vs qt) = getHsNamesFromHsQualType qt List.\\ map hsTyVarBindName vs
-getHsNamesFromHsType (HsTyExists vs qt) = getHsNamesFromHsQualType qt List.\\ map hsTyVarBindName vs
+getHsNamesFromHsType (HsTyForall vs qt) = getHsNamesFromHsQualType qt Data.List.\\ map hsTyVarBindName vs
+getHsNamesFromHsType (HsTyExists vs qt) = getHsNamesFromHsQualType qt Data.List.\\ map hsTyVarBindName vs
 getHsNamesFromHsType (HsTyCon _hsName) = [] -- don't rename the Constructors
 getHsNamesFromHsType ty = execWriter $ traverseHsType_ f ty where
     f t = tell $ getHsNamesFromHsType t

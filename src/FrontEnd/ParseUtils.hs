@@ -34,10 +34,10 @@ module FrontEnd.ParseUtils (
         , doForeignEq
  ) where
 
-import Char
+import Data.Char
 import Data.Maybe
 import Data.Monoid
-import Ratio
+import Data.Ratio
 import qualified Data.Set as Set
 import qualified Data.Traversable as T
 

@@ -6,11 +6,11 @@ module E.FromHs(
     getMainFunction
     ) where
 
-import Char
+import Data.Char
 import Control.Monad.Error
 import Control.Monad.Identity
 import Control.Monad.RWS
-import List(isPrefixOf,nub)
+import Data.List(isPrefixOf,nub)
 import Prelude
 import Text.Printf
 import qualified Data.Map as Map

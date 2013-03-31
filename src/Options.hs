@@ -34,10 +34,11 @@ import Control.Monad.Identity
 import Control.Monad.Reader
 import Data.List(nub)
 import Data.Maybe
-import System
 import System.Console.GetOpt
 import System.Directory
 import System.IO.Unsafe
+import System.Environment
+import System.Exit
 import qualified Data.ByteString.UTF8 as BS
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -323,7 +324,7 @@ postProcessFO o = case FlagOpts.process (optFOptsSet o) (optFOpts o) of
 getArguments = do
     x <- lookupEnv "AJHC_OPTS"
     let eas = maybe [] words x
-    as <- System.getArgs
+    as <- getArgs
     return (eas ++ as)
 
 pfill ::
@@ -518,6 +519,6 @@ flagOpt flag = do
     return (flag `S.member` optFOptsSet opt)
 
 getArgString = do
-    name <- System.getProgName
+    name <- getProgName
     args <- getArguments
     return (simpleQuote (name:args),head $ lines versionString)

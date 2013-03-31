@@ -1,6 +1,6 @@
 module Support.Tuple where
 
-import List(intersperse)
+import Data.List(intersperse)
 
 class Tuple a where
     tupleNil :: a

@@ -14,7 +14,7 @@ module Fixer.VMap(
 
 import Data.Monoid(Monoid(..))
 import Data.Typeable
-import List(intersperse)
+import Data.List(intersperse)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 

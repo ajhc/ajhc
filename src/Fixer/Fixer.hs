@@ -51,8 +51,8 @@ import Data.IORef
 import Data.Monoid
 import Data.Typeable
 import Data.Unique
-import IO(hFlush, stdout, Handle, hPutStr)
-import Monad
+import System.IO(hFlush, stdout, Handle, hPutStr)
+import Control.Monad
 import qualified Data.Set as Set
 
 -- | Fixable class, must satisfy the following rules

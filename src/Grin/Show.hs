@@ -7,10 +7,10 @@ module Grin.Show(
     render
     ) where
 
-import Char
+import Data.Char
 import Control.Monad.Writer(tell,when,forM_,execWriter)
 import Data.Maybe
-import IO
+import System.IO
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 

@@ -46,7 +46,7 @@ import Control.Monad.Identity
 import Control.Monad.Writer(tell,execWriter)
 import Data.Maybe
 import Data.Monoid hiding(getProduct)
-import List(sortBy)
+import Data.List(sortBy)
 import qualified Data.Map as Map hiding(map)
 import qualified Data.Set as Set hiding(map)
 

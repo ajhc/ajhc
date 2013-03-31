@@ -13,7 +13,7 @@ import Control.Monad.RWS
 import Control.Monad.Writer
 import Data.Char
 import Data.Maybe
-import List hiding(union)
+import Data.List hiding(union)
 import qualified Data.Foldable as Seq
 import qualified Data.Map as Map
 import qualified Data.Sequence as Seq

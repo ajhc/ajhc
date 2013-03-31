@@ -14,7 +14,7 @@ import Control.Monad.Identity
 import Data.Maybe
 import Data.Typeable
 import Debug.Trace
-import List hiding(delete,union,insert)
+import Data.List hiding(delete,union,insert)
 import qualified Data.Set as Set
 import qualified Data.Traversable as T
 

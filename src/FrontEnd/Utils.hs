@@ -1,6 +1,6 @@
 module FrontEnd.Utils where
 
-import Char
+import Data.Char
 import Control.Monad.Identity
 import qualified Data.Map as Map
 

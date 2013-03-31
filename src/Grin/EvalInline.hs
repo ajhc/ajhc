@@ -1,7 +1,7 @@
 module Grin.EvalInline(createEvalApply) where
 
 import Control.Monad.Identity
-import List hiding(union)
+import Data.List hiding(union)
 import qualified Data.Set as Set
 
 import GenUtil

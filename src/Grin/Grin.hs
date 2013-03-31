@@ -56,7 +56,7 @@ module Grin.Grin(
 import Control.Monad.Identity
 import Data.Char
 import Data.Monoid(Monoid(..))
-import List(isPrefixOf)
+import Data.List(isPrefixOf)
 import qualified Data.Set as Set
 
 import C.FFI

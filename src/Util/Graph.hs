@@ -34,7 +34,7 @@ import Data.Array.Unsafe (unsafeFreeze)
 import Data.Graph hiding(Graph)
 import Data.Maybe
 import GenUtil
-import List(sort,sortBy,group,delete)
+import Data.List(sort,sortBy,group,delete)
 import qualified Data.Graph as G
 import qualified Data.Map as Map
 
@@ -85,7 +85,7 @@ findLoopBreakers func ex (Graph g ln) = ans where
     scc = G.scc g
     ans = f g scc [] [] where
         f g (Node v []:sccs) fs lb
-            | v `elem` g ! v = let ng = (fmap (List.delete v) g) in  f ng (G.scc ng) [] (v:lb)
+            | v `elem` g ! v = let ng = (fmap (delete v) g) in  f ng (G.scc ng) [] (v:lb)
             | otherwise = f g sccs (v:fs) lb
 
         f g (n:_) fs lb = f ng (G.scc ng) [] (mv:lb) where
@@ -93,7 +93,7 @@ findLoopBreakers func ex (Graph g ln) = ans where
                 ((mv,_):_) -> mv
                 [] -> error "findLoopBreakers: no valid loopbreakers"
             ns = dec n []
-            ng = fmap (List.delete mv) g
+            ng = fmap (delete mv) g
 
         f _ [] xs lb = (map ((ln!) . head) (group $ sort lb),reverse $ map (ln!) xs)
     dec (Node v ts) vs = v:foldr dec vs ts

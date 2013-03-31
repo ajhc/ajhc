@@ -2,7 +2,7 @@
 
 module Doc.Chars where
 
-import Char(chr)
+import Data.Char(chr)
 import Doc.DocLike
 
 ulCorner, llCorner, urCorner, lrCorner, rTee, lTee, bTee, tTee, hLine,

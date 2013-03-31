@@ -5,7 +5,7 @@ module Util.Graphviz(
 ) where
 
 import Data.Graph.Inductive.Graph
-import List(intersperse)
+import Data.List(intersperse)
 
 data Orient = Portrait | Landscape deriving (Eq, Show)
 

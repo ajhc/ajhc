@@ -5,8 +5,8 @@ import Control.Monad.Reader
 import Data.Graph(stronglyConnComp, SCC(..))
 import Data.IORef
 import Data.Monoid(Monoid(..))
-import List
-import Maybe
+import Data.List
+import Data.Maybe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 

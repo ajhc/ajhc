@@ -32,7 +32,7 @@ import Util.ContextMonad
 import Util.Gen
 import Util.SetLike as S
 import qualified FlagDump as FD
-import qualified IO
+import qualified System.IO
 
 -- all transformation routines assume they are being passed a correct program, and only check the output
 
@@ -141,12 +141,12 @@ dumpCore pname prog = dumpCoreExtra pname prog ""
 dumpCoreExtra pname prog extra = do
     let fn = outputName ++ "_" ++ pname ++ ".jhc_core"
     putErrLn $ "Writing: " ++ fn
-    h <- IO.openFile fn IO.WriteMode
+    h <- System.IO.openFile fn System.IO.WriteMode
     (argstring,sversion) <- getArgString
-    IO.hPutStrLn h $ unlines [ "-- " ++ argstring,"-- " ++ sversion,""]
+    System.IO.hPutStrLn h $ unlines [ "-- " ++ argstring,"-- " ++ sversion,""]
     hPrintProgram h prog
-    IO.hPutStrLn h extra
-    IO.hClose h
+    System.IO.hPutStrLn h extra
+    System.IO.hClose h
     wdump FD.Core $ do
         putErrLn $ "v-- " ++ pname ++ " Core"
         printProgram prog

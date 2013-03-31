@@ -1,7 +1,7 @@
 module Grin.Optimize(grinPush,grinSpeculate) where
 
 import Control.Monad.State
-import List
+import Data.List
 import qualified Data.Set as Set
 
 import C.Prims

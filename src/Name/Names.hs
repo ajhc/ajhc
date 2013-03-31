@@ -10,7 +10,7 @@
 
 module Name.Names(module Name.Names,module Name.Prim) where
 
-import Char(isDigit)
+import Data.Char(isDigit)
 
 import Name.Name
 import Name.Prim

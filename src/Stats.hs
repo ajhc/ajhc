@@ -38,7 +38,7 @@ import Control.Monad.Reader
 import Control.Monad.Writer.Strict
 import Data.IORef
 import Data.Tree
-import List(sort,groupBy)
+import Data.List(sort,groupBy)
 import Prelude hiding(null)
 import System.IO.Unsafe
 import qualified Data.Map as Map
