@@ -1,6 +1,6 @@
 cabal-version: >= 1.6
 name:          ajhc
-build-type:    Simple
+build-type:    Custom
 version:       @VERSION@
 license:       GPL-2
 license-file:  COPYING
@@ -20,8 +20,9 @@ homepage:      http://ajhc.masterq.net/
 data-files:    README.md
 
 extra-source-files:
-    examples/*.hs,
-    src/StringTable/StringTable_cbits.h, src/cbits/config.h, src/hs_src_config.h
+    examples/*.hs, rts/HsFFI.h, Makefile.cabalinst, library_deps.make,
+    src/StringTable/StringTable_cbits.h, src/cbits/config.h, src/hs_src_config.h,
+    lib/*, lib/*/*, lib/*/*/*, lib/*/*/*/*
 
 source-repository head
     type:     git

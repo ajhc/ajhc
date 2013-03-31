@@ -1,6 +1,7 @@
 ACLOCAL_AMFLAGS=-I ac-macros
 
 bin_PROGRAMS = ajhc
+AJHC = ./$(bin_PROGRAMS)
 
 ajhc_SOURCES = src/Main.hs $(HSFILES) $(BUILT_SOURCES) $(HSBOOT) $(DRIFTFILES)
 
