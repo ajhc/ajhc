@@ -77,6 +77,9 @@ main = putStrLn "hello"
 jlibpath=${datadir}/$PACKAGE-$SHORTVERSION
 jetcpath=${sysconfdir}/$PACKAGE-$SHORTVERSION
 
+JHCLIB_FILES=`find lib -type f | perl -e "while (<STDIN>) {chomp; print; print ' ';}"`
+AC_DEFINE_UNQUOTED(JHCLIB_FILES, "$JHCLIB_FILES", [jhc libraries dir])
+
 AC_DEFINE_DIR(LIBDIR,libdir)
 AC_DEFINE_DIR(DATADIR,datadir)
 AC_DEFINE_DIR(JLIBPATH,jlibpath)
@@ -84,6 +87,7 @@ AC_DEFINE_DIR(JETCPATH,jetcpath)
 
 dnl AX_CREATE_STDINT_H([cbits/_stdint.h])
 
+AC_SUBST(JHCLIB_FILES)
 AC_SUBST(BYTE_ORDER)
 AC_SUBST(EXTRA_PACKAGES)
 AC_SUBST(GHCFLAGS)
