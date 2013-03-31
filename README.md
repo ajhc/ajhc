@@ -103,6 +103,9 @@ Example: C:\HaskellPlatform\2012.4.0.0
 ### Yet
 
 * Cabalize Ajhc. Ajhc's hl files will be not controled with cabal.
+* No more depend on DrIFT. Use http://hackage.haskell.org/package/derive.
+* No more depend on CPAN (LWP and YAML).
+* Support LPCXpresso NXP LPX1769 with demo.
 * Rewrite Cortex-M3 base library with Ajhc.
 * Pass all regress test, and enable regress fail setting on travis-ci.
   https://travis-ci.org/ajhc/ajhc
