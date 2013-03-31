@@ -1,7 +1,7 @@
 cabal-version: >= 1.6
 name:          ajhc
 build-type:    Simple
-version:       @VERSION@.0
+version:       @VERSION@
 license:       GPL-2
 license-file:  COPYING
 category:      Compiler
@@ -20,8 +20,8 @@ homepage:      http://ajhc.masterq.net/
 data-files:    README.md
 
 extra-source-files:
-    examples/BinaryTrees.hs, examples/Calendar.hs, examples/Forall.hs,
-    examples/HelloWorld.hs, examples/Options.hs, examples/Primes.hs
+    examples/*.hs,
+    src/StringTable/StringTable_cbits.h, src/cbits/config.h, src/hs_src_config.h
 
 source-repository head
     type:     git
@@ -29,25 +29,15 @@ source-repository head
 
 executable ajhc
     main-is:        Main.hs
-    hs-source-dirs: src
+    hs-source-dirs: drift_processed src
 
     c-sources:
         src/StringTable/StringTable_cbits.c
         src/cbits/md5sum.c
         src/cbits/lookup3.c
-        src/StringTable/StringTable_cbits.h
-        src/cbits/config.h
-        src/hs_src_config.h
 
-    include-dirs: src/StringTable, src/cbits, src/data, src
-    includes:
-        StringTable_cbits.h
-        config.h
-        hs_src_config.h
-    install-includes:
-        StringTable_cbits.h
-        config.h
-        hs_src_config.h
+    include-dirs:
+        src/data, src/StringTable, src/cbits, src
 
     build-depends:
         base >= 4.0 && < 5,
@@ -258,5 +248,19 @@ executable ajhc
         Version.Config
         Version.Version
 
-    ghc-options:    -Wall
+    extensions:
+        BangPatterns, TypeFamilies, ViewPatterns, UndecidableInstances,
+        OverlappingInstances, RecordWildCards, RecursiveDo, TupleSections,
+        ParallelListComp, GeneralizedNewtypeDeriving, ScopedTypeVariables,
+        FlexibleInstances, TypeSynonymInstances, MultiParamTypeClasses,
+        DeriveDataTypeable, NoMonoLocalBinds, NamedFieldPuns,
+        ForeignFunctionInterface, UnliftedFFITypes, ImplicitParams,
+        UnboxedTuples, StandaloneDeriving, DeriveFunctor, DeriveFoldable,
+        DeriveTraversable, FlexibleContexts,
+        ConstrainedClassMethods, FunctionalDependencies, MagicHash,
+        PolymorphicComponents, ExistentialQuantification, UnicodeSyntax,
+        PostfixOperators, PatternGuards, LiberalTypeSynonyms, RankNTypes,
+        TypeOperators, EmptyDataDecls, KindSignatures
+    ghc-options:    -W -fno-warn-unused-matches  -fwarn-type-defaults -i./drift_processed -i./src
     cc-options:     -std=c99
+    cpp-options:    -DUSE_HASKELINE

@@ -196,6 +196,9 @@ bin-dist: ajhc$(EXEEXT)
 cabal-dist: src/Main.hs  $(HSFILES) $(BUILT_SOURCES) src/StringTable/Atom.hs $(CFILES)
 	runhaskell Setup.hs sdist
 
+cabal-install: src/Main.hs  $(HSFILES) $(BUILT_SOURCES) src/StringTable/Atom.hs $(CFILES)
+	cabal install
+
 .INTERMEDIATE: deps.txt ajhc_man.mkd options.mkd
 .DELETE_ON_ERROR: deps.txt depend.make ChangeLog data/shortchange.txt manual.mkd ajhc_man.mkd options.mkd
 
@@ -229,6 +232,7 @@ hl-clean:
 
 clean-local:
 	find . \( \! -path \*/_\* \( -name \*.o-boot -o -name \*.hi -o -name \*.o -o -name \*.hi-boot \) \) -print | xargs rm -f --
+	rm -rf dist
 
 MAINTAINERCLEANFILES= $(BUILT_SOURCES) $(DRIFTFILES)
 
