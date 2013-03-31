@@ -46,6 +46,7 @@ import qualified Data.Set as S
 import RawFiles(targets_ini)
 import Support.IniParse
 import Support.TempDir
+import Support.Cabal
 import Util.ExitCodes
 import Util.Gen
 import Util.YAML
@@ -483,13 +484,12 @@ initialLibIncludes :: [String]
 initialLibIncludes = unsafePerformIO $ do
     ps <- lookupEnv "AJHC_LIBRARY_PATH"
     h <- lookupEnv "HOME"
-    let paths = h ++ ["/usr/local","/usr",
-                      "/mingw/msys/1.0/local","/mingw/msys/1.0"]
-                      -- xxx ^ For Windows. But is it collect???
+    let paths = h ++ ["/usr/local","/usr"]
         bases = ["/lib","/share"]
         vers = ["/ajhc-" ++ shortVersion, "/ajhc"]
+    dat <- getDataFileNameMaybe "lib"
     return $ nub $ maybe [] (tokens (':' ==))  ps ++ [ p ++ b ++ v | p <- paths, v <- vers, b <- bases ]
-               ++ [d ++ v | d <- [libdir,datadir], v <- vers] ++ [libraryInstall]
+               ++ [d ++ v | d <- [libdir,datadir], v <- vers] ++ [libraryInstall] ++ maybeToList dat
 
 class Monad m => OptionMonad m where
     getOptions :: m Opt

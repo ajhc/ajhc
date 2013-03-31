@@ -202,6 +202,7 @@ executable ajhc
         Stats
         StringTable.Atom
         Support.CFF
+        Support.Cabal
         Support.CanType
         Support.Compat
         Support.FreeVars
@@ -248,6 +249,7 @@ executable ajhc
         Util.YAML
         Version.Config
         Version.Version
+        Paths_ajhc
 
     extensions:
         BangPatterns, TypeFamilies, ViewPatterns, UndecidableInstances,
@@ -264,4 +266,4 @@ executable ajhc
         TypeOperators, EmptyDataDecls, KindSignatures
     ghc-options:    -W -fno-warn-unused-matches  -fwarn-type-defaults -i./drift_processed -i./src
     cc-options:     -std=c99
-    cpp-options:    -DUSE_HASKELINE
+    cpp-options:    -DUSE_HASKELINE -DWITH_CABAL
