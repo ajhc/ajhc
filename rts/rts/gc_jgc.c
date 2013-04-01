@@ -491,6 +491,7 @@ s_alloc(gc_t gc, struct s_cache *sc)
 #ifdef _JHC_JGC_NAIVEGC
         if(__predict_false(!pg)) {
                 gc_perform_gc(gc);
+                pg = SLIST_FIRST(&sc->blocks);
         }
 #endif
         if(__predict_false(!pg)) {
