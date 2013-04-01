@@ -1,5 +1,4 @@
-{-# OPTIONS_GHC -cpp #-}
-{-# LANGUAGE CPP, ForeignFunctionInterface,ViewPatterns,RecordWildCards #-}
+{-# LANGUAGE ForeignFunctionInterface,ViewPatterns,RecordWildCards #-}
 -- Various routines for dealing with temporary directories and files.
 module Support.TempDir(
     getTempDir,
@@ -22,14 +21,10 @@ import System.FilePath as FP
 import System.IO
 import System.IO.Unsafe
 import System.IO.Temp
-#ifdef mingw32_HOST_OS
-import System.Win32.Console
-#else
-import System.Posix.Signals
-#endif
 import Text.Printf
 import qualified Data.Set as Set
 import GenUtil (iocatch)
+import Support.CompatMingw32
 
 data TempDir = TempDir {
     tempDirClean   :: Bool,  -- ^ whether to delete the directory afterwords.
@@ -111,14 +106,7 @@ fileInTempDir (FP.normalise -> fp) action = do
     let nfp = FP.normalise (tdir </> fp)
     b <- addCleanup fp
     when b $ action nfp
-#ifdef mingw32_HOST_OS
-    -- Windows filepath backslash confuses jhc's lexer with escape code.
-    let replace :: Eq a => a -> a -> [a] -> [a]
-        replace x y = map (\z -> if z == x then y else z)
-    return $ replace '\\' '/' nfp
-#else
-    return nfp
-#endif
+    return $ noEscapePath nfp
 
 cleanUp :: IO ()
 cleanUp = do
@@ -143,11 +131,7 @@ addCleanup fp = do
 
 wrapMain :: IO () -> IO ()
 wrapMain main = E.catch (main >> cleanUp) f where
-#ifdef mingw32_HOST_OS
-    panic = generateConsoleCtrlEvent cTRL_C_EVENT 0
-#else
-    panic = raiseSignal sigINT
-#endif
+    panic = raiseSigIntCompat
     f (fromException -> Just code) = cleanUp >> exitWith code
     f (fromException -> Just UserInterrupt) = cleanUp >> panic
     f e = do

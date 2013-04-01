@@ -10,7 +10,6 @@ import qualified Data.ByteString.Lazy.UTF8 as LBS
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified System.FilePath as FP
-import System.Process
 import System.Exit
 
 import C.Prims
@@ -31,6 +30,7 @@ import PackedString
 import RawFiles
 import Support.TempDir
 import Support.Transform
+import Support.CompatMingw32
 import Util.Gen
 import qualified C.FromGrin2 as FG2
 import qualified FlagDump as FD
@@ -136,7 +136,7 @@ compileGrinToC grin = do
     when (optStop options == StopC) $
         exitSuccess
     putProgressLn ("Running: " ++ comm)
-    r <- system comm
+    r <- systemCompat comm
     when (r /= ExitSuccess) $ fail "C code did not compile."
     return ()
 

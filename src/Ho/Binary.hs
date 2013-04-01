@@ -1,13 +1,9 @@
-{-# OPTIONS_GHC -cpp #-}
-{-# LANGUAGE CPP, ImpredicativeTypes #-}
+{-# LANGUAGE ImpredicativeTypes #-}
 module Ho.Binary(readHoFile,recordHoFile,readHlFile,recordHlFile) where
 
 import Codec.Compression.Zlib
 import Control.Monad
 import Data.Binary
-#ifndef mingw32_HOST_OS
-import System.Posix.Files
-#endif
 import System.Directory
 import Text.Printf
 import Util.Gen
@@ -21,14 +17,10 @@ import Name.Binary()
 import Options
 import Support.CFF
 import Support.MapBinaryInstance
+import Support.CompatMingw32
 
 current_version :: Int
 current_version = 11
-
-#ifdef mingw32_HOST_OS
-createLink :: FilePath -> FilePath -> IO ()
-createLink = copyFile
-#endif
 
 readHFile :: FilePath -> IO (FilePath,HoHeader,forall a . Binary a => ChunkType -> a)
 readHFile fn = do
@@ -76,7 +68,7 @@ recordHoFile ho idep fs header = do
             if optNoWriteHo options then return () else do
             let tfn = fn' ++ ".tmp"
             removeLink' tfn
-            createLink fn tfn
+            createLinkCompat fn tfn
             renameFile tfn fn'
         f fn = do
             when verbose $ do

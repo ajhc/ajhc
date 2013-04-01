@@ -27,10 +27,9 @@ import System.Console.Readline
 #endif
 import System.Directory
 import System.IO
-import System.Process
 
 import GenUtil
-
+import Support.CompatMingw32
 
 #ifndef USE_HASKELINE
 readLine :: String -> (String -> IO [String]) -> IO String
@@ -143,7 +142,7 @@ runInteraction act s = do
             when (not $ null setable) $ putStrLn "Setable options:" >> putStr (unlines setable)
     case basicParse (interactComment act) (if interactCommandMode act then ':':s else s) of
         Right "" -> return act
-        Right ('!':rest) -> system rest >> return act
+        Right ('!':rest) -> systemCompat rest >> return act
         Right s -> do
             when (interactEcho act) $ putStrLn $ (interactPrompt act) ++ s
             act' <- interactExpr act act s
