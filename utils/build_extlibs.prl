@@ -7,8 +7,9 @@ use LWP::Simple;
 use Cwd;
 use Getopt::Std;
 
-our ($opt_l,$opt_d);
-getopts('ld') or die "unknown opt";
+our ($opt_l,$opt_d,$opt_c);
+getopts('ldc:') or die "unknown opt";
+$opt_c = "./ajhc" unless $opt_c;
 
 # clean out environment
 delete $ENV{AJHC_PATH};
@@ -58,6 +59,6 @@ foreach my $fn (@ARGV) {
     mysystem "patch -d $tmpdir/$name-$version -p1 < $patch" if -e $patch;
     mysystem("cp '$fn' '$tmpdir/$name-$version'");
     $fn =~ s/.*\///;
-    mysystem("./ajhc $options " . ($ENV{AJHC_TEST} || "") .
+    mysystem("$opt_c $options " . ($ENV{AJHC_TEST} || "") .
         " --build-hl '$tmpdir/$name-$version/$fn' -L- -L. -i- '-i$tmpdir/$name-$version$src'") and die "$!: ajhc";
 }
