@@ -10,7 +10,7 @@ BUILT_SOURCES= src/RawFiles.hs src/FrontEnd/HsParser.hs src/FlagDump.hs \
 
 MY_CINCLUDES= -I$(srcdir)/src/data -I$(srcdir)/src/StringTable -I$(srcdir)/src/cbits -I$(builddir)/src/cbits
 MY_CFLAGS= $(MY_CINCLUDES) -optc-std=c99 -optc-O2 -optc-Wall
-CC = $(HC)
+CC = "$(HC)"
 
 HSFILES=src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/DataP.hs \
 	src/DerivingDrift/Drift.hs src/DerivingDrift/RuleUtils.hs src/Doc/Attr.hs src/Doc/Chars.hs src/Doc/DocLike.hs \
@@ -135,14 +135,14 @@ CFILES = src/StringTable/StringTable_cbits.o src/cbits/md5sum.o src/cbits/lookup
 
 %.o : %.c
 	mkdir -p `echo $@ | sed -e 's@/[^/]*$$@@'`
-	$(HC) $(MY_CFLAGS) $< -c -o $@
+	"$(HC)" $(MY_CFLAGS) $< -c -o $@
 
 ajhc$(EXEEXT): src/Main.hs  $(HSFILES) $(BUILT_SOURCES) src/StringTable/Atom.hs $(CFILES)
-	$(BUILD_STOW) $(HC) $(GHCOPTS) --make $< $(CFILES) -o $@
+	$(BUILD_STOW) "$(HC)" $(GHCOPTS) --make $< $(CFILES) -o $@
 
 # You can see stacktrace with running "ajhcp Foo.hs +RTS -p -xc".
 ajhcp$(EXEEXT): src/Main.hs $(BUILT_SOURCES) $(HSFILES) src/StringTable/Atom.hs $(CFILES)
-	$(HC) $(GHCOPTS) $(GHCPROFOPTS) --make $< $(CFILES) -o $@
+	"$(HC)" $(GHCOPTS) $(GHCPROFOPTS) --make $< $(CFILES) -o $@
 
 dist_man_MANS = ajhc.1
 
@@ -155,7 +155,7 @@ HSBOOT= src/DataConstructors.hs-boot src/FrontEnd/Tc/Class.hs-boot src/Grin/Grin
 
 %.hs: %.hsc
 	mkdir -p `echo $@ | sed -e 's@/[^/]*$$@@'`
-	$(HSC2HS) $(MY_CINCLUDES) -o $@ $<
+	"$(HSC2HS)" $(MY_CINCLUDES) -o $@ $<
 
 %.hs: %.flags utils/opt_sets.prl
 	perl $(srcdir)/utils/opt_sets.prl -n $< $< > $@
@@ -205,7 +205,7 @@ cabal-install: src/Main.hs  $(HSFILES) $(BUILT_SOURCES) src/StringTable/Atom.hs 
 
 deps.txt:
 	$(MAKE) $(AM_MAKEFLAGS) $(BUILT_SOURCES)
-	$(HC) -M -optdep-f -optdep$@ $(GHCOPTS) src/Main.hs
+	"$(HC)" -M -optdep-f -optdep$@ $(GHCOPTS) src/Main.hs
 
 depend.make: deps.txt
 	echo HSFILES=`egrep -o '[A-Za-z0-9/._]+.hs' $< | sed -e 's/^\.\///' | sort | uniq` > depend.make
@@ -213,10 +213,10 @@ depend.make: deps.txt
 built-sources: $(BUILT_SOURCES)
 
 i: $(BUILT_SOURCES)
-	$(HC) --interactive $(GHCOPTS) src/Main.hs $(CFILES)
+	"$(HC)" --interactive $(GHCOPTS) src/Main.hs $(CFILES)
 
 i2: $(BUILT_SOURCES)
-	$(HC) --interactive $(GHCOPTS)  $(CFILES)
+	"$(HC)" --interactive $(GHCOPTS)  $(CFILES)
 
 lint:
 	perl utils/hslint.prl `darcs wh -s | sed -e 's/^..//' -e 's/ .*$$//' | grep '.hs$$'`
