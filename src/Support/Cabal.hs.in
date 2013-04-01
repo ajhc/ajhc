@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 module Support.Cabal (getDataFileNameMaybe) where
 #ifdef WITH_CABAL
-import Paths_ajhc (getDataFileName)
+import Paths_@PACKAGE_NAME@ (getDataFileName)
 #endif
 
 getDataFileNameMaybe :: FilePath -> IO (Maybe FilePath)

@@ -1,5 +1,5 @@
 cabal-version: >= 1.6
-name:          ajhc
+name:          @PACKAGE_NAME@
 build-type:    Custom
 version:       @VERSION@
 license:       GPL-2
@@ -29,7 +29,7 @@ source-repository head
     type:     git
     location: https://github.com/ajhc/ajhc.git
 
-executable ajhc
+executable @PACKAGE_NAME@
     main-is:        Main.hs
     hs-source-dirs: drift_processed src
 
@@ -251,7 +251,7 @@ executable ajhc
         Util.YAML
         Version.Config
         Version.Version
-        Paths_ajhc
+        Paths_@PACKAGE_NAME@
 
     extensions:
         BangPatterns, TypeFamilies, ViewPatterns, UndecidableInstances,

@@ -57,7 +57,10 @@ You should run cabal install on msys console.
 
 http://msysgit.github.com/
 
-It's good choosing "Checkout as-is, commit as-is".
+It's good choosing the below option.
+
+* "Checkout as-is, commit as-is"
+* "Run Git and included Unix tools from the Windows Command Prompt"
 
 ### Install Haskell Platform
 

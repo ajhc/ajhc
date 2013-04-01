@@ -14,6 +14,6 @@ install: $(JHC_LIBS) $(JHC_EXT_LIBS)
 	done
 	$(INSTALL_DATA) ./rts/HsFFI.h "$(TARGET)/include"
 	$(INSTALL_DATA) ./src/data/targets.ini "$(TARGET)/etc"
-	cd "$(BINDIR)" && ln -sf ajhc$(EXEEXT) ajhci$(EXEEXT)
+	cd "$(BINDIR)" && ln -sf $(bin_PROGRAMS)$(EXEEXT) $(bin_PROGRAMS)i$(EXEEXT)
 
 .PHONY: install

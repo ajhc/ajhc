@@ -1,7 +1,7 @@
 ACLOCAL_AMFLAGS=-I ac-macros
 
 bin_PROGRAMS = ajhc
-AJHC = ./$(bin_PROGRAMS)
+JHCPROG = ./$(bin_PROGRAMS)
 
 ajhc_SOURCES = src/Main.hs $(HSFILES) $(BUILT_SOURCES) $(HSBOOT) $(DRIFTFILES)
 
@@ -100,7 +100,7 @@ install-data-hook: $(JHC_LIBS) $(JHC_EXT_LIBS)
 	$(INSTALL_DATA) "$(srcdir)/src/data/targets.ini" $(DESTDIR)$(sysconfdir)/@PACKAGE@-@SHORTVERSION@
 
 uninstall-hook:
-	rm -f -- "$(DESTDIR)$(bindir)/ajhci$(EXTEXT)"
+	rm -f -- "$(DESTDIR)$(bindir)/$(bin_PROGRAMS)i$(EXTEXT)"
 	for lib in $(JHC_LIBS) $(JHC_EXT_LIBS); do \
 		rm -f -- "$(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/$$lib" ; \
 	done
@@ -137,17 +137,17 @@ CFILES = src/StringTable/StringTable_cbits.o src/cbits/md5sum.o src/cbits/lookup
 	mkdir -p `echo $@ | sed -e 's@/[^/]*$$@@'`
 	"$(HC)" $(MY_CFLAGS) $< -c -o $@
 
-ajhc$(EXEEXT): src/Main.hs  $(HSFILES) $(BUILT_SOURCES) src/StringTable/Atom.hs $(CFILES)
+$(bin_PROGRAMS)$(EXEEXT): src/Main.hs  $(HSFILES) $(BUILT_SOURCES) src/StringTable/Atom.hs $(CFILES)
 	$(BUILD_STOW) "$(HC)" $(GHCOPTS) --make $< $(CFILES) -o $@
 
 # You can see stacktrace with running "ajhcp Foo.hs +RTS -p -xc".
-ajhcp$(EXEEXT): src/Main.hs $(BUILT_SOURCES) $(HSFILES) src/StringTable/Atom.hs $(CFILES)
+$(bin_PROGRAMS)p$(EXEEXT): src/Main.hs $(BUILT_SOURCES) $(HSFILES) src/StringTable/Atom.hs $(CFILES)
 	"$(HC)" $(GHCOPTS) $(GHCPROFOPTS) --make $< $(CFILES) -o $@
 
 dist_man_MANS = ajhc.1
 
 install-exec-hook:
-	cd $(DESTDIR)$(bindir) && $(LN_S) -f ajhc$(EXEEXT) ajhci$(EXEEXT)
+	cd $(DESTDIR)$(bindir) && $(LN_S) -f $(bin_PROGRAMS)$(EXEEXT) $(bin_PROGRAMS)i$(EXEEXT)
 
 HSBOOT= src/DataConstructors.hs-boot src/FrontEnd/Tc/Class.hs-boot src/Grin/Grin.hs-boot src/Grin/Show.hs-boot src/Info/Binary.hs-boot src/E/Show.hs-boot
 
@@ -185,11 +185,11 @@ src/data/shortchange.txt: ChangeLog
 
 BINDISTDIR=$(PACKAGE)-$(VERSION)-$(host)
 
-bin-dist: ajhc$(EXEEXT)
+bin-dist: $(bin_PROGRAMS)$(EXEEXT)
 	rm -rf -- $(BINDISTDIR)
 	mkdir $(BINDISTDIR)
-	strip -- ajhc$(EXEEXT) || true
-	cp -- ajhc$(EXEEXT) $(BINDISTDIR)
+	strip -- $(bin_PROGRAMS)$(EXEEXT) || true
+	cp -- $(bin_PROGRAMS)$(EXEEXT) $(BINDISTDIR)
 	tar cvf $(BINDISTDIR).tar $(BINDISTDIR)
 	gzip -f -- $(BINDISTDIR).tar
 	rm -rf -- $(BINDISTDIR)
@@ -289,9 +289,9 @@ ajhc_man.mkd: $(JHC_MANUAL_FILES)
 man: ajhc_man.mkd
 	pandoc $< -s -f markdown -t man -s  -o ajhc.1
 
-options.mkd: drift_processed/Options.hs | ajhc$(EXEEXT)
+options.mkd: drift_processed/Options.hs | $(bin_PROGRAMS)$(EXEEXT)
 	echo "{-@Options 1" > $@
-	./ajhc --help | sed -e 's/^/    /'  >> $@
+	./$(bin_PROGRAMS) --help | sed -e 's/^/    /'  >> $@
 
 fix-whitespace:
 	find src -not \( -name .svn -prune -o -name .git -prune \) -type f -name \*.hs -print0 | xargs -0 sed -i  -E 's/[ 	]*$$//'
@@ -312,8 +312,8 @@ libs: $(JHC_LIBS) $(JHC_EXT_LIBS)
 show_elibs: lib/ext/*.cabal  lib/ext/*.yaml
 	-perl utils/build_extlibs.prl -l $^
 
-%: examples/%.hs ajhc$(EXEEXT) $(JHC_LIBS)
-	./ajhc -L- -L$(srcdir) -L. --no-cache $(JHC_TEST) $< -o $@ # 2>&1 | tee $@.log
+%: examples/%.hs $(bin_PROGRAMS)$(EXEEXT) $(JHC_LIBS)
+	./$(bin_PROGRAMS) -L- -L$(srcdir) -L. --no-cache $(JHC_TEST) $< -o $@ # 2>&1 | tee $@.log
 
 TESTS=HelloWorld Primes
 

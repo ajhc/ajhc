@@ -6,23 +6,24 @@ import qualified Distribution.Simple.Setup as S
 import qualified Distribution.Simple.Program as P
 import System.FilePath ((</>), splitDirectories)
 import qualified System.FilePath.Posix as Px
+import Distribution.Package
 
 make verbosity = P.runProgramInvocation verbosity . P.simpleProgramInvocation "make"
 
-ajhcCmd :: LocalBuildInfo -> FilePath
 #ifdef mingw32_HOST_OS
 (<//>) = (Px.</>)
-ajhcCmd local = Px.joinPath $ splitDirectories $
-                 buildDir local <//> "ajhc" <//> "ajhc"
+jhcCmd local = Px.joinPath $ splitDirectories $
+               buildDir local <//> pName <//> pName
 #else
-ajhcCmd local = buildDir local </>  "ajhc" </>  "ajhc"
+jhcCmd local = buildDir local </>  pName </>  pName
 #endif
+  where pName = "@PACKAGE_NAME@"
 
 installStdLib pkg local verbosity copy
     = do let dirs = L.absoluteInstallDirs pkg local copy
              idir = datadir dirs
              bdir = bindir dirs
-             icmd = ajhcCmd local
+             icmd = jhcCmd local
 #ifdef mingw32_HOST_OS
              exeExt = ".exe"
 #else
@@ -32,7 +33,7 @@ installStdLib pkg local verbosity copy
          make verbosity
                [ "-f", "Makefile.cabalinst", "install"
                , "TARGET=" ++ idir
-               , "AJHC=" ++ icmd
+               , "JHCPROG=" ++ icmd
                , "BINDIR=" ++ bdir
                , "EXEEXT=" ++ exeExt
                ]
