@@ -42,7 +42,7 @@ noEscapePath = id
 
 systemCompat :: String -> IO ExitCode
 #ifdef mingw32_HOST_OS
-systemCompat s = system $ "sh -c " ++ s
+systemCompat s = system $ "sh -c \"" ++ s ++ "\""
 #else
 systemCompat = system
 #endif
