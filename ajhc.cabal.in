@@ -22,6 +22,7 @@ data-files:    README.md
 extra-source-files:
     examples/*.hs rts/HsFFI.h Makefile.cabalinst library_deps.make src/data/targets.ini
     src/StringTable/StringTable_cbits.h src/cbits/config.h src/hs_src_config.h
+    utils/build_extlibs.prl
     @JHCLIB_FILES@
 
 source-repository head
