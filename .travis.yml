@@ -6,8 +6,13 @@ before_install:
   - uname -a
   - cat /proc/cpuinfo
   - sudo apt-get -qq -y install make locales autoconf libreadline-dev libwww-perl libconfig-yaml-perl graphviz haskell-platform drift pandoc po4a libghc-readline-dev libghc-utf8-string-dev libghc-hssyck-dev libghc-pandoc-dev
+  - cabal update
 script:
   - ghc --version
+  - autoreconf -i
+  - ./configure
+  - make cabal-install
+  - make distclean
   - autoreconf -i
   - ./configure
   - make
