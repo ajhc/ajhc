@@ -233,7 +233,7 @@ hl-clean:
 
 clean-local:
 	find . \( \! -path \*/_\* \( -name \*.o-boot -o -name \*.hi -o -name \*.o -o -name \*.hi-boot \) \) -print | xargs rm -f --
-	rm -rf dist
+	rm -rf dist drift_processed tmp autom4te.cache
 
 MAINTAINERCLEANFILES= $(BUILT_SOURCES) $(DRIFTFILES)
 
