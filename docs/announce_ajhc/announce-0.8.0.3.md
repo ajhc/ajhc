@@ -3,7 +3,7 @@
 We are happy to announce Ajhc 0.8.0.3.
 
 Major change on this release is supporting Windows MinGW32 platform.
-And you can cabal install Ajhc.
+And you can cabal install ajhc.
 
 http://hackage.haskell.org/package/ajhc
 
