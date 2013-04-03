@@ -8,7 +8,8 @@ category:      Compiler
 author:        John Meacham <john@repetae.net>
 maintainer:    Kiwamu Okabe <kiwamu@debian.or.jp>
 synopsis:      Haskell compiler that produce binary through C language
-description:   The jhc is a haskell compiler which aims to produce the most efficient
+description:   Ajhc is a fork of jhc.
+               The jhc is a haskell compiler which aims to produce the most efficient
                programs possible via whole program analysis and other optimizations.
                .
                The jhc is very minimalist in that it does not have a precompiled run time
