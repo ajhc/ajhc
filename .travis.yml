@@ -9,9 +9,8 @@ before_install:
   - cabal update
   - git --version
   - ghc --version
-script:
-  - git tag
   - git fetch --tags
+script:
   - autoreconf -i
   - ./configure
   - make cabal-install
