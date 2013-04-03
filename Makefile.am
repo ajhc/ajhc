@@ -178,7 +178,7 @@ src/FrontEnd/HsParser.hs: src/FrontEnd/HsParser.y
 .SECONDARY: src/data/shortchange.txt
 
 ChangeLog:
-	git log fork-jhc-0.8.0-darcs20120314..HEAD > $@
+	git log fork-jhc-0.8.0-darcs20120314.. > $@
 
 src/data/shortchange.txt: ChangeLog
 	echo -n "`head -1 $< | sed -ne 's/^commit \(.*\)/\1/p'`"  > $@
