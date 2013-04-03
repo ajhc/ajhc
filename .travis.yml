@@ -11,6 +11,7 @@ before_install:
   - ghc --version
 script:
   - git tag
+  - git fetch --tags
   - autoreconf -i
   - ./configure
   - make cabal-install
