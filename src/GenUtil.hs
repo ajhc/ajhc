@@ -130,7 +130,7 @@ import System.Random(StdGen, newStdGen, Random(randomR))
 import System.Time
 import System.CPUTime
 import System.Exit
-import System.Environment
+import System.Environment (getArgs, getEnv)
 
 {-# SPECIALIZE snub :: [String] -> [String] #-}
 {-# SPECIALIZE snub :: [Int] -> [Int] #-}
