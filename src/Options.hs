@@ -37,7 +37,7 @@ import Data.Maybe
 import System.Console.GetOpt
 import System.Directory
 import System.IO.Unsafe
-import System.Environment
+import System.Environment (getArgs, getProgName)
 import System.Exit
 import qualified Data.ByteString.UTF8 as BS
 import qualified Data.Map as M
