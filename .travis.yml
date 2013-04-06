@@ -5,7 +5,9 @@ before_install:
   - date
   - uname -a
   - cat /proc/cpuinfo
-  - sudo apt-get -qq -y install make locales autoconf libreadline-dev libwww-perl libconfig-yaml-perl graphviz haskell-platform drift pandoc po4a libghc-readline-dev libghc-utf8-string-dev libghc-hssyck-dev libgc-dev gcc-multilib mingw-w64 wine
+  - sudo apt-get -qq -y install make locales autoconf libreadline-dev libwww-perl libconfig-yaml-perl graphviz haskell-platform drift pandoc po4a libghc-readline-dev libghc-utf8-string-dev libghc-hssyck-dev libgc-dev gcc-multilib
+  - apt-cache show mingw-w64
+  - apt-cache show wine
   - cabal update
   - git --version
   - ghc --version
