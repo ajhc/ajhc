@@ -1,10 +1,10 @@
 import Data.Monoid
-import List(sort,nub)
-import Monad
+import Data.List(sort,nub)
+import Control.Monad
 import System.IO
 import Test.QuickCheck
 import qualified Data.Set as Set
-import qualified List
+import qualified Data.List
 
 import Data.Binary
 import E.Arbitrary
@@ -112,7 +112,7 @@ testName = do
     qc "name.overlap" $ \t -> (isTypeNamespace t,isValNamespace t) /= (True,True)
 
 testProperties = do
-    let prop_list x xs = sort (List.delete x $ nub xs) == toList p where
+    let prop_list x xs = sort (Data.List.delete x $ nub xs) == toList p where
             p = unsetProperty x ((fromList xs) :: Properties)
         prop_enum :: Info.Types.Property -> Info.Types.Property -> Bool
         prop_enum x y = (fromEnum x `compare` fromEnum y) == (x `compare` y)
@@ -198,6 +198,8 @@ instance Arbitrary Module where
         f "" = f "X"
         f s = toModule s
 
+{--
 instance Arbitrary Char where
     arbitrary     = Test.QuickCheck.choose ('\32', '\128')
-    coarbitrary c = variant (fromEnum c `rem` 4)
+--    coarbitrary c = variant (fromEnum c `rem` 4)
+--}

@@ -234,6 +234,7 @@ hl-clean:
 clean-local:
 	find . \( \! -path \*/_\* \( -name \*.o-boot -o -name \*.hi -o -name \*.o -o -name \*.hi-boot \) \) -print | xargs rm -f --
 	rm -rf dist drift_processed tmp autom4te.cache
+	$(MAKE) -C selftest clean
 
 MAINTAINERCLEANFILES= $(BUILT_SOURCES) $(DRIFTFILES)
 
@@ -306,7 +307,7 @@ manual.html :
 manual_ja.html :
 	$(MAKE) manual_ja
 
-.PHONY: libs regress
+.PHONY: libs regress selftest
 libs: $(JHC_LIBS) $(JHC_EXT_LIBS)
 
 show_elibs: lib/ext/*.cabal  lib/ext/*.yaml
@@ -324,3 +325,6 @@ JHC_MANUAL_FILES = docs/make.mkd options.mkd docs/dependency_format.mkd docs/pra
 regress: all
 	mkdir -p regress/results
 	./regress/regress.prl
+
+selftest: $(BUILT_SOURCES) src/StringTable/Atom.hs
+	$(MAKE) -C selftest test

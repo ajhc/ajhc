@@ -11,7 +11,7 @@ import E.TypeCheck()
 import GenUtil
 import Name.Id
 import Name.VConsts
-import Random
+import System.Random
 import Support.CanType
 import Support.FreeVars
 import qualified Data.Map as Map

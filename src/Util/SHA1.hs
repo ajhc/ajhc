@@ -23,7 +23,7 @@ Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 -}
 
-{-# OPTIONS -funbox-strict-fields -fglasgow-exts -fno-warn-name-shadowing -O2 #-}
+{-# OPTIONS -funbox-strict-fields -fno-warn-name-shadowing -O2 #-}
 
 module Util.SHA1 (sha1String,sha1file,sha1Bytes,hashToBytes,sha1Handle,ABCDE(..),Hash,emptyHash) where
 
@@ -59,7 +59,7 @@ sha1String ss = sha1Bytes (toUTF ss) where
 
 
 sha1Bytes :: [Word8] -> Hash
-sha1Bytes ss = unsafePerformIO $ do
+sha1Bytes ss = System.IO.Unsafe.unsafePerformIO $ do
     let len = length ss
         plen = sha1_step_1_2_plength len
     allocaBytes plen $ \ptr -> do
@@ -100,7 +100,7 @@ sha1file fp = do
     hClose h
     return hash
 
-big_endian = unsafePerformIO $ do
+big_endian = System.IO.Unsafe.unsafePerformIO $ do
     let x :: Word32
         x = 0x12345678
     s <- with x $ \ptr -> peekCStringLen (castPtr ptr,4)

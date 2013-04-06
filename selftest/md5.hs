@@ -1,6 +1,6 @@
 
 
-import System
+import System.Environment
 
 import Support.MD5
 

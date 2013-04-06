@@ -1,5 +1,5 @@
 
-import System
+import System.Environment
 
 import Util.SHA1
 

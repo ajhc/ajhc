@@ -3,7 +3,7 @@
 import System.IO
 import Support.CFF
 import qualified Data.ByteString as BS
-import System
+import System.Environment
 
 main = do
     xs <- getArgs
