@@ -3,7 +3,7 @@
 A fork of [jhc](http://repetae.net/computer/jhc/).
 And also Haskell compiler. 
 
-This project is founded by [Metasepi Project](http://metasepi.masterq.net/).
+This project is founded by [Metasepi Project](http://metasepi.org/).
 
 ## How to install
 
@@ -77,7 +77,7 @@ http://www.haskell.org/platform/windows.html
 * Try to rewrite a part of NetBSD bootloader.
   http://www.youtube.com/watch?v=JMyxy5Qo2m8
 * Translate Jhc User’s Manual to Japanese.
-  http://metasepi.masterq.net/posts/2013-01-12-jhc_manual_ja.html
+  http://metasepi.org/posts/2013-01-12-jhc_manual_ja.html
 * Fix bug that run stm32f3-discovery demo. It causes Ajhc RTS heep impl.
   https://github.com/ajhc/demo-cortex-m3/tree/master/stm32f3-discovery
 * Support to build on Windows.
@@ -92,7 +92,7 @@ http://www.haskell.org/platform/windows.html
 * Pass all regress test, and enable regress fail setting on travis-ci.
   https://travis-ci.org/ajhc/ajhc
 * Analyze jhc internal (Japanese doc).
-  http://metasepi.masterq.net/posts/2013-01-31-jhc_internal_overview.html
+  http://metasepi.org/posts/2013-01-31-jhc_internal_overview.html
 * Find critical region of Ajhc for reentrant and thread safe.
 * Port Haskell libraries on haskell-platform to Ajhc.
 * Understand jhc's region inference.

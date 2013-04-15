@@ -16,7 +16,7 @@ description:   Ajhc is a fork of jhc.
                system, but rather generates what is needed as part of the compilation
                process. However, back ends do have specific run-time representations of
                data, which can be affected by things like the choice of garbage collector.
-homepage:      http://ajhc.masterq.net/
+homepage:      http://ajhc.metasepi.org/
 
 data-files:    README.md
 
