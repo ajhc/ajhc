@@ -1,7 +1,7 @@
 # [Ajhc](http://ajhc.github.com/) - arafura-jhc [![Build Status](https://travis-ci.org/ajhc/ajhc.png)](https://travis-ci.org/ajhc/ajhc)
 
 A fork of [jhc](http://repetae.net/computer/jhc/).
-And also Haskell compiler. 
+And also a Haskell compiler. 
 
 This project is founded by [Metasepi Project](http://metasepi.org/).
 
@@ -19,7 +19,15 @@ This project is founded by [Metasepi Project](http://metasepi.org/).
     $ git checkout arafura
     $ autoreconf -i
     $ ./configure
+
+For build with Cabal.
+
     $ make cabal-install
+
+For build with GNU make.
+
+    $ make
+    $ sudo make install
 
 ## For developing
 
@@ -39,7 +47,7 @@ You should send patch to jhc, if testing on Ajhc is good.
 The command [darcs send](http://darcs.net/Using/Send) sends email the patch to
 jhc author (= [John Meacham](http://repetae.net/)).
 
-## Needing to install/build on Windows (currently in progress)
+## Needing to install/build on Windows (experimental)
 
 ### Install msys
 
