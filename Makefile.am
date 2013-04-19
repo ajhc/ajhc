@@ -323,7 +323,10 @@ JHC_MANUAL_FILES = docs/make.mkd options.mkd docs/dependency_format.mkd docs/pra
 	drift_processed/E/TypeCheck.hs drift_processed/Options.hs
 
 regress: all
-	mkdir -p regress/results
+	mkdir -p regress/results/dummy
+	ln -sf regress/results/dummy regress/results/current
+	ln -sf regress/results/dummy regress/results/late
+	ln -sf regress/results/dummy regress/results/latest
 	./regress/regress.prl
 
 selftest: $(BUILT_SOURCES) src/StringTable/Atom.hs
