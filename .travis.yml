@@ -9,7 +9,7 @@ before_install:
   - cat /proc/meminfo
   - cat /etc/apt/sources.list
   - sudo apt-get -qq update
-  - sudo apt-get -qq -y install make locales autoconf libreadline-dev libwww-perl libconfig-yaml-perl graphviz haskell-platform drift pandoc po4a libghc-readline-dev libghc-utf8-string-dev libghc-hssyck-dev libgc-dev gcc-multilib
+  - sudo apt-get -qq -y install make locales autoconf libreadline-dev libwww-perl libconfig-yaml-perl graphviz haskell-platform drift pandoc po4a libghc-temporary-dev libghc-haskeline-dev libghc-utf8-string-dev libghc-hssyck-dev libgc-dev gcc-multilib
   - cabal update
   - git --version
   - ghc --version
