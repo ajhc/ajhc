@@ -22,6 +22,7 @@ If not see <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html>.  --}
 module Main where
 import System.Environment (getArgs)
 import System.Directory (getCurrentDirectory)
+import System.FilePath ((</>))
 import Network.URI (parseURI)
 import Distribution.Client.HttpUtils (downloadURI)
 import Distribution.Verbosity (verbose)
@@ -30,7 +31,7 @@ main :: IO ()
 main = getArgs >>= mainWorker
 
 mainWorker :: [String] -> IO ()
-mainWorker ("downloadURI":u:[]) = do curDir <- getCurrentDirectory
-                                     let Just url = parseURI u
-                                     downloadURI verbose url curDir
+mainWorker ("downloadURI":u:f:[]) = do curDir <- getCurrentDirectory
+                                       let Just url = parseURI u
+                                       downloadURI verbose url $ curDir </> f
 mainWorker _ = print "help"

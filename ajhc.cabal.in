@@ -270,3 +270,30 @@ executable @PACKAGE_NAME@
     ghc-options:    -W -fno-warn-unused-matches  -fwarn-type-defaults -i./drift_processed -i./src
     cc-options:     -std=c99
     cpp-options:    -DUSE_HASKELINE -DWITH_CABAL
+
+executable jahm
+    main-is:        Main.hs
+    hs-source-dirs: src_jahm
+
+    build-depends:
+        base >= 4.0 && < 5,
+        HTTP,
+        bytestring,
+        filepath,
+        network,
+        pretty,
+        process,
+        directory
+
+  if !os(windows)
+    build-depends:
+        unix
+
+    other-modules:
+        Distribution.Client.HttpUtils
+        Distribution.Compat.CopyFile
+        Distribution.Compat.Exception
+        Distribution.Compat.TempFile
+        Distribution.Simple.Utils
+        Distribution.Text
+        Distribution.Verbosity
