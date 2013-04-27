@@ -45,13 +45,11 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. -}
 
 module Distribution.Simple.Utils (
-        cabalVersion,
-
         -- * logging and errors
         die,
         dieWithLocation,
         topHandler,
-        warn, notice, setupMessage, info, debug,
+        warn, notice, info, debug,
         debugNoWrap, chattyTry,
 
         -- * running programs
@@ -64,10 +62,8 @@ module Distribution.Simple.Utils (
         maybeExit,
         xargs,
         findProgramLocation,
-        findProgramVersion,
 
         -- * copying files
-        smartCopySources,
         createDirectoryIfMissingVerbose,
         copyFileVerbose,
         copyDirectoryRecursiveVerbose,
@@ -91,9 +87,6 @@ module Distribution.Simple.Utils (
         findFirstFile,
         findFileWithExtension,
         findFileWithExtension',
-        findModuleFile,
-        findModuleFiles,
-        getDirectoryContentsRecursive,
 
         -- * environment variables
         isInSearchPath,
@@ -179,13 +172,7 @@ import System.IO.Unsafe
 import qualified Control.Exception as Exception
 
 import Distribution.Text
-    ( display, simpleParse )
-import Distribution.Package
-    ( PackageIdentifier )
-import Distribution.ModuleName (ModuleName)
-import qualified Distribution.ModuleName as ModuleName
-import Distribution.Version
-    (Version(..))
+    ( display )
 
 import Control.Exception (evaluate)
 import System.Process (runProcess)
@@ -204,20 +191,6 @@ import Distribution.Compat.TempFile
 import Distribution.Compat.Exception
          ( IOException, throwIOIO, tryIO, catchIO, catchExit )
 import Distribution.Verbosity
-
-#ifdef VERSION_base
-import qualified Paths_Cabal (version)
-#endif
-
--- We only get our own version number when we're building with ourselves
-cabalVersion :: Version
-#if defined(VERSION_base)
-cabalVersion = Paths_Cabal.version
-#elif defined(CABAL_VERSION)
-cabalVersion = Version [CABAL_VERSION] []
-#else
-cabalVersion = Version [1,9999] []  --used when bootstrapping
-#endif
 
 -- ----------------------------------------------------------------------------
 -- Exception and logging utils
@@ -273,10 +246,6 @@ notice :: Verbosity -> String -> IO ()
 notice verbosity msg =
   when (verbosity >= normal) $
     putStr (wrapText msg)
-
-setupMessage :: Verbosity -> String -> PackageIdentifier -> IO ()
-setupMessage verbosity msg pkgid =
-    notice verbosity (msg ++ ' ': display pkgid ++ "...")
 
 -- | More detail on the operation of some action.
 --
@@ -509,29 +478,6 @@ findProgramLocation verbosity prog = do
   return res
 
 
--- | Look for a program and try to find it's version number. It can accept
--- either an absolute path or the name of a program binary, in which case we
--- will look for the program on the path.
---
-findProgramVersion :: String             -- ^ version args
-                   -> (String -> String) -- ^ function to select version
-                                         --   number from program output
-                   -> Verbosity
-                   -> FilePath           -- ^ location
-                   -> IO (Maybe Version)
-findProgramVersion versionArg selectVersion verbosity path = do
-  str <- rawSystemStdout verbosity path [versionArg]
-         `catchIO`   (\_ -> return "")
-         `catchExit` (\_ -> return "")
-  let version :: Maybe Version
-      version = simpleParse (selectVersion str)
-  case version of
-      Nothing -> warn verbosity $ "cannot determine version of " ++ path
-                               ++ " :\n" ++ show str
-      Just v  -> debug verbosity $ path ++ " is version " ++ display v
-  return version
-
-
 -- | Like the unix xargs program. Useful for when we've got very long command
 -- lines that might overflow an OS limit on command line length and so you
 -- need to invoke a command multiple times to get all the args in.
@@ -610,34 +556,6 @@ findFirstFile file = findFirst
                                 then return (Just x)
                                 else findFirst xs
 
--- | Finds the files corresponding to a list of Haskell module names.
---
--- As 'findModuleFile' but for a list of module names.
---
-findModuleFiles :: [FilePath]   -- ^ build prefix (location of objects)
-                -> [String]     -- ^ search suffixes
-                -> [ModuleName] -- ^ modules
-                -> IO [(FilePath, FilePath)]
-findModuleFiles searchPath extensions moduleNames =
-  mapM (findModuleFile searchPath extensions) moduleNames
-
--- | Find the file corresponding to a Haskell module name.
---
--- This is similar to 'findFileWithExtension'' but specialised to a module
--- name. The function fails if the file corresponding to the module is missing.
---
-findModuleFile :: [FilePath]  -- ^ build prefix (location of objects)
-               -> [String]    -- ^ search suffixes
-               -> ModuleName  -- ^ module
-               -> IO (FilePath, FilePath)
-findModuleFile searchPath extensions moduleName =
-      maybe notFound return
-  =<< findFileWithExtension' extensions searchPath
-                             (ModuleName.toFilePath moduleName)
-  where
-    notFound = die $ "Error: Could not find module: " ++ display moduleName
-                  ++ " with any suffix: " ++ show extensions
-                  ++ " in the search path: " ++ show searchPath
 
 -- | List all the files in a directory and all subdirectories.
 --
@@ -857,14 +775,6 @@ installDirectoryContents verbosity srcDir destDir = do
 
 ---------------------------------
 -- Deprecated file copy functions
-
-{-# DEPRECATED smartCopySources
-      "Use findModuleFiles and copyFiles or installOrdinaryFiles" #-}
-smartCopySources :: Verbosity -> [FilePath] -> FilePath
-                 -> [ModuleName] -> [String] -> IO ()
-smartCopySources verbosity searchPath targetDir moduleNames extensions =
-      findModuleFiles searchPath extensions moduleNames
-  >>= copyFiles verbosity targetDir
 
 {-# DEPRECATED copyDirectoryRecursiveVerbose
       "You probably want installDirectoryContents instead" #-}

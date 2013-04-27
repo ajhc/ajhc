@@ -25,7 +25,6 @@ import Control.Monad
 import qualified Data.ByteString.Lazy.Char8 as ByteString
 import Data.ByteString.Lazy (ByteString)
 
-import qualified Paths_cabal_install (version)
 import Distribution.Verbosity (Verbosity)
 import Distribution.Simple.Utils
          ( die, info, warn, debug
@@ -33,7 +32,7 @@ import Distribution.Simple.Utils
 import Distribution.Text
          ( display )
 import Data.Char ( isSpace )
-import qualified System.FilePath.Posix as FilePath.Posix
+import qualified System.FilePath as FilePath.Posix
          ( splitDirectories )
 
 -- Trime
@@ -58,7 +57,7 @@ mkRequest uri = Request{ rqURI     = uri
                        , rqMethod  = GET
                        , rqHeaders = [Header HdrUserAgent userAgent]
                        , rqBody    = ByteString.empty }
-  where userAgent = "cabal-install/" ++ display Paths_cabal_install.version
+  where userAgent = "cabal-install/0.1(jahm)"
 
 -- |Carry out a GET request, using the local proxy settings
 getHTTP :: Verbosity -> URI -> IO (Result (Response ByteString))

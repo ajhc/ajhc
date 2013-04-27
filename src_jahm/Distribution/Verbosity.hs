@@ -48,12 +48,11 @@ module Distribution.Verbosity (
   Verbosity,
   silent, normal, verbose, deafening,
   moreVerbose, lessVerbose,
-  intToVerbosity, flagToVerbosity,
+  intToVerbosity,
   showForCabal, showForGHC
  ) where
 
 import Data.List (elemIndex)
-import Distribution.ReadE
 
 data Verbosity = Silent | Normal | Verbose | Deafening
     deriving (Show, Read, Eq, Ord, Enum, Bounded)
@@ -93,16 +92,6 @@ intToVerbosity 1 = Just Normal
 intToVerbosity 2 = Just Verbose
 intToVerbosity 3 = Just Deafening
 intToVerbosity _ = Nothing
-
-flagToVerbosity :: ReadE Verbosity
-flagToVerbosity = ReadE $ \s ->
-   case reads s of
-       [(i, "")] ->
-           case intToVerbosity i of
-               Just v -> Right v
-               Nothing -> Left ("Bad verbosity: " ++ show i ++
-                                     ". Valid values are 0..3")
-       _ -> Left ("Can't parse verbosity " ++ s)
 
 showForCabal, showForGHC :: Verbosity -> String
 
