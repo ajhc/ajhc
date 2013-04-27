@@ -1,4 +1,4 @@
-BUILD_EXTLIBS = perl utils/build_extlibs.prl -c $(JHCPROG)
+BUILD_EXTLIBS = perl utils/build_extlibs.prl -c $(JHCPROG) -j $(JAHMPROG)
 
 jhc-prim-1.0.hl: lib/jhc-prim/jhc-prim.yaml lib/jhc-prim/Jhc/Prim/IO.hs lib/jhc-prim/Jhc/Prim/Prim.hs lib/jhc-prim/Jhc/Prim/Array.hs lib/jhc-prim/Jhc/Prim/Wrapper.hs \
     lib/jhc-prim/Jhc/Prim/Rts.hs lib/jhc-prim/Jhc/Prim/Bits.hs

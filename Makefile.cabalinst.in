@@ -3,6 +3,8 @@ INSTALL_DATA=$(INSTALL) -m 644
 LIB_OPTIONS=$(RTSOPTS) $(JHC_TEST)  -L- -L.
 include library_deps.make
 
+build: $(JHC_LIBS) $(JHC_EXT_LIBS)
+
 ## Note: Should write like below style for Windows + msys env.
 ##      install FILES "DESTDIR"
 install: $(JHC_LIBS) $(JHC_EXT_LIBS)

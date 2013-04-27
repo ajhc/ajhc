@@ -18,12 +18,6 @@ script:
   - autoreconf -i
   - ./configure
   - make cabal-install
-  - make distclean
-  - autoreconf -i
-  - ./configure
-  - make
-  - make manual_ja.html
-  - sudo make install
   - make regress
 after_script:
   - date

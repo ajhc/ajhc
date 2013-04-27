@@ -10,9 +10,10 @@ use LWP::Simple qw(!head);
 use Cwd;
 use Getopt::Std;
 
-our ($opt_l,$opt_d,$opt_c);
-getopts('ldc:') or die "unknown opt";
+our ($opt_l,$opt_d,$opt_c,$opt_j);
+getopts('ldc:j:') or die "unknown opt";
 $opt_c = "./ajhc" unless $opt_c;
+$opt_j = "./jahm" unless $opt_j;
 
 # clean out environment
 delete $ENV{AJHC_PATH};
@@ -54,8 +55,7 @@ foreach my $fn (@ARGV) {
     my $url = "http://hackage.haskell.org/packages/archive/$name/$version/$name-$version.tar.gz";
     print "Fetching $url\n";
     unless(-e "$tmpdir/$name-$version.tar.gz") {
-        my $rc = getstore($url, "$tmpdir/$name-$version.tar.gz");
-        if (is_error $rc) { die "$url: $rc" } ;
+        mysystem "$opt_j downloadURI $url $tmpdir/$name-$version.tar.gz";
     }
     mysystem "tar -zxv --directory $tmpdir -f $tmpdir/$name-$version.tar.gz" and die "$!: tar";
     my $src = -d "$tmpdir/$name-$version/src" ? "/src" : "";

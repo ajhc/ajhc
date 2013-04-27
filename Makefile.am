@@ -197,7 +197,11 @@ bin-dist: $(bin_PROGRAMS)$(EXEEXT)
 cabal-dist: src/Main.hs  $(HSFILES) $(BUILT_SOURCES) src/StringTable/Atom.hs $(CFILES)
 	runhaskell Setup.hs sdist
 
-cabal-install: src/Main.hs  $(HSFILES) $(BUILT_SOURCES) src/StringTable/Atom.hs $(CFILES)
+cabal-build: src/Main.hs  $(HSFILES) $(BUILT_SOURCES) src/StringTable/Atom.hs $(CFILES)
+	cabal configure
+	cabal build
+
+cabal-install: cabal-build
 	cabal install
 
 .INTERMEDIATE: deps.txt ajhc_man.mkd options.mkd
@@ -235,6 +239,7 @@ clean-local:
 	find . \( \! -path \*/_\* \( -name \*.o-boot -o -name \*.hi -o -name \*.o -o -name \*.hi-boot \) \) -print | xargs rm -f --
 	rm -rf dist drift_processed tmp autom4te.cache
 	$(MAKE) -C selftest clean
+	cabal clean
 
 MAINTAINERCLEANFILES= $(BUILT_SOURCES) $(DRIFTFILES)
 
@@ -322,7 +327,7 @@ JHC_MANUAL_FILES = docs/make.mkd options.mkd docs/dependency_format.mkd docs/pra
 	docs/unboxed.mkd rts/rts/jhc_rts.c src/FlagOpts.mkd src/FlagDump.mkd src/E/PrimOpt.hs \
 	drift_processed/E/TypeCheck.hs drift_processed/Options.hs
 
-regress: all
+regress: cabal-build
 	mkdir -p regress/results/dummy
 	ln -sf regress/results/dummy regress/results/current
 	ln -sf regress/results/dummy regress/results/late
