@@ -102,8 +102,8 @@ clean-local:
 
 CLEANFILES= $(JHC_LIBS) $(JHC_EXT_LIBS) HelloWorld Primes src/StringTable/Atom.hs src/RawFiles.hs
 CLEANFILES+= ajhc.spec manual.html manual.mkd manual_ja.html manual_ja.mkd docs/building.mkd src/FlagDump.mkd src/FlagOpts.mkd
-CLEANFILES+= ac-macros/install-sh ac-macros/missing src/data/shortchange.txt
 CLEANFILES+= src/FlagDump.hs src/FlagOpts.hs src/FrontEnd/HsParser.hs src/Info/Properties.hs src/Name/Prim.hs
+CLEANFILES+= src/data/shortchange.txt ChangeLog ajhc.1 *.hl
 
 # docs
 %.pdf: %.ps
