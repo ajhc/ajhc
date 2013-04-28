@@ -19,13 +19,6 @@ This project is founded by [Metasepi Project](http://metasepi.org/).
     $ git checkout arafura
     $ autoreconf -i
     $ ./configure
-
-For build with Cabal.
-
-    $ make cabal-install
-
-For build with GNU make.
-
     $ make
     $ sudo make install
 
