@@ -20,7 +20,7 @@ This project is founded by [Metasepi Project](http://metasepi.org/).
     $ autoreconf -i
     $ ./configure
     $ make
-    $ sudo make install
+    $ make install
 
 ## For developing
 
