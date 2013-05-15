@@ -95,7 +95,9 @@ testName = do
         prop_acc t a b = nn a && nn b ==> let
             n = toName t (a::String,b::String)
             un = toUnqualified n
-            in  nameType n == t && getModule n == Just (toModule a) && getModule un == Nothing && show un == b && show n == (a ++ "." ++ b)
+            in  nameType n == t && getModule n == Just (toModule a) && getModule un == Nothing && show n == (a ++ "." ++ b) && case t of
+              QuotedName -> show un == '`':b
+              _          -> show un == b
     qc "name.tofrom" $ \t a b -> nn a && nn b ==> fromName (toName t (a::String,b::String)) == (t,(a,b))
     qc "name.nameparts" $ \t a b -> nn b ==> nameParts (toName t (a,b)) == (t,a,b)
     qc "name.nameparts2" $ \t a b ->  nn b ==> nameParts (toName t (a,b)) == (t,Just a,b)
