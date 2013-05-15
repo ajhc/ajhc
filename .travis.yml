@@ -18,6 +18,7 @@ script:
   - ./configure
   - make
   - make regress
+  - make selftest
   - make install
 after_script:
   - date
