@@ -99,6 +99,7 @@ clean-local:
 	find . \( \! -path \*/_\* \( -name \*.o-boot -o -name \*.hi -o -name \*.o -o -name \*.hi-boot \) \) -print | xargs rm -f --
 	rm -rf dist drift_processed tmp autom4te.cache
 	$(MAKE) -C selftest clean
+	$(MAKE) -C rts/test clean
 
 CLEANFILES= $(JHC_LIBS) $(JHC_EXT_LIBS) HelloWorld Primes src/StringTable/Atom.hs src/RawFiles.hs
 CLEANFILES+= ajhc.spec manual.html manual.mkd manual_ja.html manual_ja.mkd docs/building.mkd src/FlagDump.mkd src/FlagOpts.mkd
@@ -173,4 +174,7 @@ regress: cabal-build
 selftest: $(BUILT_SOURCES) src/StringTable/Atom.hs
 	$(MAKE) -C selftest test
 
-.PHONY: regress selftest ho-clean hl-clean updatepo cabal-dist cabal-build cabal-install
+rtstest:
+	$(MAKE) -C rts/test test
+
+.PHONY: regress selftest rtstest ho-clean hl-clean updatepo cabal-dist cabal-build cabal-install

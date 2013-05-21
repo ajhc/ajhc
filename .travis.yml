@@ -19,6 +19,7 @@ script:
   - make
   - make regress
   - make selftest
+  - make rtstest
   - make install
 after_script:
   - date
