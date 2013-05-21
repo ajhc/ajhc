@@ -68,7 +68,8 @@ int main(int argc, char *argv[])
         test_fixture_start();
         run_test(basic_test);
         run_test(foreignptr_test);
-        test_fixture_end();
+        int err = test_fixture_end();
+        if (err != 0) {return err;}
         hs_exit();
-        return 0;
+        /* NOTREACHED */
 }

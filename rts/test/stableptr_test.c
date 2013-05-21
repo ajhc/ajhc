@@ -36,6 +36,5 @@ int main(int argc, const char *argv[])
 {
         test_fixture_start();
         run_test(stableptr_test);
-        test_fixture_end();
-        return 0;
+        return test_fixture_end();
 }

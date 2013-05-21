@@ -191,12 +191,13 @@ void seatest_test_fixture_start(char* filepath)
 	seatest_fixture_setup = 0;
 }
 
-void seatest_test_fixture_end()
+int seatest_test_fixture_end()
 {
 	char s[SEATEST_PRINT_BUFFER_SIZE];
 	sprintf(s, "%d run  %d failed", sea_tests_run-seatest_fixture_tests_run, sea_tests_failed-seatest_fixture_tests_failed);
 	seatest_header_printer(s, 50, ' ');
 	printf("\r\n");
+	return sea_tests_failed-seatest_fixture_tests_failed;
 }
 
 static char* seatest_fixture_filter = 0;
