@@ -127,7 +127,7 @@ sub maybe_read {
     return @lines;
 }
 
-my $error;
+my $error = 0;
 my @res;
 
 sub rlog {
@@ -335,6 +335,8 @@ sub done {
         $name =~ /^([^.]*)\.(.*)$/;
         rlog sprintf $fmt, $1, $2, statf($r->{compile_status}),statf($r->{run_status}),statf($r->{stdout_diff}), timef($r->{compile_time}), timef($r->{run_time}) ;
     }
+    rlog "-------------------------------------------------------------------------";
+    rlog sprintf "Failed: %d\n", $error;
     close RLOG;
     unlink "$results_dir/last";
     system "mv -f $results_dir/latest $results_dir/last";
@@ -344,7 +346,7 @@ sub done {
         unlink "$results_dir/latest_success";
         system "ln -sf $time $results_dir/latest_success";
     }
-    exit 0;
+    exit $error;
 }
 
 __END__
