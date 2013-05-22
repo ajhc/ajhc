@@ -1,0 +1,3 @@
+tests:
+   NoMonomorphism:
+     skip: known_bug

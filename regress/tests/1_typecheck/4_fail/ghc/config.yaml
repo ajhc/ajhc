@@ -7,3 +7,59 @@ tests:
      skip: not test
    T5084:
      skip: not error in jhc
+   tcfail012:
+     skip:  known_bug
+   tcfail027:
+     skip:  known_bug
+   tcfail032:
+     skip:  known_bug
+   tcfail038:
+     skip:  known_bug
+   tcfail044:
+     skip:  known_bug
+   tcfail071:
+     skip:  known_bug
+   tcfail085:
+     skip:  known_bug
+   tcfail099:
+     skip:  known_bug
+   tcfail107:
+     skip:  known_bug
+   tcfail116:
+     skip:  known_bug
+   tcfail117:
+     skip:  known_bug
+   tcfail120:
+     skip:  known_bug
+   tcfail129:
+     skip:  known_bug
+   tcfail131:
+     skip:  known_bug
+   tcfail139:
+     skip:  known_bug
+   tcfail144:
+     skip:  known_bug
+   tcfail149:
+     skip:  known_bug
+   tcfail150:
+     skip:  known_bug
+   tcfail152:
+     skip:  known_bug
+   tcfail156:
+     skip:  known_bug
+   tcfail159:
+     skip:  known_bug
+   tcfail166:
+     skip:  known_bug
+   tcfail181:
+     skip:  known_bug
+   tcfail183:
+     skip:  known_bug
+   tcfail184:
+     skip:  known_bug
+   tcfail197:
+     skip:  known_bug
+   tcfail198:
+     skip:  known_bug
+   tcfail204:
+     skip:  known_bug

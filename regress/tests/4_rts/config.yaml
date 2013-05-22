@@ -21,6 +21,7 @@ tests:
   HelloWorld_nofullint:
     jhc_flags: -m32 -fno-full-int
   HelloWorld_win:
+    skip: i386-mingw32-gcc_package_not_portable
     jhc_flags: -mwin32
     opt_win: 1
 
