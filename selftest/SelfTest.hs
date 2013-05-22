@@ -32,7 +32,6 @@ import qualified Info.Info as Info
 {-# NOINLINE main #-}
 main :: IO ()
 main = $(defaultMainGenerator)
--- XXXXXXXXXXXXX Should run testInfo and testBinary!!!
 
 prop_atom_id xs = fromAtom (toAtom xs) == (xs::String)
 prop_atom_eq xs = (toAtom xs) == toAtom (xs::String)
@@ -106,13 +105,12 @@ prop_hasSize_gt (xs,n) = sizeGT n (xs::[Int]) == (length xs > n)
 prop_hasSize_gte (xs,n) = sizeGTE n (xs::[Int]) == (length xs >= n)
 prop_hasSize_lte (xs,n) = sizeLTE n (xs::[Int]) == (length xs <= n)
 
-testInfo = do
-    putStrLn "Testing Info"
+case_testInfo = do
     i <- return mempty
-    unless (Info.lookup i == (Nothing :: Maybe Int)) $ fail "test failed..."
+    Info.lookup i @=? (Nothing :: Maybe Int)
     i <- return $ Info.insert (3 :: Int) i
-    unless (Info.lookup i == (Just 3 :: Maybe Int)) $ fail "test failed..."
-    unless (Info.fetch (Info.insert (5 :: Int) i) == ([] :: [Int])) $ fail "test failed..."
+    Info.lookup i @=? (Just 3 :: Maybe Int)
+    Info.fetch (Info.insert (5 :: Int) i) @=? ([] :: [Int])
 
     let x = Properties mempty
         x' = setProperty prop_METHOD $ setProperty prop_INLINE x
@@ -127,14 +125,12 @@ testInfo = do
     print (x'',getProperty prop_METHOD x'', getProperty prop_INSTANCE x'')
     print (getProperties x')
 
-
-testBinary = do
+case_testBinary = do
     let test = ("hello",3::Int,toAtom "Up and Atom!")
         fn = "/tmp/jhc.test.bin"
-    putStrLn "Testing Binary"
     encodeFile fn test
     x <- decodeFile fn
-    if (x /= test) then fail "Test Failed" else return ()
+    x @=? test
     print x
     let fn = "/tmp/jhc.info.bin"
         t = (singleton prop_INLINE) `mappend` fromList [prop_WORKER,prop_SPECIALIZATION]
@@ -146,7 +142,7 @@ testBinary = do
     x@(nfo,_,_) <- decodeFile fn
     print $ x `asTypeOf` nf
     z <- Info.lookup nfo
-    if (z /= t) then fail "Info Test Failed" else return ()
+    z @=? t
 
 
 deriving instance Bounded NameType
