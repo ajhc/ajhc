@@ -30,7 +30,7 @@ TempDir: TempDir.hs ../src/Support/TempDir.hs
 	$(HC) $(GHCOPTS) --make $< -o $@  -I../src/cbits ../src/cbits/md5sum.c ../src/StringTable/StringTable_cbits.c ../src/cbits/lookup3.c
 
 test: all
-	./SelfTest
+	./SelfTest --plain -j 1
 
 clean:
 	rm -f -- md5 sha1 TestParse cff SelfTest TempDir UnionSolve
