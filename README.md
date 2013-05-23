@@ -83,15 +83,15 @@ http://www.haskell.org/platform/windows.html
   https://github.com/ajhc/demo-cortex-m3/tree/master/stm32f3-discovery
 * Support to build on Windows.
 * Cabalize Ajhc. Ajhc's hl files will be not controled with cabal.
+* Support LPCXpresso NXP LPX1769 with demo.
+* Pass all regress test, and enable regress fail setting on travis-ci.
+  https://travis-ci.org/ajhc/ajhc
 
 ### Yet
 
 * No more depend on DrIFT. Use http://hackage.haskell.org/package/derive.
 * No more depend on Perl (LWP and YAML).
-* Support LPCXpresso NXP LPX1769 with demo.
 * Rewrite Cortex-M3 base library with Ajhc.
-* Pass all regress test, and enable regress fail setting on travis-ci.
-  https://travis-ci.org/ajhc/ajhc
 * Analyze jhc internal (Japanese doc).
   http://metasepi.org/posts/2013-01-31-jhc_internal_overview.html
 * Find critical region of Ajhc for reentrant and thread safe.
