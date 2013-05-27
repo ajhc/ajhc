@@ -21,7 +21,7 @@ void gc_perform_gc(gc_t gc) A_STD;
 static bool s_set_used_bit(void *val) A_UNUSED;
 static void clear_used_bits(struct s_arena *arena) A_UNUSED;
 static void s_cleanup_blocks(struct s_arena *arena);
-static struct s_block *get_free_block(gc_t gc, struct s_arena *arena);
+static struct s_block *get_free_block(gc_t gc, struct s_arena *arena, bool retry);
 static void *jhc_aligned_alloc(unsigned size);
 
 typedef struct {
@@ -347,14 +347,19 @@ s_new_megablock(struct s_arena *arena)
 /* block allocator */
 
 static struct s_block *
-get_free_block(gc_t gc, struct s_arena *arena) {
+get_free_block(gc_t gc, struct s_arena *arena, bool retry) {
         arena->block_used++;
         if(__predict_true(SLIST_FIRST(&arena->free_blocks))) {
                 struct s_block *pg = SLIST_FIRST(&arena->free_blocks);
                 SLIST_REMOVE_HEAD(&arena->free_blocks,link);
                 return pg;
         } else {
-#ifndef _JHC_JGC_NAIVEGC
+#ifdef _JHC_JGC_NAIVEGC
+                if(retry == false) {
+                        gc_perform_gc(gc);
+                        return NULL;
+                }
+#else
                 if((arena->block_used >= arena->block_threshold)) {
                         gc_perform_gc(gc);
                         // if we are still using 80% of the heap after a gc, raise the threshold.
@@ -487,15 +492,16 @@ s_alloc(gc_t gc, struct s_cache *sc)
        sc->allocations++;
        sc->arena->number_allocs++;
 #endif
-        struct s_block *pg = SLIST_FIRST(&sc->blocks);
-#ifdef _JHC_JGC_NAIVEGC
+        bool retry = false;
+        struct s_block *pg;
+retry_s_alloc:
+        pg = SLIST_FIRST(&sc->blocks);
         if(__predict_false(!pg)) {
-                gc_perform_gc(gc);
-                pg = SLIST_FIRST(&sc->blocks);
-        }
-#endif
-        if(__predict_false(!pg)) {
-                pg = get_free_block(gc, sc->arena);
+                pg = get_free_block(gc, sc->arena, retry);
+                if(__predict_false(!pg)) {
+                        retry = true;
+                        goto retry_s_alloc;
+                }
                 VALGRIND_MAKE_MEM_NOACCESS(pg, BLOCK_SIZE);
                 VALGRIND_MAKE_MEM_DEFINED(pg, sizeof(struct s_block));
                 if(sc->num_entries != pg->u.pi.num_free)
