@@ -155,7 +155,7 @@ compileGrin grin = (LBS.fromChunks code, req)  where
     include fn = text "#include <" <> text fn <> text ">"
     (header,body) = generateC (function (name "jhc_hs_init") voidType [] [Public] icaches:Map.elems fm) (Map.elems sm)
     icaches :: Statement
-    icaches | fopts FO.Jgc = mconcat [  toStatement $ functionCall (name "find_cache") [reference (toExpression $ nodeCacheName t),toExpression $ name "arena", tbsize (sizeof (structType $ nodeStructName t)), toExpression nptrs] | (t,nptrs) <- Set.toList wAllocs ]
+    icaches | fopts FO.Jgc = mconcat [  toStatement $ functionCall (name "find_cache") [reference (toExpression $ nodeCacheName t),toExpression $ name "saved_arena", tbsize (sizeof (structType $ nodeStructName t)), toExpression nptrs] | (t,nptrs) <- Set.toList wAllocs ]
             | otherwise = mempty
     cafnames = [ text "&_" <> tshow (varName v) | (v,_) <- grinCafs grin ]
     constnames =  map (\n -> text "&_c" <> tshow n) [ 1 .. length $ Grin.HashConst.toList finalHcHash]
@@ -211,7 +211,7 @@ convertFunc ffie (n,as :-> body) = do
                         fr2 = basicType' retTy
 
                     return [function fnname2 fr2 as2 [Public]
-                                     (creturn $ cast fr2 $ functionCall fnname $ (if fopts FO.Jgc then (variable (name "saved_gc"):) else id) $
+                                     (creturn $ cast fr2 $ functionCall fnname $ (if fopts FO.Jgc then ([variable (name "saved_gc"), variable (name "saved_arena")] ++) else id) $
                                       zipWith cast (map snd as')
                                                    (map variable newVars))]
 
@@ -560,8 +560,8 @@ isCompound Return {} = False
 isCompound Prim {} = False
 isCompound _ = True
 
-mgc = if fopts FO.Jgc then (v_gc:) else id
-mgct = if fopts FO.Jgc then ((name "gc",gc_t):) else id
+mgc = if fopts FO.Jgc then ([v_gc, v_arena] ++) else id
+mgct = if fopts FO.Jgc then ([(name "gc",gc_t), (name "arena",arena_t)] ++) else id
 
 convertExp :: Exp -> C (Statement,Expression)
 convertExp (Prim Func { primArgTypes = as, primRetType = r, primRetArgs = rs@(_:_), ..} vs ty) = do
@@ -812,7 +812,7 @@ newNode region ty ~(NodeC t as) = do
       Nothing -> do
         st <- nodeType t
         as' <- mapM convertVal as
-        let wmalloc | fopts FO.Jgc = \_ -> functionCall (name "s_alloc") [toExpression $ name "gc", (toExpression $ nodeCacheName t)]
+        let wmalloc | fopts FO.Jgc = \_ -> functionCall (name "s_alloc") [toExpression $ name "gc", toExpression $ name "arena", (toExpression $ nodeCacheName t)]
                     | otherwise = jhc_malloc (reference (toExpression $ nodeCacheName t)) nptrs'
             nptrs = length (filter (not . nonPtr . getType) as) + if sf then 1 else 0
             nptrs' = if nptrs > 0 && not sf && t `Map.notMember` cpr then nptrs + 1 else nptrs
@@ -929,15 +929,15 @@ gc_roots vs   = case length vs of
 --gc_end        = functionCall (name "gc_end") []
 tbsize sz = functionCall (name "TO_BLOCKS") [sz]
 
-jhc_malloc_atomic sz | fopts FO.Jgc = functionCall (name "gc_array_alloc_atomic") [v_gc,nullPtr, sz, toExpression (0::Int)]
+jhc_malloc_atomic sz | fopts FO.Jgc = functionCall (name "gc_array_alloc_atomic") [v_gc, v_arena, nullPtr, sz, toExpression (0::Int)]
                      | otherwise = jhc_malloc nullPtr (0::Int) (sizeof sptr_t *# sz)
 
-jhc_malloc ntn nptrs sz | fopts FO.Jgc = functionCall (name "gc_alloc") [v_gc,ntn, tbsize sz, toExpression nptrs]
---    | fopts FO.Jgc =  functionCall (name "gc_alloc") [v_gc,tbsize sz, toExpression nptrs]
+jhc_malloc ntn nptrs sz | fopts FO.Jgc = functionCall (name "gc_alloc") [v_gc, v_arena, ntn, tbsize sz, toExpression nptrs]
+--    | fopts FO.Jgc =  functionCall (name "gc_alloc") [v_gc, v_arena, tbsize sz, toExpression nptrs]
 jhc_malloc _ 0 sz = functionCall (name "jhc_malloc_atomic") [sz]
 jhc_malloc _ _ sz = functionCall (name "jhc_malloc") [sz]
 
-jhc_malloc_ptrs sz | fopts FO.Jgc =  functionCall (name "gc_array_alloc") [v_gc, sz]
+jhc_malloc_ptrs sz | fopts FO.Jgc =  functionCall (name "gc_array_alloc") [v_gc, v_arena, sz]
 jhc_malloc_ptrs sz = functionCall (name "jhc_malloc") [sizeof sptr_t *# sz]
 
 f_assert e    = functionCall (name "assert") [e]
@@ -977,8 +977,10 @@ uintptr_t = basicGCType "uintptr_t"
 fptr_t  = basicGCType "fptr_t"
 wptr_t  = basicGCType "wptr_t"
 gc_t    = basicGCType "gc_t"
+arena_t = basicGCType "arena_t"
 v_gc = variable (name "gc")
 v_saved_gc = variable (name "saved_gc")
+v_arena = variable (name "arena")
 
 a_STD = Attribute "A_STD"
 a_FALIGNED = Attribute "A_FALIGNED"

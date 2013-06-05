@@ -11,17 +11,16 @@
 static char aligned_megablock_1[MEGABLOCK_SIZE] __attribute__ ((aligned(BLOCK_SIZE)));
 static char gc_stack_base_area[(1UL << 8)*sizeof(gc_t)];
 #endif
-gc_t saved_gc;
-struct s_arena *arena;
-static gc_t gc_stack_base;
+gc_t saved_gc; /* xxx Remove me. */
+arena_t saved_arena; /* xxx Remove me. */
 
 #define TO_GCPTR(x) (entry_t *)(FROM_SPTR(x))
 
-void gc_perform_gc(gc_t gc) A_STD;
+void gc_perform_gc(gc_t gc, arena_t arena) A_STD;
 static bool s_set_used_bit(void *val) A_UNUSED;
-static void clear_used_bits(struct s_arena *arena) A_UNUSED;
-static void s_cleanup_blocks(struct s_arena *arena);
-static struct s_block *get_free_block(gc_t gc, struct s_arena *arena, bool retry);
+static void clear_used_bits(arena_t arena) A_UNUSED;
+static void s_cleanup_blocks(arena_t arena);
+static struct s_block *get_free_block(gc_t gc, arena_t arena, bool retry);
 static void *jhc_aligned_alloc(unsigned size);
 
 typedef struct {
@@ -69,7 +68,7 @@ stack_check(struct stack *s, unsigned n) {
 
 static struct stack root_stack = EMPTY_STACK;
 
-void gc_add_root(gc_t gc, void *root)
+void gc_add_root(gc_t gc, arena_t arena, void *root)
 {
         if(IS_PTR(root)) {
                 entry_t *nroot = TO_GCPTR(root);
@@ -89,17 +88,17 @@ gc_add_grey(struct stack *stack, entry_t *s)
 }
 
 void A_STD
-gc_perform_gc(gc_t gc)
+gc_perform_gc(gc_t gc, arena_t arena)
 {
         profile_push(&gc_gc_time);
-        arena->number_gcs++;
+        saved_arena->number_gcs++;
 
         unsigned number_redirects = 0;
         unsigned number_stack = 0;
         unsigned number_ptr = 0;
         struct stack stack = EMPTY_STACK;
 
-        clear_used_bits(arena);
+        clear_used_bits(saved_arena);
 
         debugf("Setting Roots:");
         stack_check(&stack, root_stack.ptr);
@@ -116,12 +115,12 @@ gc_perform_gc(gc_t gc)
 
         debugf("\n");
         debugf("Trace:");
-        stack_check(&stack, gc - gc_stack_base);
-        number_stack = gc - gc_stack_base;
+        stack_check(&stack, gc - saved_arena->gc_stack_base);
+        number_stack = gc - saved_arena->gc_stack_base;
         for(unsigned i = 0; i < number_stack; i++) {
                 debugf(" |");
                 // TODO - short circuit redirects on stack
-                sptr_t ptr = gc_stack_base[i];
+                sptr_t ptr = saved_arena->gc_stack_base[i];
                 if(1 && (IS_LAZY(ptr))) {
                         assert(GET_PTYPE(ptr) == P_LAZY);
                         VALGRIND_MAKE_MEM_DEFINED(FROM_SPTR(ptr), sizeof(uintptr_t));
@@ -170,19 +169,19 @@ gc_perform_gc(gc_t gc)
                 }
         }
         free(stack.stack);
-        s_cleanup_blocks(arena);
+        s_cleanup_blocks(saved_arena);
         if (JHC_STATUS) {
                 fprintf(stderr, "%3u - %6u Used: %4u Thresh: %4u Ss: %5u Ps: %5u Rs: %5u Root: %3u\n",
-                        arena->number_gcs,
-                        arena->number_allocs,
-                        (unsigned)arena->block_used,
-                        (unsigned)arena->block_threshold,
+                        saved_arena->number_gcs,
+                        saved_arena->number_allocs,
+                        (unsigned)saved_arena->block_used,
+                        (unsigned)saved_arena->block_threshold,
                         number_stack,
                         number_ptr,
                         number_redirects,
                         (unsigned)root_stack.ptr
                        );
-                arena->number_allocs = 0;
+                saved_arena->number_allocs = 0;
         }
         profile_pop(&gc_gc_time);
 }
@@ -197,12 +196,12 @@ static struct s_cache *array_caches_atomic[GC_STATIC_ARRAY_NUM];
 void
 jhc_alloc_init(void) {
         VALGRIND_PRINTF("Jhc-Valgrind mode active.\n");
+        saved_arena = new_arena();
 #ifdef _JHC_JGC_FIXED_MEGABLOCK
-        saved_gc = gc_stack_base = (void *) gc_stack_base_area;
+        saved_gc = saved_arena->gc_stack_base = (void *) gc_stack_base_area;
 #else
-        saved_gc = gc_stack_base = malloc((1UL << 18)*sizeof(gc_stack_base[0]));
+        saved_gc = saved_arena->gc_stack_base = malloc((1UL << 18)*sizeof(saved_arena->gc_stack_base[0]));
 #endif
-        arena = new_arena();
         if(nh_stuff[0]) {
                 nh_end = nh_start = nh_stuff[0];
                 for(int i = 1; nh_stuff[i]; i++) {
@@ -212,36 +211,32 @@ jhc_alloc_init(void) {
                                 nh_end = nh_stuff[i];
                 }
         }
-        for (int i = 0; i < GC_STATIC_ARRAY_NUM; i++) {
-                find_cache(&array_caches[i], arena, i + 1, i + 1);
-                find_cache(&array_caches_atomic[i], arena, i + 1, 0);
-        }
 }
 
 void
 jhc_alloc_fini(void) {
         if(_JHC_PROFILE || JHC_STATUS) {
-                fprintf(stderr, "arena: %p\n", arena);
-                fprintf(stderr, "  block_used: %i\n", arena->block_used);
-                fprintf(stderr, "  block_threshold: %i\n", arena->block_threshold);
+                fprintf(stderr, "arena: %p\n", saved_arena);
+                fprintf(stderr, "  block_used: %i\n", saved_arena->block_used);
+                fprintf(stderr, "  block_threshold: %i\n", saved_arena->block_threshold);
                 struct s_cache *sc;
-                SLIST_FOREACH(sc,&arena->caches,next)
+                SLIST_FOREACH(sc,&saved_arena->caches,next)
                         print_cache(sc);
         }
 }
 
 heap_t A_STD
-(gc_alloc)(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs)
+(gc_alloc)(gc_t gc, arena_t arena, struct s_cache **sc, unsigned count, unsigned nptrs)
 {
         assert(nptrs <= count);
-        entry_t *e = s_alloc(gc, find_cache(sc, arena, count, nptrs));
+        entry_t *e = s_alloc(gc, arena, find_cache(sc, saved_arena, count, nptrs));
         VALGRIND_MAKE_MEM_UNDEFINED(e,sizeof(uintptr_t)*count);
         debugf("gc_alloc: %p %i %i\n",(void *)e, count, nptrs);
         return (void *)e;
 }
 
 static heap_t A_STD
-s_monoblock(struct s_arena *arena, unsigned size, unsigned nptrs, unsigned flags) {
+s_monoblock(arena_t arena, unsigned size, unsigned nptrs, unsigned flags) {
         struct s_block *b = jhc_aligned_alloc(size * sizeof(uintptr_t));
         b->flags = flags | SLAB_MONOLITH;
         b->color = (sizeof(struct s_block) + BITARRAY_SIZE_IN_BYTES(1) +
@@ -255,30 +250,30 @@ s_monoblock(struct s_arena *arena, unsigned size, unsigned nptrs, unsigned flags
 // Allocate an array of count garbage collectable locations in the garbage
 // collected heap.
 heap_t A_STD
-gc_array_alloc(gc_t gc, unsigned count)
+gc_array_alloc(gc_t gc, arena_t arena, unsigned count)
 {
         if (!count)
                return NULL;
         if (count <= GC_STATIC_ARRAY_NUM)
-                return (wptr_t)s_alloc(gc,array_caches[count - 1]);
+                return (wptr_t)s_alloc(gc, arena,array_caches[count - 1]);
         if (count < GC_MAX_BLOCK_ENTRIES)
-                return s_alloc(gc, find_cache(NULL, arena, count, count));
-        return s_monoblock(arena, count, count, 0);
+                return s_alloc(gc, arena, find_cache(NULL, saved_arena, count, count));
+        return s_monoblock(saved_arena, count, count, 0);
         abort();
 }
 
 // Allocate an array of count non-garbage collectable locations in the garbage
 // collected heap.
 heap_t A_STD
-gc_array_alloc_atomic(gc_t gc, unsigned count, unsigned flags)
+gc_array_alloc_atomic(gc_t gc, arena_t arena, unsigned count, unsigned flags)
 {
         if (!count)
                return NULL;
         if (count <= GC_STATIC_ARRAY_NUM && !flags)
-                return (wptr_t)s_alloc(gc,array_caches_atomic[count - 1]);
+                return (wptr_t)s_alloc(gc, arena, array_caches_atomic[count - 1]);
         if (count < GC_MAX_BLOCK_ENTRIES && !flags)
-                return s_alloc(gc, find_cache(NULL, arena, count, 0));
-        return s_monoblock(arena, count, count, flags);
+                return s_alloc(gc, arena, find_cache(NULL, saved_arena, count, 0));
+        return s_monoblock(saved_arena, count, count, flags);
         abort();
 }
 
@@ -326,7 +321,7 @@ jhc_aligned_alloc(unsigned size) {
 }
 
 struct s_megablock *
-s_new_megablock(struct s_arena *arena)
+s_new_megablock(arena_t arena)
 {
         struct s_megablock *mb = malloc(sizeof(*mb));
 #ifdef _JHC_JGC_FIXED_MEGABLOCK
@@ -347,7 +342,7 @@ s_new_megablock(struct s_arena *arena)
 /* block allocator */
 
 static struct s_block *
-get_free_block(gc_t gc, struct s_arena *arena, bool retry) {
+get_free_block(gc_t gc, arena_t arena, bool retry) {
         arena->block_used++;
         if(__predict_true(SLIST_FIRST(&arena->free_blocks))) {
                 struct s_block *pg = SLIST_FIRST(&arena->free_blocks);
@@ -356,12 +351,12 @@ get_free_block(gc_t gc, struct s_arena *arena, bool retry) {
         } else {
 #ifdef _JHC_JGC_NAIVEGC
                 if(retry == false) {
-                        gc_perform_gc(gc);
+                        gc_perform_gc(gc, arena);
                         return NULL;
                 }
 #else
                 if((arena->block_used >= arena->block_threshold)) {
-                        gc_perform_gc(gc);
+                        gc_perform_gc(gc, arena);
                         // if we are still using 80% of the heap after a gc, raise the threshold.
                         if(__predict_false((unsigned)arena->block_used * 10 >= arena->block_threshold * 9)) {
                                 arena->block_threshold *= 2;
@@ -391,7 +386,7 @@ void hs_foreignptr_env_helper(HsPtr env, HsPtr arg) {
 }
 
 static void
-s_cleanup_blocks(struct s_arena *arena) {
+s_cleanup_blocks(arena_t arena) {
         struct s_block *pg = SLIST_FIRST(&arena->monolithic_blocks);
         SLIST_INIT(&arena->monolithic_blocks);
         while (pg) {
@@ -486,7 +481,7 @@ clear_block_used_bits(unsigned num_entries, struct s_block *pg)
  */
 
 heap_t A_STD
-s_alloc(gc_t gc, struct s_cache *sc)
+s_alloc(gc_t gc, arena_t arena, struct s_cache *sc)
 {
 #if _JHC_PROFILE
        sc->allocations++;
@@ -541,7 +536,7 @@ retry_s_alloc:
 }
 
 struct s_cache *
-new_cache(struct s_arena *arena, unsigned short size, unsigned short num_ptrs)
+new_cache(arena_t arena, unsigned short size, unsigned short num_ptrs)
 {
         struct s_cache *sc = malloc(sizeof(*sc));
         memset(sc,0,sizeof(*sc));
@@ -561,7 +556,7 @@ new_cache(struct s_arena *arena, unsigned short size, unsigned short num_ptrs)
 
 // clear all used bits, must be followed by a marking phase.
 static void
-clear_used_bits(struct s_arena *arena)
+clear_used_bits(arena_t arena)
 {
         struct s_block *pg;
         SLIST_FOREACH(pg, &arena->monolithic_blocks, link)
@@ -600,7 +595,7 @@ s_set_used_bit(void *val)
 }
 
 struct s_cache *
-find_cache(struct s_cache **rsc, struct s_arena *arena,
+find_cache(struct s_cache **rsc, arena_t arena,
            unsigned short size, unsigned short num_ptrs)
 {
         if(__predict_true(rsc && *rsc))
@@ -617,9 +612,9 @@ found:
         return sc;
 }
 
-struct s_arena *
+arena_t
 new_arena(void) {
-        struct s_arena *arena = malloc(sizeof(struct s_arena));
+        arena_t arena = malloc(sizeof(struct s_arena));
         SLIST_INIT(&arena->caches);
         SLIST_INIT(&arena->free_blocks);
         SLIST_INIT(&arena->megablocks);
@@ -627,6 +622,11 @@ new_arena(void) {
         arena->block_used = 0;
         arena->block_threshold = 8;
         arena->current_megablock = NULL;
+
+        for (int i = 0; i < GC_STATIC_ARRAY_NUM; i++) {
+                find_cache(&array_caches[i], arena, i + 1, i + 1);
+                find_cache(&array_caches_atomic[i], arena, i + 1, 0);
+        }
         return arena;
 }
 
@@ -655,7 +655,7 @@ gc_malloc_foreignptr(unsigned alignment, unsigned size, bool finalizer) {
         // no finalizers yet
         assert (!finalizer);
         unsigned spacing = 1 + finalizer;
-        wptr_t *res = gc_array_alloc_atomic(saved_gc, spacing + TO_BLOCKS(size),
+        wptr_t *res = gc_array_alloc_atomic(saved_gc, saved_arena, spacing + TO_BLOCKS(size),
                                              finalizer ? SLAB_FLAG_FINALIZER : SLAB_FLAG_NONE);
         res[0] = (wptr_t)(res + spacing);
         if (finalizer)
@@ -665,7 +665,7 @@ gc_malloc_foreignptr(unsigned alignment, unsigned size, bool finalizer) {
 
 heap_t A_STD
 gc_new_foreignptr(HsPtr ptr) {
-        HsPtr *res = gc_array_alloc_atomic(saved_gc, 2, SLAB_FLAG_FINALIZER);
+        HsPtr *res = gc_array_alloc_atomic(saved_gc, saved_arena, 2, SLAB_FLAG_FINALIZER);
         res[0] = ptr;
         res[1] = NULL;
         return TO_SPTR(P_WHNF, res);
@@ -710,7 +710,7 @@ print_cache(struct s_cache *sc) {
 }
 
 void hs_perform_gc(void) {
-        gc_perform_gc(saved_gc);
+        gc_perform_gc(saved_gc, saved_arena);
 }
 
 #endif

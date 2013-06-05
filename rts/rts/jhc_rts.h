@@ -69,7 +69,7 @@ typedef struct dnode {
 
 wptr_t A_STD
 #if _JHC_GC == _JHC_GC_JGC
-eval(gc_t gc,sptr_t s);
+eval(gc_t gc,arena_t arena,sptr_t s);
 #else
 eval(sptr_t s);
 #endif

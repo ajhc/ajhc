@@ -17,6 +17,7 @@ struct s_arena {
         SLIST_HEAD(,s_megablock) megablocks;
         unsigned number_gcs;    // number of garbage collections
         unsigned number_allocs; // number of allocations since last garbage collection
+        gc_t gc_stack_base;
 };
 
 struct s_megablock {
