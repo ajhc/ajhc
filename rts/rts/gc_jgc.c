@@ -197,6 +197,11 @@ void
 jhc_alloc_init(void) {
         VALGRIND_PRINTF("Jhc-Valgrind mode active.\n");
         saved_arena = new_arena();
+#ifdef _JHC_JGC_FIXED_MEGABLOCK
+        saved_gc = saved_arena->gc_stack_base = (void *) gc_stack_base_area;
+#else
+        saved_gc = saved_arena->gc_stack_base = malloc((1UL << 18)*sizeof(saved_arena->gc_stack_base[0]));
+#endif
         if(nh_stuff[0]) {
                 nh_end = nh_start = nh_stuff[0];
                 for(int i = 1; nh_stuff[i]; i++) {
@@ -617,12 +622,6 @@ new_arena(void) {
         arena->block_used = 0;
         arena->block_threshold = 8;
         arena->current_megablock = NULL;
-
-#ifdef _JHC_JGC_FIXED_MEGABLOCK
-        saved_gc = arena->gc_stack_base = (void *) gc_stack_base_area;
-#else
-        saved_gc = arena->gc_stack_base = malloc((1UL << 18)*sizeof(arena->gc_stack_base[0]));
-#endif
 
         for (int i = 0; i < GC_STATIC_ARRAY_NUM; i++) {
                 find_cache(&array_caches[i], arena, i + 1, i + 1);
