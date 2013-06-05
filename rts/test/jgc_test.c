@@ -9,13 +9,13 @@ block_aligned(void *p) {
 }
 
 void
-block_sanity(struct s_arena *arena, struct s_cache *sc, struct s_block *b) {
+block_sanity(arena_t arena, struct s_cache *sc, struct s_block *b) {
         assert_true (!sc == !!(b->flags & SLAB_MONOLITH));
         assert_true (block_aligned(b));
 }
 
 void
-cache_sanity(struct s_arena *arena, struct s_cache *sc) {
+cache_sanity(arena_t arena, struct s_cache *sc) {
         struct s_block *b;
         assert_true(sc->arena == arena);
         SLIST_FOREACH(b, &sc->blocks, link)
@@ -23,7 +23,7 @@ cache_sanity(struct s_arena *arena, struct s_cache *sc) {
 }
 
 void
-arena_sanity(struct s_arena *arena) {
+arena_sanity(arena_t arena) {
         assert_true(!!arena);
         struct s_cache *sc;
         struct s_block *b;
@@ -47,19 +47,19 @@ void foreignptr_test(void) {
         assert_ptr_equal(PTR1, ptr[0]);
         assert_true(!!ptr[1]);
         assert_ptr_equal(ptr[1][0], PTR2);
-        arena_sanity(arena);
+        arena_sanity(saved_arena);
 }
 
 void basic_test(void) {
-        arena_sanity(arena);
+        arena_sanity(saved_arena);
         gc_t gc = saved_gc;
-        heap_t e = gc_alloc(gc, NULL, 2, 2);
+        heap_t e = gc_alloc(gc, saved_arena, NULL, 2, 2);
         ((void **)e)[0] = e;
         ((void **)e)[1] = e;
         gc[0] = e;
-        arena_sanity(arena);
-        gc_perform_gc(gc + 1);
-        arena_sanity(arena);
+        arena_sanity(saved_arena);
+        gc_perform_gc(gc + 1, saved_arena);
+        arena_sanity(saved_arena);
 }
 
 int main(int argc, char *argv[])
