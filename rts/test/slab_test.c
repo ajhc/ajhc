@@ -6,7 +6,7 @@
 void
 stress_test(int n) {
         jhc_alloc_init();
-        struct s_arena *arena = new_arena();
+        arena_t arena = new_arena();
         struct s_cache *caches[NUM_CACHES];
 
         void *ptrs[n];
@@ -20,7 +20,7 @@ stress_test(int n) {
                         //free(ptrs[wp]);
                         ptrs[wp] = NULL;
                 } else {
-                        ptrs[wp] = s_alloc(saved_gc, caches[rand() % NUM_CACHES]);
+                        ptrs[wp] = s_alloc(saved_gc, arena, caches[rand() % NUM_CACHES]);
                         //ptrs[wp] = malloc((rand() % NUM_CACHES) * sizeof(uintptr_t));
                 }
         }
@@ -32,7 +32,7 @@ main(int argc, char *argv[])
 
         setbuf(stdout,NULL);
         stress_test(1 << 2);
-        struct s_arena *arena = new_arena();
+        arena_t arena = new_arena();
         for(int i = 0;i < 10; i++) {
         struct s_cache *sc = new_cache(arena,i,0);
         print_cache(sc);
@@ -40,12 +40,12 @@ main(int argc, char *argv[])
         struct s_cache *sc1 = new_cache(arena,7,4);
         struct s_cache *sc2 = new_cache(arena,1,3);
 
-        printf("Alloc1: %p\n", s_alloc(saved_gc, sc1));
-        printf("Alloc1: %p\n", s_alloc(saved_gc, sc1));
-        printf("Alloc1: %p\n", s_alloc(saved_gc, sc1));
-        printf("Alloc2: %p\n", s_alloc(saved_gc, sc2));
-        printf("Alloc2: %p\n", s_alloc(saved_gc, sc2));
-        printf("Alloc2: %p\n", s_alloc(saved_gc, sc2));
+        printf("Alloc1: %p\n", s_alloc(saved_gc, arena, sc1));
+        printf("Alloc1: %p\n", s_alloc(saved_gc, arena, sc1));
+        printf("Alloc1: %p\n", s_alloc(saved_gc, arena, sc1));
+        printf("Alloc2: %p\n", s_alloc(saved_gc, arena, sc2));
+        printf("Alloc2: %p\n", s_alloc(saved_gc, arena, sc2));
+        printf("Alloc2: %p\n", s_alloc(saved_gc, arena, sc2));
 
         print_cache(sc1);
         print_cache(sc2);
