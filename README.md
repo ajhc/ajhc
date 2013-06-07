@@ -40,6 +40,10 @@ You should send patch to jhc, if testing on Ajhc is good.
 The command [darcs send](http://darcs.net/Using/Send) sends email the patch to
 jhc author (= [John Meacham](http://repetae.net/)).
 
+Perhaps you can get internal overview with following compile flow image:
+
+![](https://raw.github.com/ajhc/ajhc/arafura/docs/jhc_compile_flow.png)
+
 ## Needing to install/build on Windows (experimental)
 
 ### Install msys
