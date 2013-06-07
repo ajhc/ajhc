@@ -76,7 +76,6 @@ cabal-dist: $(BUILT_SOURCES) src/StringTable/Atom.hs
 cabal-build: $(BUILT_SOURCES) src/StringTable/Atom.hs
 	cabal configure
 	cabal build
-	cabal haddock
 
 cabal-install: cabal-build
 	cabal install
