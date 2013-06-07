@@ -2,19 +2,19 @@ module E.Arbitrary where
 
 --import Test.QuickCheck
 import Data.Monoid
-import Doc.DocLike
+import Doc.DocLike()
 import Doc.PPrint
 import Doc.Pretty (putDoc, Doc)
 import E.E
 import E.Show
 import E.TypeCheck()
-import GenUtil
+import GenUtil()
 import Name.Id
 import Name.VConsts
 import System.Random
 import Support.CanType
-import Support.FreeVars
-import qualified Data.Map as Map
+import Support.FreeVars()
+-- import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 data EP = EP {
@@ -32,6 +32,7 @@ value t
     | t == tInteger = choose [return $ ELit $ LitInt 1 tInteger]
     | t == tChar = choose [return $ ELit $ LitInt (fromIntegral (fromEnum 'x')) tChar]
     | t == eStar = choose $ map return [tChar, tInteger]
+    | otherwise = fail "not support value"
 
 var t = do
     x <- randomRIO (1,100)

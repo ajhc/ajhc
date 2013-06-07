@@ -1,4 +1,4 @@
-cabal-version: >= 1.6
+cabal-version: >= 1.10
 name:          @PACKAGE_NAME@
 build-type:    Custom
 version:       @VERSION@
@@ -30,9 +30,9 @@ source-repository head
     type:     git
     location: https://github.com/ajhc/ajhc.git
 
-executable @PACKAGE_NAME@
-    main-is:        Main.hs
+library
     hs-source-dirs: drift_processed src
+    default-language: Haskell98
 
     c-sources:
         src/StringTable/StringTable_cbits.c
@@ -69,6 +69,28 @@ executable @PACKAGE_NAME@
     else
         build-depends: unix
 
+    exposed-modules:
+        DataConstructors
+        E.Main
+        E.Program
+        E.Rules
+        E.Type
+        FlagDump
+        FrontEnd.Class
+        Grin.Main
+        Grin.Show
+        Ho.Build
+        Ho.Collected
+        Ho.Library
+        Interactive
+        Name.Name
+        Options
+        StringTable.Atom
+        Support.TempDir
+        Util.Gen
+        Util.SetLike
+        Version.Version
+
     other-modules:
         C.FFI
         C.FromGrin2
@@ -77,7 +99,6 @@ executable @PACKAGE_NAME@
         Cmm.Number
         Cmm.Op
         Cmm.OpEval
-        DataConstructors
         DerivingDrift.DataP
         DerivingDrift.Drift
         DerivingDrift.RuleUtils
@@ -102,18 +123,12 @@ executable @PACKAGE_NAME@
         E.LambdaLift
         E.LetFloat
         E.Lint
-        E.Main
         E.PrimDecode
         E.PrimOpt
-        E.Program
-        E.Rules
         E.SSimplify
-        E.SStrictness
         E.Show
         E.Subst
-        E.ToHs
         E.Traverse
-        E.Type
         E.TypeAnalysis
         E.TypeCheck
         E.Values
@@ -122,9 +137,7 @@ executable @PACKAGE_NAME@
         Fixer.Fixer
         Fixer.Supply
         Fixer.VMap
-        FlagDump
         FlagOpts
-        FrontEnd.Class
         FrontEnd.DataConsAssump
         FrontEnd.DeclsDepends
         FrontEnd.DependAnalysis
@@ -160,49 +173,35 @@ executable @PACKAGE_NAME@
         FrontEnd.Utils
         FrontEnd.Warning
         GenUtil
-        Grin.Arity
         Grin.DeadCode
         Grin.Devolve
-        Grin.Embed
         Grin.EvalInline
         Grin.FromE
         Grin.Grin
         Grin.HashConst
-        Grin.Interpret
         Grin.Lint
-        Grin.Main
         Grin.NodeAnalyze
         Grin.Noodle
         Grin.Optimize
         Grin.SSimplify
-        Grin.Show
         Grin.StorageAnalysis
-        Grin.Unboxing
         Grin.Val
         Grin.Whiz
         Ho.Binary
-        Ho.Build
-        Ho.Collected
-        Ho.Library
         Ho.ReadSource
         Ho.Type
         Info.Binary
         Info.Info
         Info.Properties
         Info.Types
-        Interactive
-        Main
         Name.Binary
         Name.Id
-        Name.Name
         Name.Names
         Name.Prim
         Name.VConsts
-        Options
         PackedString
         RawFiles
         Stats
-        StringTable.Atom
         Support.CFF
         Support.Cabal
         Support.CanType
@@ -212,19 +211,15 @@ executable @PACKAGE_NAME@
         Support.IniParse
         Support.MD5
         Support.MapBinaryInstance
-        Support.ShowTable
-        Support.TempDir
         Support.Tickle
         Support.Transform
         Support.Tuple
         Support.Unparse
         Util.BitSet
-        Util.BooleanSolver
         Util.ContextMonad
         Util.ExitCodes
         Util.FilterInput
         Util.GMap
-        Util.Gen
         Util.Graph
         Util.Graphviz
         Util.HasSize
@@ -242,7 +237,6 @@ executable @PACKAGE_NAME@
         Util.SHA1
         Util.SameShape
         Util.Seq
-        Util.SetLike
         Util.TrueSet
         Util.UnionFind
         Util.UnionSolve
@@ -251,10 +245,9 @@ executable @PACKAGE_NAME@
         Util.VarName
         Util.YAML
         Version.Config
-        Version.Version
         Paths_@PACKAGE_NAME@
 
-    extensions:
+    default-extensions:
         BangPatterns, TypeFamilies, ViewPatterns, UndecidableInstances,
         OverlappingInstances, RecordWildCards, RecursiveDo, TupleSections,
         ParallelListComp, GeneralizedNewtypeDeriving, ScopedTypeVariables,
@@ -267,13 +260,52 @@ executable @PACKAGE_NAME@
         PolymorphicComponents, ExistentialQuantification, UnicodeSyntax,
         PostfixOperators, PatternGuards, LiberalTypeSynonyms, RankNTypes,
         TypeOperators, EmptyDataDecls, KindSignatures
+
     ghc-options:    -W -fno-warn-unused-matches  -fwarn-type-defaults -i./drift_processed -i./src
+    cc-options:     -std=c99
+    cpp-options:    -DUSE_HASKELINE -DWITH_CABAL
+
+executable @PACKAGE_NAME@
+    main-is:        Main.hs
+    hs-source-dirs: src_main
+    default-language: Haskell98
+
+    build-depends:
+        base >= 4.0 && < 5,
+        HsSyck,
+        array,
+        binary,
+        bytestring,
+        containers,
+        directory,
+        fgl,
+        filepath,
+        haskeline,
+        mtl,
+        old-time,
+        pretty,
+        process,
+        random,
+        regex-compat,
+        syb,
+        temporary,
+        utf8-string,
+        zlib,
+        @PACKAGE_NAME@
+
+    if os(windows)
+        build-depends: Win32
+    else
+        build-depends: unix
+
+    ghc-options:    -W -fno-warn-unused-matches  -fwarn-type-defaults
     cc-options:     -std=c99
     cpp-options:    -DUSE_HASKELINE -DWITH_CABAL
 
 executable jahm
     main-is:        Main.hs
     hs-source-dirs: src_jahm
+    default-language: Haskell98
 
     build-depends:
         base >= 4.0 && < 5,
