@@ -70,33 +70,61 @@ library
         build-depends: unix
 
     exposed-modules:
+        C.FFI
+        C.FromGrin2
+        C.Prims
+        Cmm.Number
         DataConstructors
+        Doc.DocLike
+        Doc.Pretty
         E.Main
         E.Program
         E.Rules
         E.Type
         FlagDump
         FrontEnd.Class
+        FrontEnd.Exports
+        FrontEnd.HsSyn
+        FrontEnd.Infix
+        FrontEnd.KindInfer
+        FrontEnd.Rename
+        FrontEnd.Representation
+        FrontEnd.SrcLoc
+        FrontEnd.Tc.Kind
+        FrontEnd.Tc.Module
+        FrontEnd.Tc.Type
+        FrontEnd.TypeSynonyms
+        FrontEnd.Warning
+        Grin.FromE
+        Grin.Grin
         Grin.Main
         Grin.Show
         Ho.Build
         Ho.Collected
         Ho.Library
+        Ho.Type
+        Info.Info
+        Info.Types
         Interactive
+        Name.Id
         Name.Name
         Options
+        PackedString
+        Stats
         StringTable.Atom
+        Support.CFF
         Support.TempDir
+        Util.BitSet
+        Util.GMap
         Util.Gen
+        Util.HasSize
+        Util.Perhaps
+        Util.SHA1
         Util.SetLike
         Version.Version
 
     other-modules:
-        C.FFI
-        C.FromGrin2
         C.Generate
-        C.Prims
-        Cmm.Number
         Cmm.Op
         Cmm.OpEval
         DerivingDrift.DataP
@@ -105,9 +133,7 @@ library
         DerivingDrift.StandardRules
         Doc.Attr
         Doc.Chars
-        Doc.DocLike
         Doc.PPrint
-        Doc.Pretty
         E.Annotate
         E.Arbitrary
         E.Binary
@@ -143,41 +169,27 @@ library
         FrontEnd.DependAnalysis
         FrontEnd.Desugar
         FrontEnd.Diagnostic
-        FrontEnd.Exports
         FrontEnd.FrontEnd
         FrontEnd.HsErrors
         FrontEnd.HsParser
         FrontEnd.HsPretty
-        FrontEnd.HsSyn
-        FrontEnd.Infix
-        FrontEnd.KindInfer
         FrontEnd.Lexer
         FrontEnd.ParseMonad
         FrontEnd.ParseUtils
-        FrontEnd.Rename
-        FrontEnd.Representation
-        FrontEnd.SrcLoc
         FrontEnd.Syn.Options
         FrontEnd.Syn.Traverse
         FrontEnd.Tc.Class
-        FrontEnd.Tc.Kind
         FrontEnd.Tc.Main
-        FrontEnd.Tc.Module
         FrontEnd.Tc.Monad
-        FrontEnd.Tc.Type
         FrontEnd.Tc.Unify
         FrontEnd.TypeSigs
-        FrontEnd.TypeSynonyms
         FrontEnd.TypeSyns
         FrontEnd.Unlit
         FrontEnd.Utils
-        FrontEnd.Warning
         GenUtil
         Grin.DeadCode
         Grin.Devolve
         Grin.EvalInline
-        Grin.FromE
-        Grin.Grin
         Grin.HashConst
         Grin.Lint
         Grin.NodeAnalyze
@@ -189,20 +201,13 @@ library
         Grin.Whiz
         Ho.Binary
         Ho.ReadSource
-        Ho.Type
         Info.Binary
-        Info.Info
         Info.Properties
-        Info.Types
         Name.Binary
-        Name.Id
         Name.Names
         Name.Prim
         Name.VConsts
-        PackedString
         RawFiles
-        Stats
-        Support.CFF
         Support.Cabal
         Support.CanType
         Support.Compat
@@ -215,26 +220,21 @@ library
         Support.Transform
         Support.Tuple
         Support.Unparse
-        Util.BitSet
         Util.ContextMonad
         Util.ExitCodes
         Util.FilterInput
-        Util.GMap
         Util.Graph
         Util.Graphviz
-        Util.HasSize
         Util.Histogram
         Util.Inst
         Util.IntBag
         Util.Interact
         Util.NameMonad
         Util.Once
-        Util.Perhaps
         Util.Progress
         Util.RWS
         Util.ReaderWriter
         Util.Relation
-        Util.SHA1
         Util.SameShape
         Util.Seq
         Util.TrueSet
