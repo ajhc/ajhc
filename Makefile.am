@@ -127,6 +127,12 @@ publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/in
 publish_ajhc: manual.html manual_ja.html docs/manual.css
 	cp -- $^ /home/kiwamu/doc/ajhc.github.com/
 
+publish_haddock: $(BUILT_SOURCES) src/StringTable/Atom.hs
+	cabal configure
+	cabal haddock --hyperlink-source --html
+	rm -rf /home/kiwamu/doc/ajhc.github.com/api
+	cp -r dist/doc/html/ajhc /home/kiwamu/doc/ajhc.github.com/api
+
 manual.mkd: $(JHC_MANUAL_FILES)
 	perl $(srcdir)/utils/stitch.prl $^ > $@
 
