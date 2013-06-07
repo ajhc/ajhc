@@ -34,73 +34,72 @@ cff_ldef  = chunkType "LDEF"
 cff_idep  = chunkType "IDEP"
 cff_file  = chunkType "FILE"
 
--- A SourceHash is the hash of a specific file, it is associated with a
+-- | A SourceHash is the hash of a specific file, it is associated with a
 -- specific 'Module' that said file implements.
 type SourceHash = MD5.Hash
--- HoHash is a unique identifier for a ho file or library.
+-- | HoHash is a unique identifier for a ho file or library.
 type HoHash     = MD5.Hash
 
--- while a 'Module' is a single Module associated with a single haskell source
+-- | while a 'Module' is a single Module associated with a single haskell source
 -- file, a 'ModuleGroup' identifies a group of mutually recursive modules.
 -- Generally it is chosen from among the Modules making up the group, but the
 -- specific choice has no other meaning. We could use the HoHash, but for readability
 -- reasons when debugging it makes more sense to choose an arbitrary Module.
 type ModuleGroup = Module
 
--- the collected information that is passed around
+-- | the collected information that is passed around
 -- this is not stored in any file, but is what is collected from the ho files.
 data CollectedHo = CollectedHo {
-    -- this is a list of external names that are valid but that we may not know
+    -- | this is a list of external names that are valid but that we may not know
     -- anything else about it is used to recognize invalid ids.
     choExternalNames :: IdSet,
-    -- these are the functions in Comb form.
+    -- | these are the functions in Comb form.
     choCombinators  :: IdMap Comb,
-    -- these are rules that may need to be retroactively applied to other
+    -- | these are rules that may need to be retroactively applied to other
     -- modules
     choOrphanRules :: Rules,
-    -- the hos
+    -- | the hos
     choHoMap :: Map.Map ModuleGroup Ho,
-    -- libraries depended on
+    -- | libraries depended on
     choLibDeps :: Map.Map PackedString HoHash,
-    -- these are caches of pre-computed values
+    -- | these are caches of pre-computed values
     choHo :: Ho, -- ^ cache of combined and renamed ho
     choVarMap :: IdMap (Maybe E) -- ^ cache of variable substitution map
     }
     {-! derive: update !-}
 
--- The header contains basic information about the file, it should be enough to determine whether
+-- | The header contains basic information about the file, it should be enough to determine whether
 -- we can discard the file right away or consider it further.
-
 data HoHeader = HoHeader {
-    -- * the version of the file format. it comes first so we don't try to read data that may be in a different format.
+    -- | the version of the file format. it comes first so we don't try to read data that may be in a different format.
     hohVersion  :: Int,
-    -- * my sha1 id
+    -- | my sha1 id
     hohHash     :: HoHash,
-    -- * the human readable name, either the ModuleGroup or the library name and version.
+    -- | the human readable name, either the ModuleGroup or the library name and version.
     hohName     :: Either ModuleGroup (PackedString,Version),
-    -- * library dependencies
+    -- | library dependencies
     hohLibDeps  :: [(PackedString,HoHash)],
-    -- * arch dependencies, these say whether the file is specialized for a
+    -- | arch dependencies, these say whether the file is specialized for a
     -- given arch.
     hohArchDeps :: [(PackedString,PackedString)]
     }
 
--- These are the dependencies needed to check if a ho file is up to date.  it
+-- | These are the dependencies needed to check if a ho file is up to date.  it
 -- only appears in ho files as hl files do not have source code to check
 -- against or depend on anything but other libraries.
 data HoIDeps = HoIDeps {
-    -- * modules depended on indexed by a hash of the source.
+    -- | modules depended on indexed by a hash of the source.
     hoIDeps :: Map.Map SourceHash (Module,[(Module,SrcLoc)]),
-    -- * Haskell Source files depended on
+    -- | Haskell Source files depended on
     hoDepends    :: [(Module,SourceHash)],
-    -- * Other objects depended on to be considered up to date.
+    -- | Other objects depended on to be considered up to date.
     hoModDepends :: [HoHash],
-    -- * library module groups needed
+    -- | library module groups needed
     hoModuleGroupNeeds :: [ModuleGroup]
     }
 
 data HoLib = HoLib {
-    -- * arbitrary metainformation such as library author, web site, etc.
+    -- | arbitrary metainformation such as library author, web site, etc.
     hoModuleMap  :: Map.Map Module ModuleGroup,
     hoReexports  :: Map.Map Module Module,
     hoModuleDeps :: Map.Map ModuleGroup [ModuleGroup],
@@ -119,13 +118,13 @@ data Library = Library {
 instance Show Library where
     showsPrec n lib = showsPrec n (hohHash $ libHoHeader lib)
 
--- data only needed for type checking.
+-- | data only needed for type checking.
 data HoTcInfo = HoTcInfo {
     hoExports :: Map.Map Module [Name],
     hoDefs :: Map.Map Name (SrcLoc,[Name]),
-    hoAssumps :: Map.Map Name Type,        -- used for typechecking
+    hoAssumps :: Map.Map Name Type,        -- ^ used for typechecking
     hoFixities :: FixityMap,
-    hoKinds :: KindEnv,                    -- used for typechecking
+    hoKinds :: KindEnv,                    -- ^ used for typechecking
     hoTypeSynonyms :: TypeSynonyms,
     hoClassHierarchy :: ClassHierarchy,
     hoFieldMap :: FieldMap
@@ -133,7 +132,7 @@ data HoTcInfo = HoTcInfo {
     {-! derive: update, Monoid !-}
 
 data HoBuild = HoBuild {
-    -- Filled in by E generation
+    -- | Filled in by E generation
     hoDataTable :: DataTable,
     hoEs :: [(TVr,E)],
     hoRules :: Rules

@@ -129,8 +129,7 @@ parseHsSource options fn lbs = do
                       (ws,ParseOk e) -> processErrors ws >> return (e { hsModuleOpt = fileOpts' },LBSU.fromString s')
                       (_,ParseFailed sl err) -> putErrDie $ show sl ++ ": " ++ err
 
-fetchCompilerFlags :: IO (FilePath,     -- ^ file path to compiler
-                          [String])     -- ^ compiler arguments
+fetchCompilerFlags :: IO (FilePath, [String]) -- ^ file path to compiler, compiler arguments
 fetchCompilerFlags = return (cc,args) where
     lup k = maybe "" id $ Map.lookup k (optInis options)
     boehmOpts | fopts FO.Boehm = ["-D_JHC_GC=_JHC_GC_BOEHM", "-lgc"]

@@ -208,7 +208,7 @@ tagE env e  = emapE_ (tagE env) e
 getValue (EVar v)
     | Just x <- Info.lookup (tvrInfo v) = return x
     | otherwise = return $ value (vmapPlaceholder ())
-    -- | otherwise = fail $ "getValue: no varinfo: " ++ show v
+    ---- | otherwise = fail $ "getValue: no varinfo: " ++ show v
 getValue e | Just c <- typConstant e = return $ value c
 getValue e = return $ value $ fuzzyConstant e -- TODO - make more accurate
 

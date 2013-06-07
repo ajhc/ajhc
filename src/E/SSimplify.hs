@@ -975,7 +975,7 @@ exprSize max e discount known = f max e >>= \n -> return (max - n) where
 noSizeIncrease e xs = f e xs where
     currentSize = 1 + length xs
     f (ELam t e) (x:xs) = f e xs
-    f ELam {} [] = False -- ^ abort if we will create a lambda
+    f ELam {} [] = False -- abort if we will create a lambda
     f e [] = isJust $ exprSize currentSize  e 3 []
     f e xs = isJust $ exprSize (currentSize - length xs) e 3 []
 

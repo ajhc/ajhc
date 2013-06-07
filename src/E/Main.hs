@@ -208,7 +208,7 @@ processDecls cho ho' tiData = withStackStatus "processDecls" $  do
 
         mprog <- simplifyProgram sopt "Init-One" coreMini mprog
 
-        -- | this catches more static arguments if we wait until after the initial normalizing simplification pass
+        -- this catches more static arguments if we wait until after the initial normalizing simplification pass
         mprog <- transformProgram tparms { transformSkipNoStats = True, transformCategory = "SimpleRecursive"
                                          , transformOperation = return . staticArgumentTransform } mprog
 

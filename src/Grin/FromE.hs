@@ -576,7 +576,7 @@ compile' cenv (tvr,as,e) = ans where
     -- | cc evaluates something in lazy context, returning a pointer to a node which when evaluated will produce the strict result.
     -- it is an invarient that evaling (cc e) produces the same value as (ce e)
     cc (EPrim don [e,_] _) | don == p_dependingOn  = cc e
-    cc (EPrim (PrimPrim "fromBang_") (args -> [e]) _) = return $ if getType e == tyDNode then demote e else Return [e] -- $ demote e
+    cc (EPrim (PrimPrim "fromBang_") (args -> [e]) _) = return $ if getType e == tyDNode then demote e else Return [e] ---- $ demote e
 --        e <- ce e
 --        return $ e :>>= [v] :-> demote v
     cc e | Just _ <- literal e = error "unboxed literal in lazy context"

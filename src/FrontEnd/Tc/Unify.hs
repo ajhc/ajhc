@@ -301,7 +301,7 @@ mgu t (TMetaVar u) | not $ isBoxyMetaVar u = varBind u t
 mgu (TVar a) (TVar b) | a == b = return ()
 mgu c1@(TCon tc1) c2@(TCon tc2)
            | tc1==tc2 = return ()
-           -- | otherwise = fail $ "mgu: Constructors don't match:" ++ show (c1,c2)
+           ---- | otherwise = fail $ "mgu: Constructors don't match:" ++ show (c1,c2)
            | otherwise = unificationError c1 c2
 mgu TForAll {} _ = error "attempt to unify TForall"
 mgu _ TForAll {} = error "attempt to unify TForall"

@@ -235,8 +235,10 @@ tagHole = toAtom "@hole"
 gEval :: Val -> Exp
 gEval x = BaseOp Eval [x]
 
-tyINode = TyINode -- ^ lazy node sptr_t
-tyDNode = TyNode  -- ^ strict node wptr_t
+-- | lazy node sptr_t
+tyINode = TyINode
+-- | strict node wptr_t
+tyDNode = TyNode
 
 createFuncDef local name body@(args :-> rest)  = updateFuncDefProps FuncDef { funcDefName = name, funcDefBody = body, funcDefCall = call, funcDefProps = funcProps } where
     call = Item name (TyCall (if local then LocalFunction else Function) (map getType args) (getType rest))
