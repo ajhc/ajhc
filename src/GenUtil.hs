@@ -125,7 +125,7 @@ import Control.Monad (join, liftM, MonadPlus, mzero)
 import qualified System.IO as IO
 import System.IO.Error (isDoesNotExistError)
 import Control.Exception
-import Prelude
+import Prelude hiding (catch)
 import System.Random(StdGen, newStdGen, Random(randomR))
 import System.Time
 import System.CPUTime
