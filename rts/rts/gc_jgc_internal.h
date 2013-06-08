@@ -18,6 +18,11 @@ struct s_arena {
         unsigned number_gcs;    // number of garbage collections
         unsigned number_allocs; // number of allocations since last garbage collection
         gc_t gc_stack_base;
+// 7 to share caches with the first 7 tuples
+#define GC_STATIC_ARRAY_NUM 7
+#define GC_MAX_BLOCK_ENTRIES 150
+        struct s_cache *array_caches[GC_STATIC_ARRAY_NUM];
+        struct s_cache *array_caches_atomic[GC_STATIC_ARRAY_NUM];
 };
 
 struct s_megablock {

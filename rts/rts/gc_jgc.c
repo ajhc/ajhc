@@ -186,13 +186,6 @@ gc_perform_gc(gc_t gc, arena_t arena)
         profile_pop(&gc_gc_time);
 }
 
-// 7 to share caches with the first 7 tuples
-#define GC_STATIC_ARRAY_NUM 7
-#define GC_MAX_BLOCK_ENTRIES 150
-
-static struct s_cache *array_caches[GC_STATIC_ARRAY_NUM];
-static struct s_cache *array_caches_atomic[GC_STATIC_ARRAY_NUM];
-
 void
 jhc_alloc_init(void) {
         VALGRIND_PRINTF("Jhc-Valgrind mode active.\n");
@@ -255,7 +248,7 @@ gc_array_alloc(gc_t gc, arena_t arena, unsigned count)
         if (!count)
                return NULL;
         if (count <= GC_STATIC_ARRAY_NUM)
-                return (wptr_t)s_alloc(gc, arena,array_caches[count - 1]);
+                return (wptr_t)s_alloc(gc, arena, arena->array_caches[count - 1]);
         if (count < GC_MAX_BLOCK_ENTRIES)
                 return s_alloc(gc, arena, find_cache(NULL, saved_arena, count, count));
         return s_monoblock(saved_arena, count, count, 0);
@@ -270,7 +263,7 @@ gc_array_alloc_atomic(gc_t gc, arena_t arena, unsigned count, unsigned flags)
         if (!count)
                return NULL;
         if (count <= GC_STATIC_ARRAY_NUM && !flags)
-                return (wptr_t)s_alloc(gc, arena, array_caches_atomic[count - 1]);
+                return (wptr_t)s_alloc(gc, arena, arena->array_caches_atomic[count - 1]);
         if (count < GC_MAX_BLOCK_ENTRIES && !flags)
                 return s_alloc(gc, arena, find_cache(NULL, saved_arena, count, 0));
         return s_monoblock(saved_arena, count, count, flags);
@@ -624,8 +617,8 @@ new_arena(void) {
         arena->current_megablock = NULL;
 
         for (int i = 0; i < GC_STATIC_ARRAY_NUM; i++) {
-                find_cache(&array_caches[i], arena, i + 1, i + 1);
-                find_cache(&array_caches_atomic[i], arena, i + 1, 0);
+                find_cache(&arena->array_caches[i], arena, i + 1, i + 1);
+                find_cache(&arena->array_caches_atomic[i], arena, i + 1, 0);
         }
         return arena;
 }
