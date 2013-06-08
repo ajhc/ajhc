@@ -11,9 +11,11 @@ This project is founded by [Metasepi Project](http://metasepi.org/).
 
 ## How to build latest version
 
-    $ sudo apt-get install make locales autoconf libreadline-dev \
-      libwww-perl libconfig-yaml-perl graphviz haskell-platform drift pandoc \
-      libghc-readline-dev libghc-utf8-string-dev libghc-hssyck-dev
+    $ sudo apt-get install make locales autoconf libreadline-dev libwww-perl libconfig-yaml-perl \
+      graphviz haskell-platform drift pandoc hscolour po4a libghc-temporary-dev \
+      libghc-haskeline-dev libghc-utf8-string-dev libghc-hssyck-dev libghc-test-framework-th-dev \
+      libghc-test-framework-hunit-dev libghc-test-framework-quickcheck2-dev libgc-dev gcc-multilib \
+      valgrind
     $ git clone git://github.com/ajhc/ajhc.git
     $ cd ajhc
     $ git checkout arafura
@@ -77,20 +79,6 @@ http://www.haskell.org/platform/windows.html
 
 ## Future plan
 
-### Done
-
-* Try to rewrite a part of NetBSD bootloader.
-  http://www.youtube.com/watch?v=JMyxy5Qo2m8
-* Translate Jhc User’s Manual to Japanese.
-  http://metasepi.org/posts/2013-01-12-jhc_manual_ja.html
-* Fix bug that run stm32f3-discovery demo. It causes Ajhc RTS heep impl.
-  https://github.com/ajhc/demo-cortex-m3/tree/master/stm32f3-discovery
-* Support to build on Windows.
-* Cabalize Ajhc. Ajhc's hl files will be not controled with cabal.
-* Support LPCXpresso NXP LPX1769 with demo.
-* Pass all regress test, and enable regress fail setting on travis-ci.
-  https://travis-ci.org/ajhc/ajhc
-
 ### Yet
 
 * No more depend on DrIFT. Use http://hackage.haskell.org/package/derive.
@@ -104,3 +92,17 @@ http://www.haskell.org/platform/windows.html
 * Find the method to implement GC that can be interrupted.
 * Get smaller RTS. Benchmark the RTS for running on custom FPGA CPU.
 * Start rewritng NetBSD kernel with Ajhc.
+
+### Done
+
+* Try to rewrite a part of NetBSD bootloader.
+  http://www.youtube.com/watch?v=JMyxy5Qo2m8
+* Translate Jhc User’s Manual to Japanese.
+  http://metasepi.org/posts/2013-01-12-jhc_manual_ja.html
+* Fix bug that run stm32f3-discovery demo. It causes Ajhc RTS heep impl.
+  https://github.com/ajhc/demo-cortex-m3/tree/master/stm32f3-discovery
+* Support to build on Windows.
+* Cabalize Ajhc. Ajhc's hl files will be not controled with cabal.
+* Support LPCXpresso NXP LPX1769 with demo.
+* Pass all regress test, and enable regress fail setting on travis-ci.
+  https://travis-ci.org/ajhc/ajhc
