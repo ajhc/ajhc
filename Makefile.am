@@ -78,7 +78,7 @@ cabal-build: $(BUILT_SOURCES) src/StringTable/Atom.hs
 	cabal build
 
 cabal-install: cabal-build
-	cabal install --enable-documentation --haddock-hyperlink-source --haddock-html
+	cabal install
 
 .INTERMEDIATE: ajhc_man.mkd options.mkd
 .DELETE_ON_ERROR: ChangeLog data/shortchange.txt manual.mkd ajhc_man.mkd options.mkd
