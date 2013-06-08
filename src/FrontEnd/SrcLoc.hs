@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module FrontEnd.SrcLoc where
 
 import Control.Applicative
@@ -7,6 +8,7 @@ import Data.Foldable
 import Data.Traversable
 import Data.Binary
 import Data.Generics
+import Data.DeriveTH
 
 import PackedString
 
@@ -16,11 +18,9 @@ data SrcLoc = SrcLoc {
         srcLocColumn :: {-# UNPACK #-} !Int
         }
     deriving(Data,Typeable,Eq,Ord)
-    {-! derive: update, Binary !-}
 
 data SrcSpan = SrcSpan { srcSpanBegin :: !SrcLoc, srcSpanEnd :: !SrcLoc }
     deriving(Data,Typeable,Eq,Ord)
-    {-! derive: update, Binary !-}
 
 -- Useful bogus file names used to indicate where non file based errors are.
 fileNameCommandLine = packString "(command line)"
@@ -63,7 +63,6 @@ instance HasLocation (Located a) where
 
 data Located x = Located SrcSpan x
     deriving(Ord,Show,Data,Typeable,Eq)
-    {-! derive: Binary !-}
 
 fromLocated :: Located x -> x
 fromLocated (Located _ x) = x
@@ -121,3 +120,9 @@ instance Show SrcSpan where
     show SrcSpan { srcSpanBegin =  sl1, srcSpanEnd = sl2 }
       | sl1 == sl2 = show sl1
       | otherwise = show sl1 ++ "-" ++ show sl2
+
+$(derive makeUpdate ''SrcLoc)
+$(derive makeBinary ''SrcLoc)
+$(derive makeUpdate ''SrcSpan)
+$(derive makeBinary ''SrcSpan)
+$(derive makeBinary ''Located)

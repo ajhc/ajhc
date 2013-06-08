@@ -1,9 +1,11 @@
+{-# LANGUAGE TemplateHaskell #-}
 -- | The definitions related to jhc core
 
 module E.Type where
 
 import Data.Foldable hiding(concat)
 import Data.Traversable
+import Data.DeriveTH
 
 import C.Prims
 import Cmm.Number
@@ -14,6 +16,7 @@ import Name.Name
 import Name.Names
 import StringTable.Atom
 import Util.Gen
+import Util.SetLike
 import qualified Info.Info as Info
 
 {- @Internals
@@ -110,7 +113,6 @@ data ARules = ARules {
 data Lit e t = LitInt { litNumber :: Number, litType :: t }
     | LitCons  { litName :: Name, litArgs :: [e], litType :: t, litAliasFor :: Maybe E }
     deriving(Eq,Ord,Functor,Foldable,Traversable)
-        {-!derive: is !-}
 
 --------------------------------------
 -- Lambda Cube (it's just fun to say.)
@@ -129,7 +131,6 @@ data ESort =
     | EStarStar   -- ^ the supersort of boxed types
     | ESortNamed Name -- ^ user defined sorts
     deriving(Eq, Ord)
-    {-! derive: is !-}
 
 data E = EAp E E
     | ELam TVr E
@@ -150,7 +151,6 @@ data E = EAp E E
        eCaseAllFV  :: IdSet
        }
 	deriving(Eq, Ord)
-    {-! derive: is, from !-}
 
 --instance Functor (Lit e) where
 --    fmap f x = runIdentity $ fmapM (return . f) x
@@ -182,7 +182,11 @@ instance Show a => Show (TVr' a) where
 type TVr = TVr' E
 data TVr' e = TVr { tvrIdent :: !Id, tvrType :: e, tvrInfo :: Info.Info }
     deriving(Functor,Foldable,Traversable)
-        {-!derive: update !-}
+
+tvrInfo_u f r@TVr{tvrInfo  = x} = r{tvrInfo = f x}
+tvrType_u f r@TVr{tvrType  = x} = r{tvrType = f x}
+tvrInfo_s v =  tvrInfo_u  (const v)
+tvrType_s v =  tvrType_u  (const v)
 
 data Alt e = Alt (Lit TVr e) e
     deriving(Eq,Ord)
@@ -254,3 +258,8 @@ tVr x y = tvr { tvrIdent = x, tvrType = y }
 tvr = TVr { tvrIdent = emptyId, tvrType = Unknown, tvrInfo = Info.empty }
 
 --  Imported from other files :-
+
+$(derive makeIs ''Lit)
+$(derive makeIs ''ESort)
+$(derive makeIs ''E)
+$(derive makeFrom ''E)

@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS -funbox-strict-fields #-}
 -- |
 -- This module implements the Kind Inference algorithm, and the routines which
@@ -22,6 +23,7 @@ import Control.Monad.Reader
 import Control.Monad.Writer
 import Data.Binary
 import Data.Generics(Typeable, everything, mkQ)
+import Data.DeriveTH
 import Data.IORef
 import Data.List
 import System.IO.Unsafe
@@ -52,7 +54,6 @@ data KindEnv = KindEnv {
     kindEnvAssocs :: Map.Map Name (Int,Int),
     kindEnvClasses :: Map.Map Name [Kind]
     } deriving(Typeable,Show)
-        {-!derive: Monoid !-}
 
 instance Binary KindEnv where
     put KindEnv { kindEnv = a, kindEnvAssocs = b, kindEnvClasses = c } =
@@ -623,3 +624,5 @@ hoistType t = f t where
 fromHsTyVar (HsTyVar v) = return v
 fromHsTyVar (HsTyExpKind (Located _ t) _) = fromHsTyVar t
 fromHsTyVar _ = fail "fromHsTyVar"
+
+$(derive makeMonoid ''KindEnv)

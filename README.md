@@ -12,10 +12,9 @@ This project is founded by [Metasepi Project](http://metasepi.org/).
 ## How to build latest version
 
     $ sudo apt-get install make locales autoconf libreadline-dev libwww-perl libconfig-yaml-perl \
-      graphviz haskell-platform drift pandoc hscolour po4a libghc-temporary-dev \
-      libghc-haskeline-dev libghc-utf8-string-dev libghc-hssyck-dev libghc-test-framework-th-dev \
-      libghc-test-framework-hunit-dev libghc-test-framework-quickcheck2-dev libgc-dev gcc-multilib \
-      valgrind
+      graphviz haskell-platform pandoc hscolour po4a libghc-temporary-dev libghc-haskeline-dev
+      libghc-utf8-string-dev libghc-hssyck-dev libghc-test-framework-th-dev libghc-test-framework-hunit-dev
+      libghc-test-framework-quickcheck2-dev libgc-dev gcc-multilib valgrind
     $ git clone git://github.com/ajhc/ajhc.git
     $ cd ajhc
     $ git checkout arafura
@@ -73,15 +72,10 @@ It's good choosing the below option.
 
 http://www.haskell.org/platform/windows.html
 
-### Install DrIFT
-
-    $ cabal install DrIFT-cabalized
-
 ## Future plan
 
 ### Yet
 
-* No more depend on DrIFT. Use http://hackage.haskell.org/package/derive.
 * No more depend on Perl (LWP and YAML).
 * Rewrite Cortex-M3 base library with Ajhc.
 * Analyze jhc internal (Japanese doc).
@@ -106,3 +100,4 @@ http://www.haskell.org/platform/windows.html
 * Support LPCXpresso NXP LPX1769 with demo.
 * Pass all regress test, and enable regress fail setting on travis-ci.
   https://travis-ci.org/ajhc/ajhc
+* No more depend on DrIFT. Use http://hackage.haskell.org/package/derive.

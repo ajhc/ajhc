@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, TemplateHaskell #-}
 module DataConstructors(
     AliasType(..),
     boxPrimitive,
@@ -52,6 +52,7 @@ import qualified Data.Set as Set hiding(map)
 
 import C.Prims
 import Data.Binary
+import Data.DeriveTH
 import Doc.DocLike as D
 import Doc.PPrint
 import Doc.Pretty
@@ -121,7 +122,6 @@ kind k = error $ "DataConstructors.kind: cannot convert " ++ show k
 
 data AliasType = ErasedAlias | RecursiveAlias
     deriving(Eq,Ord,Show)
-    {-! derive: Binary !-}
 
 -- these apply to types
 data DataFamily =
@@ -132,7 +132,6 @@ data DataFamily =
     | DataNormal [Name]            -- child constructors
     | DataAlias !AliasType
     deriving(Eq,Ord,Show)
-    {-! derive: Binary !-}
 
 -- | Record describing a data type.
 -- * is also a data type containing the type constructors, which are unlifted, yet boxed.
@@ -147,14 +146,12 @@ data Constructor = Constructor {
     conChildren  :: DataFamily,
     conCTYPE     :: Maybe ExtType -- external type
     } deriving(Show)
-    {-! derive: Binary !-}
 
 data Slot =
     SlotNormal E
     | SlotUnpacked E !Name [E]
     | SlotExistential TVr
     deriving(Eq,Ord,Show)
-    {-! derive: Binary !-}
 
 mapESlot f (SlotExistential t) = SlotExistential t { tvrType = f (tvrType t) }
 mapESlot f (SlotNormal e) = SlotNormal $ f e
@@ -340,7 +337,7 @@ typesCompatable a b = f etherealIds a b where
 extractPrimitive :: Monad m => DataTable -> E -> m (E,(ExtType,E))
 extractPrimitive dataTable e = case followAliases dataTable (getType e) of
     st@(ELit LitCons { litName = c, litArgs = [], litType = t })
-        | t == eHash -> return (e,(ExtType (packString $show c),st))
+        | t == eHash -> return (e,(ExtType (packString $ show c),st))
         | otherwise -> do
             Constructor { conChildren = DataNormal [cn] }  <- getConstructor c dataTable
             Constructor { conOrigSlots = [SlotNormal st] } <- getConstructor cn dataTable
@@ -922,3 +919,8 @@ rawExtTypeMap = Map.fromList [
     (rt_float80,   "long double"),
     (rt_float128,  "__float128")
     ]
+
+$(derive makeBinary ''AliasType)
+$(derive makeBinary ''DataFamily)
+$(derive makeBinary ''Constructor)
+$(derive makeBinary ''Slot)

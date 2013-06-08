@@ -1,4 +1,4 @@
-{-# LANGUAGE NoMonoLocalBinds, NamedFieldPuns #-}
+{-# LANGUAGE NoMonoLocalBinds, NamedFieldPuns, TemplateHaskell #-}
 module FrontEnd.Class(
     printClassHierarchy,
     instanceToTopDecls,
@@ -32,6 +32,7 @@ import Control.Monad.Writer(Monoid(..))
 import Data.Generics(mkQ,something)
 import Data.List(nub)
 import Data.Maybe
+import Data.DeriveTH
 import Debug.Trace
 import Text.PrettyPrint.HughesPJ(render,Doc())
 import Text.Printf
@@ -66,7 +67,6 @@ data Inst = Inst {
     instHead    :: Qual Pred,
     instAssocs  :: [(Tycon,[Tyvar],[Tyvar],Sigma)]
     } deriving(Eq,Ord,Show)
-    {-! derive: Binary !-}
 
 instance PPrint a (Qual Pred) => PPrint a Inst where
     pprint Inst { instHead = h, instAssocs = [], instDerived = d } = (if d then text "*" else text " ") <> pprint h
@@ -86,7 +86,6 @@ data ClassType = ClassNormal | ClassTypeFamily | ClassDataFamily | ClassAlias
 -- Bool is true if data declaration instead of type declaration
 data AssociatedType = Assoc !Tycon !Bool [Tyvar] Kind
     deriving(Eq,Show)
-    {-! derive: Binary !-}
 
 data ClassRecord = ClassRecord {
     className    :: !Class, -- ^ can be a TypeConstructor if we are a type or data family
@@ -97,7 +96,6 @@ data ClassRecord = ClassRecord {
     classAssumps :: [(Name,Sigma)], -- ^ method signatures
     classAssocs  :: [AssociatedType]
     } deriving (Show,Eq)
-    {-! derive: Binary !-}
 
 newtype InstanceEnv = InstanceEnv {
     instanceEnv :: Map.Map (Name,Name) ([Tyvar],[Tyvar],Type) }
@@ -535,3 +533,7 @@ unaryPassDerivable = [
     class_Bounded
     ]
 -}
+
+$(derive makeBinary ''Inst)
+$(derive makeBinary ''AssociatedType)
+$(derive makeBinary ''ClassRecord)

@@ -1,7 +1,7 @@
 ACLOCAL_AMFLAGS=-I ac-macros
 
 BUILT_SOURCES= src/RawFiles.hs src/FrontEnd/HsParser.hs src/FlagDump.hs \
-	       src/FlagOpts.hs src/Name/Prim.hs src/Info/Properties.hs $(DRIFTFILES)
+	       src/FlagOpts.hs src/Name/Prim.hs src/Info/Properties.hs
 
 MY_CINCLUDES= -I$(srcdir)/src/data -I$(srcdir)/src/StringTable -I$(srcdir)/src/cbits -I$(builddir)/src/cbits
 
@@ -23,18 +23,6 @@ RAWFILES = src/data/ViaGhc.hs src/data/prelude.m4 \
 	   rts/rts/gc_jgc.c rts/rts/gc_jgc.h rts/rts/profile.c rts/rts/profile.h rts/rts/cdefs.h rts/rts/rts_support.c \
 	   rts/rts/rts_support.h rts/rts/gc.h rts/rts/gc_none.c rts/rts/gc_none.h rts/rts/jhc_rts.c rts/rts/jhc_rts.h \
 	   rts/lib/lib_cbits.c rts/jhc_rts_header.h rts/lib/lib_cbits.h rts/rts/gc_jgc_internal.h
-
-DRIFTFILES = drift_processed/C/FFI.hs drift_processed/C/FromGrin2.hs drift_processed/Cmm/Op.hs drift_processed/C/Prims.hs drift_processed/DataConstructors.hs \
-   drift_processed/E/CPR.hs drift_processed/E/Demand.hs drift_processed/E/LambdaLift.hs \
-   drift_processed/E/SSimplify.hs drift_processed/E/ToHs.hs drift_processed/E/TypeCheck.hs drift_processed/E/Type.hs drift_processed/FrontEnd/Class.hs \
-   drift_processed/FrontEnd/HsSyn.hs drift_processed/FrontEnd/KindInfer.hs \
-   drift_processed/FrontEnd/Representation.hs drift_processed/FrontEnd/SrcLoc.hs drift_processed/FrontEnd/Tc/Kind.hs \
-   drift_processed/FrontEnd/Tc/Monad.hs drift_processed/Grin/SSimplify.hs drift_processed/Name/VConsts.hs drift_processed/Options.hs \
-   drift_processed/DataConstructors.hs-boot drift_processed/Ho/Type.hs  drift_processed/Ho/Build.hs
-
-drift_processed/%: src/%
-	mkdir -p `echo $@ | sed -e 's@/[^/]*$$@@'`
-	$(DRIFTGHC) $< -o $@
 
 install-exec-hook: cabal-install
 
@@ -97,7 +85,7 @@ hl-clean:
 clean-local:
 	cabal clean
 	find . \( \! -path \*/_\* \( -name \*.o-boot -o -name \*.hi -o -name \*.o -o -name \*.hi-boot \) \) -print | xargs rm -f --
-	rm -rf dist drift_processed tmp autom4te.cache
+	rm -rf dist tmp autom4te.cache
 	$(MAKE) -C selftest clean
 	$(MAKE) -C rts/test clean
 
@@ -155,7 +143,7 @@ ajhc_man.mkd: $(JHC_MANUAL_FILES)
 ajhc.1: ajhc_man.mkd
 	pandoc $< -s -f markdown -t man -s  -o $@
 
-options.mkd: drift_processed/Options.hs | $(bin_PROGRAMS)$(EXEEXT)
+options.mkd: src/Options.hs | $(bin_PROGRAMS)$(EXEEXT)
 	echo "{-@Options 1" > $@
 	./$(bin_PROGRAMS) --help | sed -e 's/^/    /'  >> $@
 
@@ -168,7 +156,7 @@ show_elibs: lib/ext/*.cabal  lib/ext/*.yaml
 
 JHC_MANUAL_FILES = docs/make.mkd options.mkd docs/dependency_format.mkd docs/pragmas.mkd docs/differences.mkd \
 	docs/unboxed.mkd rts/rts/jhc_rts.c src/FlagOpts.mkd src/FlagDump.mkd src/E/PrimOpt.hs \
-	drift_processed/E/TypeCheck.hs drift_processed/Options.hs
+	src/E/TypeCheck.hs src/Options.hs
 
 regress: cabal-build
 	mkdir -p regress/results/dummy

@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module FrontEnd.Representation(
     Type(..),
     Tyvar(..),
@@ -26,6 +27,7 @@ import Control.Monad.Identity
 import Data.IORef
 
 import Data.Binary
+import Data.DeriveTH
 import Doc.DocLike
 import Doc.PPrint
 import FrontEnd.Tc.Kind
@@ -40,7 +42,6 @@ import Util.VarName
 
 data MetaVarType = Tau | Rho | Sigma
              deriving(Eq,Ord)
-    {-! derive: Binary !-}
 
 data Type  = TVar     { typeVar :: !Tyvar }
            | TCon     { typeCon :: !Tycon }
@@ -51,7 +52,6 @@ data Type  = TVar     { typeVar :: !Tyvar }
            | TMetaVar { metaVar :: MetaVar }
            | TAssoc   { typeCon :: !Tycon, typeClassArgs :: [Type], typeExtraArgs :: [Type] }
              deriving(Ord,Show)
-    {-! derive: Binary !-}
 
 -- | metavars are used in type checking
 data MetaVar = MetaVar {
@@ -60,7 +60,6 @@ data MetaVar = MetaVar {
     metaRef :: {-# UNPACK #-} !(IORef (Maybe Type)),
     metaType :: !MetaVarType
     }
-    {-! derive: Binary !-}
 
 instance Eq MetaVar where
     a == b = metaUniq a == metaUniq b
@@ -106,7 +105,6 @@ tassocToAp _ = error "Representation.tassocToAp: bad."
 -- Unquantified type variables
 
 data Tyvar = Tyvar { tyvarName ::  {-# UNPACK #-} !Name, tyvarKind :: Kind }
-    {-  derive: Binary -}
 
 instance Show Tyvar where
     showsPrec _ Tyvar { tyvarName = hn, tyvarKind = k } = shows hn . ("::" ++) . shows k
@@ -136,7 +134,6 @@ instance Ord Tyvar where
 
 data Tycon = Tycon { tyconName :: Name, tyconKind :: Kind }
     deriving(Eq, Show,Ord)
-    {-! derive: Binary !-}
 
 instance ToTuple Tycon where
     toTuple n = Tycon (nameTuple TypeConstructor n) (foldr Kfun kindStar $ replicate n kindStar)
@@ -155,12 +152,10 @@ a `fn` b    = TArrow a b
 -- Predicates
 data Pred   = IsIn Class Type | IsEq Type Type
               deriving(Show, Eq,Ord)
-    {-! derive: Binary !-}
 
 -- Qualified entities
 data Qual t =  [Pred] :=> t
               deriving(Show, Eq,Ord)
-    {-! derive: Binary !-}
 
 instance (DocLike d,PPrint d t) => PPrint d (Qual t) where
     pprint ([] :=> r) = pprint r
@@ -316,3 +311,10 @@ tTTuple ts = foldl TAp (toTuple (length ts)) ts
 
 tTTuple' ts = foldl TAp (TCon $ Tycon (unboxedNameTuple TypeConstructor  n) (foldr Kfun kindUTuple $ replicate n kindStar)) ts where
     n = length ts
+
+$(derive makeBinary ''MetaVarType)
+$(derive makeBinary ''Type)
+$(derive makeBinary ''MetaVar)
+$(derive makeBinary ''Tycon)
+$(derive makeBinary ''Pred)
+$(derive makeBinary ''Qual)

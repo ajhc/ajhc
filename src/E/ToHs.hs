@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module E.ToHs(compileToHs) where
 
 import Char
@@ -7,6 +8,7 @@ import Control.Monad.RWS
 import Control.Monad.Trans
 import Control.Monad.Writer
 import Data.Monoid
+import Data.DeriveTH
 import System.IO
 import Text.PrettyPrint.HughesPJ(render,($$),nest,Doc())
 import qualified Data.Set as Set
@@ -158,7 +160,6 @@ emptyEnvironment = Env {
     }
 
 data Collect = Coll { collNames :: Set.Set (Name,Int,Bool), collPrims :: Set.Set Prim }
-    {-! derive: Monoid !-}
 
 newtype TM a = TM { fromTM :: RWST Environment Collect Int IO a }
     deriving(MonadState Int,MonadReader Environment,MonadWriter Collect,Monad,Functor,MonadIO)
@@ -483,3 +484,5 @@ mangleIdent xs =  concatMap f xs where
         f '_' = "_u"
         f c | isAlphaNum c = [c]
         f c = '_':'x':showHex (ord c) ""
+
+$(derive makeMonoid ''Collect)

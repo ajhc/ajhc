@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Grin.SSimplify(simplify,explicitRecurse) where
 
 import Control.Monad.Identity
@@ -9,6 +10,7 @@ import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Data.DeriveTH
 
 import Grin.Grin
 import Grin.Noodle
@@ -40,7 +42,6 @@ data SEnv = SEnv {
     envPapp  :: IM.IntMap (Atom,[Val])
     --envPush  :: IM.IntMap Exp
     }
-    {-! derive: Monoid !-}
 
 newtype SState = SState { usedVars :: IS.IntSet }
 
@@ -48,7 +49,8 @@ data SCol = SCol {
     colStats :: Stats.Stat,
     colFreeVars :: GSet Var
     }
-    {-! derive: Monoid !-}
+
+$(derive makeMonoid ''SCol)
 
 {-
 data ExpInfo = ExpInfo {
@@ -429,3 +431,5 @@ explicitRecurse grin =  mapGrinFuncsM f grin where
             g (App n rs t) | n == name = App nname rs t
             g e = tickle g e
         return $ as :-> grinLet [createFuncDef True nname (as :-> g e) ] (App nname as (getType e))
+
+$(derive makeMonoid ''SEnv)

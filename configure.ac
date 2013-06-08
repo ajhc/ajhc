@@ -29,14 +29,6 @@ AC_ARG_WITH(hcflags,
             [  --with-hcflags=HCFLAGS  specify flags for Haskell compiler],
 	    [HCFLAGS=$withval])
 
-AC_PATH_PROG([DRIFTGHC],[DrIFT], [])
-if test -z "$DRIFTGHC"; then
-    AC_PATH_PROG([DRIFTGHC],[DrIFT-cabalized], [])
-fi
-if test -z "$DRIFTGHC"; then
-    echo [DrIFT not found: using preprocessed files]
-fi
-
 AC_CHECK_PROGS([MINGW],[mingw-gcc mingw32-gcc i386-mingw32-gcc i686-w64-mingw32-gcc],
                [i386-mingw32-gcc])
 

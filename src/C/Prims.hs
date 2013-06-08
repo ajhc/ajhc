@@ -1,9 +1,10 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, TemplateHaskell #-}
 module C.Prims where
 
 import Data.Binary
 import Data.Monoid(Monoid(..))
 import Data.Typeable
+import Data.DeriveTH
 import qualified Data.Set as Set
 
 import Doc.DocLike
@@ -16,10 +17,9 @@ import GHC.Exts
 
 data CallConv = CCall | StdCall | CApi | Primitive | DotNet
     deriving(Eq,Ord,Show)
-    {-! derive: Binary !-}
+$(derive makeBinary ''CallConv)
 
 data Safety = Safe | Unsafe deriving(Eq,Ord,Show)
-    {-! derive: Binary !-}
 
 newtype ExtType = ExtType PackedString
     deriving(Binary,IsString,Eq,Ord)
@@ -35,7 +35,6 @@ newtype Requires = Requires (Set.Set (CallConv,PackedString))
 
 data DotNetPrim = DotNetField | DotNetCtor | DotNetMethod
     deriving(Typeable, Eq, Ord, Show)
-    {-! derive: Binary !-}
 
 primReqs p = f p where
     f CConst {} = primRequires p
@@ -87,11 +86,9 @@ data Prim =
         primRetTy :: Op.Ty
         }
     deriving(Typeable, Eq, Ord, Show)
-    {-! derive: Binary !-}
 
 data PrimTypeInfo = PrimSizeOf | PrimMaxBound | PrimMinBound | PrimAlignmentOf | PrimUMaxBound
     deriving(Typeable, Eq, Ord, Show)
-    {-! derive: Binary !-}
 
 primStaticTypeInfo :: Op.Ty -> PrimTypeInfo -> Maybe Integer
 primStaticTypeInfo (Op.TyBits (Op.Bits b) _) w = Just ans where
@@ -180,3 +177,8 @@ parseDotNetFFI s = ans where
     g dn ['[':rs] | (as,']':nm) <- span (/= ']') rs = return dn { primAssembly = packString as, primDotNetName = packString nm }
     g dn [n] = return dn { primDotNetName = packString n }
     g _ _ = fail "invalid .NET ffi specification"
+
+$(derive makeBinary ''Safety)
+$(derive makeBinary ''DotNetPrim)
+$(derive makeBinary ''Prim)
+$(derive makeBinary ''PrimTypeInfo)

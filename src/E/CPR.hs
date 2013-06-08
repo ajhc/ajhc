@@ -1,9 +1,11 @@
+{-# LANGUAGE TemplateHaskell #-}
 module E.CPR(Val(..), cprAnalyzeDs, cprAnalyzeProgram) where
 
 import Control.Monad.Writer(runWriter,tell,Monoid(..))
 import Data.Binary
 import Data.Monoid()
 import Data.Typeable
+import Data.DeriveTH
 import qualified Data.Map as Map
 
 import Cmm.Number
@@ -31,7 +33,6 @@ data Val =
     | Tag [Name]      -- A nullary constructor, like True, False
     | Bot             -- the bottom
     deriving(Eq,Ord,Typeable)
-    {-! derive: Binary !-}
 
 trimVal v = f (0::Int) v where
     f !n Tup {} | n > 5 = Top
@@ -136,3 +137,5 @@ cprAnalyze dataTable env e = cprAnalyze' env e where
         f (EError {}) = Bot
         f e = error $ "cprAnalyze'.f: " ++ show e
         g = snd . cprAnalyze' env
+
+$(derive makeBinary ''Val)

@@ -1,4 +1,4 @@
-{-# LANGUAGE ImpredicativeTypes #-}
+{-# LANGUAGE ImpredicativeTypes, TemplateHaskell #-}
 module FrontEnd.Tc.Monad(
     CoerceTerm(..),
     Tc(),
@@ -54,6 +54,7 @@ import Control.Monad.Reader
 import Control.Monad.Writer.Strict
 import Data.IORef
 import Data.List
+import Data.DeriveTH
 --import Text.PrettyPrint.HughesPJ(Doc)
 import qualified Data.Foldable as T
 import qualified Data.Map as Map
@@ -84,6 +85,15 @@ import {-# SOURCE #-} FrontEnd.Tc.Class(simplify)
 -- data BindingType = RecursiveInfered | Supplied
 type TypeEnv = Map.Map Name Sigma
 
+-- | information that is passed into the type checker.
+data TcInfo = TcInfo {
+    tcInfoEnv            :: TypeEnv, -- initial typeenv, data constructors, and previously infered types
+    tcInfoSigEnv         :: TypeEnv, -- type signatures used for binding analysis
+    tcInfoModName        :: Module,
+    tcInfoKindInfo       :: KindEnv,
+    tcInfoClassHierarchy :: ClassHierarchy
+    }
+
 -- read only environment, set up before type checking.
 data TcEnv = TcEnv {
     tcInfo              :: TcInfo,
@@ -113,19 +123,11 @@ data Output = Output {
     tcWarnings       :: !(Seq.Seq Warning),
     outKnots         :: [(Name,Name)]
     }
-   {-! derive: Monoid !-}
+
+$(derive makeMonoid ''Output)
 
 newtype Tc a = Tc (ReaderT TcEnv (WriterT Output IO) a)
     deriving(MonadFix,MonadIO,MonadReader TcEnv,MonadWriter Output,Functor)
-
--- | information that is passed into the type checker.
-data TcInfo = TcInfo {
-    tcInfoEnv            :: TypeEnv, -- initial typeenv, data constructors, and previously infered types
-    tcInfoSigEnv         :: TypeEnv, -- type signatures used for binding analysis
-    tcInfoModName        :: Module,
-    tcInfoKindInfo       :: KindEnv,
-    tcInfoClassHierarchy :: ClassHierarchy
-    }
 
 getDeName :: DeNameable n => Tc (n -> n)
 getDeName = do

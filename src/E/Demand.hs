@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module E.Demand(
     Demand(..),
     DemandSignature(..),
@@ -13,6 +14,7 @@ import Control.Monad.Writer hiding(Product(..))
 import Data.Binary
 import Data.List hiding(union,delete)
 import Data.Typeable
+import Data.DeriveTH
 
 --import Debug.Trace
 import DataConstructors
@@ -36,23 +38,18 @@ data Demand =
     | Error !SubDemand  -- diverges, might use arguments
     | Absent           -- Not used
     deriving(Eq,Ord,Typeable)
-        {-! derive: Binary !-}
 
 data SubDemand = None | Product ![Demand]
     deriving(Eq,Ord)
-        {-! derive: Binary !-}
 
 data DemandEnv = DemandEnv !(IdMap Demand) !Demand
     deriving(Eq,Ord)
-        {-! derive: Binary !-}
 
 data DemandType = (:=>) !DemandEnv ![Demand]
     deriving(Eq,Ord)
-        {-! derive: Binary !-}
 
 data DemandSignature = DemandSignature {-# UNPACK #-} !Int !DemandType
     deriving(Eq,Ord,Typeable)
-        {-! derive: Binary !-}
 
 idGlb = Absent
 
@@ -405,3 +402,9 @@ instance Show DemandEnv where
 
 instance Show DemandSignature where
     showsPrec _ (DemandSignature n dt) = showString "<" . shows n . showString "," . shows dt . showString ">"
+
+$(derive makeBinary ''Demand)
+$(derive makeBinary ''SubDemand)
+$(derive makeBinary ''DemandEnv)
+$(derive makeBinary ''DemandType)
+$(derive makeBinary ''DemandSignature)

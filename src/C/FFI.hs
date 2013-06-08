@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module C.FFI(
     CallConv(..),
     Safety(..),
@@ -9,6 +10,7 @@ module C.FFI(
 
 import C.Prims
 import Data.Binary
+import Data.DeriveTH
 import Data.Typeable
 
 type CName = String
@@ -30,4 +32,5 @@ data FfiExport = FfiExport {
     ffiExportRetType  :: ExtType
     }
  deriving(Eq,Ord,Show,Typeable)
-     {-! derive: Binary !-}
+
+$(derive makeBinary ''FfiExport)

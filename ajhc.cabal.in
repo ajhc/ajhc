@@ -36,7 +36,7 @@ source-repository head
     location: https://github.com/ajhc/ajhc.git
 
 library
-    hs-source-dirs: drift_processed src
+    hs-source-dirs: src
     default-language: Haskell98
 
     c-sources:
@@ -54,6 +54,7 @@ library
         binary,
         bytestring,
         containers,
+        derive,
         directory,
         fgl,
         filepath,
@@ -264,7 +265,7 @@ library
         PostfixOperators, PatternGuards, LiberalTypeSynonyms, RankNTypes,
         TypeOperators, EmptyDataDecls, KindSignatures
 
-    ghc-options:    -W -fno-warn-unused-matches  -fwarn-type-defaults -i./drift_processed -i./src
+    ghc-options:    -W -fno-warn-unused-matches  -fwarn-type-defaults -i./src
     cc-options:     -std=c99
     cpp-options:    -DUSE_HASKELINE -DWITH_CABAL
 
@@ -280,6 +281,7 @@ executable @PACKAGE_NAME@
         binary,
         bytestring,
         containers,
+        derive,
         directory,
         fgl,
         filepath,

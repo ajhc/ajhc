@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module E.SSimplify(
     Occurance(..),
     cacheSimpOpts,
@@ -13,6 +14,7 @@ module E.SSimplify(
 import Control.Monad.Identity
 import Data.Maybe
 import Data.Typeable
+import Data.DeriveTH
 import Debug.Trace
 import Data.List hiding(delete,union,insert)
 import qualified Data.Set as Set
@@ -369,7 +371,6 @@ data Env = Env {
     envInScope :: IdMap Binding,
     envInScopeCache :: IdMap E
     }
-    {-! derive: Monoid !-}
 
 envSubst_u f r@Env{envSubst  = x} = r{envSubst = f x}
 envSubst_s v =  envSubst_u  (const v)
@@ -1080,3 +1081,5 @@ smAddBoundNamesIdSet nset = --trace ("addBoundNamesIdSet: "++show (size nset)) $
    do modifyIds (\ (used,bound) -> (nset `union` used, nset `union` bound) )
 
 --smAddBoundNamesIdMap = smAddNamesIdSet . idMapToIdSet
+
+$(derive makeMonoid ''Env)

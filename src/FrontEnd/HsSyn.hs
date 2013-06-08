@@ -1,7 +1,9 @@
+{-# LANGUAGE TemplateHaskell #-}
 module FrontEnd.HsSyn where
 
 import Data.Binary
 import Data.Generics
+import Data.DeriveTH
 
 import C.FFI
 import FrontEnd.SrcLoc
@@ -44,7 +46,6 @@ data HsModule = HsModule {
     hsModuleOptions :: [String],
     hsModuleOpt     :: Opt
     }
-  {-! derive: update !-}
 
 -- Export/Import Specifications
 
@@ -71,7 +72,6 @@ data HsImportDecl = HsImportDecl {
 
 data HsAssoc = HsAssocNone | HsAssocLeft | HsAssocRight
   deriving(Eq,Show)
-  {-! derive: Binary !-}
 
 instance HasLocation HsDecl where
     srcLoc HsTypeDecl	  { hsDeclSrcLoc = sl } = sl
@@ -209,7 +209,6 @@ data HsDecl
         hsDeclClassHead :: HsClassHead
         }
   deriving(Eq,Show)
-  {-! derive: is !-}
 
 data HsRule = HsRule {
     hsRuleUniq      :: (Module,Int),
@@ -250,7 +249,6 @@ data HsConDecl
         hsConDeclRecArg :: [([HsName],HsBangType)]
         }
   deriving(Eq,Show)
-  {-! derive: is, update !-}
 
 hsConDeclArgs HsConDecl { hsConDeclConArg = as } = as
 hsConDeclArgs HsRecDecl { hsConDeclRecArg = as } = concat [ replicate (length ns) t | (ns,t) <- as]
@@ -272,7 +270,6 @@ data HsQualType = HsQualType {
     hsQualTypeContext :: HsContext,
     hsQualTypeType :: HsType
     } deriving(Data,Typeable,Eq,Ord,Show)
-  {-! derive: Binary !-}
 
 type LHsType = Located HsType
 
@@ -300,14 +297,12 @@ data HsType
     | HsTyAssoc
     | HsTyEq HsType HsType
   deriving(Data,Typeable,Eq,Ord,Show)
-  {-! derive: Binary, is !-}
 
 data HsTyVarBind = HsTyVarBind {
     hsTyVarBindSrcLoc :: SrcLoc,
     hsTyVarBindName :: HsName,
     hsTyVarBindKind :: Maybe HsKind }
   deriving(Data,Typeable,Eq,Ord,Show)
-  {-! derive: Binary, update !-}
 
 hsTyVarBind = HsTyVarBind {
     hsTyVarBindSrcLoc = bogusASrcLoc,
@@ -322,7 +317,6 @@ type HsContext = [HsAsst]
 
 data HsAsst = HsAsst HsName [HsName] | HsAsstEq HsType HsType
   deriving(Data,Typeable,Eq,Ord, Show)
-    {-! derive: Binary !-}
 
 data HsLiteral
 	= HsInt		!Integer
@@ -338,7 +332,6 @@ data HsLiteral
 	-- GHC extension:
 	| HsLitLit	String
   deriving(Eq,Ord, Show)
-    {-! derive: is !-}
 
 hsParen x@HsVar {} = x
 hsParen x@HsCon {} = x
@@ -392,14 +385,12 @@ data HsExp
 	| HsBangPat { hsExpLExp :: LHsExp }
         | HsLocatedExp LHsExp
  deriving(Eq,Show)
-    {-! derive: is, update !-}
 
 data HsClassHead = HsClassHead {
     hsClassHeadContext :: HsContext,
     hsClassHead :: HsName,
     hsClassHeadArgs :: [HsType] }
  deriving(Eq,Show)
-    {-! derive: update !-}
 
 type LHsPat = Located HsPat
 
@@ -420,7 +411,6 @@ data HsPat
 	| HsPBangPat { hsPatLPat :: LHsPat }
 	| HsPTypeSig SrcLoc HsPat HsQualType  -- scoped type variable extension
  deriving(Eq,Ord,Show)
- {-! derive: is !-}
 
 data HsPatField = HsPFieldPat HsName HsPat
     deriving(Eq,Ord,Show)
@@ -439,7 +429,6 @@ data HsAlt = HsAlt SrcLoc HsPat HsRhs [HsDecl]
 
 data HsKind = HsKind HsName | HsKindFn HsKind HsKind
   deriving(Data,Typeable,Eq,Ord,Show)
-  {-! derive: Binary !-}
 
 hsKindStar = HsKind s_Star
 hsKindHash = HsKind s_Hash
@@ -447,3 +436,21 @@ hsKindBang = HsKind s_Bang
 hsKindQuest = HsKind s_Quest
 hsKindQuestQuest = HsKind s_QuestQuest
 hsKindStarBang = HsKind s_StarBang
+
+$(derive makeUpdate ''HsModule)
+$(derive makeBinary ''HsAssoc)
+$(derive makeIs ''HsDecl)
+$(derive makeIs ''HsConDecl)
+$(derive makeUpdate ''HsConDecl)
+$(derive makeBinary ''HsQualType)
+$(derive makeBinary ''HsType)
+$(derive makeIs ''HsType)
+$(derive makeBinary ''HsTyVarBind)
+$(derive makeUpdate ''HsTyVarBind)
+$(derive makeBinary ''HsAsst)
+$(derive makeIs ''HsLiteral)
+$(derive makeIs ''HsExp)
+$(derive makeUpdate ''HsExp)
+$(derive makeUpdate ''HsClassHead)
+$(derive makeIs ''HsPat)
+$(derive makeBinary ''HsKind)

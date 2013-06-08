@@ -1,8 +1,10 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Ho.Type where
 
 import Data.Monoid
 import qualified Data.ByteString as BS
-import qualified Data.Map as Map
+import Data.Map
+import Data.DeriveTH
 
 import Data.Version
 import DataConstructors(DataTable)
@@ -19,9 +21,10 @@ import FrontEnd.TypeSynonyms(TypeSynonyms)
 import Name.Id
 import Name.Name(Name,Module)
 import PackedString
+import Util.SetLike
 import Support.CFF
 import Support.MapBinaryInstance()
-import qualified Support.MD5 as MD5
+import Support.MD5
 
 cff_magic = chunkType "JHC"
 cff_link  = chunkType "LINK"
@@ -36,9 +39,9 @@ cff_file  = chunkType "FILE"
 
 -- | A SourceHash is the hash of a specific file, it is associated with a
 -- specific 'Module' that said file implements.
-type SourceHash = MD5.Hash
+type SourceHash = Hash
 -- | HoHash is a unique identifier for a ho file or library.
-type HoHash     = MD5.Hash
+type HoHash     = Hash
 
 -- | while a 'Module' is a single Module associated with a single haskell source
 -- file, a 'ModuleGroup' identifies a group of mutually recursive modules.
@@ -59,14 +62,13 @@ data CollectedHo = CollectedHo {
     -- modules
     choOrphanRules :: Rules,
     -- | the hos
-    choHoMap :: Map.Map ModuleGroup Ho,
+    choHoMap :: Map ModuleGroup Ho,
     -- | libraries depended on
-    choLibDeps :: Map.Map PackedString HoHash,
+    choLibDeps :: Map PackedString HoHash,
     -- | these are caches of pre-computed values
     choHo :: Ho, -- ^ cache of combined and renamed ho
     choVarMap :: IdMap (Maybe E) -- ^ cache of variable substitution map
     }
-    {-! derive: update !-}
 
 -- | The header contains basic information about the file, it should be enough to determine whether
 -- we can discard the file right away or consider it further.
@@ -89,7 +91,7 @@ data HoHeader = HoHeader {
 -- against or depend on anything but other libraries.
 data HoIDeps = HoIDeps {
     -- | modules depended on indexed by a hash of the source.
-    hoIDeps :: Map.Map SourceHash (Module,[(Module,SrcLoc)]),
+    hoIDeps :: Map SourceHash (Module,[(Module,SrcLoc)]),
     -- | Haskell Source files depended on
     hoDepends    :: [(Module,SourceHash)],
     -- | Other objects depended on to be considered up to date.
@@ -100,17 +102,17 @@ data HoIDeps = HoIDeps {
 
 data HoLib = HoLib {
     -- | arbitrary metainformation such as library author, web site, etc.
-    hoModuleMap  :: Map.Map Module ModuleGroup,
-    hoReexports  :: Map.Map Module Module,
-    hoModuleDeps :: Map.Map ModuleGroup [ModuleGroup],
+    hoModuleMap  :: Map Module ModuleGroup,
+    hoReexports  :: Map Module Module,
+    hoModuleDeps :: Map ModuleGroup [ModuleGroup],
     hoMetaInfo   :: [(PackedString,PackedString)]
     }
 
 data Library = Library {
     libHoHeader :: HoHeader,
     libHoLib :: HoLib,
-    libTcMap :: (Map.Map ModuleGroup HoTcInfo),
-    libBuildMap :: (Map.Map ModuleGroup HoBuild),
+    libTcMap :: (Map ModuleGroup HoTcInfo),
+    libBuildMap :: (Map ModuleGroup HoBuild),
     libExtraFiles :: [ExtraFile],
     libFileName :: FilePath
     }
@@ -120,16 +122,15 @@ instance Show Library where
 
 -- | data only needed for type checking.
 data HoTcInfo = HoTcInfo {
-    hoExports :: Map.Map Module [Name],
-    hoDefs :: Map.Map Name (SrcLoc,[Name]),
-    hoAssumps :: Map.Map Name Type,        -- ^ used for typechecking
+    hoExports :: Map Module [Name],
+    hoDefs :: Map Name (SrcLoc,[Name]),
+    hoAssumps :: Map Name Type,        -- ^ used for typechecking
     hoFixities :: FixityMap,
     hoKinds :: KindEnv,                    -- ^ used for typechecking
     hoTypeSynonyms :: TypeSynonyms,
     hoClassHierarchy :: ClassHierarchy,
     hoFieldMap :: FieldMap
     }
-    {-! derive: update, Monoid !-}
 
 data HoBuild = HoBuild {
     -- | Filled in by E generation
@@ -137,14 +138,12 @@ data HoBuild = HoBuild {
     hoEs :: [(TVr,E)],
     hoRules :: Rules
     }
-    {-! derive: update, Monoid !-}
 
 data Ho = Ho {
     hoModuleGroup :: ModuleGroup,
     hoTcInfo :: HoTcInfo,
     hoBuild :: HoBuild
     }
-    {-! derive: update !-}
 
 instance Monoid Ho where
     mempty = Ho (error "unknown module group") mempty mempty
@@ -184,3 +183,10 @@ instance Monoid HoBuild where
     }
 
  -}
+
+$(derive makeUpdate ''CollectedHo)
+$(derive makeUpdate ''HoTcInfo)
+$(derive makeMonoid ''HoTcInfo)
+$(derive makeUpdate ''HoBuild)
+$(derive makeMonoid ''HoBuild)
+$(derive makeUpdate ''Ho)

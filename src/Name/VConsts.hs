@@ -1,9 +1,11 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Name.VConsts where
 
 import Control.Applicative
 import Data.Foldable
 import Data.Monoid
 import Data.Traversable
+import Data.DeriveTH
 
 -- This is much more verbose/complicated than it needs be.
 
@@ -75,4 +77,7 @@ data FuncNames a = FuncNames {
     func_runNoWrapper :: a,
     func_runRaw :: a
     }
-    {-! derive: Functor, Traversable, Foldable !-}
+
+$(derive makeFunctor ''FuncNames)
+$(derive makeTraversable ''FuncNames)
+$(derive makeFoldable ''FuncNames)

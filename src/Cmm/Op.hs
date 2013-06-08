@@ -1,9 +1,11 @@
+{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS -funbox-strict-fields #-}
 module Cmm.Op where
 
 import Data.Binary
+import Data.DeriveTH
 import Util.Gen
-import Text.ParserCombinators.ReadP as P
+import qualified Text.ParserCombinators.ReadP as P
 import Text.Read.Lex
 
 {-
@@ -92,7 +94,6 @@ data BinOp
     -- whether two values can be compared at all.
     | FOrdered
     deriving(Eq,Show,Ord,Read,Enum,Bounded)
-    {-! derive: Binary !-}
 
 data UnOp
     = Neg   -- ^ 2s compliment negation
@@ -121,7 +122,6 @@ data UnOp
     | Popcount -- ^ number of bits set to 1 in word
     | Parity   -- ^ number of bits set to 1 mod 2
     deriving(Eq,Show,Ord,Read,Enum,Bounded)
-    {-! derive: Binary !-}
 
 -- conversion ops
 
@@ -138,7 +138,6 @@ data ConvOp
     | U2U         -- ^ perform a 'Lobits' or a 'Zx' depending on the sizes of the arguments
     | B2B         -- ^ a nop, useful for coercing hints (bits 2 bits)
     deriving(Eq,Show,Ord,Read,Enum,Bounded)
-    {-! derive: Binary !-}
 
 data ValOp
     = NaN
@@ -147,15 +146,12 @@ data ValOp
     | PZero
     | NZero
     deriving(Eq,Show,Ord,Read,Bounded)
-    {-! derive: Binary !-}
 
 data ArchBits = BitsMax | BitsPtr | BitsUnknown
     deriving(Eq,Ord)
-    {-! derive: Binary !-}
 
 data TyBits = Bits {-# UNPACK #-} !Int | BitsArch !ArchBits |  BitsExt String
     deriving(Eq,Ord)
-    {-! derive: Binary !-}
 
 data TyHint
     = HintSigned
@@ -164,7 +160,6 @@ data TyHint
     | HintCharacter    -- a unicode character, implies unsigned
     | HintNone         -- no hint
     deriving(Eq,Ord)
-    {-! derive: Binary !-}
 
 data Ty
     = TyBits !TyBits !TyHint
@@ -172,24 +167,23 @@ data Ty
     | TyComplex Ty
     | TyVector !Int Ty
     deriving(Eq,Ord)
-    {-! derive: Binary !-}
 
 --runReadP :: ReadP a -> String -> Maybe a
 --runReadP rp s = case readP_to_S rp s of
 --    [(x,"")] -> Just x
 --    _ -> Nothing
 
-preadTy :: ReadP Ty
-preadTy = choice cs where
-    cs = [ do string "bool"; return TyBool
-         , do char 's'; TyBits x _ <- preadTy; return $ TyBits x HintSigned
-         , do char 'u'; TyBits x _ <- preadTy; return $ TyBits x HintUnsigned
-         , do char 'f'; TyBits x _ <- preadTy; return $ TyBits x HintFloat
-         , do char 'c'; TyBits x _ <- preadTy; return $ TyBits x HintCharacter
-         , do string "bits<"; x <- manyTill P.get (char '>'); return $ TyBits (f x) HintNone
-         , do string "bits"; x <- readDecP; return $ TyBits (Bits x) HintNone
-         , do n <- readDecP; char '*'; t <- preadTy; return (TyVector n t)
-         , do string "i"; t <- preadTy; return (TyComplex t)
+preadTy :: P.ReadP Ty
+preadTy = P.choice cs where
+    cs = [ do P.string "bool"; return TyBool
+         , do P.char 's'; TyBits x _ <- preadTy; return $ TyBits x HintSigned
+         , do P.char 'u'; TyBits x _ <- preadTy; return $ TyBits x HintUnsigned
+         , do P.char 'f'; TyBits x _ <- preadTy; return $ TyBits x HintFloat
+         , do P.char 'c'; TyBits x _ <- preadTy; return $ TyBits x HintCharacter
+         , do P.string "bits<"; x <- P.manyTill P.get (P.char '>'); return $ TyBits (f x) HintNone
+         , do P.string "bits"; x <- readDecP; return $ TyBits (Bits x) HintNone
+         , do n <- readDecP; P.char '*'; t <- preadTy; return (TyVector n t)
+         , do P.string "i"; t <- preadTy; return (TyComplex t)
          ]
     f "ptr" = BitsArch BitsPtr
     f "max" = BitsArch BitsMax
@@ -256,7 +250,6 @@ data Op v
     | ValOp ValOp
     | ConvOp ConvOp v
     deriving(Eq,Show,Ord)
-    {-! derive: Binary !-}
 
 binopType :: BinOp -> Ty -> Ty -> Ty
 binopType Mulx  (TyBits (Bits i) h) _ = TyBits (Bits (i*2)) h
@@ -406,3 +399,13 @@ instance IsOperator (Op v) where
     isEagerSafe (UnOp o _) = isEagerSafe o
     isEagerSafe (ConvOp o _) = isEagerSafe o
     isEagerSafe _ = False
+
+$(derive makeBinary ''BinOp)
+$(derive makeBinary ''UnOp)
+$(derive makeBinary ''ConvOp)
+$(derive makeBinary ''ValOp)
+$(derive makeBinary ''ArchBits)
+$(derive makeBinary ''TyBits)
+$(derive makeBinary ''TyHint)
+$(derive makeBinary ''Ty)
+$(derive makeBinary ''Op)
