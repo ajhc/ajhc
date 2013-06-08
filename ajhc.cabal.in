@@ -77,68 +77,21 @@ library
     exposed-modules:
         C.FFI
         C.FromGrin2
+        C.Generate
         C.Prims
         Cmm.Number
-        DataConstructors
-        Doc.DocLike
-        Doc.Pretty
-        E.Main
-        E.Program
-        E.Rules
-        E.Type
-        FlagDump
-        FrontEnd.Class
-        FrontEnd.Exports
-        FrontEnd.HsSyn
-        FrontEnd.Infix
-        FrontEnd.KindInfer
-        FrontEnd.Rename
-        FrontEnd.Representation
-        FrontEnd.SrcLoc
-        FrontEnd.Tc.Kind
-        FrontEnd.Tc.Module
-        FrontEnd.Tc.Type
-        FrontEnd.TypeSynonyms
-        FrontEnd.Warning
-        Grin.FromE
-        Grin.Grin
-        Grin.Main
-        Grin.Show
-        Ho.Build
-        Ho.Collected
-        Ho.Library
-        Ho.Type
-        Info.Info
-        Info.Types
-        Interactive
-        Name.Id
-        Name.Name
-        Options
-        PackedString
-        Stats
-        StringTable.Atom
-        Support.CFF
-        Support.TempDir
-        Util.BitSet
-        Util.GMap
-        Util.Gen
-        Util.HasSize
-        Util.Perhaps
-        Util.SHA1
-        Util.SetLike
-        Version.Version
-
-    other-modules:
-        C.Generate
         Cmm.Op
         Cmm.OpEval
+        DataConstructors
         DerivingDrift.DataP
         DerivingDrift.Drift
         DerivingDrift.RuleUtils
         DerivingDrift.StandardRules
         Doc.Attr
         Doc.Chars
+        Doc.DocLike
         Doc.PPrint
+        Doc.Pretty
         E.Annotate
         E.Arbitrary
         E.Binary
@@ -154,12 +107,16 @@ library
         E.LambdaLift
         E.LetFloat
         E.Lint
+        E.Main
         E.PrimDecode
         E.PrimOpt
+        E.Program
+        E.Rules
         E.SSimplify
         E.Show
         E.Subst
         E.Traverse
+        E.Type
         E.TypeAnalysis
         E.TypeCheck
         E.Values
@@ -168,51 +125,83 @@ library
         Fixer.Fixer
         Fixer.Supply
         Fixer.VMap
+        FlagDump
         FlagOpts
+        FrontEnd.Class
         FrontEnd.DataConsAssump
         FrontEnd.DeclsDepends
         FrontEnd.DependAnalysis
         FrontEnd.Desugar
         FrontEnd.Diagnostic
+        FrontEnd.Exports
         FrontEnd.FrontEnd
         FrontEnd.HsErrors
         FrontEnd.HsParser
         FrontEnd.HsPretty
+        FrontEnd.HsSyn
+        FrontEnd.Infix
+        FrontEnd.KindInfer
         FrontEnd.Lexer
         FrontEnd.ParseMonad
         FrontEnd.ParseUtils
+        FrontEnd.Rename
+        FrontEnd.Representation
+        FrontEnd.SrcLoc
         FrontEnd.Syn.Options
         FrontEnd.Syn.Traverse
         FrontEnd.Tc.Class
+        FrontEnd.Tc.Kind
         FrontEnd.Tc.Main
+        FrontEnd.Tc.Module
         FrontEnd.Tc.Monad
+        FrontEnd.Tc.Type
         FrontEnd.Tc.Unify
         FrontEnd.TypeSigs
+        FrontEnd.TypeSynonyms
         FrontEnd.TypeSyns
         FrontEnd.Unlit
         FrontEnd.Utils
+        FrontEnd.Warning
         GenUtil
         Grin.DeadCode
         Grin.Devolve
         Grin.EvalInline
+        Grin.FromE
+        Grin.Grin
         Grin.HashConst
         Grin.Lint
+        Grin.Main
         Grin.NodeAnalyze
         Grin.Noodle
         Grin.Optimize
         Grin.SSimplify
+        Grin.Show
         Grin.StorageAnalysis
         Grin.Val
         Grin.Whiz
         Ho.Binary
+        Ho.Build
+        Ho.Collected
+        Ho.Library
         Ho.ReadSource
+        Ho.Type
         Info.Binary
+        Info.Info
         Info.Properties
+        Info.Types
+        Interactive
         Name.Binary
+        Name.Id
+        Name.Name
         Name.Names
         Name.Prim
         Name.VConsts
+        Options
+        PackedString
         RawFiles
+        Stats
+        StringTable.Atom
+        Support.CFF
         Support.Cabal
         Support.CanType
         Support.Compat
@@ -221,27 +210,35 @@ library
         Support.IniParse
         Support.MD5
         Support.MapBinaryInstance
+        Support.TempDir
         Support.Tickle
         Support.Transform
         Support.Tuple
         Support.Unparse
+        Util.BitSet
         Util.ContextMonad
         Util.ExitCodes
         Util.FilterInput
+        Util.GMap
+        Util.Gen
         Util.Graph
         Util.Graphviz
+        Util.HasSize
         Util.Histogram
         Util.Inst
         Util.IntBag
         Util.Interact
         Util.NameMonad
         Util.Once
+        Util.Perhaps
         Util.Progress
         Util.RWS
         Util.ReaderWriter
         Util.Relation
+        Util.SHA1
         Util.SameShape
         Util.Seq
+        Util.SetLike
         Util.TrueSet
         Util.UnionFind
         Util.UnionSolve
@@ -250,6 +247,7 @@ library
         Util.VarName
         Util.YAML
         Version.Config
+        Version.Version
         Paths_@PACKAGE_NAME@
 
     default-extensions:
