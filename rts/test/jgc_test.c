@@ -3,6 +3,9 @@
 #include "rts/constants.h"
 #include "seatest.h"
 
+gc_t saved_gc;
+arena_t saved_arena;
+
 bool
 block_aligned(void *p) {
         return (S_BLOCK(p) == p);
@@ -66,6 +69,8 @@ void basic_test(void) {
 int main(int argc, char *argv[])
 {
         hs_init(&argc, &argv);
+        jhc_alloc_init(&saved_gc, &saved_arena);
+        jhc_hs_init(saved_gc, saved_arena);
         test_fixture_start();
         run_test(basic_test);
         run_test(foreignptr_test);
