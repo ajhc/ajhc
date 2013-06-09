@@ -84,7 +84,6 @@ hs_exit(void)
                 abort();
         }
         if(!--hs_init_count) {
-                jhc_alloc_fini();
                 jhc_exit(0);
         }
 }

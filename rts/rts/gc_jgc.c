@@ -11,8 +11,9 @@
 static char aligned_megablock_1[MEGABLOCK_SIZE] __attribute__ ((aligned(BLOCK_SIZE)));
 static char gc_stack_base_area[(1UL << 8)*sizeof(gc_t)];
 #endif
-gc_t saved_gc; /* xxx Remove me. */
-arena_t saved_arena; /* xxx Remove me. */
+SLIST_HEAD(,s_arena) used_arenas;
+SLIST_HEAD(,s_arena) free_arenas;
+SLIST_HEAD(,s_megablock) free_megablock;
 
 #define TO_GCPTR(x) (entry_t *)(FROM_SPTR(x))
 
@@ -186,14 +187,20 @@ gc_perform_gc(gc_t gc, arena_t arena)
         profile_pop(&gc_gc_time);
 }
 
+static int jhc_alloc_init_count = 0;
 void
 jhc_alloc_init(gc_t *gc_p,arena_t *arena_p) {
         VALGRIND_PRINTF("Jhc-Valgrind mode active.\n");
-        saved_arena = *arena_p = new_arena();
+        if (!jhc_alloc_init_count++) {
+                SLIST_INIT(&used_arenas);
+                SLIST_INIT(&free_arenas);
+        }
+        *arena_p = new_arena();
+        SLIST_INSERT_HEAD(&used_arenas, *arena_p, link);
 #ifdef _JHC_JGC_FIXED_MEGABLOCK
-        saved_gc = *gc_p = *arena_p->gc_stack_base = (void *) gc_stack_base_area;
+        *gc_p = *arena_p->gc_stack_base = (void *) gc_stack_base_area;
 #else
-        saved_gc = *gc_p = (*arena_p)->gc_stack_base = malloc((1UL << 18)*sizeof((*arena_p)->gc_stack_base[0]));
+        *gc_p = (*arena_p)->gc_stack_base = malloc((1UL << 18)*sizeof((*arena_p)->gc_stack_base[0]));
 #endif
         if(nh_stuff[0]) {
                 nh_end = nh_start = nh_stuff[0];
@@ -207,15 +214,17 @@ jhc_alloc_init(gc_t *gc_p,arena_t *arena_p) {
 }
 
 void
-jhc_alloc_fini(void) {
+jhc_alloc_fini(gc_t gc,arena_t arena) {
         if(_JHC_PROFILE || JHC_STATUS) {
-                fprintf(stderr, "arena: %p\n", saved_arena);
-                fprintf(stderr, "  block_used: %i\n", saved_arena->block_used);
-                fprintf(stderr, "  block_threshold: %i\n", saved_arena->block_threshold);
+                fprintf(stderr, "arena: %p\n", arena);
+                fprintf(stderr, "  block_used: %i\n", arena->block_used);
+                fprintf(stderr, "  block_threshold: %i\n", arena->block_threshold);
                 struct s_cache *sc;
-                SLIST_FOREACH(sc,&saved_arena->caches,next)
+                SLIST_FOREACH(sc,&arena->caches,next)
                         print_cache(sc);
         }
+        SLIST_REMOVE(&used_arenas, arena, s_arena, link);
+        SLIST_INSERT_HEAD(&free_arenas, arena, link);
 }
 
 heap_t A_STD
@@ -482,6 +491,10 @@ s_alloc(gc_t gc, arena_t arena, struct s_cache *sc)
 #endif
         bool retry = false;
         struct s_block *pg;
+        if (__predict_false(arena->force_gc_next_s_alloc)) {
+                arena->force_gc_next_s_alloc = 0;
+                gc_perform_gc(gc, arena);
+        }
 retry_s_alloc:
         pg = SLIST_FIRST(&sc->blocks);
         if(__predict_false(!pg)) {
@@ -713,7 +726,10 @@ print_cache(struct s_cache *sc) {
 }
 
 void hs_perform_gc(void) {
-        gc_perform_gc(saved_gc, saved_arena);
+        arena_t arena;
+        SLIST_FOREACH(arena, &used_arenas, link) {
+                arena->force_gc_next_s_alloc = 1;
+        }
 }
 
 #endif

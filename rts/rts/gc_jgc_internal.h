@@ -10,6 +10,7 @@
 struct s_caches_pub;
 
 struct s_arena {
+        SLIST_ENTRY(s_arena) link;
         struct s_megablock *current_megablock;
         SLIST_HEAD(,s_block) free_blocks;
         unsigned block_used;
@@ -26,6 +27,7 @@ struct s_arena {
         struct s_cache *array_caches[GC_STATIC_ARRAY_NUM];
         struct s_cache *array_caches_atomic[GC_STATIC_ARRAY_NUM];
         struct s_caches_pub *public_caches_p; // access from main_code.c
+        int force_gc_next_s_alloc;
 };
 
 struct s_megablock {
