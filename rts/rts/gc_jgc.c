@@ -253,7 +253,12 @@ heap_t A_STD
 
 static heap_t A_STD
 s_monoblock(arena_t arena, unsigned size, unsigned nptrs, unsigned flags) {
-        struct s_block *b = jhc_aligned_alloc(size * sizeof(uintptr_t));
+        struct s_block *b = SLIST_FIRST(&free_monolithic_blocks);
+        if (b) {
+		SLIST_REMOVE(&free_monolithic_blocks, b, s_block, link);
+        } else {
+                b = jhc_aligned_alloc(size * sizeof(uintptr_t));
+        }
         b->flags = flags | SLAB_MONOLITH;
         b->color = (sizeof(struct s_block) + BITARRAY_SIZE_IN_BYTES(1) +
                     sizeof(uintptr_t) - 1) / sizeof(uintptr_t);
@@ -339,7 +344,12 @@ jhc_aligned_alloc(unsigned size) {
 struct s_megablock *
 s_new_megablock(arena_t arena)
 {
-        struct s_megablock *mb = malloc(sizeof(*mb));
+        struct s_megablock *mb = SLIST_FIRST(&free_megablocks);
+        if (mb) {
+                SLIST_REMOVE(&free_megablocks, mb, s_megablock, next);
+        } else {
+                mb = malloc(sizeof(*mb));
+        }
 #ifdef _JHC_JGC_FIXED_MEGABLOCK
         static int count = 0;
         if (count != 0) {
@@ -634,7 +644,9 @@ found:
 
 void
 alloc_public_caches(arena_t arena, size_t size) {
-	arena->public_caches_p = malloc(size);
+        if (arena->public_caches_p == NULL) {
+                arena->public_caches_p = malloc(size);
+        }
 }
 
 struct s_caches_pub *
@@ -644,8 +656,15 @@ public_caches(arena_t arena) {
 
 arena_t
 new_arena(void) {
-        arena_t arena = malloc(sizeof(struct s_arena));
-        SLIST_INIT(&arena->caches);
+        arena_t arena = SLIST_FIRST(&free_arenas);
+        if (arena) {
+                SLIST_REMOVE(&free_arenas, arena, s_arena, link);
+        } else {
+                arena = malloc(sizeof(struct s_arena));
+                // Following menbers isn't clear at jhc_alloc_fini for keeping caches.
+                SLIST_INIT(&arena->caches);
+                arena->public_caches_p = NULL;
+        }
         SLIST_INIT(&arena->free_blocks);
         SLIST_INIT(&arena->megablocks);
         SLIST_INIT(&arena->monolithic_blocks);
