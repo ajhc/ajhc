@@ -39,7 +39,8 @@ arena_sanity(arena_t arena) {
 
 void foreignptr_test(void) {
         gc_t gc = saved_gc;
-        HsPtr **ptr = gc_new_foreignptr(PTR1);
+        arena_t arena = saved_arena;
+        HsPtr **ptr = gc_new_foreignptr(gc, arena, PTR1);
         assert_ptr_equal(PTR1, ptr[0]);
         assert_ptr_equal(NULL, ptr[1]);
         assert_true(gc_add_foreignptr_finalizer((sptr_t)ptr, PTR2));

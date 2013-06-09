@@ -652,13 +652,13 @@ get_heap_flags(void * sp) {
 }
 
 heap_t A_STD
-gc_malloc_foreignptr(unsigned alignment, unsigned size, bool finalizer) {
+gc_malloc_foreignptr(gc_t gc, arena_t arena, unsigned alignment, unsigned size, bool finalizer) {
         // we don't allow higher alignments yet.
         assert (alignment <= sizeof(uintptr_t));
         // no finalizers yet
         assert (!finalizer);
         unsigned spacing = 1 + finalizer;
-        wptr_t *res = gc_array_alloc_atomic(saved_gc, saved_arena, spacing + TO_BLOCKS(size),
+        wptr_t *res = gc_array_alloc_atomic(gc, arena, spacing + TO_BLOCKS(size),
                                              finalizer ? SLAB_FLAG_FINALIZER : SLAB_FLAG_NONE);
         res[0] = (wptr_t)(res + spacing);
         if (finalizer)
@@ -667,8 +667,8 @@ gc_malloc_foreignptr(unsigned alignment, unsigned size, bool finalizer) {
 }
 
 heap_t A_STD
-gc_new_foreignptr(HsPtr ptr) {
-        HsPtr *res = gc_array_alloc_atomic(saved_gc, saved_arena, 2, SLAB_FLAG_FINALIZER);
+gc_new_foreignptr(gc_t gc, arena_t arena, HsPtr ptr) {
+        HsPtr *res = gc_array_alloc_atomic(gc, arena, 2, SLAB_FLAG_FINALIZER);
         res[0] = ptr;
         res[1] = NULL;
         return TO_SPTR(P_WHNF, res);

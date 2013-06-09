@@ -5,8 +5,14 @@
 
 void
 stress_test(int n) {
+#if _JHC_GC == _JHC_GC_JGC
+        gc_t gc;
+        arena_t arena;
+        jhc_alloc_init(&gc, &arena);
+#else
         jhc_alloc_init();
         arena_t arena = new_arena();
+#endif
         struct s_cache *caches[NUM_CACHES];
 
         void *ptrs[n];

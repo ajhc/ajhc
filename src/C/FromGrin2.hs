@@ -584,8 +584,11 @@ convertExp (Prim Func { primRetArgs = [], .. } vs ty) = do
     tell mempty { wRequires = primRequires }
     vs' <- mapM convertVal vs
     rt <- convertTypes ty
-    let fcall =  cast rt (functionCall (name $ unpackPS funcName) [ cast (basicType' t) v | v <- vs' | t <- primArgTypes ])
-    return (if primSafety == Safe && fopts FO.Jgc then v_saved_gc =* v_gc else mempty,fcall)
+    let state = if primSafety == Safe && fopts FO.Jgc then v_saved_gc =* v_gc else mempty
+        addgc = if primSafety == JhcContext && fopts FO.Jgc then mgc else id
+        fcall =  cast rt (functionCall (name $ unpackPS funcName) $ addgc [ cast (basicType' t) v | v <- vs' | t <- primArgTypes ])
+    -- return (if primSafety == Safe && fopts FO.Jgc then v_saved_gc =* v_gc else mempty,fcall)
+    return (state, fcall)
 convertExp (Prim p vs ty) =  do
     tell mempty { wRequires = primReqs p }
     e <- convertPrim p vs ty
