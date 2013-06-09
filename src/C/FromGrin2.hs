@@ -147,16 +147,23 @@ compileGrin grin = (LBS.fromChunks code, req)  where
         text "",
         body
         ]
-    jgcs | fopts FO.Jgc = [ text "static struct s_cache *" <> tshow (nodeCacheName m) <> char ';' | (m,_) <- Set.toList wAllocs]
+    jgcs | fopts FO.Jgc = text "struct s_caches_pub {" : ( [text "    struct s_cache *" <> tshow (nodeCacheName m) <> char ';' | (m,_) <- Set.toList wAllocs] ++ text "};" )
          | otherwise = empty
     fromRequires (Requires s) = map (unpackPS . snd) (Set.toList s)
     nh_stuff  = text "const void * const nh_stuff[] = {" $$ fsep (punctuate (char ',') (cafnames ++ constnames ++ [text "NULL"]))  $$ text "};"
     includes  = map include (filter ((".h" ==) . takeExtension)  $ fromRequires req)
 --    cincludes = map include (filter ((".c" ==) . takeExtension) $ fromRequires req)
     include fn = text "#include <" <> text fn <> text ">"
-    (header,body) = generateC (function (name "jhc_hs_init") voidType [] [Public] icaches:Map.elems fm) (Map.elems sm)
+    (header,body) = generateC (function (name "jhc_hs_init") voidType (mgct []) [Public] icaches:Map.elems fm) (Map.elems sm)
     icaches :: Statement
-    icaches | fopts FO.Jgc = mconcat [  toStatement $ functionCall (name "find_cache") [reference (toExpression $ nodeCacheName t),toExpression $ name "saved_arena", tbsize (sizeof (structType $ nodeStructName t)), toExpression nptrs] | (t,nptrs) <- Set.toList wAllocs ]
+    icaches | fopts FO.Jgc =
+      mconcat $ [toStatement $ f_alloc_pubcache (toExpression . name $ "arena") (sizeof . structType . name $ "s_caches_pub")] ++
+                  [toStatement $ functionCall (name "find_cache") [
+                      reference . toExpression .  pub_cache . nodeCacheName $ t,
+                      toExpression . name $ "arena",
+                      tbsize . sizeof . structType . nodeStructName $ t,
+                      toExpression nptrs]
+                  | (t,nptrs) <- Set.toList wAllocs ]
             | otherwise = mempty
     cafnames = [ text "&_" <> tshow (varName v) | (v,_) <- grinCafs grin ]
     constnames =  map (\n -> text "&_c" <> tshow n) [ 1 .. length $ Grin.HashConst.toList finalHcHash]
@@ -210,11 +217,19 @@ convertFunc ffie (n,as :-> body) = do
                     let fnname2 = name cn
                         as2 = zip (newVars) (map basicType' argTys)
                         fr2 = basicType' retTy
+                        g = if fopts FO.Jgc then localVariable gc_t (name "gc") =* nullPtr else mempty
+                        a = if fopts FO.Jgc then localVariable arena_t (name "arena") =* nullPtr else mempty
+                        ai = toStatement $ functionCall (name "jhc_alloc_init") $ mgcr []
+                        hi = toStatement $ functionCall (name "jhc_hs_init") $ mgc []
+                        fi = toStatement $ functionCall (name "jhc_alloc_fini") $ mgc []
+                        funcall = functionCall fnname $ mgc $
+                                                  zipWith cast (map snd as') (map variable newVars)
+                    (callret,tmp) <- fr2 `newTmpVar` (cast fr2 $ funcall)
 
+                    let call = if voidType == fr2 then toStatement $ funcall else callret
+                        r    = if voidType == fr2 then mempty else creturn tmp
                     return [function fnname2 fr2 as2 [Public]
-                                     (creturn $ cast fr2 $ functionCall fnname $ (if fopts FO.Jgc then ([variable (name "saved_gc"), variable (name "saved_arena")] ++) else id) $
-                                      zipWith cast (map snd as')
-                                                   (map variable newVars))]
+                              (g & a & ai & hi & call & fi & r)]
 
         return (function fnname fr (mgct as') ats s : mstub)
 
@@ -562,6 +577,7 @@ isCompound Prim {} = False
 isCompound _ = True
 
 mgc = if fopts FO.Jgc then ([v_gc, v_arena] ++) else id
+mgcr = if fopts FO.Jgc then ([reference v_gc, reference v_arena] ++) else id
 mgct = if fopts FO.Jgc then ([(name "gc",gc_t), (name "arena",arena_t)] ++) else id
 
 convertExp :: Exp -> C (Statement,Expression)
@@ -577,8 +593,9 @@ convertExp (Prim Func { primRetArgs = [], .. } vs ty) = do
     tell mempty { wRequires = primRequires }
     vs' <- mapM convertVal vs
     rt <- convertTypes ty
-    let fcall =  cast rt (functionCall (name $ unpackPS funcName) [ cast (basicType' t) v | v <- vs' | t <- primArgTypes ])
-    return (if primSafety == Safe && fopts FO.Jgc then v_saved_gc =* v_gc else mempty,fcall)
+    let addgc = if primSafety == JhcContext && fopts FO.Jgc then mgc else id
+        fcall =  cast rt (functionCall (name $ unpackPS funcName) $ addgc [ cast (basicType' t) v | v <- vs' | t <- primArgTypes ])
+    return (mempty, fcall)
 convertExp (Prim p vs ty) =  do
     tell mempty { wRequires = primReqs p }
     e <- convertPrim p vs ty
@@ -813,7 +830,7 @@ newNode region ty ~(NodeC t as) = do
       Nothing -> do
         st <- nodeType t
         as' <- mapM convertVal as
-        let wmalloc | fopts FO.Jgc = \_ -> functionCall (name "s_alloc") [toExpression $ name "gc", toExpression $ name "arena", (toExpression $ nodeCacheName t)]
+        let wmalloc | fopts FO.Jgc = \_ -> functionCall (name "s_alloc") [toExpression $ name "gc", toExpression $ name "arena", toExpression . pub_cache . nodeCacheName $ t]
                     | otherwise = jhc_malloc (reference (toExpression $ nodeCacheName t)) nptrs'
             nptrs = length (filter (not . nonPtr . getType) as) + if sf then 1 else 0
             nptrs' = if nptrs > 0 && not sf && t `Map.notMember` cpr then nptrs + 1 else nptrs
@@ -962,6 +979,7 @@ f_SET_MEM_TAG e v = functionCall (name "SET_MEM_TAG") [e,v]
 f_demote e    = functionCall (name "demote") [e]
 --f_follow e    = functionCall (name "follow") [e]
 f_update x y  = functionCall (name "update") [x,y]
+f_alloc_pubcache a s = functionCall (name "alloc_public_caches") [a,s]
 
 arg i = name $ 'a':show i
 
@@ -980,8 +998,8 @@ wptr_t  = basicGCType "wptr_t"
 gc_t    = basicGCType "gc_t"
 arena_t = basicGCType "arena_t"
 v_gc = variable (name "gc")
-v_saved_gc = variable (name "saved_gc")
 v_arena = variable (name "arena")
+pub_cache n = project' n $ functionCall (name "public_caches") [variable (name "arena")]
 
 a_STD = Attribute "A_STD"
 a_FALIGNED = Attribute "A_FALIGNED"

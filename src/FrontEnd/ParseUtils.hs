@@ -407,6 +407,7 @@ doForeign srcLoc names ms qt = ans where
     pconv rs = g Safe CCall rs where
         g _ cc ("safe":rs) = g Safe cc rs
         g _ cc ("unsafe":rs) = g Unsafe cc rs
+        g _ cc ("jhc_context":rs) = g JhcContext cc rs
         g s _  ("ccall":rs)  = g s CCall rs
         g s _  ("capi":rs)  = g s CApi rs
         g s _  ("stdcall":rs) = g s StdCall rs

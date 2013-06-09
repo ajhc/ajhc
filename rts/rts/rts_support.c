@@ -53,16 +53,17 @@ jhc_case_fell_off(int n) {
         abort();
 }
 
-void jhc_hs_init(void);
+#if _JHC_GC == _JHC_GC_JGC
+void jhc_hs_init(gc_t gc,arena_t arena);
+#else
+void jhc_hs_init();
+#endif
 
 static int hs_init_count;
 void
 hs_init(int *argc, char **argv[])
 {
-
         if(!hs_init_count++) {
-                jhc_alloc_init();
-                jhc_hs_init();
                 hs_set_argv(*argc,*argv);
 #if JHC_isPosix
                 struct utsname jhc_utsname;
@@ -83,7 +84,6 @@ hs_exit(void)
                 abort();
         }
         if(!--hs_init_count) {
-                jhc_alloc_fini();
                 jhc_exit(0);
         }
 }
