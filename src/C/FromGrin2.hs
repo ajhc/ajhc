@@ -147,7 +147,7 @@ compileGrin grin = (LBS.fromChunks code, req)  where
         text "",
         body
         ]
-    jgcs | fopts FO.Jgc = [ text "static struct s_cache *" <> tshow (nodeCacheName m) <> char ';' | (m,_) <- Set.toList wAllocs]
+    jgcs | fopts FO.Jgc = text "struct s_caches_pub {" : ( [text "    struct s_cache *" <> tshow (nodeCacheName m) <> char ';' | (m,_) <- Set.toList wAllocs] ++ text "};" )
          | otherwise = empty
     fromRequires (Requires s) = map (unpackPS . snd) (Set.toList s)
     nh_stuff  = text "const void * const nh_stuff[] = {" $$ fsep (punctuate (char ',') (cafnames ++ constnames ++ [text "NULL"]))  $$ text "};"
@@ -156,7 +156,14 @@ compileGrin grin = (LBS.fromChunks code, req)  where
     include fn = text "#include <" <> text fn <> text ">"
     (header,body) = generateC (function (name "jhc_hs_init") voidType [] [Public] icaches:Map.elems fm) (Map.elems sm)
     icaches :: Statement
-    icaches | fopts FO.Jgc = mconcat [  toStatement $ functionCall (name "find_cache") [reference (toExpression $ nodeCacheName t),toExpression $ name "saved_arena", tbsize (sizeof (structType $ nodeStructName t)), toExpression nptrs] | (t,nptrs) <- Set.toList wAllocs ]
+    icaches | fopts FO.Jgc =
+      mconcat $ [toStatement $ f_alloc_pubcache (toExpression . name $ "saved_arena") (sizeof . structType . name $ "s_caches_pub")] ++
+                  [toStatement $ functionCall (name "find_cache") [
+                      reference . toExpression .  pub_cache . nodeCacheName $ t,
+                      toExpression . name $ "saved_arena",
+                      tbsize . sizeof . structType . nodeStructName $ t,
+                      toExpression nptrs]
+                  | (t,nptrs) <- Set.toList wAllocs ]
             | otherwise = mempty
     cafnames = [ text "&_" <> tshow (varName v) | (v,_) <- grinCafs grin ]
     constnames =  map (\n -> text "&_c" <> tshow n) [ 1 .. length $ Grin.HashConst.toList finalHcHash]
@@ -813,7 +820,7 @@ newNode region ty ~(NodeC t as) = do
       Nothing -> do
         st <- nodeType t
         as' <- mapM convertVal as
-        let wmalloc | fopts FO.Jgc = \_ -> functionCall (name "s_alloc") [toExpression $ name "gc", toExpression $ name "arena", (toExpression $ nodeCacheName t)]
+        let wmalloc | fopts FO.Jgc = \_ -> functionCall (name "s_alloc") [toExpression $ name "gc", toExpression $ name "arena", toExpression . pub_cache . nodeCacheName $ t]
                     | otherwise = jhc_malloc (reference (toExpression $ nodeCacheName t)) nptrs'
             nptrs = length (filter (not . nonPtr . getType) as) + if sf then 1 else 0
             nptrs' = if nptrs > 0 && not sf && t `Map.notMember` cpr then nptrs + 1 else nptrs
@@ -962,6 +969,7 @@ f_SET_MEM_TAG e v = functionCall (name "SET_MEM_TAG") [e,v]
 f_demote e    = functionCall (name "demote") [e]
 --f_follow e    = functionCall (name "follow") [e]
 f_update x y  = functionCall (name "update") [x,y]
+f_alloc_pubcache a s = functionCall (name "alloc_public_caches") [a,s]
 
 arg i = name $ 'a':show i
 
@@ -982,6 +990,7 @@ arena_t = basicGCType "arena_t"
 v_gc = variable (name "gc")
 v_saved_gc = variable (name "saved_gc")
 v_arena = variable (name "arena")
+pub_cache n = project' n $ functionCall (name "public_caches") [variable (name "saved_arena")]
 
 a_STD = Attribute "A_STD"
 a_FALIGNED = Attribute "A_FALIGNED"

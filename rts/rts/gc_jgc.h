@@ -38,6 +38,8 @@ struct s_cache *new_cache(arena_t arena, unsigned short size,
 arena_t new_arena(void);
 struct s_cache *find_cache(struct s_cache **rsc, arena_t arena,
                            unsigned short size, unsigned short num_ptrs);
+void alloc_public_caches(arena_t arena, size_t size);
+struct s_caches_pub *public_caches(arena_t arena);
 void gc_add_root(gc_t gc, arena_t arena, void * root);
 void A_STD gc_perform_gc(gc_t gc, arena_t arena);
 uint32_t get_heap_flags(void* sp);

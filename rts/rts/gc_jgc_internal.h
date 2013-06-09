@@ -7,6 +7,8 @@
 
 #if _JHC_GC == _JHC_GC_JGC
 
+struct s_caches_pub;
+
 struct s_arena {
         struct s_megablock *current_megablock;
         SLIST_HEAD(,s_block) free_blocks;
@@ -23,6 +25,7 @@ struct s_arena {
 #define GC_MAX_BLOCK_ENTRIES 150
         struct s_cache *array_caches[GC_STATIC_ARRAY_NUM];
         struct s_cache *array_caches_atomic[GC_STATIC_ARRAY_NUM];
+        struct s_caches_pub *public_caches_p; // access from main_code.c
 };
 
 struct s_megablock {

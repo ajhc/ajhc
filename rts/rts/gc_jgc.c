@@ -605,6 +605,16 @@ found:
         return sc;
 }
 
+void
+alloc_public_caches(arena_t arena, size_t size) {
+	arena->public_caches_p = malloc(size);
+}
+
+struct s_caches_pub *
+public_caches(arena_t arena) {
+        return arena->public_caches_p;
+}
+
 arena_t
 new_arena(void) {
         arena_t arena = malloc(sizeof(struct s_arena));
