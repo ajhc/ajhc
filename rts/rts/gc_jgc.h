@@ -38,6 +38,8 @@ struct s_cache *new_cache(arena_t arena, unsigned short size,
 arena_t new_arena(void);
 struct s_cache *find_cache(struct s_cache **rsc, arena_t arena,
                            unsigned short size, unsigned short num_ptrs);
+void alloc_public_caches(arena_t arena, size_t size);
+struct s_caches_pub *public_caches(arena_t arena);
 void gc_add_root(gc_t gc, arena_t arena, void * root);
 void A_STD gc_perform_gc(gc_t gc, arena_t arena);
 uint32_t get_heap_flags(void* sp);
@@ -47,8 +49,8 @@ heap_t (gc_alloc)(gc_t gc, arena_t arena,struct s_cache **sc, unsigned count, un
 heap_t gc_array_alloc(gc_t gc, arena_t arena, unsigned count) A_STD;
 heap_t gc_array_alloc_atomic(gc_t gc, arena_t arena, unsigned count, unsigned slab_flags) A_STD;
 /* foreignptr, saved_gc must be set properly. */
-heap_t gc_malloc_foreignptr(unsigned alignment, unsigned size, bool finalizer) A_STD;
-heap_t gc_new_foreignptr(HsPtr ptr) A_STD;
+heap_t gc_malloc_foreignptr(gc_t gc, arena_t arena, unsigned alignment, unsigned size, bool finalizer) A_STD;
+heap_t gc_new_foreignptr(gc_t gc, arena_t arena, HsPtr ptr) A_STD;
 bool gc_add_foreignptr_finalizer(struct sptr* fp, HsFunPtr finalizer) A_STD;
 
 #define gc_frame0(gc,n,...) void *ptrs[n] = { __VA_ARGS__ }; \

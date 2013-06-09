@@ -19,7 +19,7 @@ data CallConv = CCall | StdCall | CApi | Primitive | DotNet
     deriving(Eq,Ord,Show)
 $(derive makeBinary ''CallConv)
 
-data Safety = Safe | Unsafe deriving(Eq,Ord,Show)
+data Safety = Safe | Unsafe | JhcContext deriving(Eq,Ord,Show)
 
 newtype ExtType = ExtType PackedString
     deriving(Binary,IsString,Eq,Ord)

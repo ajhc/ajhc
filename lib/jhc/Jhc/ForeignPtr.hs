@@ -55,13 +55,13 @@ mallocForeignPtrAlignBytes align size = fromUIO $ \w ->
     case gc_malloc_foreignptr (int2word align) (int2word size) True w of
         (# w', bp #) -> (# w', fromBang_ bp #)
 
-foreign import safe ccall gc_malloc_foreignptr
+foreign import jhc_context ccall gc_malloc_foreignptr
     :: Word     -- alignment in words
     -> Word     -- size in words
     -> Bool     -- false for plain foreignptrs, true for ones with finalizers.
     -> UIO (Bang_ (ForeignPtr a))
 
-foreign import safe ccall gc_new_foreignptr ::
+foreign import jhc_context ccall gc_new_foreignptr ::
     Ptr a -> UIO (Bang_ (ForeignPtr a))
 
 foreign import unsafe ccall gc_add_foreignptr_finalizer
