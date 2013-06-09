@@ -91,14 +91,14 @@ void A_STD
 gc_perform_gc(gc_t gc, arena_t arena)
 {
         profile_push(&gc_gc_time);
-        saved_arena->number_gcs++;
+        arena->number_gcs++;
 
         unsigned number_redirects = 0;
         unsigned number_stack = 0;
         unsigned number_ptr = 0;
         struct stack stack = EMPTY_STACK;
 
-        clear_used_bits(saved_arena);
+        clear_used_bits(arena);
 
         debugf("Setting Roots:");
         stack_check(&stack, root_stack.ptr);
@@ -115,12 +115,12 @@ gc_perform_gc(gc_t gc, arena_t arena)
 
         debugf("\n");
         debugf("Trace:");
-        stack_check(&stack, gc - saved_arena->gc_stack_base);
-        number_stack = gc - saved_arena->gc_stack_base;
+        stack_check(&stack, gc - arena->gc_stack_base);
+        number_stack = gc - arena->gc_stack_base;
         for(unsigned i = 0; i < number_stack; i++) {
                 debugf(" |");
                 // TODO - short circuit redirects on stack
-                sptr_t ptr = saved_arena->gc_stack_base[i];
+                sptr_t ptr = arena->gc_stack_base[i];
                 if(1 && (IS_LAZY(ptr))) {
                         assert(GET_PTYPE(ptr) == P_LAZY);
                         VALGRIND_MAKE_MEM_DEFINED(FROM_SPTR(ptr), sizeof(uintptr_t));
@@ -169,31 +169,31 @@ gc_perform_gc(gc_t gc, arena_t arena)
                 }
         }
         free(stack.stack);
-        s_cleanup_blocks(saved_arena);
+        s_cleanup_blocks(arena);
         if (JHC_STATUS) {
                 fprintf(stderr, "%3u - %6u Used: %4u Thresh: %4u Ss: %5u Ps: %5u Rs: %5u Root: %3u\n",
-                        saved_arena->number_gcs,
-                        saved_arena->number_allocs,
-                        (unsigned)saved_arena->block_used,
-                        (unsigned)saved_arena->block_threshold,
+                        arena->number_gcs,
+                        arena->number_allocs,
+                        (unsigned)arena->block_used,
+                        (unsigned)arena->block_threshold,
                         number_stack,
                         number_ptr,
                         number_redirects,
                         (unsigned)root_stack.ptr
                        );
-                saved_arena->number_allocs = 0;
+                arena->number_allocs = 0;
         }
         profile_pop(&gc_gc_time);
 }
 
 void
-jhc_alloc_init(void) {
+jhc_alloc_init(gc_t *gc_p,arena_t *arena_p) {
         VALGRIND_PRINTF("Jhc-Valgrind mode active.\n");
-        saved_arena = new_arena();
+        saved_arena = *arena_p = new_arena();
 #ifdef _JHC_JGC_FIXED_MEGABLOCK
-        saved_gc = saved_arena->gc_stack_base = (void *) gc_stack_base_area;
+        saved_gc = *gc_p = *arena_p->gc_stack_base = (void *) gc_stack_base_area;
 #else
-        saved_gc = saved_arena->gc_stack_base = malloc((1UL << 18)*sizeof(saved_arena->gc_stack_base[0]));
+        saved_gc = *gc_p = (*arena_p)->gc_stack_base = malloc((1UL << 18)*sizeof((*arena_p)->gc_stack_base[0]));
 #endif
         if(nh_stuff[0]) {
                 nh_end = nh_start = nh_stuff[0];
@@ -222,7 +222,7 @@ heap_t A_STD
 (gc_alloc)(gc_t gc, arena_t arena, struct s_cache **sc, unsigned count, unsigned nptrs)
 {
         assert(nptrs <= count);
-        entry_t *e = s_alloc(gc, arena, find_cache(sc, saved_arena, count, nptrs));
+        entry_t *e = s_alloc(gc, arena, find_cache(sc, arena, count, nptrs));
         VALGRIND_MAKE_MEM_UNDEFINED(e,sizeof(uintptr_t)*count);
         debugf("gc_alloc: %p %i %i\n",(void *)e, count, nptrs);
         return (void *)e;
@@ -250,8 +250,8 @@ gc_array_alloc(gc_t gc, arena_t arena, unsigned count)
         if (count <= GC_STATIC_ARRAY_NUM)
                 return (wptr_t)s_alloc(gc, arena, arena->array_caches[count - 1]);
         if (count < GC_MAX_BLOCK_ENTRIES)
-                return s_alloc(gc, arena, find_cache(NULL, saved_arena, count, count));
-        return s_monoblock(saved_arena, count, count, 0);
+                return s_alloc(gc, arena, find_cache(NULL, arena, count, count));
+        return s_monoblock(arena, count, count, 0);
         abort();
 }
 
@@ -265,8 +265,8 @@ gc_array_alloc_atomic(gc_t gc, arena_t arena, unsigned count, unsigned flags)
         if (count <= GC_STATIC_ARRAY_NUM && !flags)
                 return (wptr_t)s_alloc(gc, arena, arena->array_caches_atomic[count - 1]);
         if (count < GC_MAX_BLOCK_ENTRIES && !flags)
-                return s_alloc(gc, arena, find_cache(NULL, saved_arena, count, 0));
-        return s_monoblock(saved_arena, count, count, flags);
+                return s_alloc(gc, arena, find_cache(NULL, arena, count, 0));
+        return s_monoblock(arena, count, count, flags);
         abort();
 }
 

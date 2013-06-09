@@ -10,10 +10,14 @@
 #define _JHC_GC _JHC_GC_NONE
 #endif
 
-void jhc_alloc_init(void);
-void jhc_alloc_fini(void);
-
 #include "rts/gc_none.h"
 #include "rts/gc_jgc.h"
+
+#if _JHC_GC == _JHC_GC_JGC
+void jhc_alloc_init(gc_t *gc_p,arena_t *arena_p);
+#else
+void jhc_alloc_init(void);
+#endif
+void jhc_alloc_fini(void);
 
 #endif

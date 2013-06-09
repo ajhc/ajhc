@@ -154,13 +154,13 @@ compileGrin grin = (LBS.fromChunks code, req)  where
     includes  = map include (filter ((".h" ==) . takeExtension)  $ fromRequires req)
 --    cincludes = map include (filter ((".c" ==) . takeExtension) $ fromRequires req)
     include fn = text "#include <" <> text fn <> text ">"
-    (header,body) = generateC (function (name "jhc_hs_init") voidType [] [Public] icaches:Map.elems fm) (Map.elems sm)
+    (header,body) = generateC (function (name "jhc_hs_init") voidType (mgct []) [Public] icaches:Map.elems fm) (Map.elems sm)
     icaches :: Statement
     icaches | fopts FO.Jgc =
-      mconcat $ [toStatement $ f_alloc_pubcache (toExpression . name $ "saved_arena") (sizeof . structType . name $ "s_caches_pub")] ++
+      mconcat $ [toStatement $ f_alloc_pubcache (toExpression . name $ "arena") (sizeof . structType . name $ "s_caches_pub")] ++
                   [toStatement $ functionCall (name "find_cache") [
                       reference . toExpression .  pub_cache . nodeCacheName $ t,
-                      toExpression . name $ "saved_arena",
+                      toExpression . name $ "arena",
                       tbsize . sizeof . structType . nodeStructName $ t,
                       toExpression nptrs]
                   | (t,nptrs) <- Set.toList wAllocs ]
@@ -990,7 +990,7 @@ arena_t = basicGCType "arena_t"
 v_gc = variable (name "gc")
 v_saved_gc = variable (name "saved_gc")
 v_arena = variable (name "arena")
-pub_cache n = project' n $ functionCall (name "public_caches") [variable (name "saved_arena")]
+pub_cache n = project' n $ functionCall (name "public_caches") [variable (name "arena")]
 
 a_STD = Attribute "A_STD"
 a_FALIGNED = Attribute "A_FALIGNED"
