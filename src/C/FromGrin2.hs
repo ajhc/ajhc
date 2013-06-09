@@ -217,11 +217,15 @@ convertFunc ffie (n,as :-> body) = do
                     let fnname2 = name cn
                         as2 = zip (newVars) (map basicType' argTys)
                         fr2 = basicType' retTy
+                        g = if fopts FO.Jgc then localVariable gc_t (name "gc") =* nullPtr else mempty
+                        a = if fopts FO.Jgc then localVariable arena_t (name "arena") =* nullPtr else mempty
+                        ai = toStatement $ functionCall (name "jhc_alloc_init") $ mgcr []
+                        hi = toStatement $ functionCall (name "jhc_hs_init") $ mgc []
+                        callret = creturn $ cast fr2 $ functionCall fnname $ mgc $
+                                    zipWith cast (map snd as') (map variable newVars)
+                        body = g & a & ai & hi & callret
 
-                    return [function fnname2 fr2 as2 [Public]
-                                     (creturn $ cast fr2 $ functionCall fnname $ (if fopts FO.Jgc then ([variable (name "saved_gc"), variable (name "saved_arena")] ++) else id) $
-                                      zipWith cast (map snd as')
-                                                   (map variable newVars))]
+                    return [function fnname2 fr2 as2 [Public] body]
 
         return (function fnname fr (mgct as') ats s : mstub)
 
@@ -569,6 +573,7 @@ isCompound Prim {} = False
 isCompound _ = True
 
 mgc = if fopts FO.Jgc then ([v_gc, v_arena] ++) else id
+mgcr = if fopts FO.Jgc then ([reference v_gc, reference v_arena] ++) else id
 mgct = if fopts FO.Jgc then ([(name "gc",gc_t), (name "arena",arena_t)] ++) else id
 
 convertExp :: Exp -> C (Statement,Expression)
@@ -584,11 +589,9 @@ convertExp (Prim Func { primRetArgs = [], .. } vs ty) = do
     tell mempty { wRequires = primRequires }
     vs' <- mapM convertVal vs
     rt <- convertTypes ty
-    let state = if primSafety == Safe && fopts FO.Jgc then v_saved_gc =* v_gc else mempty
-        addgc = if primSafety == JhcContext && fopts FO.Jgc then mgc else id
+    let addgc = if primSafety == JhcContext && fopts FO.Jgc then mgc else id
         fcall =  cast rt (functionCall (name $ unpackPS funcName) $ addgc [ cast (basicType' t) v | v <- vs' | t <- primArgTypes ])
-    -- return (if primSafety == Safe && fopts FO.Jgc then v_saved_gc =* v_gc else mempty,fcall)
-    return (state, fcall)
+    return (mempty, fcall)
 convertExp (Prim p vs ty) =  do
     tell mempty { wRequires = primReqs p }
     e <- convertPrim p vs ty
@@ -991,7 +994,6 @@ wptr_t  = basicGCType "wptr_t"
 gc_t    = basicGCType "gc_t"
 arena_t = basicGCType "arena_t"
 v_gc = variable (name "gc")
-v_saved_gc = variable (name "saved_gc")
 v_arena = variable (name "arena")
 pub_cache n = project' n $ functionCall (name "public_caches") [variable (name "arena")]
 
