@@ -13,7 +13,8 @@ static char gc_stack_base_area[(1UL << 8)*sizeof(gc_t)];
 #endif
 SLIST_HEAD(,s_arena) used_arenas;
 SLIST_HEAD(,s_arena) free_arenas;
-SLIST_HEAD(,s_megablock) free_megablock;
+SLIST_HEAD(,s_megablock) free_megablocks;
+SLIST_HEAD(,s_block) free_monolithic_blocks;
 
 #define TO_GCPTR(x) (entry_t *)(FROM_SPTR(x))
 
@@ -194,6 +195,8 @@ jhc_alloc_init(gc_t *gc_p,arena_t *arena_p) {
         if (!jhc_alloc_init_count++) {
                 SLIST_INIT(&used_arenas);
                 SLIST_INIT(&free_arenas);
+                SLIST_INIT(&free_megablocks);
+                SLIST_INIT(&free_monolithic_blocks);
         }
         *arena_p = new_arena();
         SLIST_INSERT_HEAD(&used_arenas, *arena_p, link);
@@ -215,6 +218,8 @@ jhc_alloc_init(gc_t *gc_p,arena_t *arena_p) {
 
 void
 jhc_alloc_fini(gc_t gc,arena_t arena) {
+        struct s_block *pg;
+        struct s_megablock *mb;
         if(_JHC_PROFILE || JHC_STATUS) {
                 fprintf(stderr, "arena: %p\n", arena);
                 fprintf(stderr, "  block_used: %i\n", arena->block_used);
@@ -222,6 +227,15 @@ jhc_alloc_fini(gc_t gc,arena_t arena) {
                 struct s_cache *sc;
                 SLIST_FOREACH(sc,&arena->caches,next)
                         print_cache(sc);
+        }
+        SLIST_FOREACH(pg, &arena->monolithic_blocks, link) {
+	        SLIST_INSERT_HEAD(&free_monolithic_blocks, pg, link);
+        }
+        SLIST_FOREACH(mb, &arena->megablocks, next) {
+	        SLIST_INSERT_HEAD(&free_megablocks, mb, next);
+        }
+        if(arena->current_megablock) {
+                SLIST_INSERT_HEAD(&free_megablocks, arena->current_megablock, next);
         }
         SLIST_REMOVE(&used_arenas, arena, s_arena, link);
         SLIST_INSERT_HEAD(&free_arenas, arena, link);

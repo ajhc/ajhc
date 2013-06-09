@@ -221,11 +221,15 @@ convertFunc ffie (n,as :-> body) = do
                         a = if fopts FO.Jgc then localVariable arena_t (name "arena") =* nullPtr else mempty
                         ai = toStatement $ functionCall (name "jhc_alloc_init") $ mgcr []
                         hi = toStatement $ functionCall (name "jhc_hs_init") $ mgc []
-                        callret = creturn $ cast fr2 $ functionCall fnname $ mgc $
-                                    zipWith cast (map snd as') (map variable newVars)
-                        body = g & a & ai & hi & callret
+                        fi = toStatement $ functionCall (name "jhc_alloc_fini") $ mgc []
+                        funcall = functionCall fnname $ mgc $
+                                                  zipWith cast (map snd as') (map variable newVars)
+                    (callret,tmp) <- fr2 `newTmpVar` (cast fr2 $ funcall)
 
-                    return [function fnname2 fr2 as2 [Public] body]
+                    let call = if voidType == fr2 then toStatement $ funcall else callret
+                        r    = if voidType == fr2 then mempty else creturn tmp
+                    return [function fnname2 fr2 as2 [Public]
+                              (g & a & ai & hi & call & fi & r)]
 
         return (function fnname fr (mgct as') ats s : mstub)
 
