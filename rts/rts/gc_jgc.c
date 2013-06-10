@@ -188,6 +188,18 @@ gc_perform_gc(gc_t gc, arena_t arena)
         profile_pop(&gc_gc_time);
 }
 
+static gc_t
+new_gc_stack(arena_t arena) {
+        if (!arena->gc_stack_base) {
+#ifdef _JHC_JGC_FIXED_MEGABLOCK
+                arena->gc_stack_base = (void *) gc_stack_base_area;
+#else
+                arena->gc_stack_base = malloc((1UL << 18)*sizeof(arena->gc_stack_base[0]));
+#endif
+	}
+        return arena->gc_stack_base;
+}
+
 static int jhc_alloc_init_count = 0;
 void
 jhc_alloc_init(gc_t *gc_p,arena_t *arena_p) {
@@ -200,11 +212,7 @@ jhc_alloc_init(gc_t *gc_p,arena_t *arena_p) {
         }
         *arena_p = new_arena();
         SLIST_INSERT_HEAD(&used_arenas, *arena_p, link);
-#ifdef _JHC_JGC_FIXED_MEGABLOCK
-        *gc_p = *arena_p->gc_stack_base = (void *) gc_stack_base_area;
-#else
-        *gc_p = (*arena_p)->gc_stack_base = malloc((1UL << 18)*sizeof((*arena_p)->gc_stack_base[0]));
-#endif
+        *gc_p = new_gc_stack(*arena_p);
         if(nh_stuff[0]) {
                 nh_end = nh_start = nh_stuff[0];
                 for(int i = 1; nh_stuff[i]; i++) {
@@ -661,6 +669,7 @@ new_arena(void) {
                 SLIST_REMOVE(&free_arenas, arena, s_arena, link);
         } else {
                 arena = malloc(sizeof(struct s_arena));
+                memset(arena, 0, sizeof(*arena));
                 // Following menbers isn't clear at jhc_alloc_fini for keeping caches.
                 SLIST_INIT(&arena->caches);
                 arena->public_caches_p = NULL;
