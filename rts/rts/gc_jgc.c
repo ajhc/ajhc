@@ -9,7 +9,9 @@
 
 #ifdef _JHC_JGC_FIXED_MEGABLOCK
 static char aligned_megablock_1[MEGABLOCK_SIZE] __attribute__ ((aligned(BLOCK_SIZE)));
-static char gc_stack_base_area[(1UL << 8)*sizeof(gc_t)];
+#endif
+#if defined(_JHC_JGC_LIMITED_NUM_GC_STACK)
+static char gc_stack_base_area[(GC_STACK_SIZE)*sizeof(gc_t)*(_JHC_JGC_LIMITED_NUM_GC_STACK)];
 #endif
 SLIST_HEAD(,s_arena) used_arenas;
 SLIST_HEAD(,s_arena) free_arenas;
@@ -191,12 +193,18 @@ gc_perform_gc(gc_t gc, arena_t arena)
 static gc_t
 new_gc_stack(arena_t arena) {
         if (!arena->gc_stack_base) {
-#ifdef _JHC_JGC_FIXED_MEGABLOCK
-                arena->gc_stack_base = (void *) gc_stack_base_area;
+#if defined(_JHC_JGC_LIMITED_NUM_GC_STACK)
+                static int count = 0;
+                if (count >= _JHC_JGC_LIMITED_NUM_GC_STACK) {
+                        abort();
+                }
+                arena->gc_stack_base = (void *) (gc_stack_base_area +
+                    (GC_STACK_SIZE) * sizeof(gc_t) * (_JHC_JGC_LIMITED_NUM_GC_STACK));
+                count++;
 #else
-                arena->gc_stack_base = malloc((1UL << 18)*sizeof(arena->gc_stack_base[0]));
+                arena->gc_stack_base = malloc((GC_STACK_SIZE)*sizeof(arena->gc_stack_base[0]));
 #endif
-	}
+        }
         return arena->gc_stack_base;
 }
 

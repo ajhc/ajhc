@@ -24,8 +24,13 @@ typedef void* heap_t;  // a pointer into the GCed heap.
 #define _JHC_JGC_MEGABLOCK_SHIFT 20
 #endif /* defined(_JHC_JGC_BLOCK_SHIFT) && defined(_JHC_JGC_MEGABLOCK_SHIFT) */
 
+#if !defined(_JHC_JGC_GC_STACK_SHIFT)
+#define _JHC_JGC_GC_STACK_SHIFT  18
+#endif /* !defined(_JHC_JGC_BLOCK_SHIFT) */
+
 #define BLOCK_SIZE     (1UL << (_JHC_JGC_BLOCK_SHIFT))
 #define MEGABLOCK_SIZE (1UL << (_JHC_JGC_MEGABLOCK_SHIFT))
+#define GC_STACK_SIZE  (1UL << (_JHC_JGC_GC_STACK_SHIFT))
 #define S_BLOCK(val) ((struct s_block *)((uintptr_t)(val) & ~(BLOCK_SIZE - 1)))
 #define TO_BLOCKS(x) (((x) + sizeof(uintptr_t) - 1)/sizeof(uintptr_t))
 
