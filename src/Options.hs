@@ -139,14 +139,16 @@ _arch_                    what to pass to gcc as the architecture
 
 # Special defines to set cflags
 
-Define                             Meaning
-------                             ---------------------------------------------------------------------------
-\_JHC\_ARM\_STAY\_IN\_THUMB\_MODE  set bit0 to any function pointers, for Cortex-M*. ([more detail](http://communities.mentor.com/community/cs/archives/arm-gnu/msg01904.html))
-\_JHC\_JGC\_NAIVEGC                run gc when have no more blocks.
-\_JHC\_JGC\_STACKGROW              number of stack entry growed when run short of it.
-\_JHC\_JGC\_FIXED\_MEGABLOCK       use a single megablock without allocation megablock.
-\_JHC\_JGC\_BLOCK\_SHIFT           bit shift to specify block size. Use it internally like this: (1 << (_JHC_JGC_BLOCK_SHIFT)).
-\_JHC\_JGC\_MEGABLOCK\_SHIFT       bit shift to specify megablock size. Use it internally like this: (1 << (_JHC_JGC_MEGABLOCK_SHIFT)).
+Define                              Meaning
+------                              ---------------------------------------------------------------------------
+\_JHC\_ARM\_STAY\_IN\_THUMB\_MODE   set bit0 to any function pointers, for Cortex-M*. ([more detail](http://communities.mentor.com/community/cs/archives/arm-gnu/msg01904.html))
+\_JHC\_JGC\_NAIVEGC                 run gc when have no more blocks.
+\_JHC\_JGC\_LIMITED\_NUM\_GC\_STACK number of limited gc_stack entry.
+\_JHC\_JGC\_GC\_STACK\_SHIFT        bit shift to specify gc_stack size. Use it internally like this: (1 << (\_JHC\_JGC\_GC\_STACK\_SHIFT)).
+\_JHC\_JGC\_STACKGROW               number of stack entry growed when run short of it.
+\_JHC\_JGC\_FIXED\_MEGABLOCK        use a single megablock without allocation megablock.
+\_JHC\_JGC\_BLOCK\_SHIFT            bit shift to specify block size. Use it internally like this: (1 << (\_JHC\_JGC\_BLOCK\_SHIFT)).
+\_JHC\_JGC\_MEGABLOCK\_SHIFT        bit shift to specify megablock size. Use it internally like this: (1 << (\_JHC\_JGC\_MEGABLOCK_SHIFT)).
 
 -}
 
