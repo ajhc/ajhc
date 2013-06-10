@@ -65,7 +65,7 @@ cabal-build: $(BUILT_SOURCES) src/StringTable/Atom.hs
 	cabal configure
 	cabal build
 
-cabal-install: cabal-build
+cabal-install:
 	cabal install
 
 .INTERMEDIATE: ajhc_man.mkd options.mkd
@@ -143,9 +143,9 @@ ajhc_man.mkd: $(JHC_MANUAL_FILES)
 ajhc.1: ajhc_man.mkd
 	pandoc $< -s -f markdown -t man -s  -o $@
 
-options.mkd: src/Options.hs | $(bin_PROGRAMS)$(EXEEXT)
+options.mkd: src/Options.hs cabal-build
 	echo "{-@Options 1" > $@
-	./$(bin_PROGRAMS) --help | sed -e 's/^/    /'  >> $@
+	./dist/build/ajhc/ajhc --help | sed -e 's/^/    /'  >> $@
 
 fix-whitespace:
 	find src -not \( -name .svn -prune -o -name .git -prune \) -type f -name \*.hs -print0 | xargs -0 sed -i  -E 's/[ 	]*$$//'
