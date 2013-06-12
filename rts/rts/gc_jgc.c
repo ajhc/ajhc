@@ -7,8 +7,8 @@
 
 #if _JHC_GC == _JHC_GC_JGC
 
-#ifdef _JHC_JGC_FIXED_MEGABLOCK
-static char aligned_megablock_1[MEGABLOCK_SIZE] __attribute__ ((aligned(BLOCK_SIZE)));
+#if defined(_JHC_JGC_LIMITED_NUM_MEGABLOCK)
+static char aligned_megablock[(MEGABLOCK_SIZE)*(_JHC_JGC_LIMITED_NUM_MEGABLOCK)] __attribute__ ((aligned(BLOCK_SIZE)));
 #endif
 #if defined(_JHC_JGC_LIMITED_NUM_GC_STACK)
 static char gc_stack_base_area[(GC_STACK_SIZE)*sizeof(gc_t)*(_JHC_JGC_LIMITED_NUM_GC_STACK)];
@@ -199,7 +199,7 @@ new_gc_stack(arena_t arena) {
                         abort();
                 }
                 arena->gc_stack_base = (void *) (gc_stack_base_area +
-                    (GC_STACK_SIZE) * sizeof(gc_t) * (_JHC_JGC_LIMITED_NUM_GC_STACK));
+                    (GC_STACK_SIZE) * sizeof(gc_t) * count);
                 count++;
 #else
                 arena->gc_stack_base = malloc((GC_STACK_SIZE)*sizeof(arena->gc_stack_base[0]));
@@ -366,13 +366,13 @@ s_new_megablock(arena_t arena)
         } else {
                 mb = malloc(sizeof(*mb));
         }
-#ifdef _JHC_JGC_FIXED_MEGABLOCK
+#ifdef _JHC_JGC_LIMITED_NUM_MEGABLOCK
         static int count = 0;
-        if (count != 0) {
+        if (count >= _JHC_JGC_LIMITED_NUM_MEGABLOCK) {
                 abort();
         }
+        mb->base = aligned_megablock + (MEGABLOCK_SIZE) * count;
         count++;
-        mb->base = aligned_megablock_1;
 #else
         mb->base = jhc_aligned_alloc(MEGABLOCK_SIZE);
 #endif
