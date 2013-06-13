@@ -236,6 +236,8 @@ void
 jhc_alloc_fini(gc_t gc,arena_t arena) {
         struct s_block *pg;
         struct s_megablock *mb;
+        struct s_cache *sc;
+
         if(_JHC_PROFILE || JHC_STATUS) {
                 fprintf(stderr, "arena: %p\n", arena);
                 fprintf(stderr, "  block_used: %i\n", arena->block_used);
@@ -244,6 +246,7 @@ jhc_alloc_fini(gc_t gc,arena_t arena) {
                 SLIST_FOREACH(sc,&arena->caches,next)
                         print_cache(sc);
         }
+
         SLIST_FOREACH(pg, &arena->monolithic_blocks, link) {
 	        SLIST_INSERT_HEAD(&free_monolithic_blocks, pg, link);
         }
@@ -253,6 +256,15 @@ jhc_alloc_fini(gc_t gc,arena_t arena) {
         if(arena->current_megablock) {
                 SLIST_INSERT_HEAD(&free_megablocks, arena->current_megablock, next);
         }
+
+        SLIST_FOREACH(sc, &arena->caches, next) {
+                SLIST_INIT(&sc->blocks);
+                SLIST_INIT(&sc->full_blocks);
+#if _JHC_PROFILE
+                sc->allocations = 0;
+#endif
+        }
+
         SLIST_REMOVE(&used_arenas, arena, s_arena, link);
         SLIST_INSERT_HEAD(&free_arenas, arena, link);
 }
