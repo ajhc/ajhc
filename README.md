@@ -84,6 +84,9 @@ http://www.haskell.org/platform/windows.html
 * Port Haskell libraries on haskell-platform to Ajhc.
 * Understand jhc's region inference.
 * Find the method to implement GC that can be interrupted.
+* Play with Android NDK. http://developer.android.com/tools/sdk/ndk/index.html
+* Play with Google Native Client. https://developers.google.com/native-client/
+* Play with Nintendo DS. http://devkitpro.org/wiki/Getting_Started/devkitARM
 * Get smaller RTS. Benchmark the RTS for running on custom FPGA CPU.
 * Start rewritng NetBSD kernel with Ajhc.
 
