@@ -15,8 +15,8 @@ foreign import ccall "stdio.h jhc_utf8_putchar" c_putwchar :: Int -> IO ()
 foreign import ccall "wchar.h jhc_utf8_getc" c_fgetwc      :: FILE -> IO Int
 foreign import ccall "wchar.h jhc_utf8_getchar" c_getwchar :: IO Int
 foreign import ccall "wchar.h jhc_utf8_putc" c_fputwc      :: Int -> FILE -> IO Int
-foreign import ccall "stdio.h fwrite_unlocked" c_fwrite    :: Ptr a -> CSize -> CSize -> FILE -> IO CSize
-foreign import ccall "stdio.h fread_unlocked" c_fread      :: Ptr a -> CSize -> CSize -> FILE -> IO CSize
+foreign import ccall "stdio.h fwrite" c_fwrite             :: Ptr a -> CSize -> CSize -> FILE -> IO CSize
+foreign import ccall "stdio.h fread" c_fread               :: Ptr a -> CSize -> CSize -> FILE -> IO CSize
 foreign import ccall "stdio.h fflush" c_fflush             :: FILE -> IO ()
 foreign import ccall "stdio.h feof" c_feof                 :: FILE -> IO Int
 foreign import ccall "stdio.h ftell" c_ftell               :: FILE -> IO IntMax

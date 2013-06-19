@@ -25,13 +25,13 @@ readBinaryFile fn = do
 foreign import primitive "Lobits" cintToWord8 :: CInt -> Word8
 --foreign import primitive "const.\"rb\"" read_str :: Ptr CChar
 
-foreign import ccall "stdio.h getc_unlocked" c_getc :: Ptr () -> IO CInt
+foreign import ccall "stdio.h getc" c_getc :: Ptr () -> IO CInt
 foreign import ccall "stdio.h fopen" c_fopen :: CString -> BitsPtr_ -> IO (Ptr ())
 foreign import ccall "stdio.h fclose" c_fclose :: Ptr () -> IO CInt
 
 -- Int translates to CInt in the calling conventions so this is safe.
-foreign import ccall "stdio.h putchar_unlocked" c_putchar :: Int -> IO Int
-foreign import ccall "stdio.h getchar_unlocked" c_getchar :: IO Int
+foreign import ccall "stdio.h putchar" c_putchar :: Int -> IO Int
+foreign import ccall "stdio.h getchar" c_getchar :: IO Int
 
 putWord8 :: Word8 -> IO ()
 putWord8 w = c_putchar (fromIntegral w) >> return ()
