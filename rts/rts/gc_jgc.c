@@ -4,6 +4,7 @@
 #include "rts/cdefs.h"
 #include "rts/constants.h"
 #include "rts/gc_jgc_internal.h"
+#include "rts/conc.h"
 
 #if _JHC_GC == _JHC_GC_JGC
 

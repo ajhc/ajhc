@@ -6,6 +6,7 @@
 #include "rts/rts_support.h"
 #include "rts/profile.h"
 #include "rts/gc.h"
+#include "rts/conc.h"
 
 jmp_buf jhc_uncaught;
 int jhc_argc;
@@ -59,11 +60,12 @@ void jhc_hs_init(gc_t gc,arena_t arena);
 void jhc_hs_init();
 #endif
 
-static int hs_init_count;
+static int hs_init_count = 0;
 void
 hs_init(int *argc, char **argv[])
 {
         if(!hs_init_count++) {
+                jhc_conc_init();
                 hs_set_argv(*argc,*argv);
 #if JHC_isPosix
                 struct utsname jhc_utsname;

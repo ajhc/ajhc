@@ -1,5 +1,25 @@
 #include "rts/conc.h"
 
+static jhc_mutex_t jhc_rts_mutex;
+
+void
+jhc_conc_init()
+{
+        jhc_mutex_init(&jhc_rts_mutex);
+}
+
+void
+jhc_rts_lock()
+{
+        jhc_mutex_lock(&jhc_rts_mutex);
+}
+
+void
+jhc_rts_unlock()
+{
+        jhc_mutex_unlock(&jhc_rts_mutex);
+}
+
 #if _JHC_CONC == _JHC_CONC_NONE
 jhc_threadid_t
 forkOS_createThread(void *(*wrapper) (void *), void *entry, int *err)
