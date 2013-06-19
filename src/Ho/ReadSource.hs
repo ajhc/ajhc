@@ -137,6 +137,9 @@ fetchCompilerFlags = return (cc,args) where
               | otherwise = []
     profileOpts | fopts FO.Profile || lup "profile" == "true" = ["-D_JHC_PROFILE=1"]
                 | otherwise = []
+    threadOpts | fopts FO.Pthread      = ["-D_JHC_CONC=_JHC_CONC_PTHREAD", "-pthread"]
+               | fopts FO.Customthread = ["-D_JHC_CONC=_JHC_CONC_CUSTOM"]
+               | otherwise             = ["-D_JHC_CONC=_JHC_CONC_NONE"]
     debug = if fopts FO.Debug then words (lup "cflags_debug") else words (lup "cflags_nodebug")
     cc = lup "cc"
-    args = words (lup "cflags") ++ debug ++ optCCargs options  ++ boehmOpts ++ profileOpts
+    args = words (lup "cflags") ++ debug ++ optCCargs options  ++ boehmOpts ++ profileOpts ++ threadOpts

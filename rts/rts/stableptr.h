@@ -9,4 +9,4 @@ sptr_t c_derefStablePtr(wptr_t wp);
 void hs_free_stable_ptr(HsStablePtr sp);
 void hs_free_fun_ptr(HsFunPtr fp);
 
-#endif
+#endif /* STABLEPTR_H */

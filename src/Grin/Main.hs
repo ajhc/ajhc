@@ -120,11 +120,13 @@ compileGrinToC grin = do
            ("rts/gc_jgc_internal.h",gc_jgc_internal_h),
            ("rts/gc_none.c",gc_none_c),
            ("rts/gc_none.h",gc_none_h),
+           ("rts/conc.c",conc_c),
+           ("rts/conc.h",conc_h),
            ("sys/bitarray.h",bitarray_h)] $ \ (fn,bs) -> do
         fileInTempDir fn $ flip BS.writeFile bs
     let cFiles = ["rts/profile.c", "rts/rts_support.c", "rts/gc_none.c",
                   "rts/jhc_rts.c", "lib/lib_cbits.c", "rts/gc_jgc.c",
-                  "rts/stableptr.c"]
+                  "rts/stableptr.c", "rts/conc.c"]
     tdir <- getTempDir
     ds <- iocatch (getDirectoryContents (tdir FP.</> "cbits")) (\_ -> return [])
     let extraCFiles = map noEscapePath $ map (tdir FP.</>) cFiles ++ ["-I" ++ tdir ++ "/cbits", "-I" ++ tdir ] ++ [ tdir FP.</> "cbits" FP.</> fn | fn@(reverse -> 'c':'.':_) <- ds ]
