@@ -80,10 +80,8 @@ http://www.haskell.org/platform/windows.html
 * Rewrite Cortex-M3 base library with Ajhc.
 * Analyze jhc internal (Japanese doc).
   http://metasepi.org/posts/2013-01-31-jhc_internal_overview.html
-* Find critical region of Ajhc for reentrant and thread safe.
 * Port Haskell libraries on haskell-platform to Ajhc.
 * Understand jhc's region inference.
-* Find the method to implement GC that can be interrupted.
 * Play with Android NDK. http://developer.android.com/tools/sdk/ndk/index.html
 * Play with Google Native Client. https://developers.google.com/native-client/
 * Play with Nintendo DS. http://devkitpro.org/wiki/Getting_Started/devkitARM
@@ -104,3 +102,5 @@ http://www.haskell.org/platform/windows.html
 * Pass all regress test, and enable regress fail setting on travis-ci.
   https://travis-ci.org/ajhc/ajhc
 * No more depend on DrIFT. Use http://hackage.haskell.org/package/derive.
+* Find critical region of Ajhc for reentrant and thread safe.
+* Find the method to implement GC that can be interrupted.
