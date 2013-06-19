@@ -37,6 +37,6 @@ deRefStablePtr x = do
     fromUIO $ \w -> case c_derefStablePtr (toBang_ x) w of
         (# w', s #) -> (# w', fromBang_ s #)
 
-foreign import ccall unsafe "rts/stableptr.c c_freeStablePtr"  c_freeStablePtr   :: Bang_ (StablePtr a) -> IO ()
-foreign import ccall unsafe "rts/stableptr.c c_newStablePtr"   c_newStablePtr    :: Bang_ a -> UIO (Bang_ (StablePtr a))
-foreign import ccall unsafe "rts/stableptr.c c_derefStablePtr" c_derefStablePtr :: Bang_ (StablePtr a) -> UIO (Bang_ a)
+foreign import ccall unsafe "rts/stableptr.h c_freeStablePtr"  c_freeStablePtr   :: Bang_ (StablePtr a) -> IO ()
+foreign import ccall unsafe "rts/stableptr.h c_newStablePtr"   c_newStablePtr    :: Bang_ a -> UIO (Bang_ (StablePtr a))
+foreign import ccall unsafe "rts/stableptr.h c_derefStablePtr" c_derefStablePtr :: Bang_ (StablePtr a) -> UIO (Bang_ a)

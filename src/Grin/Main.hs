@@ -99,6 +99,7 @@ compileGrinToC grin = do
     (cc,args) <- fetchCompilerFlags
     forM_ [("rts/constants.h",constants_h),
            ("rts/stableptr.c",stableptr_c),
+           ("rts/stableptr.h",stableptr_h),
            ("rts/slub.c",slub_c),
            ("rts/profile.c",profile_c),
            ("rts/profile.h",profile_h),

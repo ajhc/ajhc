@@ -18,7 +18,7 @@ all-local: cabal-build
 install-data-hook: cabal-install
 
 RAWFILES = src/data/ViaGhc.hs src/data/prelude.m4 \
-	   src/data/targets.ini rts/rts/constants.h rts/rts/stableptr.c rts/sys/queue.h rts/HsFFI.h \
+	   src/data/targets.ini rts/rts/constants.h rts/rts/stableptr.c rts/rts/stableptr.h rts/sys/queue.h rts/HsFFI.h \
            rts/sys/wsize.h rts/sys/bitarray.h ChangeLog src/data/shortchange.txt rts/rts/slub.c \
 	   rts/rts/gc_jgc.c rts/rts/gc_jgc.h rts/rts/profile.c rts/rts/profile.h rts/rts/cdefs.h rts/rts/rts_support.c \
 	   rts/rts/rts_support.h rts/rts/gc.h rts/rts/gc_none.c rts/rts/gc_none.h rts/rts/jhc_rts.c rts/rts/jhc_rts.h \

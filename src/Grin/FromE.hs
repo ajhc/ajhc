@@ -362,6 +362,13 @@ compile' cenv (tvr,as,e) = ans where
     cc, ce, cr :: E -> C Exp
     cr x = ce x
 
+    stripBang :: E -> E
+    stripBang e = f e where
+      f (EAp p a) = g p a
+      f e = e
+      g (EPrim (PrimPrim "fromBang_") [b] _) a = EAp b a
+      g e a = EAp e a
+
     -- | ce evaluates something in strict context returning the evaluated result of its argument.
     ce (ELetRec ds e) = doLet ds (ce e)
     ce (EError s e) = return (Error s (toTypes TyNode e))
@@ -371,7 +378,7 @@ compile' cenv (tvr,as,e) = ans where
         mtick' "Grin.FromE.strict-unlifted"
         return (Return $ keepIts [toVal tvr])
         --return (Fetch (toVal tvr))
-    ce e | (EVar tvr,as) <- fromAp e = do
+    ce e | (EVar tvr,as) <- fromAp . stripBang $ e = do
         as <- return $ args as
         lfunc <- asks lfuncMap
         let fty = toTypes TyNode (getType e)
