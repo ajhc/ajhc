@@ -191,6 +191,7 @@ gc_perform_gc(gc_t gc, arena_t arena)
         profile_pop(&gc_gc_time);
 }
 
+/* Enter with rts_lock. */
 static gc_t
 new_gc_stack(arena_t arena) {
         if (!arena->gc_stack_base) {
@@ -213,24 +214,27 @@ static int jhc_alloc_init_count = 0;
 void
 jhc_alloc_init(gc_t *gc_p,arena_t *arena_p) {
         VALGRIND_PRINTF("Jhc-Valgrind mode active.\n");
+
+        jhc_rts_lock();
         if (!jhc_alloc_init_count++) {
                 SLIST_INIT(&used_arenas);
                 SLIST_INIT(&free_arenas);
                 SLIST_INIT(&free_megablocks);
                 SLIST_INIT(&free_monolithic_blocks);
+                if(nh_stuff[0]) {
+                        nh_end = nh_start = nh_stuff[0];
+                        for(int i = 1; nh_stuff[i]; i++) {
+                                if(nh_stuff[i] < nh_start)
+                                        nh_start = nh_stuff[i];
+                                if(nh_stuff[i] > nh_end)
+                                        nh_end = nh_stuff[i];
+                        }
+                }
         }
         *arena_p = new_arena();
         SLIST_INSERT_HEAD(&used_arenas, *arena_p, link);
         *gc_p = new_gc_stack(*arena_p);
-        if(nh_stuff[0]) {
-                nh_end = nh_start = nh_stuff[0];
-                for(int i = 1; nh_stuff[i]; i++) {
-                        if(nh_stuff[i] < nh_start)
-                                nh_start = nh_stuff[i];
-                        if(nh_stuff[i] > nh_end)
-                                nh_end = nh_stuff[i];
-                }
-        }
+        jhc_rts_unlock();
 }
 
 void
@@ -248,11 +252,12 @@ jhc_alloc_fini(gc_t gc,arena_t arena) {
                         print_cache(sc);
         }
 
+        jhc_rts_lock();
         SLIST_FOREACH(pg, &arena->monolithic_blocks, link) {
-	        SLIST_INSERT_HEAD(&free_monolithic_blocks, pg, link);
+                SLIST_INSERT_HEAD(&free_monolithic_blocks, pg, link);
         }
         SLIST_FOREACH(mb, &arena->megablocks, next) {
-	        SLIST_INSERT_HEAD(&free_megablocks, mb, next);
+                SLIST_INSERT_HEAD(&free_megablocks, mb, next);
         }
         if(arena->current_megablock) {
                 SLIST_INSERT_HEAD(&free_megablocks, arena->current_megablock, next);
@@ -268,6 +273,7 @@ jhc_alloc_fini(gc_t gc,arena_t arena) {
 
         SLIST_REMOVE(&used_arenas, arena, s_arena, link);
         SLIST_INSERT_HEAD(&free_arenas, arena, link);
+        jhc_rts_unlock();
 }
 
 heap_t A_STD
@@ -282,12 +288,15 @@ heap_t A_STD
 
 static heap_t A_STD
 s_monoblock(arena_t arena, unsigned size, unsigned nptrs, unsigned flags) {
+        jhc_rts_lock();
         struct s_block *b = SLIST_FIRST(&free_monolithic_blocks);
         if (b) {
-		SLIST_REMOVE(&free_monolithic_blocks, b, s_block, link);
+                SLIST_REMOVE(&free_monolithic_blocks, b, s_block, link);
         } else {
                 b = jhc_aligned_alloc(size * sizeof(uintptr_t));
         }
+        jhc_rts_unlock();
+
         b->flags = flags | SLAB_MONOLITH;
         b->color = (sizeof(struct s_block) + BITARRAY_SIZE_IN_BYTES(1) +
                     sizeof(uintptr_t) - 1) / sizeof(uintptr_t);
@@ -373,6 +382,7 @@ jhc_aligned_alloc(unsigned size) {
 struct s_megablock *
 s_new_megablock(arena_t arena)
 {
+        jhc_rts_lock();
         struct s_megablock *mb = SLIST_FIRST(&free_megablocks);
         if (mb) {
                 SLIST_REMOVE(&free_megablocks, mb, s_megablock, next);
@@ -389,6 +399,8 @@ s_new_megablock(arena_t arena)
 #else
         mb->base = jhc_aligned_alloc(MEGABLOCK_SIZE);
 #endif
+        jhc_rts_unlock();
+
         VALGRIND_MAKE_MEM_NOACCESS(mb->base,MEGABLOCK_SIZE);
         mb->next_free = 0;
         return mb;
@@ -683,6 +695,7 @@ public_caches(arena_t arena) {
         return arena->public_caches_p;
 }
 
+/* Enter with rts_lock. */
 arena_t
 new_arena(void) {
         arena_t arena = SLIST_FIRST(&free_arenas);
@@ -790,9 +803,11 @@ print_cache(struct s_cache *sc) {
 
 void hs_perform_gc(void) {
         arena_t arena;
+        jhc_rts_lock();
         SLIST_FOREACH(arena, &used_arenas, link) {
                 arena->force_gc_next_s_alloc = 1;
         }
+        jhc_rts_unlock();
 }
 
 #endif
