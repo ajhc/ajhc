@@ -4,6 +4,7 @@ build-type:    Custom
 version:       @VERSION@
 license:       GPL-2
 license-file:  COPYING
+copyright:     Copyright (C) 2002-2013 John Meacham
 category:      Compiler
 author:        John Meacham <john@repetae.net>
 maintainer:    Kiwamu Okabe <kiwamu@debian.or.jp>
@@ -22,6 +23,7 @@ description:   Ajhc is a fork of jhc.
                .
                <<https://raw.github.com/ajhc/ajhc/arafura/docs/jhc_compile_flow.png>>
 homepage:      http://ajhc.metasepi.org/
+bug-reports:   http://github.com/ajhc/ajhc/issues
 
 data-files:    README.md
 
