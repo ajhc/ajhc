@@ -9,7 +9,7 @@ TESTS=slab_test stableptr_test jgc_test
 all: $(TESTS)
 
 RTSFILES=hs_fake.c ../rts/profile.c ../rts/jhc_rts.c ../rts/gc_jgc.c \
-	 ../rts/stableptr.c ../rts/gc_none.c ../rts/rts_support.c
+	 ../rts/stableptr.c ../rts/gc_none.c ../rts/rts_support.c ../rts/conc.c
 
 clean:
 	rm -f $(TESTS)
