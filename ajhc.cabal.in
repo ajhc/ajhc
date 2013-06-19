@@ -249,6 +249,8 @@ library
         Util.YAML
         Version.Config
         Version.Version
+
+    other-modules:
         Paths_@PACKAGE_NAME@
 
     default-extensions:
