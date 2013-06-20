@@ -33,7 +33,7 @@ static void print_quoted(FILE *file,unsigned char *s,int len);
 
 // string allocation stuff
 
-#define NUM_CHUNKS 256
+#define NUM_CHUNKS 384
 #define CHUNK_SIZE 16384
 
 #define ATOM_LEN(c)     (((atom_t)(c) >> ATOM_LEN_SHIFT) & ATOM_LEN_MASK)
