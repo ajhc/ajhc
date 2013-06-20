@@ -113,10 +113,13 @@ gc_perform_gc(gc_t gc, arena_t arena)
         }
         debugf(" # ");
         struct StablePtr *sp;
+
+        jhc_rts_lock();
         LIST_FOREACH(sp, &root_StablePtrs, link) {
             gc_add_grey(&stack, (entry_t *)sp);
             debugf(" %p", root_stack.stack[i]);
         }
+        jhc_rts_unlock();
 
         debugf("\n");
         debugf("Trace:");
