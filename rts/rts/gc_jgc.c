@@ -92,6 +92,41 @@ gc_add_grey(struct stack *stack, entry_t *s)
                 stack->stack[stack->ptr++] = s;
 }
 
+static void
+gc_mark_deeper(struct stack *stack, unsigned *number_redirects)
+{
+        while(stack->ptr) {
+                entry_t *e = stack->stack[--stack->ptr];
+                struct s_block *pg = S_BLOCK(e);
+                if(!(pg->flags & SLAB_MONOLITH))
+                        VALGRIND_MAKE_MEM_DEFINED(e,pg->u.pi.size * sizeof(uintptr_t));
+                debugf("Processing Grey: %p\n",e);
+                unsigned num_ptrs = pg->flags & SLAB_MONOLITH ? pg->u.m.num_ptrs : pg->u.pi.num_ptrs;
+                stack_check(stack, num_ptrs);
+                for(unsigned i = 0; i < num_ptrs; i++) {
+                        if(1 && (P_LAZY == GET_PTYPE(e->ptrs[i]))) {
+                                VALGRIND_MAKE_MEM_DEFINED(FROM_SPTR(e->ptrs[i]), sizeof(uintptr_t));
+                                if(!IS_LAZY(GETHEAD(FROM_SPTR(e->ptrs[i])))) {
+                                        *number_redirects++;
+                                        debugf(" *");
+                                        e->ptrs[i] = (sptr_t)GETHEAD(FROM_SPTR(e->ptrs[i]));
+                                }
+                        }
+                        if(IS_PTR(e->ptrs[i])) {
+                                entry_t * ptr = TO_GCPTR(e->ptrs[i]);
+                                debugf("Following: %p %p\n",e->ptrs[i], ptr);
+                                gc_add_grey(stack, ptr);
+                        }
+                }
+        }
+}
+
+#if defined(_JHC_JGC_ECO_MALLOC_HEAP)
+#define DO_GC_MARK_DEEPER(S,N)  gc_mark_deeper((S),(N))
+#else
+#define DO_GC_MARK_DEEPER(S,N)  do { } while (/* CONSTCOND */ 0)
+#endif
+
 void A_STD
 gc_perform_gc(gc_t gc, arena_t arena)
 {
@@ -110,6 +145,7 @@ gc_perform_gc(gc_t gc, arena_t arena)
         for(unsigned i = 0; i < root_stack.ptr; i++) {
                 gc_add_grey(&stack, root_stack.stack[i]);
                 debugf(" %p", root_stack.stack[i]);
+                DO_GC_MARK_DEEPER(&stack, &number_redirects);
         }
         debugf(" # ");
         struct StablePtr *sp;
@@ -117,13 +153,18 @@ gc_perform_gc(gc_t gc, arena_t arena)
         jhc_rts_lock();
         LIST_FOREACH(sp, &root_StablePtrs, link) {
             gc_add_grey(&stack, (entry_t *)sp);
-            debugf(" %p", root_stack.stack[i]);
+            debugf(" %p", sp);
+            DO_GC_MARK_DEEPER(&stack, &number_redirects);
         }
         jhc_rts_unlock();
 
         debugf("\n");
         debugf("Trace:");
+#if defined(_JHC_JGC_ECO_MALLOC_HEAP)
+        stack_check(&stack, 1); // Just alloc
+#else
         stack_check(&stack, gc - arena->gc_stack_base);
+#endif
         number_stack = gc - arena->gc_stack_base;
         for(unsigned i = 0; i < number_stack; i++) {
                 debugf(" |");
@@ -149,33 +190,11 @@ gc_perform_gc(gc_t gc, arena_t arena)
                 entry_t *e = TO_GCPTR(ptr);
                 debugf(" %p",(void *)e);
                 gc_add_grey(&stack, e);
+                DO_GC_MARK_DEEPER(&stack, &number_redirects);
         }
         debugf("\n");
 
-        while(stack.ptr) {
-                entry_t *e = stack.stack[--stack.ptr];
-                struct s_block *pg = S_BLOCK(e);
-                if(!(pg->flags & SLAB_MONOLITH))
-                        VALGRIND_MAKE_MEM_DEFINED(e,pg->u.pi.size * sizeof(uintptr_t));
-                debugf("Processing Grey: %p\n",e);
-                unsigned num_ptrs = pg->flags & SLAB_MONOLITH ? pg->u.m.num_ptrs : pg->u.pi.num_ptrs;
-                stack_check(&stack, num_ptrs);
-                for(unsigned i = 0; i < num_ptrs; i++) {
-                        if(1 && (P_LAZY == GET_PTYPE(e->ptrs[i]))) {
-                                VALGRIND_MAKE_MEM_DEFINED(FROM_SPTR(e->ptrs[i]), sizeof(uintptr_t));
-                                if(!IS_LAZY(GETHEAD(FROM_SPTR(e->ptrs[i])))) {
-                                        number_redirects++;
-                                        debugf(" *");
-                                        e->ptrs[i] = (sptr_t)GETHEAD(FROM_SPTR(e->ptrs[i]));
-                                }
-                        }
-                        if(IS_PTR(e->ptrs[i])) {
-                                entry_t * ptr = TO_GCPTR(e->ptrs[i]);
-                                debugf("Following: %p %p\n",e->ptrs[i], ptr);
-                                gc_add_grey( &stack, ptr);
-                        }
-                }
-        }
+        gc_mark_deeper(&stack, &number_redirects); // Final marking
         free(stack.stack);
         s_cleanup_blocks(arena);
         if (JHC_STATUS) {
