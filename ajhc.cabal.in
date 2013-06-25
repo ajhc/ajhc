@@ -4,7 +4,6 @@ build-type:    Custom
 version:       @VERSION@
 license:       GPL-2
 license-file:  COPYING
-copyright:     Copyright (C) 2002-2013 John Meacham
 category:      Compiler
 author:        John Meacham <john@repetae.net>
 maintainer:    Kiwamu Okabe <kiwamu@debian.or.jp>
