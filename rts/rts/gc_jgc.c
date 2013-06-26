@@ -121,7 +121,7 @@ gc_mark_deeper(struct stack *stack, unsigned *number_redirects)
         }
 }
 
-#if defined(_JHC_JGC_ECO_MALLOC_HEAP)
+#if defined(_JHC_JGC_SAVING_MALLOC_HEAP)
 #define DO_GC_MARK_DEEPER(S,N)  gc_mark_deeper((S),(N))
 #else
 #define DO_GC_MARK_DEEPER(S,N)  do { } while (/* CONSTCOND */ 0)
@@ -160,7 +160,7 @@ gc_perform_gc(gc_t gc, arena_t arena)
 
         debugf("\n");
         debugf("Trace:");
-#if defined(_JHC_JGC_ECO_MALLOC_HEAP)
+#if defined(_JHC_JGC_SAVING_MALLOC_HEAP)
         stack_check(&stack, 1); // Just alloc
 #else
         stack_check(&stack, gc - arena->gc_stack_base);
