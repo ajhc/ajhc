@@ -25,10 +25,11 @@
 #define jhc_mutex_unlock(M)	pthread_mutex_unlock((M))
 
 #elif _JHC_CONC == _JHC_CONC_CUSTOM
+#include "conc_custom.h"
 /* You should impl "jhc_threadid_t" and "jhc_mutex_t". */
-void jhc_mutex_init(jhc_mutex_t *mutex)
-void jhc_mutex_lock(jhc_mutex_t *mutex)
-void jhc_mutex_unlock(jhc_mutex_t *mutex)
+void jhc_mutex_init(jhc_mutex_t *mutex);
+void jhc_mutex_lock(jhc_mutex_t *mutex);
+void jhc_mutex_unlock(jhc_mutex_t *mutex);
 
 #else
 #error "You should choose _JHC_CONC."
