@@ -1,5 +1,5 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
-module Control.Concurrent (forkOS, ThreadId) where
+module Control.Concurrent (forkIO, forkOS, ThreadId) where
 import Foreign.Ptr
 import Foreign.StablePtr
 import Foreign.Storable
@@ -33,3 +33,7 @@ forkOS f = alloca $ \ip -> do
   i <- peek ip
   when (i /= 0) $ fail "Cannot create OS thread."
   return $ ThreadId pth
+
+-- xxx Should impl user thread.
+forkIO :: IO () -> IO ThreadId
+forkIO = forkOS
