@@ -2,7 +2,7 @@
 
 We are happy to announce Ajhc 0.8.0.7.
 You can program interrupt handler with Haskell language on this release.
-Major change on the release is supporting THREAD. Yeah!
+But not yet collect (big) patch sets, the changes will be merged to jhc.
 
 You can get Ajhc using "cabal install ajhc" command.
 The usage is found at Ajhc's project web site http://ajhc.metasepi.org/.
