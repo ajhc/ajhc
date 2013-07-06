@@ -143,6 +143,7 @@ Define                              Meaning
 ------                              ---------------------------------------------------------------------------
 \_JHC\_ARM\_STAY\_IN\_THUMB\_MODE   set bit0 to any function pointers, for Cortex-M*. ([more detail](http://communities.mentor.com/community/cs/archives/arm-gnu/msg01904.html))
 \_JHC\_JGC\_NAIVEGC                 run gc when have no more blocks.
+\_JHC\_JGC\_SAVING\_MALLOC\_HEAP    get smaller malloc heap.
 \_JHC\_JGC\_LIMITED\_NUM\_GC\_STACK number of limited gc_stack entries.
 \_JHC\_JGC\_GC\_STACK\_SHIFT        bit shift to specify gc_stack size. Use it internally like this: (1 << (\_JHC\_JGC\_GC\_STACK\_SHIFT)).
 \_JHC\_JGC\_STACKGROW               number of stack entry growed when run short of it.

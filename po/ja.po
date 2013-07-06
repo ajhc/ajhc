@@ -7,8 +7,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
-"POT-Creation-Date: 2013-06-20 02:38+0900\n"
-"PO-Revision-Date: 2013-06-20 02:44+0900\n"
+"POT-Creation-Date: 2013-07-06 12:32+0900\n"
+"PO-Revision-Date: 2013-07-06 12:34+0900\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "Language: \n"
@@ -1943,13 +1943,14 @@ msgid "## Special defines to set cflags"
 msgstr "## cflagsで指定できる特殊なdefine"
 
 #. type: Plain text
-#: manual.mkd:784
+#: manual.mkd:785
 #, no-wrap
 msgid ""
 "Define                              Meaning\n"
 "------                              ---------------------------------------------------------------------------\n"
 "\\_JHC\\_ARM\\_STAY\\_IN\\_THUMB\\_MODE   set bit0 to any function pointers, for Cortex-M*. ([more detail](http://communities.mentor.com/community/cs/archives/arm-gnu/msg01904.html))\n"
 "\\_JHC\\_JGC\\_NAIVEGC                 run gc when have no more blocks.\n"
+"\\_JHC\\_JGC\\_SAVING\\_MALLOC\\_HEAP    get smaller malloc heap.\n"
 "\\_JHC\\_JGC\\_LIMITED\\_NUM\\_GC\\_STACK number of limited gc_stack entries.\n"
 "\\_JHC\\_JGC\\_GC\\_STACK\\_SHIFT        bit shift to specify gc_stack size. Use it internally like this: (1 << (\\_JHC\\_JGC\\_GC\\_STACK\\_SHIFT)).\n"
 "\\_JHC\\_JGC\\_STACKGROW               number of stack entry growed when run short of it.\n"
@@ -1961,6 +1962,7 @@ msgstr ""
 "------                              ---------------------------------------------------------------------------\n"
 "\\_JHC\\_ARM\\_STAY\\_IN\\_THUMB\\_MODE   Cortex-M*などのアーキティクチャのために関数ポインタのビット0を1にする ([詳細](http://communities.mentor.com/community/cs/archives/arm-gnu/msg01904.html))\n"
 "\\_JHC\\_JGC\\_NAIVEGC                 ブロックが不足した際にGCする\n"
+"\\_JHC\\_JGC\\_SAVING\\_MALLOC\\_HEAP    mallocヒープを節約して使う\n"
 "\\_JHC\\_JGC\\_LIMITED\\_NUM\\_GC\\_STACK 個数の限定されたGCスタックのエントリ数\n"
 "\\_JHC\\_JGC\\_GC\\_STACK\\_SHIFT        GCスタックの大きさを指定するビットシフト。内部ではこのように使われる: (1 << (\\_JHC\\_JGC\\_GC\\_STACK\\_SHIFT)).\n"
 "\\_JHC\\_JGC\\_STACKGROW               GCスタックが不足した際に新たに確保するGCスタックエントリ数\n"
@@ -1969,17 +1971,17 @@ msgstr ""
 "\\_JHC\\_JGC\\_MEGABLOCK\\_SHIFT        メガブロックの大きさを指定するビットシフト。内部ではこのように使われる: (1 << (_JHC_JGC_MEGABLOCK_SHIFT)).\n"
 
 #. type: Plain text
-#: manual.mkd:787
+#: manual.mkd:788
 msgid "# Internals"
 msgstr "# 内部設計"
 
 #. type: Plain text
-#: manual.mkd:790
+#: manual.mkd:791
 msgid "## The Run Time System"
 msgstr "## ランタイムシステム"
 
 #. type: Plain text
-#: manual.mkd:799
+#: manual.mkd:800
 msgid ""
 "Ajhc is very minimalist in that it does not have a precompiled run time "
 "system, but rather generates what is needed as part of the compilation "
@@ -2000,7 +2002,7 @@ msgstr ""
 "われて、最適化されたレイアウトが使用できるかに影響を及ぼす。"
 
 #. type: Plain text
-#: manual.mkd:807
+#: manual.mkd:808
 msgid ""
 "Unboxed values directly translate to values in the target language, an "
 "unboxed Int will translate directly into an 'int' as an argument and an "
@@ -2021,7 +2023,7 @@ msgstr ""
 "値を取り扱うのは悪い考えではない。"
 
 #. type: Plain text
-#: manual.mkd:813
+#: manual.mkd:814
 msgid ""
 "Boxed values have a standard representation and can be followed. Unlike some "
 "other implementation, being boxed does not imply the object is located on "
@@ -2040,7 +2042,7 @@ msgstr ""
 "実際には伝統的なポインタであるかもしれないのだ。"
 
 #. type: Plain text
-#: manual.mkd:817
+#: manual.mkd:818
 msgid ""
 "A boxed value in Ajhc is represented by a 'smart pointer' of c type sptr_t. "
 "a smart pointer is the size of a native pointer, but can take on different "
@@ -2053,12 +2055,12 @@ msgstr ""
 "それはptypeと呼ばれる。"
 
 #. type: Plain text
-#: manual.mkd:819
+#: manual.mkd:820
 msgid "smart pointers take on a general form as follows:"
 msgstr "スマートポインタは一般に以下の形をしている:"
 
 #. type: Plain text
-#: manual.mkd:823
+#: manual.mkd:824
 #, no-wrap
 msgid ""
 "    -------------------------\n"
@@ -2070,7 +2072,7 @@ msgstr ""
 "    -------------------------\n"
 
 #. type: Plain text
-#: manual.mkd:826
+#: manual.mkd:827
 #, no-wrap
 msgid ""
 "      G - if set, then the garbage collector should not treat value as a pointer to be followed\n"
@@ -2080,13 +2082,13 @@ msgstr ""
 "      L - 遅延。このビットがセットされると値はWHNFではないことを示す\n"
 
 #. type: Plain text
-#: manual.mkd:828
+#: manual.mkd:829
 msgid ""
 "A sptr_t on its own in the wild can only take on one of the following forms:"
 msgstr "sptr_tは以下の形の内どれか一つの状態にある:"
 
 #. type: Plain text
-#: manual.mkd:832
+#: manual.mkd:833
 #, no-wrap
 msgid ""
 "    -------------------------\n"
@@ -2098,7 +2100,7 @@ msgstr ""
 "    -------------------------\n"
 
 #. type: Plain text
-#: manual.mkd:836
+#: manual.mkd:837
 #, no-wrap
 msgid ""
 "    -------------------------\n"
@@ -2110,7 +2112,7 @@ msgstr ""
 "    -------------------------\n"
 
 #. type: Plain text
-#: manual.mkd:843
+#: manual.mkd:844
 msgid ""
 "WHNF stands for 'Weak Head Normal Form' and means that the value is not a "
 "suspended function and hence not a pointer to a thunk. It may be directly "
@@ -2127,7 +2129,7 @@ msgstr ""
 "値がWHNFであり高価な'eval'をスキップできるかどうかを静的に知ることができる。"
 
 #. type: Plain text
-#: manual.mkd:849
+#: manual.mkd:850
 msgid ""
 "The difference between the raw value and the whnf location is that the first "
 "contains uninterpreted bits, while the second is a pointer to a location on "
@@ -2143,7 +2145,7 @@ msgstr ""
 "いちがいに決まってはいない。"
 
 #. type: Plain text
-#: manual.mkd:853
+#: manual.mkd:854
 msgid ""
 "Partial (unsaturated) applications are normal WHNF values. Saturated "
 "applications which may be 'eval'ed and updated are called thunks and must "
@@ -2155,7 +2157,7 @@ msgstr ""
 "これらの表現は以下である。"
 
 #. type: Plain text
-#: manual.mkd:857
+#: manual.mkd:858
 #, no-wrap
 msgid ""
 "    -------------------------\n"
@@ -2167,7 +2169,7 @@ msgstr ""
 "    -------------------------\n"
 
 #. type: Plain text
-#: manual.mkd:863
+#: manual.mkd:864
 msgid ""
 "A lazy location points to either a thunk, or a redirection to a WHNF value. "
 "A lazy location is always a pointer to an allocated block of memory which "
@@ -2184,7 +2186,7 @@ msgstr ""
 "それらはオブジェクトとして流通することはない。"
 
 #. type: Plain text
-#: manual.mkd:868
+#: manual.mkd:869
 msgid ""
 "A fptr_t may be a whnf value or a code pointer. If a fptr_t is a whnf value "
 "(of one of the two forms given above) then it is called a redirection, the "
@@ -2198,7 +2200,7 @@ msgstr ""
 "これは評価済みサンクへのリダイレクトとして使われる。"
 
 #. type: Plain text
-#: manual.mkd:874
+#: manual.mkd:875
 msgid ""
 "A fptr_t may also be a 'code pointer' in which case the lazy location is "
 "called a thunk. A code pointer is a pointer to executable machine code that "
@@ -2216,7 +2218,7 @@ msgstr ""
 "指示されたコードはこのリダイレクションを実行する責任がある。"
 
 #. type: Plain text
-#: manual.mkd:879
+#: manual.mkd:880
 #, no-wrap
 msgid ""
 "    -------------------------\n"
@@ -2230,7 +2232,7 @@ msgstr ""
 "    |     data ...          |\n"
 
 #. type: Plain text
-#: manual.mkd:882
+#: manual.mkd:883
 msgid ""
 "When debugging, the special code pointer BLACK_HOLE is also sometimes stored "
 "in a fptr_t to detect certain run-time errors."
@@ -2239,7 +2241,7 @@ msgstr ""
 "これはある種のランタイムエラーを検出する。"
 
 #. type: Plain text
-#: manual.mkd:886
+#: manual.mkd:887
 msgid ""
 "Note that unlike other implementations, a fptr_t may _not_ be another lazy "
 "location. you can not have chained redirections, a redirection is always a "
@@ -2250,7 +2252,7 @@ msgstr ""
 "リダイレクションは常にWHNF値へのリダイレクションでなければならない。"
 
 #. type: Plain text
-#: manual.mkd:890
+#: manual.mkd:891
 #, no-wrap
 msgid ""
 "    sptr_t - a tagged smart pointer, may contain a whnf value or a lazy location.\n"
@@ -2262,12 +2264,12 @@ msgstr ""
 "    fptr_t - タグ付けされたスマートポインタ。リダイレクションを示すWHNF値かサンクを示すコードポインタを保持する。\n"
 
 #. type: Plain text
-#: manual.mkd:894
+#: manual.mkd:895
 msgid "## Ajhc Core Type System"
 msgstr "## Ajhcコア型システム"
 
 #. type: Plain text
-#: manual.mkd:898
+#: manual.mkd:899
 msgid ""
 "Ajhc's core is based on a pure type system. A pure type system (also called "
 "a PTS) is actually a parameterized set of type systems. Ajhc's version is "
@@ -2278,7 +2280,7 @@ msgstr ""
 "AjhcのPTSについて以下で解説する。"
 
 #. type: Plain text
-#: manual.mkd:901
+#: manual.mkd:902
 #, no-wrap
 msgid ""
 "    Sorts  = (*, !, **, #, (#), ##, □)\n"
@@ -2288,7 +2290,7 @@ msgstr ""
 "    公理 = (*:**, #:##, !:**, **:□, ##:□)\n"
 
 #. type: Plain text
-#: manual.mkd:912
+#: manual.mkd:913
 #, no-wrap
 msgid ""
 "    -- sort kind\n"
@@ -2314,13 +2316,13 @@ msgstr ""
 "    □   superkindの存在位置\n"
 
 #. type: Plain text
-#: manual.mkd:914
+#: manual.mkd:915
 #, no-wrap
 msgid "    in addition there exist user defined kinds, which are always of supersort ##\n"
 msgstr "    ユーザ定義の種の存在に加えて、supersort ##が存在する。\n"
 
 #. type: Plain text
-#: manual.mkd:919
+#: manual.mkd:920
 msgid ""
 "The following Rules table shows what sort of abstractions are allowed, a "
 "rule of the form (A,B,C) means you can have functions of things of sort A to "
@@ -2333,7 +2335,7 @@ msgstr ""
 "この文脈での _関数_ は項と型レベルの抽象を含んでいる。"
 
 #. type: Plain text
-#: manual.mkd:924
+#: manual.mkd:925
 msgid ""
 "Notice that functions are always boxed, but may be strict if they take an "
 "unboxed tuple as an argument.  When a function is strict it means that it is "
@@ -2346,7 +2348,7 @@ msgstr ""
 "関数の評価が中断された値であることはありえない。"
 
 #. type: Plain text
-#: manual.mkd:931
+#: manual.mkd:932
 msgid ""
 "These type system rules apply to lambda abstractions. It is possible that "
 "data constructors might exist that cannot be given a type on their own with "
@@ -2363,7 +2365,7 @@ msgstr ""
 "を正しく推論するのは困難ではない。"
 
 #. type: Plain text
-#: manual.mkd:934
+#: manual.mkd:935
 #, no-wrap
 msgid ""
 "    as a shortcut we will use *# to mean every combination involving * and #, and so forth.\n"
@@ -2373,7 +2375,7 @@ msgstr ""
 "    例えば、 (*#,*#,*) は (*,*,*) (#,*,*) (*,#,*) (#,#,*) のセットを意味している。\n"
 
 #. type: Plain text
-#: manual.mkd:946
+#: manual.mkd:947
 #, no-wrap
 msgid ""
 "    Rules =\n"
@@ -2401,30 +2403,30 @@ msgstr ""
 "       (##,##,##)  -- Complex_ :: # -> #\n"
 
 #. type: Plain text
-#: manual.mkd:948
+#: manual.mkd:949
 #, no-wrap
 msgid "    The defining feature of boxed values is\n"
 msgstr "    ボックス化値の定義は以下である。\n"
 
 #. type: Plain text
-#: manual.mkd:950
+#: manual.mkd:951
 #, no-wrap
 msgid "    _|_ :: t iff t::*\n"
 msgstr "    _|_ :: t iff t::*\n"
 
 #. type: Plain text
-#: manual.mkd:952
+#: manual.mkd:953
 #, no-wrap
 msgid "    This PTS is functional but not injective\n"
 msgstr "    このPTSは関数的であるが単射ではない。\n"
 
 #. type: Plain text
-#: manual.mkd:954
+#: manual.mkd:955
 msgid "The PTS can be considered stratified into the following levels"
 msgstr "このPTSは次のレベルに階層化されている。"
 
 #. type: Plain text
-#: manual.mkd:960
+#: manual.mkd:961
 #, no-wrap
 msgid ""
 "    □                - sort box\n"
@@ -2440,12 +2442,12 @@ msgstr ""
 "    3,True,\"bob\"     - 種類value(値)\n"
 
 #. type: Plain text
-#: manual.mkd:962
+#: manual.mkd:963
 msgid "### On boxed kinds"
 msgstr "### ボックス化kind(種)について"
 
 #. type: Plain text
-#: manual.mkd:966
+#: manual.mkd:967
 msgid ""
 "The boxed kinds (* and !) represent types that have a uniform run time "
 "representation. Due to this, functions may be written that are polymorphic "
@@ -2458,7 +2460,7 @@ msgstr ""
 "ことができる。"
 
 #. type: Plain text
-#: manual.mkd:970
+#: manual.mkd:971
 msgid ""
 "the unboxed kind # is inhabited with types that have their own specific run "
 "time representation. Hence you cannot write functions that are polymorphic "
@@ -2468,12 +2470,12 @@ msgstr ""
 "アンボックス化型を多相的に使う関数を書くことはできない。"
 
 #. type: Plain text
-#: manual.mkd:972
+#: manual.mkd:973
 msgid "### On sort box, the unboxed tuple, and friends"
 msgstr "### 種類box、アンボックス化タプルとその同類について"
 
 #. type: Plain text
-#: manual.mkd:978
+#: manual.mkd:979
 msgid ""
 "Although sort box does not appear in the code, it is useful from a "
 "theoretical point of view to talk about certain types such as the types of "
@@ -2491,13 +2493,13 @@ msgstr ""
 "(これはアンボックス化2タプルのケースである)"
 
 #. type: Plain text
-#: manual.mkd:980
+#: manual.mkd:981
 #, no-wrap
 msgid "    ∀s1:□ ∀s2:□ ∀k1:s1 ∀k2:s2 ∀t1:k1 ∀t2:k2 . (# t1, t2 #)\n"
 msgstr "    ∀s1:□ ∀s2:□ ∀k1:s1 ∀k2:s2 ∀t1:k1 ∀t2:k2 . (# t1, t2 #)\n"
 
 #. type: Plain text
-#: manual.mkd:986
+#: manual.mkd:987
 msgid ""
 "However, although this is a valid typing of what it would mean if a unboxed "
 "tuple were not fully applied, since we do not have any rules of form "
@@ -2512,12 +2514,12 @@ msgstr ""
 "のコード表現もまた不要になる。"
 
 #. type: Plain text
-#: manual.mkd:988
+#: manual.mkd:989
 msgid "#### Do we need a superbox?"
 msgstr "#### superboxは必要か？"
 
 #. type: Plain text
-#: manual.mkd:991
+#: manual.mkd:992
 msgid ""
 "You will notice that if you look at the axioms involving the sorts, you end "
 "up with a disjoint graph"
@@ -2526,7 +2528,7 @@ msgstr ""
 "れない。"
 
 #. type: Plain text
-#: manual.mkd:997
+#: manual.mkd:998
 #, no-wrap
 msgid ""
 "             □             - the box\n"
@@ -2542,7 +2544,7 @@ msgstr ""
 "         *  !     #   (#)  - kind(種)\n"
 
 #. type: Plain text
-#: manual.mkd:1002
+#: manual.mkd:1003
 msgid ""
 "This is simply due to the fact that nothing is polymorphic in unboxed tuples "
 "of kind (#) so we never need to refer to any super-sorts of them. We can add "
@@ -2555,7 +2557,7 @@ msgstr ""
 "これらの種類は決してコードや論文には現われないが、気にしないことにする。"
 
 #. type: Plain text
-#: manual.mkd:1010
+#: manual.mkd:1011
 #, no-wrap
 msgid ""
 "               □□            - sort superbox\n"
