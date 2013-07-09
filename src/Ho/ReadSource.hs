@@ -44,7 +44,7 @@ preprocess opt fn lbs = do
         incFlags = [ "-I" ++ d | d <- optIncdirs opt ++ optIncs opt]
         defFlags = ("-D__JHC__=" ++ revision):("-D__JHC_VERSION__=" ++ version):[ "-D" ++ d | d <- optDefs opt]
     case () of
-        _ | fopts FO.Cpp -> readSystem "cpp" $ ["-CC","-traditional"] ++ incFlags ++ defFlags ++ [fn]
+        _ | fopts FO.Cpp -> readSystem "cpphs" $ incFlags ++ defFlags ++ [fn]
           | fopts FO.M4  -> do
                 m4p <- m4Prelude
                 readSystem "m4" $ ["-s", "-P"] ++ incFlags ++ defFlags ++ [m4p,fn]
