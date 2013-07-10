@@ -11,10 +11,11 @@ This project is founded by [Metasepi Project](http://metasepi.org/).
 
 ## How to build latest version
 
-    $ sudo apt-get install make locales autoconf libreadline-dev libwww-perl libconfig-yaml-perl \
-      graphviz haskell-platform pandoc hscolour po4a libghc-temporary-dev libghc-haskeline-dev
-      libghc-utf8-string-dev libghc-hssyck-dev libghc-test-framework-th-dev libghc-test-framework-hunit-dev
-      libghc-test-framework-quickcheck2-dev libgc-dev gcc-multilib valgrind
+    $ sudo apt-get install make locales autoconf libreadline-dev libwww-perl \
+      libconfig-yaml-perl graphviz haskell-platform cpphs pandoc hscolour po4a \
+      libghc-temporary-dev libghc-haskeline-dev libghc-utf8-string-dev libghc-hssyck-dev \
+      libghc-test-framework-th-dev libghc-test-framework-hunit-dev \
+      libghc-test-framework-quickcheck2-dev libghc-uniplate-dev libgc-dev gcc-multilib valgrind
     $ git clone git://github.com/ajhc/ajhc.git
     $ cd ajhc
     $ git checkout arafura
