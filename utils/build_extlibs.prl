@@ -3,10 +3,6 @@
 use strict;
 use warnings;
 
-# xxx LWP getstore may return 500 error on Windows+msys+virtualbox.
-# xxx I can't understand the below MAGIC...
-# xxx http://lwp.interglacial.com/ch02_03.htm
-use LWP::Simple qw(!head);
 use Cwd;
 use Getopt::Std;
 
