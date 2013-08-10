@@ -48,18 +48,18 @@ void jhc_profile_pop(struct profile_stack *ps);
 #define print_alloc_size_stats() do { } while(0)
 #endif
 
-#ifndef _JHC_USE_OWN_PRINTF
-#define _JHC_USE_OWN_PRINTF 0
+#ifndef _JHC_USE_OWN_STDIO
+#define _JHC_USE_OWN_STDIO 0
 #endif
 
-#if _JHC_USE_OWN_PRINTF
+#if _JHC_USE_OWN_STDIO
 /* Implement us! */
 int jhc_printf_stderr(const char *fmt, ...);
 int jhc_fflush_stdout(void);
 #else
 #define jhc_printf_stderr(...) fprintf(stderr,__VA_ARGS__)
 #define jhc_fflush_stdout()    fflush(stdout)
-#endif
+#endif /* _JHC_USE_OWN_STDIO */
 
 #if JHC_STATUS > 1
 #define debugf(...) jhc_printf_stderr(__VA_ARGS__)

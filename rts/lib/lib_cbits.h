@@ -8,6 +8,17 @@ extern HsInt jhc_stdrnd[2];
 extern HsInt jhc_data_unique;
 HsBool jhc_wait_for_input(FILE *f,HsInt timeout);
 
+#ifndef _JHC_USE_OWN_STDIO
+#define _JHC_USE_OWN_STDIO 0
+#endif
+
+#if _JHC_USE_OWN_STDIO
+/* Implement us! */
+int jhc_utf8_getchar(void);
+int jhc_utf8_getc(FILE *f);
+int jhc_utf8_putchar(int ch);
+int jhc_utf8_putc(int ch, FILE *f);
+#else
 inline static int A_UNUSED
 jhc_utf8_getchar(void)
 {
@@ -31,5 +42,6 @@ jhc_utf8_putc(int ch, FILE *f)
 {
     return putc(ch,f);
 }
+#endif /* _JHC_USE_OWN_STDIO */
 
 #endif
