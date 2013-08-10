@@ -18,6 +18,7 @@ static void clear_used_bits(struct s_arena *arena) A_UNUSED;
 
 #include "sys/bitarray.h"
 #include "sys/queue.h"
+#include "rts/profile.h"
 
 struct s_arena {
         struct s_megablock *current_megablock;
@@ -96,7 +97,7 @@ s_new_megablock(struct s_arena *arena)
         int ret = posix_memalign(&mb->base,BLOCK_SIZE,MEGABLOCK_SIZE);
 #endif
         if(ret != 0) {
-                fprintf(stderr,"Unable to allocate memory for megablock\n");
+                jhc_printf_stderr("Unable to allocate memory for megablock\n");
                 abort();
         }
         VALGRIND_MAKE_MEM_NOACCESS(mb->base,MEGABLOCK_SIZE);
@@ -239,7 +240,7 @@ s_alloc(gc_t gc, struct s_cache *sc)
                         SLIST_INSERT_HEAD(&sc->full_blocks,pg,link);
                 }
                 assert(S_BLOCK(val) == pg);
-                //printf("s_alloc: val: %p s_block: %p size: %i color: %i found: %i num_free: %i\n", val, pg, pg->pi.size, pg->pi.color, found, pg->num_free);
+                //jhc_printf_stderr("s_alloc: val: %p s_block: %p size: %i color: %i found: %i num_free: %i\n", val, pg, pg->pi.size, pg->pi.color, found, pg->num_free);
                 return val;
         }
 }
@@ -251,7 +252,7 @@ s_free(void *val)
         assert(val);
         struct s_block *pg = s_block(val);
         unsigned int offset = ((uintptr_t *)val - (uintptr_t *)pg) - pg->pi.color;
-//        printf("s_free:  val: %p s_block: %p size: %i color: %i num_free: %i offset: %i bit: %i\n", val, pg, pg->pi.size, pg->pi.color, pg->num_free, offset, offset/pg->pi.size);
+//        jhc_printf_stderr("s_free:  val: %p s_block: %p size: %i color: %i num_free: %i offset: %i bit: %i\n", val, pg, pg->pi.size, pg->pi.color, pg->num_free, offset, offset/pg->pi.size);
         assert(BIT_VALUE(pg->used,offset/(pg->pi.size)));
         BIT_UNSET(pg->used,offset/(pg->pi.size));
         pg->num_free++;
@@ -344,21 +345,21 @@ new_arena(void) {
 
 void
 print_cache(struct s_cache *sc) {
-        fprintf(stderr, "num_entries: %i\n",(int)sc->num_entries);
-//        printf("  entries: %i words\n",(int)(sc->num_entries*sc->pi.size));
-        fprintf(stderr, "  header: %lu bytes\n", sizeof(struct s_block) + BITARRAY_SIZE_IN_BYTES(sc->num_entries));
-        fprintf(stderr, "  size: %i words\n",(int)sc->pi.size);
-//        printf("  color: %i words\n",(int)sc->pi.color);
-        fprintf(stderr, "  nptrs: %i words\n",(int)sc->pi.num_ptrs);
-//        printf("  end: %i bytes\n",(int)(sc->pi.color+ sc->num_entries*sc->pi.size)*sizeof(uintptr_t));
-        fprintf(stderr, "%20s %9s %9s %s\n", "block", "num_free", "next_free", "status");
+        jhc_printf_stderr( "num_entries: %i\n",(int)sc->num_entries);
+//        jhc_printf_stderr("  entries: %i words\n",(int)(sc->num_entries*sc->pi.size));
+        jhc_printf_stderr( "  header: %lu bytes\n", sizeof(struct s_block) + BITARRAY_SIZE_IN_BYTES(sc->num_entries));
+        jhc_printf_stderr( "  size: %i words\n",(int)sc->pi.size);
+//        jhc_printf_stderr("  color: %i words\n",(int)sc->pi.color);
+        jhc_printf_stderr( "  nptrs: %i words\n",(int)sc->pi.num_ptrs);
+//        jhc_printf_stderr("  end: %i bytes\n",(int)(sc->pi.color+ sc->num_entries*sc->pi.size)*sizeof(uintptr_t));
+        jhc_printf_stderr( "%20s %9s %9s %s\n", "block", "num_free", "next_free", "status");
         struct s_block *pg;
         SLIST_FOREACH(pg,&sc->blocks,link) {
-            fprintf(stderr, "%20p %9i %9i %c\n", pg, pg->num_free, pg->next_free, 'P');
+            jhc_printf_stderr( "%20p %9i %9i %c\n", pg, pg->num_free, pg->next_free, 'P');
         }
-        fprintf(stderr, "  full_blocks:\n");
+        jhc_printf_stderr( "  full_blocks:\n");
         SLIST_FOREACH(pg,&sc->full_blocks,link) {
-            fprintf(stderr, "%20p %9i %9i %c\n", pg, pg->num_free, pg->next_free, 'F');
+            jhc_printf_stderr( "%20p %9i %9i %c\n", pg, pg->num_free, pg->next_free, 'F');
         }
 }
 

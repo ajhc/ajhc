@@ -16,6 +16,7 @@
 
 #include "jhc_rts_header.h"
 
+#if 0
 void A_UNUSED
 profile_print_header(FILE *file, char *value_unit)
 {
@@ -27,6 +28,7 @@ profile_print_header(FILE *file, char *value_unit)
         fprintf(file, "SAMPLE_UNIT \"seconds\"\n");
         fprintf(file, "VALUE_UNIT \"%s\"\n", value_unit ? value_unit : "bytes");
 }
+#endif /* 0 */
 
 #if HAVE_TIMES
 struct profile_stack {
@@ -55,9 +57,9 @@ jhc_profile_pop(struct profile_stack *ps)
 void print_times(struct tms *tm) {
 #if  !defined(__WIN32__) && !defined(__ARM_EABI__)
     float cpt = (float)sysconf(_SC_CLK_TCK);
-    fprintf(stderr, "User Time:   %.2fs\n", (float)tm->tms_utime/cpt);
-    fprintf(stderr, "System Time: %.2fs\n", (float)tm->tms_stime/cpt);
-    fprintf(stderr, "Total Time:  %.2fs\n", (float)(tm->tms_stime + tm->tms_utime)/cpt);
+    jhc_printf_stderr("User Time:   %.2fs\n", (float)tm->tms_utime/cpt);
+    jhc_printf_stderr("System Time: %.2fs\n", (float)tm->tms_stime/cpt);
+    jhc_printf_stderr("Total Time:  %.2fs\n", (float)(tm->tms_stime + tm->tms_utime)/cpt);
 #endif
     return;
 }
@@ -72,11 +74,11 @@ void jhc_profile_pop(struct profile_stack *ps) {}
 void A_COLD
 jhc_print_profile(void) {
         if(!(_JHC_PROFILE || getenv("AJHC_RTS_PROFILE"))) return;
-        fprintf(stderr, "\n-----------------\n");
-        fprintf(stderr, "Profiling: %s\n", jhc_progname);
-        fprintf(stderr, "Command: %s\n", jhc_command);
-        fprintf(stderr, "Complie: %s\n", jhc_c_compile);
-        fprintf(stderr, "Version: %s\n\n", jhc_version);
+        jhc_printf_stderr("\n-----------------\n");
+        jhc_printf_stderr("Profiling: %s\n", jhc_progname);
+        jhc_printf_stderr("Command: %s\n", jhc_command);
+        jhc_printf_stderr("Complie: %s\n", jhc_c_compile);
+        jhc_printf_stderr("Version: %s\n\n", jhc_version);
 #if HAVE_TIMES
         struct tms tm;
         times(&tm);
@@ -86,7 +88,7 @@ jhc_print_profile(void) {
         print_times(&gc_gc_time.tm_total);
         print_times(&gc_alloc_time.tm_total);
 #endif
-        fprintf(stderr, "-----------------\n");
+        jhc_printf_stderr("-----------------\n");
 }
 
 #if _JHC_PROFILE && _JHC_GC != _JHC_GC_JGC
@@ -107,12 +109,12 @@ static void
 print_alloc_size_stats(void) {
         char fmt[] = "%10s %10s %10s %10s %10s\n";
         char fmt2[] = "%10u %10u %10u %10u %10u\n";
-        fprintf(stderr,fmt,"Size","Normal","Atomic","Total","Accum");
-        fprintf(stderr,fmt,"----","------","------","-----","-----");
+        jhc_printf_stderr(fmt,"Size","Normal","Atomic","Total","Accum");
+        jhc_printf_stderr(fmt,"----","------","------","-----","-----");
         unsigned accum = 0;
         for(int i = 0; i < BUCKETS; i++) {
                 accum += alloced[i] + alloced_atomic[i];
-                fprintf(stderr,fmt2,i,alloced[i],alloced_atomic[i],alloced_atomic[i] + alloced[i], accum);
+                jhc_printf_stderr(fmt2,i,alloced[i],alloced_atomic[i],alloced_atomic[i] + alloced[i], accum);
         }
 }
 #endif

@@ -34,23 +34,23 @@ hs_set_argv(int argc, char *argv[])
 
 void A_NORETURN A_UNUSED A_COLD
 jhc_exit(int n) {
-        fflush(stdout);
+        jhc_fflush_stdout();
         jhc_print_profile();
         exit(n);
 }
 
 void  A_NORETURN A_UNUSED  A_COLD
 jhc_error(char *s) {
-        fflush(stdout);
-        fputs(s,stderr);
-        fputs("\n",stderr);
+        jhc_fflush_stdout();
+        jhc_printf_stderr(s);
+        jhc_printf_stderr("\n");
         jhc_exit(1);
 }
 
 void  A_NORETURN A_UNUSED  A_COLD
 jhc_case_fell_off(int n) {
-        fflush(stdout);
-        fprintf(stderr, "\n%s:%i: case fell off\n", __FILE__, n);
+        jhc_fflush_stdout();
+        jhc_printf_stderr("\n%s:%i: case fell off\n", __FILE__, n);
         abort();
 }
 
@@ -82,7 +82,7 @@ void
 hs_exit(void)
 {
         if(!hs_init_count) {
-                fprintf(stderr, "hs_exit() called before hs_init()\n");
+                jhc_printf_stderr("hs_exit() called before hs_init()\n");
                 abort();
         }
         if(!--hs_init_count) {

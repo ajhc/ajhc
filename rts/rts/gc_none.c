@@ -27,7 +27,7 @@ void jhc_alloc_init(void) {}
 void
 jhc_alloc_fini(void) {
         if(_JHC_PROFILE) {
-                fprintf(stderr, "Memory Allocated: %u bytes\n", (JHC_MEM_CHUNK_SIZE*(mem_chunks)) + mem_offset);
+                jhc_printf_stderr("Memory Allocated: %u bytes\n", (JHC_MEM_CHUNK_SIZE*(mem_chunks)) + mem_offset);
                 print_alloc_size_stats();
         }
 }
@@ -36,7 +36,7 @@ static void
 jhc_malloc_grow(void) {
         void *c = malloc(JHC_MEM_CHUNK_SIZE);
         if(!c) {
-                fputs("Out of memory!\n",stderr);
+                jhc_printf_stderr("Out of memory!\n");
                 abort();
         }
         mem_chunks++;

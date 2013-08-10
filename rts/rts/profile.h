@@ -30,7 +30,7 @@
     do { } while (0)
 #endif
 
-void A_UNUSED profile_print_header(FILE *file, char *value_unit);
+// void A_UNUSED profile_print_header(FILE *file, char *value_unit);
 void A_COLD jhc_print_profile(void);
 
 #if _JHC_PROFILE
@@ -48,10 +48,23 @@ void jhc_profile_pop(struct profile_stack *ps);
 #define print_alloc_size_stats() do { } while(0)
 #endif
 
+#ifndef _JHC_USE_OWN_PRINTF
+#define _JHC_USE_OWN_PRINTF 0
+#endif
+
+#if _JHC_USE_OWN_PRINTF
+/* Implement us! */
+int jhc_printf_stderr(const char *fmt, ...);
+int jhc_fflush_stdout(void);
+#else
+#define jhc_printf_stderr(...) fprintf(stderr,__VA_ARGS__)
+#define jhc_fflush_stdout()    fflush(stdout)
+#endif
+
 #if JHC_STATUS > 1
-#define debugf(...) fprintf(stderr,__VA_ARGS__)
+#define debugf(...) jhc_printf_stderr(__VA_ARGS__)
 #else
 #define debugf(...) do { } while (0)
 #endif
 
-#endif
+#endif /* RTS_PROFILE_H */
