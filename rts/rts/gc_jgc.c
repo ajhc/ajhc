@@ -410,17 +410,17 @@ s_new_megablock(arena_t arena)
                 SLIST_REMOVE(&free_megablocks, mb, s_megablock, next);
         } else {
                 mb = malloc(sizeof(*mb));
-        }
 #ifdef _JHC_JGC_LIMITED_NUM_MEGABLOCK
-        static int count = 0;
-        if (count >= _JHC_JGC_LIMITED_NUM_MEGABLOCK) {
-                abort();
-        }
-        mb->base = aligned_megablock + (MEGABLOCK_SIZE) * count;
-        count++;
+                static int count = 0;
+                if (count >= _JHC_JGC_LIMITED_NUM_MEGABLOCK) {
+                  abort();
+                }
+                mb->base = aligned_megablock + (MEGABLOCK_SIZE) * count;
+                count++;
 #else
-        mb->base = jhc_aligned_alloc(MEGABLOCK_SIZE);
+                mb->base = jhc_aligned_alloc(MEGABLOCK_SIZE);
 #endif
+        }
         jhc_rts_unlock();
 
         VALGRIND_MAKE_MEM_NOACCESS(mb->base,MEGABLOCK_SIZE);
