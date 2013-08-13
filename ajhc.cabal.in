@@ -6,7 +6,7 @@ license:       GPL-2
 license-file:  COPYING
 category:      Compiler
 author:        John Meacham <john@repetae.net>
-maintainer:    Kiwamu Okabe <kiwamu@debian.or.jp>
+maintainer:    Metasepi team <metasepi@gmail.com>
 synopsis:      Haskell compiler that produce binary through C language
 description:   Ajhc is a fork of jhc.
                The jhc is a haskell compiler which aims to produce the most efficient
