@@ -413,7 +413,7 @@ s_new_megablock(arena_t arena)
 #ifdef _JHC_JGC_LIMITED_NUM_MEGABLOCK
                 static int count = 0;
                 if (count >= _JHC_JGC_LIMITED_NUM_MEGABLOCK) {
-                  abort();
+                        abort();
                 }
                 mb->base = aligned_megablock + (MEGABLOCK_SIZE) * count;
                 count++;
