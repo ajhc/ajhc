@@ -594,7 +594,8 @@ convertExp (Prim Func { primRetArgs = [], .. } vs ty) = do
     vs' <- mapM convertVal vs
     rt <- convertTypes ty
     let addgc = if primSafety == JhcContext && fopts FO.Jgc then mgc else id
-        fcall =  cast rt (functionCall (name $ unpackPS funcName) $ addgc [ cast (basicType' t) v | v <- vs' | t <- primArgTypes ])
+        fcall'= functionCall (name $ unpackPS funcName) $ addgc [ cast (basicType' t) v | v <- vs' | t <- primArgTypes ]
+        fcall = if rt == voidType then fcall' else cast rt fcall'
     return (mempty, fcall)
 convertExp (Prim p vs ty) =  do
     tell mempty { wRequires = primReqs p }
