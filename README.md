@@ -7,6 +7,7 @@ This project is founded by [Metasepi Project](http://metasepi.org/).
 
 ## How to install
 
+    $ sudo apt-get install haskell-platform libncurses5-dev gcc m4
     $ cabal install ajhc
 
 ## How to build latest version
