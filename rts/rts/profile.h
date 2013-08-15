@@ -51,9 +51,11 @@ void jhc_profile_pop(struct profile_stack *ps);
 #ifdef _JHC_USE_OWN_STDIO
 /* Implement us! */
 int jhc_printf_stderr(const char *fmt, ...);
+int jhc_fputs_stderr(const char *s);
 int jhc_fflush_stdout(void);
 #else
 #define jhc_printf_stderr(...) fprintf(stderr,__VA_ARGS__)
+#define jhc_fputs_stderr(S)    fputs(S, stderr)
 #define jhc_fflush_stdout()    fflush(stdout)
 #endif /* _JHC_USE_OWN_STDIO */
 

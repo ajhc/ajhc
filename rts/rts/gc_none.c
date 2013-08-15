@@ -36,7 +36,7 @@ static void
 jhc_malloc_grow(void) {
         void *c = malloc(JHC_MEM_CHUNK_SIZE);
         if(!c) {
-                jhc_printf_stderr("Out of memory!\n");
+                jhc_fputs_stderr("Out of memory!\n");
                 abort();
         }
         mem_chunks++;

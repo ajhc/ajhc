@@ -42,8 +42,8 @@ jhc_exit(int n) {
 void  A_NORETURN A_UNUSED  A_COLD
 jhc_error(char *s) {
         jhc_fflush_stdout();
-        jhc_printf_stderr(s);
-        jhc_printf_stderr("\n");
+        jhc_fputs_stderr(s);
+        jhc_fputs_stderr("\n");
         jhc_exit(1);
 }
 
