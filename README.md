@@ -81,12 +81,11 @@ http://www.haskell.org/platform/windows.html
 * No more depend on Perl (LWP and YAML).
 * Rewrite Cortex-M3 base library with Ajhc.
 * Analyze jhc internal (Japanese doc).
-  http://metasepi.org/posts/2013-01-31-jhc_internal_overview.html
+  https://github.com/ajhc/ajhc-hacking-guide
 * Port Haskell libraries on haskell-platform to Ajhc.
 * Understand jhc's region inference.
 * Play with Android NDK. http://developer.android.com/tools/sdk/ndk/index.html
 * Play with Google Native Client. https://developers.google.com/native-client/
-* Play with Nintendo DS. http://devkitpro.org/wiki/Getting_Started/devkitARM
 * Snatch ChibiOS/RT. http://www.chibios.org/dokuwiki/doku.php
 * Write Linux kernel driver with Haskell.
 * Get smaller RTS. Benchmark the RTS for running on custom FPGA CPU.
