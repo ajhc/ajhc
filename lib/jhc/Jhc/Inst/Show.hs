@@ -65,6 +65,8 @@ instance Show CInt where
     showsPrec p x = showsPrec p (fromIntegral x :: Integer)
 instance Show CLong where
     showsPrec p x = showsPrec p (fromIntegral x :: Integer)
+instance Show CLLong where
+    showsPrec p x = showsPrec p (fromIntegral x :: Integer)
 
 instance Show CChar where
     showsPrec p x = showsPrec p (fromIntegral x :: Int)
@@ -75,6 +77,8 @@ instance Show CUChar where
 instance Show CUInt where
     showsPrec _ x = showWord (fromIntegral x :: Word)
 instance Show CULong where
+    showsPrec _ x = showWordMax (fromIntegral x :: WordMax)
+instance Show CULLong where
     showsPrec _ x = showWordMax (fromIntegral x :: WordMax)
 instance Show CWchar where
     showsPrec _ x = showWord (fromIntegral x :: Word)

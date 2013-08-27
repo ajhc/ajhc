@@ -59,8 +59,12 @@ UBOUNDED(CWchar)
 
 ENUMINST(CLong)
 BOUNDED(CLong)
+ENUMINST(CLLong)
+BOUNDED(CLLong)
 ENUMINST(CULong)
 UBOUNDED(CULong)
+ENUMINST(CULLong)
+UBOUNDED(CULLong)
 
 instance Enum () where
     succ _      = error "Prelude.Enum.().succ: bad argument"
