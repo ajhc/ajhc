@@ -196,6 +196,7 @@ data Opt = Opt {
     optDeps        ::  Maybe FilePath,
     optHoDir       ::  Maybe FilePath,
     optHoCache     ::  Maybe FilePath,
+    optTargetsIni  ::  Maybe FilePath,
     optArgs        ::  [String],
     optStale       ::  [String],  -- ^ treat these modules as stale
     optKeepGoing   :: !Bool,      -- ^ Keep going when encountering errors.
@@ -256,6 +257,8 @@ optStop_u f r@Opt{optStop  = x} = r{optStop = f x}
 optVerbose_u f r@Opt{optVerbose  = x} = r{optVerbose = f x}
 optWorkDir_s v =  optWorkDir_u  (const v)
 optWorkDir_u f r@Opt{optWorkDir  = x} = r{optWorkDir = f x}
+optTargetsIni_s v =  optTargetsIni_u  (const v)
+optTargetsIni_u f r@Opt{optTargetsIni  = x} = r{optTargetsIni = f x}
 
 emptyOpt = Opt {
     optMode        = CompileExe,
@@ -279,6 +282,7 @@ emptyOpt = Opt {
     optWorkDir     = Nothing,
     optHoDir       = Nothing,
     optHoCache     = Nothing,
+    optTargetsIni  = Nothing,
     optArgs        = [],
     optIgnoreHo    = False,
     optNoWriteHo   = False,
@@ -341,6 +345,7 @@ theoptions =
     , Option []    ["list-libraries"]  (NoArg  (optMode_s ListLibraries))    "List of installed libraries"
     , Option []    ["tdir"]            (ReqArg (optWorkDir_s . Just) "dir/") "specify the directory where all intermediate files/dumps will be placed."
 --    , Option []    ["print-hsc-options"] (NoArg (optMode_s PrintHscOptions)) "print options to pass to hsc2hs"
+    , Option []    ["targetsini"]      (ReqArg (optTargetsIni_s . Just) "targets.ini") "specify the targets.ini file."
     ]
 
 stop "parse" = StopParse
@@ -416,9 +421,13 @@ processOptions = do
         _ -> return ()
     -- read targets.ini file
     cabalEtc <- getDataFileNameMaybe "etc"
-    let etcDir = fromMaybe confDir cabalEtc
     Just home <- fmap (`mplus` Just "/") $ lookupEnv "HOME"
-    inis <- parseIniFiles (optVerbose o > 0) (BS.toString targets_ini) [etcDir ++ "/targets.ini", etcDir ++ "/targets-local.ini", home ++ "/etc/ajhc/targets.ini", home ++ "/.ajhc/targets.ini"] (optArch o)
+    let fromMaybeToList Nothing  = []
+        fromMaybeToList (Just s) = [s]
+        oTarget = fromMaybeToList $ optTargetsIni o
+        etcDir = fromMaybe confDir cabalEtc
+        iniFiles = [etcDir ++ "/targets.ini", etcDir ++ "/targets-local.ini", home ++ "/etc/ajhc/targets.ini", home ++ "/.ajhc/targets.ini"] ++ oTarget
+    inis <- parseIniFiles (optVerbose o > 0) (BS.toString targets_ini) iniFiles (optArch o)
     -- process dump flags
     o <- either putErrDie return $ postProcessFD o
     when (FlagDump.Ini `S.member` optDumpSet o) $ flip mapM_ (M.toList inis) $ \(a,b) -> putStrLn (a ++ "=" ++ b)
