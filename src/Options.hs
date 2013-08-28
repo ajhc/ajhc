@@ -415,8 +415,10 @@ processOptions = do
             exitSuccess
         _ -> return ()
     -- read targets.ini file
+    cabalEtc <- getDataFileNameMaybe "etc"
+    let etcDir = fromMaybe confDir cabalEtc
     Just home <- fmap (`mplus` Just "/") $ lookupEnv "HOME"
-    inis <- parseIniFiles (optVerbose o > 0) (BS.toString targets_ini) [confDir ++ "/targets.ini", confDir ++ "/targets-local.ini", home ++ "/etc/ajhc/targets.ini", home ++ "/.ajhc/targets.ini"] (optArch o)
+    inis <- parseIniFiles (optVerbose o > 0) (BS.toString targets_ini) [etcDir ++ "/targets.ini", etcDir ++ "/targets-local.ini", home ++ "/etc/ajhc/targets.ini", home ++ "/.ajhc/targets.ini"] (optArch o)
     -- process dump flags
     o <- either putErrDie return $ postProcessFD o
     when (FlagDump.Ini `S.member` optDumpSet o) $ flip mapM_ (M.toList inis) $ \(a,b) -> putStrLn (a ++ "=" ++ b)
