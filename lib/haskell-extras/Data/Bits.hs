@@ -5,6 +5,7 @@ module Data.Bits where
 import Jhc.Num
 import Jhc.Order
 import Jhc.Basics
+import Jhc.Type.C
 
 m4_include(Data/Bits.m4)
 
@@ -159,3 +160,15 @@ BITSINST(Word32)
 BITSINST(Word64)
 BITSINST(WordPtr)
 BITSINST(WordMax)
+
+BITSINST(CChar,a)
+BITSINST(CInt,a)
+BITSINST(CLLong,a)
+BITSINST(CLong,a)
+BITSINST(CSChar,a)
+BITSINST(CSize,a)
+BITSINST(CUChar,a)
+BITSINST(CUInt,a)
+BITSINST(CULLong,a)
+BITSINST(CULong,a)
+BITSINST(CWchar,a)
