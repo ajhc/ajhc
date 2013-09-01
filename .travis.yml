@@ -19,10 +19,7 @@ before_install:
 script:
   - autoreconf -i
   - ./configure
-  - make
   - make install
-  - cabal haddock --hyperlink-source --html
-  - test -f dist/doc/html/ajhc/index.html
   - make regress
   - make selftest
   - make rtstest
