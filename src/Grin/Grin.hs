@@ -468,6 +468,7 @@ instance CanType Exp where
     getType (BaseOp PeekVal [v]) = case getType v of
         TyPtr t -> [t]
         _ -> error "Exp.getType: PeekVal of non-pointer type"
+    getType (BaseOp PokeVal _) = []
     getType (Return v) = getType v
     getType (Error _ t) = t
     getType (Case _ []) = error "empty case"
