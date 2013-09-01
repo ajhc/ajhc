@@ -57,7 +57,7 @@ mkRequest uri = Request{ rqURI     = uri
                        , rqMethod  = GET
                        , rqHeaders = [Header HdrUserAgent userAgent]
                        , rqBody    = ByteString.empty }
-  where userAgent = "cabal-install/0.1(jahm)"
+  where userAgent = "cabal-install/1.17.0" -- act like cabal
 
 -- |Carry out a GET request, using the local proxy settings
 getHTTP :: Verbosity -> URI -> IO (Result (Response ByteString))
