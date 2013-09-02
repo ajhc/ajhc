@@ -19,7 +19,8 @@ before_install:
 script:
   - autoreconf -i
   - ./configure
-  - make install
+  - make cabal-setup
+  - make cabal-install
   - make regress
   - make selftest
   - make rtstest

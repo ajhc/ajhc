@@ -66,6 +66,8 @@ cabal-build: $(BUILT_SOURCES) src/StringTable/Atom.hs
 	cabal configure
 	cabal build
 
+cabal-setup: $(BUILT_SOURCES) src/StringTable/Atom.hs
+
 cabal-install:
 	cabal install
 
