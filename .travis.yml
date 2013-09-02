@@ -1,3 +1,5 @@
+language: objective-c
+
 branches:
   except:
     - master
