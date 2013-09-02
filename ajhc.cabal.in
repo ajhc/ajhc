@@ -323,7 +323,8 @@ executable jahm
         network,
         pretty,
         process,
-        directory
+        directory,
+        @PACKAGE_NAME@
 
   if !os(windows)
     build-depends:

@@ -26,6 +26,7 @@ import System.FilePath ((</>))
 import Network.URI (parseURI)
 import Distribution.Client.HttpUtils (downloadURI)
 import Distribution.Verbosity (verbose)
+import GenUtil (iocatch)
 
 main :: IO ()
 main = getArgs >>= mainWorker
@@ -33,5 +34,6 @@ main = getArgs >>= mainWorker
 mainWorker :: [String] -> IO ()
 mainWorker ("downloadURI":u:f:[]) = do curDir <- getCurrentDirectory
                                        let Just url = parseURI u
-                                       downloadURI verbose url $ curDir </> f
+                                       retry $ downloadURI verbose url $ curDir </> f
+  where retry io = io `iocatch` const io
 mainWorker _ = print "help"
