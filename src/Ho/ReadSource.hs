@@ -47,7 +47,7 @@ preprocess opt fn lbs = do
         _ | fopts FO.Cpp -> readSystem "cpphs" $ incFlags ++ defFlags ++ [fn]
           | fopts FO.M4  -> do
                 m4p <- m4Prelude
-                readSystem "m4" $ ["-s", "-P"] ++ incFlags ++ defFlags ++ [m4p,fn]
+                readSystem "m4" $ ["-g", "-s", "-P"] ++ incFlags ++ defFlags ++ [m4p,fn]
           | otherwise -> return lbs
 
 m4Prelude :: IO FilePath
