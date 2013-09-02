@@ -7,15 +7,13 @@ before_install:
   - date
   - uname -a
   - ulimit -a
-  - brew update --verbose
-  - brew install ghc --verbose
-  - export GHC=/usr/local/bin/ghc
-  - brew install cabal-install --verbose
+  - wget "http://lambda.haskell.org/platform/download/2013.2.0.0/Haskell Platform 2013.2.0.0 32bit.pkg"
+  - sudo installer -pkg "Haskell Platform 2013.2.0.0 32bit.pkg" -target /
   - cabal update || cabal update
   - export HSPACKS="derive temporary haskeline utf8-string HsSyck test-framework-th test-framework-hunit test-framework-quickcheck2 uniplate"
   - cabal install $HSPACKS || cabal install $HSPACKS
   - git --version
-  - $GHC --version
+  - ghc --version
   - pkgutil --pkgs
   - git fetch --tags
 script:
