@@ -7,14 +7,14 @@ before_install:
   - date
   - uname -a
   - ulimit -a
-  - brew update
+  - brew update --verbose
   - brew install ghc --verbose
   - export GHC=/usr/local/bin/ghc
-  - brew install cabal-install --verbose
+  - brew install haskell-platform --verbose
   - cabal update || cabal update
   - cabal install derive || cabal install derive
   - git --version
-  - ghc --version
+  - $GHC --version
   - git fetch --tags
 script:
   - autoreconf -i
