@@ -48,8 +48,8 @@ foreach my $fn (@ARGV) {
     print("$name-$version.hl\n"),next if $opt_l;
 
     print "Processing $fn, found $name-$version\n";
-#    my $url = "http://hackage.haskell.org/packages/archive/$name/$version/$name-$version.tar.gz";
-    my $url = "http://new-hackage.haskell.org/package/$name-$version/$name-$version.tar.gz";
+    my $url = "http://hackage.haskell.org/packages/archive/$name/$version/$name-$version.tar.gz";
+#    my $url = "http://new-hackage.haskell.org/package/$name-$version/$name-$version.tar.gz";
     print "Fetching $url\n";
     unless(-e "$tmpdir/$name-$version.tar.gz") {
         mysystem "$opt_j downloadURI $url $tmpdir/$name-$version.tar.gz";
