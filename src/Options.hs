@@ -150,6 +150,7 @@ Define                              Meaning
 \_JHC\_JGC\_LIMITED\_NUM\_MEGABLOCK number of limited megablock entries.
 \_JHC\_JGC\_BLOCK\_SHIFT            bit shift to specify block size. Use it internally like this: (1 << (\_JHC\_JGC\_BLOCK\_SHIFT)).
 \_JHC\_JGC\_MEGABLOCK\_SHIFT        bit shift to specify megablock size. Use it internally like this: (1 << (\_JHC\_JGC\_MEGABLOCK_SHIFT)).
+\_JHC\_USE\_OWN\_STDIO              force you should implement your own printf,fputs,fflush,getchar,getc,putchar,putc.
 
 -}
 

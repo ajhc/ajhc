@@ -7,8 +7,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
-"POT-Creation-Date: 2013-07-06 12:32+0900\n"
-"PO-Revision-Date: 2013-07-06 12:34+0900\n"
+"POT-Creation-Date: 2013-09-02 15:56+0900\n"
+"PO-Revision-Date: 2013-09-02 16:02+0900\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "Language: \n"
@@ -381,7 +381,7 @@ msgid "# Options"
 msgstr "# オプション"
 
 #. type: Plain text
-#: manual.mkd:180
+#: manual.mkd:181
 #, no-wrap
 msgid ""
 "    Usage: ajhc [OPTION...] Main.hs\n"
@@ -425,6 +425,7 @@ msgid ""
 "                        --stale=Module            Treat these modules as stale, even if they exist in the cache\n"
 "                        --list-libraries          List of installed libraries\n"
 "                        --tdir=dir/               specify the directory where all intermediate files/dumps will be placed.\n"
+"                        --targetsini=targets.ini  specify the targets.ini file.\n"
 msgstr ""
 "    Usage: ajhc [OPTION...] Main.hs\n"
 "      -V                --version                 バージョン表示\n"
@@ -467,9 +468,10 @@ msgstr ""
 "                        --stale=Module            指定したモジュールがコンパイルキャッシュにあっても古い情報として扱う\n"
 "                        --list-libraries          インストール済みライブラリを表示\n"
 "                        --tdir=dir/               中間生成物を出力するディレクトリを指定する\n"
+"                        --targetsini=targets.ini  指定したtargets.iniファイルを使う\n"
 
 #. type: Plain text
-#: manual.mkd:189
+#: manual.mkd:190
 #, no-wrap
 msgid ""
 "    valid -d arguments: 'help' for more info\n"
@@ -491,7 +493,7 @@ msgstr ""
 "        types, verbose, veryverbose\n"
 
 #. type: Plain text
-#: manual.mkd:195
+#: manual.mkd:196
 #, no-wrap
 msgid ""
 "    valid -f arguments: 'help' for more info\n"
@@ -507,12 +509,12 @@ msgstr ""
 "        type-analysis, type-families, unboxed-tuples, unboxed-values, user-kinds, wrapper\n"
 
 #. type: Plain text
-#: manual.mkd:199
+#: manual.mkd:200
 msgid "## Code Options"
 msgstr "## コードオプション"
 
 #. type: Plain text
-#: manual.mkd:203
+#: manual.mkd:204
 msgid ""
 "Various options affecting how Ajhc interprets and compiles code can be "
 "controlled with the '-f' flag, the following options are availible, you can "
@@ -523,7 +525,7 @@ msgstr ""
 "とで無効化できる。"
 
 #. type: Plain text
-#: manual.mkd:218
+#: manual.mkd:219
 #, no-wrap
 msgid ""
 "Code options              \n"
@@ -555,7 +557,7 @@ msgstr ""
 "_user-kinds_              ユーザ定義の種を使う\n"
 
 #. type: Plain text
-#: manual.mkd:223
+#: manual.mkd:224
 #, no-wrap
 msgid ""
 "Typechecking              \n"
@@ -569,7 +571,7 @@ msgstr ""
 "_monomorphism-restriction_ 単相性制限を強制する\n"
 
 #. type: Plain text
-#: manual.mkd:227
+#: manual.mkd:228
 #, no-wrap
 msgid ""
 "Debugging                 \n"
@@ -581,7 +583,7 @@ msgstr ""
 "_lint_                    より多くの型検査を行なう\n"
 
 #. type: Plain text
-#: manual.mkd:234
+#: manual.mkd:235
 #, no-wrap
 msgid ""
 "Optimization Options      \n"
@@ -599,7 +601,7 @@ msgstr ""
 "_type-analysis_           メソッド生成直後に型に対する基本的なpoints-to analysisを適用する\n"
 
 #. type: Plain text
-#: manual.mkd:248
+#: manual.mkd:249
 #, no-wrap
 msgid ""
 "Code Generation           \n"
@@ -631,7 +633,7 @@ msgstr ""
 "_wrapper_                 main関数を例外ハンドラで包む\n"
 
 #. type: Plain text
-#: manual.mkd:253
+#: manual.mkd:254
 #, no-wrap
 msgid ""
 "Default settings          \n"
@@ -645,12 +647,12 @@ msgstr ""
 "_glasgow-exts_            forall ffi unboxed-tuples\n"
 
 #. type: Plain text
-#: manual.mkd:256
+#: manual.mkd:257
 msgid "## Dumping Debugging Information"
 msgstr "## デバッグ情報のダンプ"
 
 #. type: Plain text
-#: manual.mkd:260
+#: manual.mkd:261
 msgid ""
 "You can have Ajhc print out a variety of things while running as Controlled "
 "by the '-d' flag. The following is a list of possible parameters you can "
@@ -660,7 +662,7 @@ msgstr ""
 "次に挙げるのは'-d'フラグに渡すことができるパラメータのリストである。"
 
 #. type: Plain text
-#: manual.mkd:273
+#: manual.mkd:274
 #, no-wrap
 msgid ""
 "Front End                 \n"
@@ -688,7 +690,7 @@ msgstr ""
 "_scc-modules_             強結合したモジュールを依存度順に表示\n"
 
 #. type: Plain text
-#: manual.mkd:291
+#: manual.mkd:292
 #, no-wrap
 msgid ""
 "Type Checker              \n"
@@ -728,7 +730,7 @@ msgstr ""
 "_types_                   定義された全ての名前を含んでいる型テーブルを表示\n"
 
 #. type: Plain text
-#: manual.mkd:311
+#: manual.mkd:312
 #, no-wrap
 msgid ""
 "Intermediate code         \n"
@@ -772,7 +774,7 @@ msgstr ""
 "_rules-spec_              特殊化書き換え規則を表示する\n"
 
 #. type: Plain text
-#: manual.mkd:324
+#: manual.mkd:325
 #, no-wrap
 msgid ""
 "Grin code                 \n"
@@ -802,7 +804,7 @@ msgstr ""
 "_tags_                    タグと型を列挙する\n"
 
 #. type: Plain text
-#: manual.mkd:328
+#: manual.mkd:329
 #, no-wrap
 msgid ""
 "Backend code              \n"
@@ -814,7 +816,7 @@ msgstr ""
 "_c_                       コンパイル時に生成したC言語ソースファイルを削除しない\n"
 
 #. type: Plain text
-#: manual.mkd:332
+#: manual.mkd:333
 #, no-wrap
 msgid ""
 "Internal                  \n"
@@ -826,7 +828,7 @@ msgstr ""
 "_atom_                    終了時にatomテーブルをダンプする\n"
 
 #. type: Plain text
-#: manual.mkd:339
+#: manual.mkd:340
 #, no-wrap
 msgid ""
 "General                   \n"
@@ -844,12 +846,12 @@ msgstr ""
 "_veryverbose_             スタティクスを含む冗長なプログレス表示\n"
 
 #. type: Plain text
-#: manual.mkd:341
+#: manual.mkd:342
 msgid "# Pragmas"
 msgstr "# プラグマ"
 
 #. type: Plain text
-#: manual.mkd:347
+#: manual.mkd:348
 msgid ""
 "Pragmas are special compiler directives that change its behavior in certain "
 "ways. In general, each compiler is free to define its own pragmas however "
@@ -863,12 +865,12 @@ msgstr ""
 "プラグマはソースコード中で {-# PRAGMANAME ... #-} のような形式で使われる。"
 
 #. type: Plain text
-#: manual.mkd:349
+#: manual.mkd:350
 msgid "## Function Properties"
 msgstr "## 関数の属性"
 
 #. type: Plain text
-#: manual.mkd:353
+#: manual.mkd:354
 msgid ""
 "These must appear in the same file as the definition of a function. To apply "
 "one to a instance or class method, you must place it in the where clause of "
@@ -879,7 +881,7 @@ msgstr ""
 "これらのプラグマをインスタンスやクラスの宣言の節に配置しなければならない。"
 
 #. type: Plain text
-#: manual.mkd:360
+#: manual.mkd:361
 #, no-wrap
 msgid ""
 "Pragma\n"
@@ -897,12 +899,12 @@ msgstr ""
 "_VCONSTRUCTOR_     関数を仮想コンストラクタとして扱う。CPR解析とworker/wrapper変換は関数をコンストラクタとして扱うことがある。これは'NOINLINE'で実装される。\n"
 
 #. type: Plain text
-#: manual.mkd:362
+#: manual.mkd:363
 msgid "## Class Pragmas"
 msgstr "## クラスプラグマ"
 
 #. type: Plain text
-#: manual.mkd:366
+#: manual.mkd:367
 #, no-wrap
 msgid ""
 "Pragma\n"
@@ -914,12 +916,12 @@ msgstr ""
 "_NOETA_            デフォルトではAjhcは最適化のために全てのクラスメソッドをイータ変換する。このプラグマはこの挙動を無効化する\n"
 
 #. type: Plain text
-#: manual.mkd:368
+#: manual.mkd:369
 msgid "## Rules/Specializations"
 msgstr "## 書き換え規則と特殊化"
 
 #. type: Plain text
-#: manual.mkd:375
+#: manual.mkd:376
 #, no-wrap
 msgid ""
 "Pragma\n"
@@ -937,12 +939,12 @@ msgstr ""
 "_SUPERSPECIALIZE_   SPECIALIZEと同じ効力がある。しかし一般化された関数にて特殊化された呼び出しかどうかランタイムでの検査を行なう。\n"
 
 #. type: Plain text
-#: manual.mkd:377
+#: manual.mkd:378
 msgid "## Type Pragmas"
 msgstr "## 型プラグマ"
 
 #. type: Plain text
-#: manual.mkd:386
+#: manual.mkd:387
 #, no-wrap
 msgid ""
 "Pragma\n"
@@ -964,12 +966,12 @@ msgstr ""
 "                   ~~~\n"
 
 #. type: Plain text
-#: manual.mkd:388
+#: manual.mkd:389
 msgid "## Header Pragmas"
 msgstr "## ヘッダプラグマ"
 
 #. type: Plain text
-#: manual.mkd:392
+#: manual.mkd:393
 msgid ""
 "These pragmas are only valid in the 'head' of a file, meaning they must come "
 "before the initial 'module' definition and in the first 4096 bytes of the "
@@ -982,7 +984,7 @@ msgstr ""
 "そしてASCII文字セットのみしか使ってはならない。\n"
 
 #. type: Plain text
-#: manual.mkd:397
+#: manual.mkd:398
 msgid ""
 "OPTIONS_JHC : Specify extra options to use when processing this file. The "
 "options available are equivalent to the command line options, though, not "
@@ -993,22 +995,22 @@ msgstr ""
 "宝する。"
 
 #. type: Plain text
-#: manual.mkd:400
+#: manual.mkd:401
 msgid "LANGUAGE : Specify various language options"
 msgstr "LANGUAGE : 言語拡張のオプションを指定する"
 
 #. type: Plain text
-#: manual.mkd:402
+#: manual.mkd:403
 msgid "# Extensions"
 msgstr "# 拡張"
 
 #. type: Plain text
-#: manual.mkd:405
+#: manual.mkd:406
 msgid "## Module Search Path"
 msgstr "## モジュールのサーチパス"
 
 #. type: Plain text
-#: manual.mkd:409
+#: manual.mkd:410
 msgid ""
 "Modules in Ajhc are searched for based on their name as in other Haskell "
 "compilers. However in addition to searching for 'Data/Foo.hs' for the module "
@@ -1020,17 +1022,17 @@ msgstr ""
 "'Data.Foo.hs'も同じく検索対象になる。\n"
 
 #. type: Plain text
-#: manual.mkd:411
+#: manual.mkd:412
 msgid "## extensions to the FFI"
 msgstr "## FFIへの拡張"
 
 #. type: Plain text
-#: manual.mkd:413
+#: manual.mkd:414
 msgid "### foreign imports with multiple return values."
 msgstr "### 複数の返値をともなうforeign import"
 
 #. type: Plain text
-#: manual.mkd:418
+#: manual.mkd:419
 msgid ""
 "foreign C imports may return multiple values. To indicate this is the case, "
 "use an unboxed tuple as the return value. The first return value will be the "
@@ -1045,7 +1047,7 @@ msgstr ""
 "純粋な(IOではない)関数でのみ複数の値を返値として使うことができる。\n"
 
 #. type: Plain text
-#: manual.mkd:424
+#: manual.mkd:425
 msgid ""
 "~~~~ -- frexp has C prototype -- double frexp(double x, int *exp); -- so it "
 "would normally have an import like so, requiring the IO module and -- "
@@ -1058,7 +1060,7 @@ msgstr ""
 "-- 他の純粋な関数へ渡すにはStorableを使うことになる。"
 
 #. type: Plain text
-#: manual.mkd:426
+#: manual.mkd:427
 msgid ""
 "foreign import ccall \"math.h frexp\" c_frexp :: Double -> Ptr CInt -> IO "
 "Double"
@@ -1067,7 +1069,7 @@ msgstr ""
 "Double"
 
 #. type: Plain text
-#: manual.mkd:429
+#: manual.mkd:430
 msgid ""
 "-- This extension allows it to be declared as so foreign import ccall \"math."
 "h frexp\" c_frexp2 :: Double -> (# Double, CInt #)"
@@ -1077,7 +1079,7 @@ msgstr ""
 "#)"
 
 #. type: Plain text
-#: manual.mkd:434
+#: manual.mkd:435
 msgid ""
 "-- The second return value is added as the last 'exp' parameter then read "
 "out -- of the allocated memory. The contents of the memory passed into the "
@@ -1088,12 +1090,12 @@ msgstr ""
 "~~~~"
 
 #. type: Plain text
-#: manual.mkd:436
+#: manual.mkd:437
 msgid "### 'capi' calling convention"
 msgstr "### 呼び出し規約'capi'"
 
 #. type: Plain text
-#: manual.mkd:445
+#: manual.mkd:446
 msgid ""
 "The 'capi' calling convention may be used instead of 'ccall' for static "
 "imports. The convention means that the foreign function may not be "
@@ -1113,12 +1115,12 @@ msgstr ""
 "ンカのためのシンボルがエクスポートされているか、なんの保証もしない。"
 
 #. type: Plain text
-#: manual.mkd:447
+#: manual.mkd:448
 msgid "### package relative dependencies"
 msgstr "### パッケージに関連した依存"
 
 #. type: Plain text
-#: manual.mkd:453
+#: manual.mkd:454
 msgid ""
 "dependecies in a foreign import may be written as p:foo.c or p:foo.h, this "
 "means that the file should be interpreted as part of the internal "
@@ -1134,12 +1136,12 @@ msgstr ""
 "きである。"
 
 #. type: Plain text
-#: manual.mkd:455
+#: manual.mkd:456
 msgid "## Explicit namespaces in import/export lists"
 msgstr "## import/exportされる名前空間"
 
 #. type: Plain text
-#: manual.mkd:458
+#: manual.mkd:459
 msgid ""
 "Ajhc allows explicit namespaces in import and export lists. These may be "
 "used to restrict or modiy what is imported/exported by a declaration."
@@ -1148,7 +1150,7 @@ msgstr ""
 "これらはimport/export宣言によって制限されたり修正されたりする。"
 
 #. type: Plain text
-#: manual.mkd:464
+#: manual.mkd:465
 #, no-wrap
 msgid ""
 "    * 'type' - The name is a type, as in something defined by 'type', 'newtype',\n"
@@ -1163,7 +1165,7 @@ msgstr ""
 "    * 'kind'  - 名前がユーザ定義の種であることを指定\n"
 
 #. type: Plain text
-#: manual.mkd:468
+#: manual.mkd:469
 msgid ""
 "In addition, another extension is that classes and types are in independent "
 "namespaces, so a type and a class of the same name may be in scope and not "
@@ -1173,12 +1175,12 @@ msgstr ""
 "同じ名前の型シノニムと型クラスが同じスコープに存在しても問題ない。"
 
 #. type: Plain text
-#: manual.mkd:470
+#: manual.mkd:471
 msgid "## user defined kinds"
 msgstr "## ユーザ定義された種"
 
 #. type: Plain text
-#: manual.mkd:473
+#: manual.mkd:474
 msgid ""
 "Ajhc allows users to define custom kinds when the -fuser-kinds extension is "
 "enabled. The syntax is:"
@@ -1187,7 +1189,7 @@ msgstr ""
 "その文法は:"
 
 #. type: Plain text
-#: manual.mkd:477
+#: manual.mkd:478
 msgid "~~~~ data kind Nat = Z | S Nat ~~~~"
 msgstr ""
 "~~~~\n"
@@ -1195,7 +1197,7 @@ msgstr ""
 "~~~~"
 
 #. type: Plain text
-#: manual.mkd:481
+#: manual.mkd:482
 msgid ""
 "This will define a new kind 'Nat' and two types 'Z' and 'S' which inhabit "
 "it.  The types introduced by kind declarations represent unboxed values with "
@@ -1207,23 +1209,23 @@ msgstr ""
 "そのためこれらはランタイムでの表現を持たない。(当然、⊥でさえない)"
 
 #. type: Plain text
-#: manual.mkd:483
+#: manual.mkd:484
 msgid "## Standalone deriving"
 msgstr "## 独立deriving"
 
 #. type: Plain text
-#: manual.mkd:485
+#: manual.mkd:486
 msgid ""
 "Ajhc supports a standalone deriving mechanism under certain circumstances."
 msgstr "Ajhcはある環境下にて独立derivingをサポートする。"
 
 #. type: Plain text
-#: manual.mkd:487
+#: manual.mkd:488
 msgid "## Rank-N Polymorphism"
 msgstr "## ランクN多相性"
 
 #. type: Plain text
-#: manual.mkd:493
+#: manual.mkd:494
 msgid ""
 "Ajhc supports higher ranked polymorphism. Ajhc will never infer types of "
 "higher rank, however when the context unambiguously specifies a higher "
@@ -1238,12 +1240,12 @@ msgstr ""
 "正しい多相型が手に入る。"
 
 #. type: Plain text
-#: manual.mkd:495
+#: manual.mkd:496
 msgid "## Existential types"
 msgstr "## 存在型"
 
 #. type: Plain text
-#: manual.mkd:498
+#: manual.mkd:499
 msgid ""
 "Ajhc supports first class existential types, using the 'exists' keyword. It "
 "also supports existential data types in a similar fashion to ghc."
@@ -1253,12 +1255,12 @@ msgstr ""
 "また存在データ型はghcと似た方法でサポートしている。"
 
 #. type: Plain text
-#: manual.mkd:500
+#: manual.mkd:501
 msgid "## Unboxed Values"
 msgstr "## アンボックス化された値"
 
 #. type: Plain text
-#: manual.mkd:508
+#: manual.mkd:509
 msgid ""
 "Unboxed values in Ajhc are specified in a similar fashion to GHC however the "
 "lexical syntax is not changed to allow # in identifiers. # is still used in "
@@ -1280,12 +1282,12 @@ msgstr ""
 "GHCとの互換性のため、MagicHash拡張でもアンボックス化型を有効にできる。"
 
 #. type: Plain text
-#: manual.mkd:510
+#: manual.mkd:511
 msgid "### Unboxed Tuples"
 msgstr "### アンボックス化タプル"
 
 #. type: Plain text
-#: manual.mkd:515
+#: manual.mkd:516
 msgid ""
 "Ajhc supports unboxed tuples with the same syntax as GHC, (# 2, 4 #) is an "
 "unboxed tuple of two numbers. Unboxed tuples are enabled with -funboxed-"
@@ -1300,12 +1302,12 @@ msgstr ""
 "(しかし他のアンボックス化タプルを保持することはできない)"
 
 #. type: Plain text
-#: manual.mkd:517
+#: manual.mkd:518
 msgid "### Unboxed Strings"
 msgstr "### アンボックス化文字列"
 
 #. type: Plain text
-#: manual.mkd:521
+#: manual.mkd:522
 msgid ""
 "Unboxed strings are enabled with the -funboxed-values flag. They are "
 "specified like a normal string but have a '#' at the end. Unboxed strings "
@@ -1316,12 +1318,12 @@ msgstr ""
 "アンボックス化文字列は'BitsPtr_'型である。"
 
 #. type: Plain text
-#: manual.mkd:523
+#: manual.mkd:524
 msgid "### Unboxed Characters"
 msgstr "### アンボックス化文字"
 
 #. type: Plain text
-#: manual.mkd:527
+#: manual.mkd:528
 msgid ""
 "Unboxed characters can be expressed by putting a hash after a normal "
 "character literal. Unboxed characters are of type Char_ which is a newtype "
@@ -1332,12 +1334,12 @@ msgstr ""
 "newtypeでもある。"
 
 #. type: Plain text
-#: manual.mkd:529
+#: manual.mkd:530
 msgid "### Unboxed Numbers"
 msgstr "### アンボックス化数値"
 
 #. type: Plain text
-#: manual.mkd:537
+#: manual.mkd:538
 msgid ""
 "Unboxed numbers are enabled with the -funboxed-values flag. They are "
 "postpended with a '#' such as in 3# or 4#. Ajhc supports a limited form of "
@@ -1360,12 +1362,12 @@ msgstr ""
 "そして型推論も行なわれる。"
 
 #. type: Plain text
-#: manual.mkd:539
+#: manual.mkd:540
 msgid "### Operations on unboxed values"
 msgstr "### アンボックス化された値の取り扱い"
 
 #. type: Plain text
-#: manual.mkd:550
+#: manual.mkd:551
 msgid ""
 "To operate on unboxed vaules you need to bring the appropriate primitive "
 "operators into scope. You can do this via the special form of FFI "
@@ -1393,12 +1395,12 @@ msgstr ""
 "だからモジュールからexport/importできるし、通常の高階関数としても扱える。"
 
 #. type: Plain text
-#: manual.mkd:553
+#: manual.mkd:554
 msgid "## Foreign Primitives"
 msgstr "## Foreignプリミティブ"
 
 #. type: Plain text
-#: manual.mkd:560
+#: manual.mkd:561
 msgid ""
 "In addition to foreign imports of external functions as described in the FFI "
 "spec. Jhc supports 'primitive' imports that let you communicate primitives "
@@ -1415,33 +1417,33 @@ msgstr ""
 "jhc内では、すべてのHaskellのエントリはforeign宣言によって形づくられている。"
 
 #. type: Plain text
-#: manual.mkd:562
+#: manual.mkd:563
 msgid "They all have the form"
 msgstr "それらは以下の形を取る。"
 
 #. type: Plain text
-#: manual.mkd:564
+#: manual.mkd:565
 #, no-wrap
 msgid "    foreign import primitive \"specification\" haskell_name :: type\n"
 msgstr ""
 
 #. type: Plain text
-#: manual.mkd:566
+#: manual.mkd:567
 msgid "where \"specification\" is one of the following"
 msgstr "\"specification\"には以下を選択できる。"
 
 #. type: Plain text
-#: manual.mkd:569
+#: manual.mkd:570
 msgid "seq : evaluate first argument to WHNF, then return the second argument"
 msgstr "seq : 最初の引数をWHNFとして評価し、二番目の引数を返す"
 
 #. type: Plain text
-#: manual.mkd:572
+#: manual.mkd:573
 msgid "zero,one : the values zero and one of any primitive type."
 msgstr "zero,one : 0か1の値をプリミティブ型に使う"
 
 #. type: Plain text
-#: manual.mkd:575
+#: manual.mkd:576
 msgid ""
 "const.C_CONSTANT : the text following const is directly inserted into the "
 "resulting C file"
@@ -1450,17 +1452,17 @@ msgstr ""
 "接埋め込む"
 
 #. type: Plain text
-#: manual.mkd:578
+#: manual.mkd:579
 msgid "peek.TYPE : the peek primitive for raw value TYPE"
 msgstr "peek.TYPE : TYPE型の値の読み込みプリミティブ"
 
 #. type: Plain text
-#: manual.mkd:581
+#: manual.mkd:582
 msgid "poke.TYPE : the poke primitive for raw value TYPE"
 msgstr "poke.TYPE : TYPE型の値の書き込みプリミティブ"
 
 #. type: Plain text
-#: manual.mkd:584
+#: manual.mkd:585
 msgid ""
 "sizeOf.TYPE, alignmentOf.TYPE, minBound.TYPE, maxBound.TYPE, umaxBound."
 "TYPE : various properties of a given internal type."
@@ -1469,12 +1471,12 @@ msgstr ""
 "TYPE : 内部型TYPEの各種属性"
 
 #. type: Plain text
-#: manual.mkd:587
+#: manual.mkd:588
 msgid "error.MESSAGE : results in an error with constant message MESSAGE."
 msgstr "error.MESSAGE : results in an error with constant message MESSAGE."
 
 #. type: Plain text
-#: manual.mkd:590
+#: manual.mkd:591
 msgid ""
 "constPeekByte : peek of a constant value specialized to bytes, used "
 "internally by Jhc.String"
@@ -1482,7 +1484,7 @@ msgstr ""
 "constPeekByte : 指定したバイト数、定数値を読み込み、Jhc.Stringとして使う"
 
 #. type: Plain text
-#: manual.mkd:593
+#: manual.mkd:594
 msgid ""
 "box : take an unboxed value and box it, the shape of the box is determined "
 "by the type at which this is imported"
@@ -1491,7 +1493,7 @@ msgstr ""
 "importされた型によって決まる"
 
 #. type: Plain text
-#: manual.mkd:596
+#: manual.mkd:597
 msgid ""
 "unbox : take an boxed value and unbox it, the shape of the box is determined "
 "by the type at which this is imported"
@@ -1500,51 +1502,51 @@ msgstr ""
 "によいって決まる"
 
 #. type: Plain text
-#: manual.mkd:599
+#: manual.mkd:600
 msgid ""
 "increment, decrement : increment or decrement a numerical integral primitive "
 "value"
 msgstr "increment, decrement : 整数のプリミティブ値を増減させる"
 
 #. type: Plain text
-#: manual.mkd:602
+#: manual.mkd:603
 msgid ""
 "fincrement, fdecrement : increment or decrement a numerical floating point "
 "primitive value"
 msgstr "fincrement, fdecrement : 浮動小数点のプリミティブ値を増減させる"
 
 #. type: Plain text
-#: manual.mkd:605
+#: manual.mkd:606
 msgid "exitFailure__ : abort the program immediately"
 msgstr "exitFailure__ : プログラムを即時abortさせる"
 
 #. type: Plain text
-#: manual.mkd:608
+#: manual.mkd:609
 msgid "C-- Primitive : any C-- primitive may be imported in this manner."
 msgstr "C-- Primitive : C--プリミティブはこの作法でimportする"
 
 #. type: Plain text
-#: manual.mkd:611
+#: manual.mkd:612
 msgid "# Differences"
 msgstr "# 差異"
 
 #. type: Plain text
-#: manual.mkd:614
+#: manual.mkd:615
 msgid "## Differences from Haskell 98"
 msgstr "## Haskell 98との違い"
 
 #. type: Plain text
-#: manual.mkd:616
+#: manual.mkd:617
 msgid "### Language Differences"
 msgstr "### 言語差分"
 
 #. type: Bullet: '* '
-#: manual.mkd:618
+#: manual.mkd:619
 msgid "Class contexts on data types are silently ignored."
 msgstr "データタイプ内のクラス文脈は単に無視される。"
 
 #. type: Bullet: '* '
-#: manual.mkd:623
+#: manual.mkd:624
 msgid ""
 "Class methods are fully 'eta expanded' out to the argument count specified "
 "by the type. This is often beneficial as instances that need to share "
@@ -1556,12 +1558,12 @@ msgstr ""
 "この挙動はNOETAプラグマによって無効にできる。"
 
 #. type: Plain text
-#: manual.mkd:625
+#: manual.mkd:626
 msgid "### Library Changes"
 msgstr "### ライブラリへの変更"
 
 #. type: Plain text
-#: manual.mkd:630
+#: manual.mkd:631
 msgid ""
 "In addition to a larger set of base libraries roughly modeled on GHC's "
 "base.  Jhc provides a number of extensions/minor modifications to the "
@@ -1573,7 +1575,7 @@ msgstr ""
 "これらは大部分は後方互換性とクラスシステムのためにデザインされている。"
 
 #. type: Plain text
-#: manual.mkd:639
+#: manual.mkd:640
 #, no-wrap
 msgid ""
 "* Data.Bits\n"
@@ -1593,12 +1595,12 @@ msgstr ""
 "      'shift'にはまた論理的と算術的なバリエーションがある。\n"
 
 #. type: Plain text
-#: manual.mkd:642
+#: manual.mkd:643
 msgid "### Library Additions"
 msgstr "### ライブラリの追加"
 
 #. type: Plain text
-#: manual.mkd:646
+#: manual.mkd:647
 msgid ""
 "There are many other additional libraries provided with jhc, here I list "
 "only changes that affect modules that are defined by the haskell 98 or FFI "
@@ -1609,7 +1611,7 @@ msgstr ""
 "けを挙げるにとどめる。"
 
 #. type: Plain text
-#: manual.mkd:650
+#: manual.mkd:651
 #, no-wrap
 msgid ""
 "* Data.Int and Data.Word provide WordPtr, WordMax, IntPtr, and IntMax that\n"
@@ -1620,7 +1622,7 @@ msgstr ""
 "   これらはそれぞれC言語のuintptr_t, uintmax_t, intptr_t, intmax_t型に該当する。\n"
 
 #. type: Plain text
-#: manual.mkd:653
+#: manual.mkd:654
 #, no-wrap
 msgid ""
 "* fromInt,toInt,fromDouble,toDouble have been added\n"
@@ -1630,7 +1632,7 @@ msgstr ""
 "   が追加された。\n"
 
 #. type: Plain text
-#: manual.mkd:657
+#: manual.mkd:658
 #, no-wrap
 msgid ""
 "* floating point truncation and rounding functions have varieties that don't\n"
@@ -1642,19 +1644,19 @@ msgstr ""
 "   これらの関数名には'f'という接尾辞が付いている。\n"
 
 #. type: Plain text
-#: manual.mkd:659
+#: manual.mkd:660
 msgid "## Notable Differences from GHC"
 msgstr "## GHCとの注目すべき差異"
 
 #. type: Plain text
-#: manual.mkd:662
+#: manual.mkd:663
 msgid ""
 "Jhc differs from GHC in certain ways that are allowed by Haskell 98, but "
 "might come as a surprise to some."
 msgstr "jhcはHaskell 98には準拠しているがGHCとの差異がある。"
 
 #. type: Bullet: ' * '
-#: manual.mkd:667
+#: manual.mkd:668
 msgid ""
 "An Int may be only 30 bits and may not observe simple binary truncation on "
 "overflow. If you need known bit width and binary semantics for your numbers "
@@ -1667,7 +1669,7 @@ msgstr ""
 "IntやWordがあふれた場合の結果は未定義である。"
 
 #. type: Bullet: ' * '
-#: manual.mkd:670
+#: manual.mkd:671
 msgid ""
 "A Char may only preserve values within the Unicode range. Storing values "
 "greater than 0x10FFFF has undefined results."
@@ -1676,14 +1678,14 @@ msgstr ""
 "そのため0x10FFFFより多きな保存されている値は未定義な結果をもたらす。"
 
 #. type: Bullet: ' * '
-#: manual.mkd:672
+#: manual.mkd:673
 msgid ""
 "The Int and Word types are at most 32 bits, even on 64 bit architectures."
 msgstr ""
 "例え64ビットアーキティクチャ上でもIntとWord型は最大でも32ビット幅である。"
 
 #. type: Bullet: ' * '
-#: manual.mkd:677
+#: manual.mkd:678
 msgid ""
 "All text based IO is performed according to the current locale. This means "
 "that Unicode works seamlessly, but older programs that assumed IO was "
@@ -1696,17 +1698,17 @@ msgstr ""
 "もしバイナリのIOが必要であれば、バイナリのルーチンを明示的に使うこと。"
 
 #. type: Plain text
-#: manual.mkd:680
+#: manual.mkd:681
 msgid "## Differences That are Considered Misfeatures"
 msgstr "## 仕様の欠陥"
 
 #. type: Plain text
-#: manual.mkd:682
+#: manual.mkd:683
 msgid "These misfeatures will be fixed at some point."
 msgstr "これらの仕様の欠陥は将来修正される予定である。"
 
 #. type: Bullet: ' * '
-#: manual.mkd:686
+#: manual.mkd:687
 msgid ""
 "Integer corresponds to IntMax rather than an arbitrary precision type. As "
 "soon as a suitable arbitrary precision library emerges, it will be replaced."
@@ -1715,22 +1717,22 @@ msgstr ""
 "適切な任意精度ライブラリが見つかれば、この問題は修正されるだろう。"
 
 #. type: Bullet: ' * '
-#: manual.mkd:688
+#: manual.mkd:689
 msgid "Ix is not derivable."
 msgstr "Ix型は自動導出できない。"
 
 #. type: Plain text
-#: manual.mkd:691
+#: manual.mkd:692
 msgid "# CrossCompilation"
 msgstr "# クロスコンパイル"
 
 #. type: Plain text
-#: manual.mkd:694
+#: manual.mkd:695
 msgid "## Basics"
 msgstr "## 基本"
 
 #. type: Plain text
-#: manual.mkd:701
+#: manual.mkd:702
 msgid ""
 "Unlike many other compilers, Ajhc is a native cross compiler. What this "
 "means is that every compile of Ajhc is able to create code for all possible "
@@ -1748,13 +1750,13 @@ msgstr ""
 "以下がその例である。"
 
 #. type: Plain text
-#: manual.mkd:703
+#: manual.mkd:704
 #, no-wrap
 msgid "    ; ajhc --cross -mwin32 test/HelloWorld.hs\n"
 msgstr "    ; ajhc --cross -mwin32 test/HelloWorld.hs\n"
 
 #. type: Plain text
-#: manual.mkd:706
+#: manual.mkd:707
 msgid ""
 "The targets list is extensible at run-time via the targets.ini file "
 "explained below."
@@ -1763,12 +1765,12 @@ msgstr ""
 "きる。"
 
 #. type: Plain text
-#: manual.mkd:708
+#: manual.mkd:709
 msgid "## targets.ini"
 msgstr "## targets.ini"
 
 #. type: Plain text
-#: manual.mkd:710
+#: manual.mkd:711
 msgid ""
 "This file determines what targets are available. The format consists of "
 "entries as follows."
@@ -1777,7 +1779,7 @@ msgstr ""
 "フォーマットは以下のエントリから成り立っている。"
 
 #. type: Plain text
-#: manual.mkd:716
+#: manual.mkd:717
 #, no-wrap
 msgid ""
 "    [targetname]\n"
@@ -1793,7 +1795,7 @@ msgstr ""
 "    merge=targetname2\n"
 
 #. type: Plain text
-#: manual.mkd:720
+#: manual.mkd:721
 msgid ""
 "merge is a special key meaning to merge the contents of another target into "
 "the current one. The configuration file is read in order, and the final "
@@ -1805,12 +1807,12 @@ msgstr ""
 "与えられたキーに対応する最後の値が実際に使われる。"
 
 #. type: Plain text
-#: manual.mkd:722
+#: manual.mkd:723
 msgid "An example describing how to cross compile for windows is as follows:"
 msgstr "次に示すのはWindowsクロスコンパイルの例である:"
 
 #. type: Plain text
-#: manual.mkd:728
+#: manual.mkd:729
 #, no-wrap
 msgid ""
 "    [win32]\n"
@@ -1826,7 +1828,7 @@ msgstr ""
 "    merge=i686\n"
 
 #. type: Plain text
-#: manual.mkd:735
+#: manual.mkd:736
 msgid ""
 "This sets the compiler to use as well as a few other options then jumps to "
 "the generic i686 routine. The special target [default] is always read before "
@@ -1843,14 +1845,14 @@ msgstr ""
 "defaultに追加して適切なターゲットを選択する。"
 
 #. type: Plain text
-#: manual.mkd:737
+#: manual.mkd:738
 msgid "Ajhc will attempt to read several targets.ini files in order. they are"
 msgstr ""
 "Ajhcは複数のtargets.iniファイルを順に読み込もう試みる。\n"
 "それらのファイルは以下である。"
 
 #. type: Plain text
-#: manual.mkd:740
+#: manual.mkd:741
 msgid ""
 "$PREFIX/etc/ajhc-\\$VERSION/targets.ini : this is the targets.ini that is "
 "included with Ajhc and contains the default options."
@@ -1859,7 +1861,7 @@ msgstr ""
 "て読み込まれ、既定のオプションを含む。"
 
 #. type: Plain text
-#: manual.mkd:743
+#: manual.mkd:744
 msgid ""
 "$PREFIX/etc/ajhc-\\$VERSION/targets-local.ini : Ajhc will read this if it "
 "exists, it is used to specify custom system wide configuration options, such "
@@ -1870,14 +1872,14 @@ msgstr ""
 "スタム設定を含む。"
 
 #. type: Plain text
-#: manual.mkd:746
+#: manual.mkd:747
 msgid ""
 "$HOME/.ajhc/targets.ini : this is where a users local configuration "
 "information goes."
 msgstr "$HOME/.ajhc/targets.ini : ユーザローカルの設定"
 
 #. type: Plain text
-#: manual.mkd:749
+#: manual.mkd:750
 msgid ""
 "$HOME/etc/ajhc/targets.ini : this is simply for people that prefer to not "
 "use hidden directories for configuration"
@@ -1886,7 +1888,7 @@ msgstr ""
 "のものである"
 
 #. type: Plain text
-#: manual.mkd:753
+#: manual.mkd:754
 msgid ""
 "The last value specified for an option is the one used, so a users local "
 "configuration overrides the system local version which overrides the built "
@@ -1897,12 +1899,12 @@ msgstr ""
 "またシステムグローバルのローカル設定は組み込みのオプションを上書きする。"
 
 #. type: Plain text
-#: manual.mkd:755
+#: manual.mkd:756
 msgid "## Options available"
 msgstr "## 利用可能なオプション"
 
 #. type: Plain text
-#: manual.mkd:771
+#: manual.mkd:772
 #, no-wrap
 msgid ""
 "Option                    Meaning\n"
@@ -1938,12 +1940,12 @@ msgstr ""
 "_arch_                    gccに渡すアーキティクチャ名\n"
 
 #. type: Plain text
-#: manual.mkd:773
+#: manual.mkd:774
 msgid "## Special defines to set cflags"
 msgstr "## cflagsで指定できる特殊なdefine"
 
 #. type: Plain text
-#: manual.mkd:785
+#: manual.mkd:787
 #, no-wrap
 msgid ""
 "Define                              Meaning\n"
@@ -1957,6 +1959,7 @@ msgid ""
 "\\_JHC\\_JGC\\_LIMITED\\_NUM\\_MEGABLOCK number of limited megablock entries.\n"
 "\\_JHC\\_JGC\\_BLOCK\\_SHIFT            bit shift to specify block size. Use it internally like this: (1 << (\\_JHC\\_JGC\\_BLOCK\\_SHIFT)).\n"
 "\\_JHC\\_JGC\\_MEGABLOCK\\_SHIFT        bit shift to specify megablock size. Use it internally like this: (1 << (\\_JHC\\_JGC\\_MEGABLOCK_SHIFT)).\n"
+"\\_JHC\\_USE\\_OWN\\_STDIO              force you should implement your own printf,fputs,fflush,getchar,getc,putchar,putc.\n"
 msgstr ""
 "Define                              意味\n"
 "------                              ---------------------------------------------------------------------------\n"
@@ -1969,19 +1972,20 @@ msgstr ""
 "\\_JHC\\_JGC\\_LIMITED\\_NUM\\_MEGABLOCK 個数の限定されたメガブロックのエントリ数\n"
 "\\_JHC\\_JGC\\_BLOCK\\_SHIFT            ブロックの大きさを指定するビットシフト。内部ではこのように使われる: (1 << (_JHC_JGC_BLOCK_SHIFT)).\n"
 "\\_JHC\\_JGC\\_MEGABLOCK\\_SHIFT        メガブロックの大きさを指定するビットシフト。内部ではこのように使われる: (1 << (_JHC_JGC_MEGABLOCK_SHIFT)).\n"
+"\\_JHC\\_USE\\_OWN\\_STDIO              独自のprintf,fputs,fflush,getchar,getc,putchar,putc関数実装を要求する\n"
 
 #. type: Plain text
-#: manual.mkd:788
+#: manual.mkd:790
 msgid "# Internals"
 msgstr "# 内部設計"
 
 #. type: Plain text
-#: manual.mkd:791
+#: manual.mkd:793
 msgid "## The Run Time System"
 msgstr "## ランタイムシステム"
 
 #. type: Plain text
-#: manual.mkd:800
+#: manual.mkd:802
 msgid ""
 "Ajhc is very minimalist in that it does not have a precompiled run time "
 "system, but rather generates what is needed as part of the compilation "
@@ -2002,7 +2006,7 @@ msgstr ""
 "われて、最適化されたレイアウトが使用できるかに影響を及ぼす。"
 
 #. type: Plain text
-#: manual.mkd:808
+#: manual.mkd:810
 msgid ""
 "Unboxed values directly translate to values in the target language, an "
 "unboxed Int will translate directly into an 'int' as an argument and an "
@@ -2023,7 +2027,7 @@ msgstr ""
 "値を取り扱うのは悪い考えではない。"
 
 #. type: Plain text
-#: manual.mkd:814
+#: manual.mkd:816
 msgid ""
 "Boxed values have a standard representation and can be followed. Unlike some "
 "other implementation, being boxed does not imply the object is located on "
@@ -2042,7 +2046,7 @@ msgstr ""
 "実際には伝統的なポインタであるかもしれないのだ。"
 
 #. type: Plain text
-#: manual.mkd:818
+#: manual.mkd:820
 msgid ""
 "A boxed value in Ajhc is represented by a 'smart pointer' of c type sptr_t. "
 "a smart pointer is the size of a native pointer, but can take on different "
@@ -2055,12 +2059,12 @@ msgstr ""
 "それはptypeと呼ばれる。"
 
 #. type: Plain text
-#: manual.mkd:820
+#: manual.mkd:822
 msgid "smart pointers take on a general form as follows:"
 msgstr "スマートポインタは一般に以下の形をしている:"
 
 #. type: Plain text
-#: manual.mkd:824
+#: manual.mkd:826
 #, no-wrap
 msgid ""
 "    -------------------------\n"
@@ -2072,7 +2076,7 @@ msgstr ""
 "    -------------------------\n"
 
 #. type: Plain text
-#: manual.mkd:827
+#: manual.mkd:829
 #, no-wrap
 msgid ""
 "      G - if set, then the garbage collector should not treat value as a pointer to be followed\n"
@@ -2082,13 +2086,13 @@ msgstr ""
 "      L - 遅延。このビットがセットされると値はWHNFではないことを示す\n"
 
 #. type: Plain text
-#: manual.mkd:829
+#: manual.mkd:831
 msgid ""
 "A sptr_t on its own in the wild can only take on one of the following forms:"
 msgstr "sptr_tは以下の形の内どれか一つの状態にある:"
 
 #. type: Plain text
-#: manual.mkd:833
+#: manual.mkd:835
 #, no-wrap
 msgid ""
 "    -------------------------\n"
@@ -2100,7 +2104,7 @@ msgstr ""
 "    -------------------------\n"
 
 #. type: Plain text
-#: manual.mkd:837
+#: manual.mkd:839
 #, no-wrap
 msgid ""
 "    -------------------------\n"
@@ -2112,7 +2116,7 @@ msgstr ""
 "    -------------------------\n"
 
 #. type: Plain text
-#: manual.mkd:844
+#: manual.mkd:846
 msgid ""
 "WHNF stands for 'Weak Head Normal Form' and means that the value is not a "
 "suspended function and hence not a pointer to a thunk. It may be directly "
@@ -2129,7 +2133,7 @@ msgstr ""
 "値がWHNFであり高価な'eval'をスキップできるかどうかを静的に知ることができる。"
 
 #. type: Plain text
-#: manual.mkd:850
+#: manual.mkd:852
 msgid ""
 "The difference between the raw value and the whnf location is that the first "
 "contains uninterpreted bits, while the second is a pointer to a location on "
@@ -2145,7 +2149,7 @@ msgstr ""
 "いちがいに決まってはいない。"
 
 #. type: Plain text
-#: manual.mkd:854
+#: manual.mkd:856
 msgid ""
 "Partial (unsaturated) applications are normal WHNF values. Saturated "
 "applications which may be 'eval'ed and updated are called thunks and must "
@@ -2157,7 +2161,7 @@ msgstr ""
 "これらの表現は以下である。"
 
 #. type: Plain text
-#: manual.mkd:858
+#: manual.mkd:860
 #, no-wrap
 msgid ""
 "    -------------------------\n"
@@ -2169,7 +2173,7 @@ msgstr ""
 "    -------------------------\n"
 
 #. type: Plain text
-#: manual.mkd:864
+#: manual.mkd:866
 msgid ""
 "A lazy location points to either a thunk, or a redirection to a WHNF value. "
 "A lazy location is always a pointer to an allocated block of memory which "
@@ -2186,7 +2190,7 @@ msgstr ""
 "それらはオブジェクトとして流通することはない。"
 
 #. type: Plain text
-#: manual.mkd:869
+#: manual.mkd:871
 msgid ""
 "A fptr_t may be a whnf value or a code pointer. If a fptr_t is a whnf value "
 "(of one of the two forms given above) then it is called a redirection, the "
@@ -2200,7 +2204,7 @@ msgstr ""
 "これは評価済みサンクへのリダイレクトとして使われる。"
 
 #. type: Plain text
-#: manual.mkd:875
+#: manual.mkd:877
 msgid ""
 "A fptr_t may also be a 'code pointer' in which case the lazy location is "
 "called a thunk. A code pointer is a pointer to executable machine code that "
@@ -2218,7 +2222,7 @@ msgstr ""
 "指示されたコードはこのリダイレクションを実行する責任がある。"
 
 #. type: Plain text
-#: manual.mkd:880
+#: manual.mkd:882
 #, no-wrap
 msgid ""
 "    -------------------------\n"
@@ -2232,7 +2236,7 @@ msgstr ""
 "    |     data ...          |\n"
 
 #. type: Plain text
-#: manual.mkd:883
+#: manual.mkd:885
 msgid ""
 "When debugging, the special code pointer BLACK_HOLE is also sometimes stored "
 "in a fptr_t to detect certain run-time errors."
@@ -2241,7 +2245,7 @@ msgstr ""
 "これはある種のランタイムエラーを検出する。"
 
 #. type: Plain text
-#: manual.mkd:887
+#: manual.mkd:889
 msgid ""
 "Note that unlike other implementations, a fptr_t may _not_ be another lazy "
 "location. you can not have chained redirections, a redirection is always a "
@@ -2252,7 +2256,7 @@ msgstr ""
 "リダイレクションは常にWHNF値へのリダイレクションでなければならない。"
 
 #. type: Plain text
-#: manual.mkd:891
+#: manual.mkd:893
 #, no-wrap
 msgid ""
 "    sptr_t - a tagged smart pointer, may contain a whnf value or a lazy location.\n"
@@ -2264,12 +2268,12 @@ msgstr ""
 "    fptr_t - タグ付けされたスマートポインタ。リダイレクションを示すWHNF値かサンクを示すコードポインタを保持する。\n"
 
 #. type: Plain text
-#: manual.mkd:895
+#: manual.mkd:897
 msgid "## Ajhc Core Type System"
 msgstr "## Ajhcコア型システム"
 
 #. type: Plain text
-#: manual.mkd:899
+#: manual.mkd:901
 msgid ""
 "Ajhc's core is based on a pure type system. A pure type system (also called "
 "a PTS) is actually a parameterized set of type systems. Ajhc's version is "
@@ -2280,7 +2284,7 @@ msgstr ""
 "AjhcのPTSについて以下で解説する。"
 
 #. type: Plain text
-#: manual.mkd:902
+#: manual.mkd:904
 #, no-wrap
 msgid ""
 "    Sorts  = (*, !, **, #, (#), ##, □)\n"
@@ -2290,7 +2294,7 @@ msgstr ""
 "    公理 = (*:**, #:##, !:**, **:□, ##:□)\n"
 
 #. type: Plain text
-#: manual.mkd:913
+#: manual.mkd:915
 #, no-wrap
 msgid ""
 "    -- sort kind\n"
@@ -2316,13 +2320,13 @@ msgstr ""
 "    □   superkindの存在位置\n"
 
 #. type: Plain text
-#: manual.mkd:915
+#: manual.mkd:917
 #, no-wrap
 msgid "    in addition there exist user defined kinds, which are always of supersort ##\n"
 msgstr "    ユーザ定義の種の存在に加えて、supersort ##が存在する。\n"
 
 #. type: Plain text
-#: manual.mkd:920
+#: manual.mkd:922
 msgid ""
 "The following Rules table shows what sort of abstractions are allowed, a "
 "rule of the form (A,B,C) means you can have functions of things of sort A to "
@@ -2335,7 +2339,7 @@ msgstr ""
 "この文脈での _関数_ は項と型レベルの抽象を含んでいる。"
 
 #. type: Plain text
-#: manual.mkd:925
+#: manual.mkd:927
 msgid ""
 "Notice that functions are always boxed, but may be strict if they take an "
 "unboxed tuple as an argument.  When a function is strict it means that it is "
@@ -2348,7 +2352,7 @@ msgstr ""
 "関数の評価が中断された値であることはありえない。"
 
 #. type: Plain text
-#: manual.mkd:932
+#: manual.mkd:934
 msgid ""
 "These type system rules apply to lambda abstractions. It is possible that "
 "data constructors might exist that cannot be given a type on their own with "
@@ -2365,7 +2369,7 @@ msgstr ""
 "を正しく推論するのは困難ではない。"
 
 #. type: Plain text
-#: manual.mkd:935
+#: manual.mkd:937
 #, no-wrap
 msgid ""
 "    as a shortcut we will use *# to mean every combination involving * and #, and so forth.\n"
@@ -2375,7 +2379,7 @@ msgstr ""
 "    例えば、 (*#,*#,*) は (*,*,*) (#,*,*) (*,#,*) (#,#,*) のセットを意味している。\n"
 
 #. type: Plain text
-#: manual.mkd:947
+#: manual.mkd:949
 #, no-wrap
 msgid ""
 "    Rules =\n"
@@ -2403,30 +2407,30 @@ msgstr ""
 "       (##,##,##)  -- Complex_ :: # -> #\n"
 
 #. type: Plain text
-#: manual.mkd:949
+#: manual.mkd:951
 #, no-wrap
 msgid "    The defining feature of boxed values is\n"
 msgstr "    ボックス化値の定義は以下である。\n"
 
 #. type: Plain text
-#: manual.mkd:951
+#: manual.mkd:953
 #, no-wrap
 msgid "    _|_ :: t iff t::*\n"
 msgstr "    _|_ :: t iff t::*\n"
 
 #. type: Plain text
-#: manual.mkd:953
+#: manual.mkd:955
 #, no-wrap
 msgid "    This PTS is functional but not injective\n"
 msgstr "    このPTSは関数的であるが単射ではない。\n"
 
 #. type: Plain text
-#: manual.mkd:955
+#: manual.mkd:957
 msgid "The PTS can be considered stratified into the following levels"
 msgstr "このPTSは次のレベルに階層化されている。"
 
 #. type: Plain text
-#: manual.mkd:961
+#: manual.mkd:963
 #, no-wrap
 msgid ""
 "    □                - sort box\n"
@@ -2442,12 +2446,12 @@ msgstr ""
 "    3,True,\"bob\"     - 種類value(値)\n"
 
 #. type: Plain text
-#: manual.mkd:963
+#: manual.mkd:965
 msgid "### On boxed kinds"
 msgstr "### ボックス化kind(種)について"
 
 #. type: Plain text
-#: manual.mkd:967
+#: manual.mkd:969
 msgid ""
 "The boxed kinds (* and !) represent types that have a uniform run time "
 "representation. Due to this, functions may be written that are polymorphic "
@@ -2460,7 +2464,7 @@ msgstr ""
 "ことができる。"
 
 #. type: Plain text
-#: manual.mkd:971
+#: manual.mkd:973
 msgid ""
 "the unboxed kind # is inhabited with types that have their own specific run "
 "time representation. Hence you cannot write functions that are polymorphic "
@@ -2470,12 +2474,12 @@ msgstr ""
 "アンボックス化型を多相的に使う関数を書くことはできない。"
 
 #. type: Plain text
-#: manual.mkd:973
+#: manual.mkd:975
 msgid "### On sort box, the unboxed tuple, and friends"
 msgstr "### 種類box、アンボックス化タプルとその同類について"
 
 #. type: Plain text
-#: manual.mkd:979
+#: manual.mkd:981
 msgid ""
 "Although sort box does not appear in the code, it is useful from a "
 "theoretical point of view to talk about certain types such as the types of "
@@ -2493,13 +2497,13 @@ msgstr ""
 "(これはアンボックス化2タプルのケースである)"
 
 #. type: Plain text
-#: manual.mkd:981
+#: manual.mkd:983
 #, no-wrap
 msgid "    ∀s1:□ ∀s2:□ ∀k1:s1 ∀k2:s2 ∀t1:k1 ∀t2:k2 . (# t1, t2 #)\n"
 msgstr "    ∀s1:□ ∀s2:□ ∀k1:s1 ∀k2:s2 ∀t1:k1 ∀t2:k2 . (# t1, t2 #)\n"
 
 #. type: Plain text
-#: manual.mkd:987
+#: manual.mkd:989
 msgid ""
 "However, although this is a valid typing of what it would mean if a unboxed "
 "tuple were not fully applied, since we do not have any rules of form "
@@ -2514,12 +2518,12 @@ msgstr ""
 "のコード表現もまた不要になる。"
 
 #. type: Plain text
-#: manual.mkd:989
+#: manual.mkd:991
 msgid "#### Do we need a superbox?"
 msgstr "#### superboxは必要か？"
 
 #. type: Plain text
-#: manual.mkd:992
+#: manual.mkd:994
 msgid ""
 "You will notice that if you look at the axioms involving the sorts, you end "
 "up with a disjoint graph"
@@ -2528,7 +2532,7 @@ msgstr ""
 "れない。"
 
 #. type: Plain text
-#: manual.mkd:998
+#: manual.mkd:1000
 #, no-wrap
 msgid ""
 "             □             - the box\n"
@@ -2544,7 +2548,7 @@ msgstr ""
 "         *  !     #   (#)  - kind(種)\n"
 
 #. type: Plain text
-#: manual.mkd:1003
+#: manual.mkd:1005
 msgid ""
 "This is simply due to the fact that nothing is polymorphic in unboxed tuples "
 "of kind (#) so we never need to refer to any super-sorts of them. We can add "
@@ -2557,7 +2561,7 @@ msgstr ""
 "これらの種類は決してコードや論文には現われないが、気にしないことにする。"
 
 #. type: Plain text
-#: manual.mkd:1011
+#: manual.mkd:1013
 #, no-wrap
 msgid ""
 "               □□            - sort superbox\n"
