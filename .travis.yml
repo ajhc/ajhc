@@ -17,12 +17,6 @@ before_install:
   - pkgutil --pkgs
   - git fetch --tags
 script:
-  - autoreconf -i
-  - ./configure
-  - make cabal-setup
-  - make cabal-install
-  - make regress
-  - make selftest
-  - make rtstest
+  - cd .. && cabal install ajhc
 after_script:
   - date
