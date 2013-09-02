@@ -12,7 +12,8 @@ before_install:
   - export GHC=/usr/local/bin/ghc
   - brew install haskell-platform --verbose
   - cabal update || cabal update
-  - cabal install derive || cabal install derive
+  - export HSPACKS="derive temporary haskeline utf8-string HsSyck test-framework-th test-framework-hunit test-framework-quickcheck2 uniplate"
+  - cabal install $HSPACKS || cabal install $HSPACKS
   - git --version
   - $GHC --version
   - git fetch --tags
