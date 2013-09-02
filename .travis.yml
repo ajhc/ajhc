@@ -8,7 +8,8 @@ before_install:
   - uname -a
   - ulimit -a
   - brew update
-  - brew install haskell-platform
+  - brew install ghc
+  - brew install cabal-install
   - cabal update || cabal update
   - cabal install derive || cabal install derive
   - git --version
