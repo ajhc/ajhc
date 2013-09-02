@@ -16,6 +16,7 @@ before_install:
   - cabal install $HSPACKS || cabal install $HSPACKS
   - git --version
   - $GHC --version
+  - pkgutil --pkgs
   - git fetch --tags
 script:
   - autoreconf -i
