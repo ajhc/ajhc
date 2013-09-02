@@ -8,8 +8,9 @@ before_install:
   - uname -a
   - ulimit -a
   - brew update
-  - brew install ghc
-  - brew install cabal-install
+  - brew install ghc --verbose
+  - export GHC=/usr/local/bin/ghc
+  - brew install cabal-install --verbose
   - cabal update || cabal update
   - cabal install derive || cabal install derive
   - git --version
