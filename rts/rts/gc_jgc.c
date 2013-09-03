@@ -709,6 +709,7 @@ void
 alloc_public_caches(arena_t arena, size_t size) {
         if (arena->public_caches_p == NULL) {
                 arena->public_caches_p = malloc(size);
+                memset(arena->public_caches_p, 0, size);
         }
 }
 
