@@ -55,6 +55,7 @@ library
         binary,
         bytestring,
         containers,
+        cpphs,
         derive,
         directory,
         fgl,
