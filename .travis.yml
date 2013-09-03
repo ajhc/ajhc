@@ -7,17 +7,23 @@ before_install:
   - date
   - uname -a
   - ulimit -a
-  - wget "http://lambda.haskell.org/platform/download/2013.2.0.0/Haskell Platform 2013.2.0.0 32bit.pkg"
-  - sudo installer -pkg "Haskell Platform 2013.2.0.0 32bit.pkg" -target /
+  - cat /proc/cpuinfo
+  - cat /proc/meminfo
+  - cat /etc/apt/sources.list
+  - sudo apt-get -qq update
+  - sudo apt-get -qq -y install make locales autoconf m4 libconfig-yaml-perl graphviz haskell-platform cpphs pandoc hscolour po4a libgc-dev gcc-multilib valgrind
+  - sudo apt-get -qq -y install libghc-temporary-dev libghc-haskeline-dev libghc-utf8-string-dev libghc-hssyck-dev libghc-test-framework-th-dev libghc-test-framework-hunit-dev libghc-test-framework-quickcheck2-dev libghc-uniplate-dev
   - cabal update || cabal update
-  - export PATH="$HOME/Library/Haskell/bin:$PATH"
-  - export HSPACKS="derive temporary haskeline utf8-string HsSyck test-framework-th test-framework-hunit test-framework-quickcheck2 uniplate"
-  - cabal install $HSPACKS || cabal install $HSPACKS
+  - cabal install derive || cabal install derive
   - git --version
   - ghc --version
-  - pkgutil --pkgs
   - git fetch --tags
 script:
-  - cd .. && cabal install ajhc
+  - autoreconf -i
+  - ./configure
+  - make install
+  - make regress
+  - make selftest
+  - make rtstest
 after_script:
   - date
