@@ -13,7 +13,7 @@ before_install:
   - sudo apt-get -qq -y install libghc-temporary-dev libghc-haskeline-dev libghc-utf8-string-dev libghc-hssyck-dev libghc-test-framework-th-dev libghc-test-framework-hunit-dev libghc-test-framework-quickcheck2-dev libghc-uniplate-dev
   - cabal update || cabal update
   - cabal install derive || cabal install derive
-  - export $HOME/.cabal/bin:$PATH
+  - export PATH=$HOME/.cabal/bin:$PATH
   - git --version
   - ghc --version
   - git fetch --tags
