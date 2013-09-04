@@ -1,9 +1,8 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS -funbox-strict-fields #-}
+{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
 module Cmm.Op where
 
 import Data.Binary
-import Data.DeriveTH
 import Util.Gen
 import qualified Text.ParserCombinators.ReadP as P
 import Text.Read.Lex
@@ -400,12 +399,14 @@ instance IsOperator (Op v) where
     isEagerSafe (ConvOp o _) = isEagerSafe o
     isEagerSafe _ = False
 
-$(derive makeBinary ''BinOp)
-$(derive makeBinary ''UnOp)
-$(derive makeBinary ''ConvOp)
-$(derive makeBinary ''ValOp)
-$(derive makeBinary ''ArchBits)
-$(derive makeBinary ''TyBits)
-$(derive makeBinary ''TyHint)
-$(derive makeBinary ''Ty)
-$(derive makeBinary ''Op)
+{-!
+deriving instance Binary BinOp
+deriving instance Binary UnOp
+deriving instance Binary ConvOp
+deriving instance Binary ValOp
+deriving instance Binary ArchBits
+deriving instance Binary TyBits
+deriving instance Binary TyHint
+deriving instance Binary Ty
+deriving instance Binary Op
+!-}

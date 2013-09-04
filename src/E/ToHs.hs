@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
 module E.ToHs(compileToHs) where
 
 import Char
@@ -8,7 +8,6 @@ import Control.Monad.RWS
 import Control.Monad.Trans
 import Control.Monad.Writer
 import Data.Monoid
-import Data.DeriveTH
 import System.IO
 import Text.PrettyPrint.HughesPJ(render,($$),nest,Doc())
 import qualified Data.Set as Set
@@ -485,4 +484,6 @@ mangleIdent xs =  concatMap f xs where
         f c | isAlphaNum c = [c]
         f c = '_':'x':showHex (ord c) ""
 
-$(derive makeMonoid ''Collect)
+{-!
+deriving instance Monoid Collect
+!-}

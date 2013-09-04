@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
 module E.SSimplify(
     Occurance(..),
     cacheSimpOpts,
@@ -14,7 +14,6 @@ module E.SSimplify(
 import Control.Monad.Identity
 import Data.Maybe
 import Data.Typeable
-import Data.DeriveTH
 import Debug.Trace
 import Data.List hiding(delete,union,insert)
 import qualified Data.Set as Set
@@ -1082,4 +1081,6 @@ smAddBoundNamesIdSet nset = --trace ("addBoundNamesIdSet: "++show (size nset)) $
 
 --smAddBoundNamesIdMap = smAddNamesIdSet . idMapToIdSet
 
-$(derive makeMonoid ''Env)
+{-!
+deriving instance Monoid Env
+!-}

@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
 module E.Demand(
     Demand(..),
     DemandSignature(..),
@@ -14,7 +14,6 @@ import Control.Monad.Writer hiding(Product(..))
 import Data.Binary
 import Data.List hiding(union,delete)
 import Data.Typeable
-import Data.DeriveTH
 
 --import Debug.Trace
 import DataConstructors
@@ -403,8 +402,10 @@ instance Show DemandEnv where
 instance Show DemandSignature where
     showsPrec _ (DemandSignature n dt) = showString "<" . shows n . showString "," . shows dt . showString ">"
 
-$(derive makeBinary ''Demand)
-$(derive makeBinary ''SubDemand)
-$(derive makeBinary ''DemandEnv)
-$(derive makeBinary ''DemandType)
-$(derive makeBinary ''DemandSignature)
+{-!
+deriving instance Binary Demand
+deriving instance Binary SubDemand
+deriving instance Binary DemandEnv
+deriving instance Binary DemandType
+deriving instance Binary DemandSignature
+!-}

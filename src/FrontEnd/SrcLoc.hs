@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
 module FrontEnd.SrcLoc where
 
 import Control.Applicative
@@ -8,7 +8,6 @@ import Data.Foldable
 import Data.Traversable
 import Data.Binary
 import Data.Generics
-import Data.DeriveTH
 
 import PackedString
 
@@ -121,8 +120,11 @@ instance Show SrcSpan where
       | sl1 == sl2 = show sl1
       | otherwise = show sl1 ++ "-" ++ show sl2
 
-$(derive makeUpdate ''SrcLoc)
-$(derive makeBinary ''SrcLoc)
-$(derive makeUpdate ''SrcSpan)
-$(derive makeBinary ''SrcSpan)
-$(derive makeBinary ''Located)
+{-!
+deriving instance Update SrcLoc
+deriving instance Binary SrcLoc
+deriving instance Update SrcSpan
+deriving instance Binary SrcSpan
+deriving instance Binary Located
+!-}
+

@@ -1,9 +1,8 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
 module FrontEnd.HsSyn where
 
 import Data.Binary
 import Data.Generics
-import Data.DeriveTH
 
 import C.FFI
 import FrontEnd.SrcLoc
@@ -437,20 +436,24 @@ hsKindQuest = HsKind s_Quest
 hsKindQuestQuest = HsKind s_QuestQuest
 hsKindStarBang = HsKind s_StarBang
 
-$(derive makeUpdate ''HsModule)
-$(derive makeBinary ''HsAssoc)
-$(derive makeIs ''HsDecl)
-$(derive makeIs ''HsConDecl)
-$(derive makeUpdate ''HsConDecl)
-$(derive makeBinary ''HsQualType)
-$(derive makeBinary ''HsType)
-$(derive makeIs ''HsType)
-$(derive makeBinary ''HsTyVarBind)
-$(derive makeUpdate ''HsTyVarBind)
-$(derive makeBinary ''HsAsst)
-$(derive makeIs ''HsLiteral)
-$(derive makeIs ''HsExp)
-$(derive makeUpdate ''HsExp)
-$(derive makeUpdate ''HsClassHead)
-$(derive makeIs ''HsPat)
-$(derive makeBinary ''HsKind)
+
+
+{-!
+deriving instance Update HsModule
+deriving instance Binary HsAssoc
+deriving instance Is HsDecl
+deriving instance Is HsConDecl
+deriving instance Update HsConDecl
+deriving instance Binary HsQualType
+deriving instance Binary HsType
+deriving instance Is HsType
+deriving instance Binary HsTyVarBind
+deriving instance Update HsTyVarBind
+deriving instance Binary HsAsst
+deriving instance Is HsLiteral
+deriving instance Is HsExp
+deriving instance Update HsExp
+deriving instance Update HsClassHead
+deriving instance Is HsPat
+deriving instance Binary HsKind
+!-}

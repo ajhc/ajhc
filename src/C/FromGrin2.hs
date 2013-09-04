@@ -1,4 +1,5 @@
-{-# LANGUAGE OverloadedStrings, RecordWildCards, ViewPatterns, TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings, RecordWildCards, ViewPatterns #-}
+{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
 module C.FromGrin2(compileGrin) where
 
 import Control.Monad.Identity
@@ -7,7 +8,6 @@ import Data.Char
 import Data.List
 import Data.Maybe
 import Data.Monoid(Monoid(..))
-import Data.DeriveTH
 import System.FilePath
 import Text.PrettyPrint.HughesPJ(nest,($$),fsep)
 import qualified Data.ByteString.Lazy as LBS
@@ -52,8 +52,6 @@ data Written = Written {
     wEnums :: Map.Map Name Int,
     wFunctions :: Map.Map Name Function
     }
-
-$(derive makeMonoid ''Written)
 
 -- special type representations when possible
 data TyRep
@@ -1024,3 +1022,7 @@ x =:: y = newTmpVar y x
 
 basicType' :: ExtType -> Type
 basicType' b = basicType (show b)
+
+{-!
+deriving instance Monoid Written
+!-}

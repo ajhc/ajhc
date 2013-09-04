@@ -1,10 +1,10 @@
-{-# LANGUAGE OverloadedStrings, TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
 module C.Prims where
 
 import Data.Binary
 import Data.Monoid(Monoid(..))
 import Data.Typeable
-import Data.DeriveTH
 import qualified Data.Set as Set
 
 import Doc.DocLike
@@ -17,7 +17,6 @@ import GHC.Exts
 
 data CallConv = CCall | StdCall | CApi | Primitive | DotNet
     deriving(Eq,Ord,Show)
-$(derive makeBinary ''CallConv)
 
 data Safety = Safe | Unsafe | JhcContext deriving(Eq,Ord,Show)
 
@@ -178,7 +177,10 @@ parseDotNetFFI s = ans where
     g dn [n] = return dn { primDotNetName = packString n }
     g _ _ = fail "invalid .NET ffi specification"
 
-$(derive makeBinary ''Safety)
-$(derive makeBinary ''DotNetPrim)
-$(derive makeBinary ''Prim)
-$(derive makeBinary ''PrimTypeInfo)
+{-!
+deriving instance Binary CallConv
+deriving instance Binary Safety
+deriving instance Binary DotNetPrim
+deriving instance Binary Prim
+deriving instance Binary PrimTypeInfo
+!-}

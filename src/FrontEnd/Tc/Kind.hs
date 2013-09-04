@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
 module FrontEnd.Tc.Kind(
     Kind(..),
     KBase(..),
@@ -18,7 +18,6 @@ import Control.Monad
 import Data.IORef
 import Data.Monoid
 import Data.Binary
-import Data.DeriveTH
 
 import Doc.DocLike
 import Doc.PPrint(pprint,pprintPrec,pprintAssoc,Assoc(..),PPrint,pprintBinary)
@@ -166,5 +165,7 @@ unfoldKind :: Kind -> [Kind]
 unfoldKind (Kfun k1 k2) = k1 : unfoldKind k2
 unfoldKind v = [v]
 
-$(derive makeBinary ''KBase)
-$(derive makeBinary ''Kind)
+{-!
+deriving instance Binary KBase
+deriving instance Binary Kind
+!-}

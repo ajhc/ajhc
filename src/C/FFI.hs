@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
 module C.FFI(
     CallConv(..),
     Safety(..),
@@ -10,7 +10,6 @@ module C.FFI(
 
 import C.Prims
 import Data.Binary
-import Data.DeriveTH
 import Data.Typeable
 
 type CName = String
@@ -33,4 +32,6 @@ data FfiExport = FfiExport {
     }
  deriving(Eq,Ord,Show,Typeable)
 
-$(derive makeBinary ''FfiExport)
+{-!
+deriving instance Binary FfiExport
+!-}

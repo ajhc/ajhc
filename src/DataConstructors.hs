@@ -1,4 +1,5 @@
-{-# LANGUAGE OverloadedStrings, TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
 module DataConstructors(
     AliasType(..),
     boxPrimitive,
@@ -52,7 +53,6 @@ import qualified Data.Set as Set hiding(map)
 
 import C.Prims
 import Data.Binary
-import Data.DeriveTH
 import Doc.DocLike as D
 import Doc.PPrint
 import Doc.Pretty
@@ -920,7 +920,9 @@ rawExtTypeMap = Map.fromList [
     (rt_float128,  "__float128")
     ]
 
-$(derive makeBinary ''AliasType)
-$(derive makeBinary ''DataFamily)
-$(derive makeBinary ''Constructor)
-$(derive makeBinary ''Slot)
+{-!
+deriving instance Binary AliasType
+deriving instance Binary DataFamily
+deriving instance Binary Constructor
+deriving instance Binary Slot
+!-}

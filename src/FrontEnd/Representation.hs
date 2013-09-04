@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
 module FrontEnd.Representation(
     Type(..),
     Tyvar(..),
@@ -27,7 +27,6 @@ import Control.Monad.Identity
 import Data.IORef
 
 import Data.Binary
-import Data.DeriveTH
 import Doc.DocLike
 import Doc.PPrint
 import FrontEnd.Tc.Kind
@@ -312,9 +311,11 @@ tTTuple ts = foldl TAp (toTuple (length ts)) ts
 tTTuple' ts = foldl TAp (TCon $ Tycon (unboxedNameTuple TypeConstructor  n) (foldr Kfun kindUTuple $ replicate n kindStar)) ts where
     n = length ts
 
-$(derive makeBinary ''MetaVarType)
-$(derive makeBinary ''Type)
-$(derive makeBinary ''MetaVar)
-$(derive makeBinary ''Tycon)
-$(derive makeBinary ''Pred)
-$(derive makeBinary ''Qual)
+{-!
+deriving instance Binary MetaVarType
+deriving instance Binary Type
+deriving instance Binary MetaVar
+deriving instance Binary Tycon
+deriving instance Binary Pred
+deriving instance Binary Qual
+!-}

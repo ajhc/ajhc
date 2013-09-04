@@ -1,11 +1,10 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
 module E.CPR(Val(..), cprAnalyzeDs, cprAnalyzeProgram) where
 
 import Control.Monad.Writer(runWriter,tell,Monoid(..))
 import Data.Binary
 import Data.Monoid()
 import Data.Typeable
-import Data.DeriveTH
 import qualified Data.Map as Map
 
 import Cmm.Number
@@ -138,4 +137,6 @@ cprAnalyze dataTable env e = cprAnalyze' env e where
         f e = error $ "cprAnalyze'.f: " ++ show e
         g = snd . cprAnalyze' env
 
-$(derive makeBinary ''Val)
+{-!
+deriving instance Binary Val
+!-}

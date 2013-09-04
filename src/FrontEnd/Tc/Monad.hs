@@ -1,4 +1,4 @@
-{-# LANGUAGE ImpredicativeTypes, TemplateHaskell #-}
+{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
 module FrontEnd.Tc.Monad(
     CoerceTerm(..),
     Tc(),
@@ -54,7 +54,6 @@ import Control.Monad.Reader
 import Control.Monad.Writer.Strict
 import Data.IORef
 import Data.List
-import Data.DeriveTH
 --import Text.PrettyPrint.HughesPJ(Doc)
 import qualified Data.Foldable as T
 import qualified Data.Map as Map
@@ -123,8 +122,6 @@ data Output = Output {
     tcWarnings       :: !(Seq.Seq Warning),
     outKnots         :: [(Name,Name)]
     }
-
-$(derive makeMonoid ''Output)
 
 newtype Tc a = Tc (ReaderT TcEnv (WriterT Output IO) a)
     deriving(MonadFix,MonadIO,MonadReader TcEnv,MonadWriter Output,Functor)
@@ -563,3 +560,7 @@ withMetaVars mv ks sfunc bsfunc  = do
     taus <- mapM (newMetaVar Tau) ks
     varBind mv (sfunc taus)
     bsfunc taus
+
+{-!
+deriving instance Monoid Output
+!-}

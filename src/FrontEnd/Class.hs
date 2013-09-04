@@ -1,4 +1,5 @@
-{-# LANGUAGE NoMonoLocalBinds, NamedFieldPuns, TemplateHaskell #-}
+{-# LANGUAGE NoMonoLocalBinds, NamedFieldPuns #-}
+{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
 module FrontEnd.Class(
     printClassHierarchy,
     instanceToTopDecls,
@@ -32,7 +33,6 @@ import Control.Monad.Writer(Monoid(..))
 import Data.Generics(mkQ,something)
 import Data.List(nub)
 import Data.Maybe
-import Data.DeriveTH
 import Debug.Trace
 import Text.PrettyPrint.HughesPJ(render,Doc())
 import Text.Printf
@@ -534,6 +534,8 @@ unaryPassDerivable = [
     ]
 -}
 
-$(derive makeBinary ''Inst)
-$(derive makeBinary ''AssociatedType)
-$(derive makeBinary ''ClassRecord)
+{-!
+deriving instance Binary Inst
+deriving instance Binary AssociatedType
+deriving instance Binary ClassRecord
+!-}

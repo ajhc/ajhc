@@ -1,10 +1,9 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
 module Ho.Type where
 
 import Data.Monoid
 import qualified Data.ByteString as BS
 import Data.Map
-import Data.DeriveTH
 
 import Data.Version
 import DataConstructors(DataTable)
@@ -184,9 +183,11 @@ instance Monoid HoBuild where
 
  -}
 
-$(derive makeUpdate ''CollectedHo)
-$(derive makeUpdate ''HoTcInfo)
-$(derive makeMonoid ''HoTcInfo)
-$(derive makeUpdate ''HoBuild)
-$(derive makeMonoid ''HoBuild)
-$(derive makeUpdate ''Ho)
+{-!
+deriving instance Update CollectedHo
+deriving instance Update HoTcInfo
+deriving instance Monoid HoTcInfo
+deriving instance Update HoBuild
+deriving instance Monoid HoBuild
+deriving instance Update Ho
+!-}

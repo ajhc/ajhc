@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
 {-# OPTIONS -funbox-strict-fields #-}
 -- |
 -- This module implements the Kind Inference algorithm, and the routines which
@@ -23,7 +23,6 @@ import Control.Monad.Reader
 import Control.Monad.Writer
 import Data.Binary
 import Data.Generics(Typeable, everything, mkQ)
-import Data.DeriveTH
 import Data.IORef
 import Data.List
 import System.IO.Unsafe
@@ -625,4 +624,6 @@ fromHsTyVar (HsTyVar v) = return v
 fromHsTyVar (HsTyExpKind (Located _ t) _) = fromHsTyVar t
 fromHsTyVar _ = fail "fromHsTyVar"
 
-$(derive makeMonoid ''KindEnv)
+{-!
+deriving instance Monoid KindEnv
+!-}

@@ -1,11 +1,10 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
 -- | The definitions related to jhc core
 
 module E.Type where
 
 import Data.Foldable hiding(concat)
 import Data.Traversable
-import Data.DeriveTH
 
 import C.Prims
 import Cmm.Number
@@ -259,7 +258,9 @@ tvr = TVr { tvrIdent = emptyId, tvrType = Unknown, tvrInfo = Info.empty }
 
 --  Imported from other files :-
 
-$(derive makeIs ''Lit)
-$(derive makeIs ''ESort)
-$(derive makeIs ''E)
-$(derive makeFrom ''E)
+{-!
+deriving instance Is Lit
+deriving instance Is ESort
+deriving instance Is E
+deriving instance From E
+!-}
