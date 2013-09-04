@@ -15,7 +15,6 @@ import Name.Name
 import Name.Names
 import StringTable.Atom
 import Util.Gen
-import Util.SetLike
 import qualified Info.Info as Info
 
 {- @Internals

@@ -20,7 +20,6 @@ import FrontEnd.TypeSynonyms(TypeSynonyms)
 import Name.Id
 import Name.Name(Name,Module)
 import PackedString
-import Util.SetLike
 import Support.CFF
 import Support.MapBinaryInstance()
 import Support.MD5
