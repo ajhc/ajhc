@@ -56,7 +56,7 @@ library
         bytestring,
         containers,
         cpphs,
-        derive <= 2.5.11,
+        derive,
         directory,
         fgl,
         filepath,
