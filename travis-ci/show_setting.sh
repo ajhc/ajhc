@@ -4,3 +4,6 @@ ulimit -a
 cat /proc/cpuinfo
 cat /proc/meminfo
 cat /etc/apt/sources.list
+git --version
+ghc --version
+
