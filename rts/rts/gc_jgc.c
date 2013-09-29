@@ -92,6 +92,26 @@ gc_add_grey(struct stack *stack, entry_t *s)
                 stack->stack[stack->ptr++] = s;
 }
 
+static bool
+gc_check_megablock(entry_t *s)
+{
+        arena_t arena;
+        struct s_megablock *mb;
+        SLIST_FOREACH(arena, &used_arenas, link) {
+                if(arena->current_megablock && arena->current_megablock->base <= s && s <= arena->current_megablock->base + MEGABLOCK_SIZE) {
+                        return true;
+                }
+
+                SLIST_FOREACH(mb, &arena->megablocks, next) {
+                        if(mb->base <= s && s < mb->base + MEGABLOCK_SIZE) {
+                                return true;
+                        }
+                }
+        }
+        return false;
+}
+
+
 static void
 gc_mark_deeper(struct stack *stack, unsigned *number_redirects)
 {
@@ -114,8 +134,10 @@ gc_mark_deeper(struct stack *stack, unsigned *number_redirects)
                         }
                         if(IS_PTR(e->ptrs[i])) {
                                 entry_t * ptr = TO_GCPTR(e->ptrs[i]);
-                                debugf("Following: %p %p\n",e->ptrs[i], ptr);
-                                gc_add_grey(stack, ptr);
+                                if(gc_check_megablock(ptr)) {
+                                        debugf("Following: %p %p\n",e->ptrs[i], ptr);
+                                        gc_add_grey(stack, ptr);
+                                }
                         }
                 }
         }
