@@ -6,9 +6,9 @@ branches:
 before_install:
   - date
   - export PATH="$HOME/Library/Haskell/bin:$PATH"
-  - ./travis-ci/setup.sh
+  - ./travis-ci/setup_osx.sh
   - git fetch --tags
-  - ./travis-ci/show_setting.sh
+  - ./travis-ci/show_setting_osx.sh
 script:
   - ./travis-ci/build.sh
 after_script:
