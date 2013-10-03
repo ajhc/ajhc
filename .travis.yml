@@ -1,16 +1,14 @@
+language: objective-c
+
 branches:
   except:
     - master
 before_install:
   - date
-  - export PATH=$HOME/.cabal/bin:$PATH
+  - export PATH="$HOME/Library/Haskell/bin:$PATH"
   - ./travis-ci/setup.sh
-  - git fetch --tags
   - ./travis-ci/show_setting.sh
 script:
   - ./travis-ci/build.sh
-  - make regress
-  - make selftest
-  - make rtstest
 after_script:
   - date
