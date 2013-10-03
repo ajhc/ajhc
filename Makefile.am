@@ -69,7 +69,7 @@ cabal-build: $(BUILT_SOURCES) src/StringTable/Atom.hs
 cabal-setup: $(BUILT_SOURCES) src/StringTable/Atom.hs
 
 cabal-install:
-	cabal install --disable-documentation
+	cabal install --disable-documentation --disable-library-profiling --disable-executable-profiling
 
 .INTERMEDIATE: ajhc_man.mkd options.mkd
 .DELETE_ON_ERROR: ChangeLog data/shortchange.txt manual.mkd ajhc_man.mkd options.mkd
