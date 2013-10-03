@@ -63,7 +63,7 @@ cabal-dist: $(BUILT_SOURCES) src/StringTable/Atom.hs
 	runhaskell Setup.hs sdist
 
 cabal-build: $(BUILT_SOURCES) src/StringTable/Atom.hs
-	cabal configure
+	cabal configure --disable-library-profiling --disable-executable-profiling
 	cabal build
 
 cabal-setup: $(BUILT_SOURCES) src/StringTable/Atom.hs
