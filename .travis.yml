@@ -7,6 +7,7 @@ before_install:
   - date
   - export PATH="$HOME/Library/Haskell/bin:$PATH"
   - ./travis-ci/setup.sh
+  - git fetch --tags
   - ./travis-ci/show_setting.sh
 script:
   - ./travis-ci/build.sh
