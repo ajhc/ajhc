@@ -7,4 +7,5 @@ echo "yes" | sudo cpan install YAML
 cabal update || cabal update
 export HSPACKS="derive temporary haskeline utf8-string HsSyck cpphs test-framework-th test-framework-hunit test-framework-quickcheck2 uniplate"
 export HSOPTS="-j --disable-documentation --disable-library-profiling --disable-executable-profiling"
+cabal install $HSOPTS cabal-install || cabal install $HSOPTS cabal-install
 cabal install $HSOPTS $HSPACKS || cabal install $HSOPTS $HSPACKS
