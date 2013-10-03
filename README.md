@@ -1,9 +1,14 @@
-# [Ajhc](http://ajhc.metasepi.org/) - arafura-jhc [![Build Status](https://travis-ci.org/ajhc/ajhc.png)](https://travis-ci.org/ajhc/ajhc)
+# [Ajhc](http://ajhc.metasepi.org/) - arafura-jhc
 
 A fork of [jhc](http://repetae.net/computer/jhc/).
 And also a Haskell compiler. 
 
 This project is founded by [Metasepi Project](http://metasepi.org/).
+
+## Build Status
+
+* [![Build Status](https://travis-ci.org/ajhc/ajhc.png?branch=arafura)](https://travis-ci.org/ajhc/ajhc) Ubuntu
+* [![Build Status](https://travis-ci.org/ajhc/ajhc.png?branch=arafura-ci4osx)](https://travis-ci.org/ajhc/ajhc) Mac OS X
 
 ## How to install
 
@@ -76,34 +81,10 @@ http://www.haskell.org/platform/windows.html
 
 ## Future plan
 
-### Yet
-
 * No more depend on Perl (LWP and YAML).
-* Rewrite Cortex-M3 base library with Ajhc.
-* Analyze jhc internal (Japanese doc).
-  https://github.com/ajhc/ajhc-hacking-guide
 * Port Haskell libraries on haskell-platform to Ajhc.
 * Understand jhc's region inference.
-* Play with Android NDK. http://developer.android.com/tools/sdk/ndk/index.html
 * Play with Google Native Client. https://developers.google.com/native-client/
-* Snatch ChibiOS/RT. http://www.chibios.org/dokuwiki/doku.php
 * Write Linux kernel driver with Haskell.
 * Get smaller RTS. Benchmark the RTS for running on custom FPGA CPU.
 * Start rewritng NetBSD kernel with Ajhc.
-
-### Done
-
-* Try to rewrite a part of NetBSD bootloader.
-  http://www.youtube.com/watch?v=JMyxy5Qo2m8
-* Translate Jhc User’s Manual to Japanese.
-  http://metasepi.org/posts/2013-01-12-jhc_manual_ja.html
-* Fix bug that run stm32f3-discovery demo. It causes Ajhc RTS heep impl.
-  https://github.com/ajhc/demo-cortex-m3/tree/master/stm32f3-discovery
-* Support to build on Windows.
-* Cabalize Ajhc. Ajhc's hl files will be not controled with cabal.
-* Support LPCXpresso NXP LPX1769 with demo.
-* Pass all regress test, and enable regress fail setting on travis-ci.
-  https://travis-ci.org/ajhc/ajhc
-* No more depend on DrIFT. Use http://hackage.haskell.org/package/derive.
-* Find critical region of Ajhc for reentrant and thread safe.
-* Find the method to implement GC that can be interrupted.
