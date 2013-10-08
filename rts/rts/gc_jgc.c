@@ -28,10 +28,6 @@ static void s_cleanup_blocks(arena_t arena);
 static struct s_block *get_free_block(gc_t gc, arena_t arena, bool retry);
 static void *jhc_aligned_alloc(unsigned size);
 
-typedef struct {
-        sptr_t ptrs[0];
-} entry_t;
-
 static const void *nh_start, *nh_end;
 
 static bool
@@ -39,14 +35,6 @@ gc_check_heap(entry_t *s)
 {
         return (s < (entry_t *)nh_start || s > (entry_t *)nh_end);
 }
-
-struct stack {
-        unsigned size;
-        unsigned ptr;
-        entry_t * *stack;
-};
-
-#define EMPTY_STACK { 0, 0, NULL }
 
 static void
 stack_grow(struct stack *s, unsigned grow)
@@ -71,15 +59,13 @@ stack_check(struct stack *s, unsigned n) {
         }
 }
 
-static struct stack root_stack = EMPTY_STACK;
-
 void gc_add_root(gc_t gc, arena_t arena, void *root)
 {
         if(IS_PTR(root)) {
                 entry_t *nroot = TO_GCPTR(root);
                 if(gc_check_heap(nroot)) {
-                        stack_check(&root_stack,1);
-                        root_stack.stack[root_stack.ptr++] = nroot;
+                        stack_check(&arena->root_stack,1);
+                        arena->root_stack.stack[arena->root_stack.ptr++] = nroot;
                 }
         }
 }
@@ -141,10 +127,10 @@ gc_perform_gc(gc_t gc, arena_t arena)
         clear_used_bits(arena);
 
         debugf("Setting Roots:");
-        stack_check(&stack, root_stack.ptr);
-        for(unsigned i = 0; i < root_stack.ptr; i++) {
-                gc_add_grey(&stack, root_stack.stack[i]);
-                debugf(" %p", root_stack.stack[i]);
+        stack_check(&stack, arena->root_stack.ptr);
+        for(unsigned i = 0; i < arena->root_stack.ptr; i++) {
+                gc_add_grey(&stack, arena->root_stack.stack[i]);
+                debugf(" %p", arena->root_stack.stack[i]);
                 DO_GC_MARK_DEEPER(&stack, &number_redirects);
         }
         debugf(" # ");
@@ -206,7 +192,7 @@ gc_perform_gc(gc_t gc, arena_t arena)
                         number_stack,
                         number_ptr,
                         number_redirects,
-                        (unsigned)root_stack.ptr
+                        (unsigned)arena->root_stack.ptr
                        );
                 arena->number_allocs = 0;
         }
@@ -737,6 +723,7 @@ new_arena(void) {
         arena->block_used = 0;
         arena->block_threshold = 8;
         arena->current_megablock = NULL;
+	memset(&arena->root_stack, 0, sizeof(arena->root_stack));
 
         for (int i = 0; i < GC_STATIC_ARRAY_NUM; i++) {
                 find_cache(&arena->array_caches[i], arena, i + 1, i + 1);
