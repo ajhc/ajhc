@@ -723,7 +723,7 @@ new_arena(void) {
         arena->block_used = 0;
         arena->block_threshold = 8;
         arena->current_megablock = NULL;
-//        memset(&arena->root_stack, 0, sizeof(arena->root_stack));
+        memset(&arena->root_stack, 0, sizeof(arena->root_stack));
 
         for (int i = 0; i < GC_STATIC_ARRAY_NUM; i++) {
                 find_cache(&arena->array_caches[i], arena, i + 1, i + 1);
