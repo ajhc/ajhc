@@ -88,3 +88,9 @@ http://www.haskell.org/platform/windows.html
 * Write Linux kernel driver with Haskell.
 * Get smaller RTS. Benchmark the RTS for running on custom FPGA CPU.
 * Start rewritng NetBSD kernel with Ajhc.
+
+## License
+
+* Runtime: [MIT License](https://github.com/ajhc/ajhc/blob/master/rts/LICENSE)
+* Haskell libraries: [MIT License](https://github.com/ajhc/ajhc/blob/master/lib/LICENSE)
+* The others: [GPLv2 or Later](https://github.com/ajhc/ajhc/blob/arafura/COPYING)
