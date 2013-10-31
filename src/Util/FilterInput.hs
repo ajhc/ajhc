@@ -1,4 +1,4 @@
-module Util.FilterInput (filterInput,readSystem,existCommand) where
+module Util.FilterInput (filterInput,readSystem) where
 
 import Control.Monad (when)
 import Data.List
@@ -24,8 +24,3 @@ readSystem prog args = do
     when (rExit /= ExitSuccess) $
       putErrDie (printf "'%s' exited abnormally (%s)" (intercalate " " (prog:args)) (show rExit))
     return $ LBS.pack rStdout
-
-existCommand :: String -> IO Bool
-existCommand cmd = do
-  (rExit, _, _) <- readProcessWithExitCode "which" [cmd] ""
-  return $ if rExit == ExitSuccess then True else False

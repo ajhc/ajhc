@@ -12,6 +12,7 @@ import Data.Char
 import Data.Maybe
 import System.FilePath as FP
 import System.Process
+import System.Directory
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Lazy.UTF8 as LBSU
@@ -47,9 +48,8 @@ preprocess opt fn lbs = do
         _ | fopts FO.Cpp -> readSystem "cpphs" $ incFlags ++ defFlags ++ [fn]
           | fopts FO.M4  -> do
                 m4p <- m4Prelude
-                useGm4 <- existCommand "gm4"
-                let c = if useGm4 then "gm4" else "m4"
-                readSystem c $ ["-s", "-P"] ++ incFlags ++ defFlags ++ [m4p,fn]
+                maygm4 <- findExecutable "gm4"
+                readSystem (fromMaybe "m4" maygm4) $ ["-s", "-P"] ++ incFlags ++ defFlags ++ [m4p,fn]
           | otherwise -> return lbs
 
 m4Prelude :: IO FilePath
