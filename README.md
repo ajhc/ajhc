@@ -13,11 +13,12 @@ This project is founded by [Metasepi Project](http://metasepi.org/).
 ## How to install
 
     $ sudo apt-get install haskell-platform libncurses5-dev gcc m4
+    $ cabal install drift
     $ cabal install ajhc
 
 ## How to build latest version
 
-    $ sudo apt-get install make locales autoconf haskell-derive-utils \
+    $ sudo apt-get install make locales autoconf drift \
       libconfig-yaml-perl graphviz haskell-platform cpphs pandoc hscolour po4a \
       libghc-temporary-dev libghc-haskeline-dev libghc-utf8-string-dev libghc-hssyck-dev \
       libghc-test-framework-th-dev libghc-test-framework-hunit-dev \

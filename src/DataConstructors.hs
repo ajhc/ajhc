@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
+{-# OPTIONS_GHC -pgmF drift-ghc -F #-}
 module DataConstructors(
     AliasType(..),
     boxPrimitive,
@@ -122,6 +122,7 @@ kind k = error $ "DataConstructors.kind: cannot convert " ++ show k
 
 data AliasType = ErasedAlias | RecursiveAlias
     deriving(Eq,Ord,Show)
+    {-! derive: Binary !-}
 
 -- these apply to types
 data DataFamily =
@@ -132,6 +133,7 @@ data DataFamily =
     | DataNormal [Name]            -- child constructors
     | DataAlias !AliasType
     deriving(Eq,Ord,Show)
+    {-! derive: Binary !-}
 
 -- | Record describing a data type.
 -- * is also a data type containing the type constructors, which are unlifted, yet boxed.
@@ -146,12 +148,14 @@ data Constructor = Constructor {
     conChildren  :: DataFamily,
     conCTYPE     :: Maybe ExtType -- external type
     } deriving(Show)
+    {-! derive: Binary !-}
 
 data Slot =
     SlotNormal E
     | SlotUnpacked E !Name [E]
     | SlotExistential TVr
     deriving(Eq,Ord,Show)
+    {-! derive: Binary !-}
 
 mapESlot f (SlotExistential t) = SlotExistential t { tvrType = f (tvrType t) }
 mapESlot f (SlotNormal e) = SlotNormal $ f e
@@ -919,10 +923,3 @@ rawExtTypeMap = Map.fromList [
     (rt_float80,   "long double"),
     (rt_float128,  "__float128")
     ]
-
-{-!
-deriving instance Binary AliasType
-deriving instance Binary DataFamily
-deriving instance Binary Constructor
-deriving instance Binary Slot
-!-}

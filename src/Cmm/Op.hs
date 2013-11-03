@@ -1,5 +1,5 @@
 {-# OPTIONS -funbox-strict-fields #-}
-{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
+{-# OPTIONS_GHC -pgmF drift-ghc -F #-}
 module Cmm.Op where
 
 import Data.Binary
@@ -93,6 +93,7 @@ data BinOp
     -- whether two values can be compared at all.
     | FOrdered
     deriving(Eq,Show,Ord,Read,Enum,Bounded)
+    {-! derive: Binary !-}
 
 data UnOp
     = Neg   -- ^ 2s compliment negation
@@ -121,6 +122,7 @@ data UnOp
     | Popcount -- ^ number of bits set to 1 in word
     | Parity   -- ^ number of bits set to 1 mod 2
     deriving(Eq,Show,Ord,Read,Enum,Bounded)
+    {-! derive: Binary !-}
 
 -- conversion ops
 
@@ -137,6 +139,7 @@ data ConvOp
     | U2U         -- ^ perform a 'Lobits' or a 'Zx' depending on the sizes of the arguments
     | B2B         -- ^ a nop, useful for coercing hints (bits 2 bits)
     deriving(Eq,Show,Ord,Read,Enum,Bounded)
+    {-! derive: Binary !-}
 
 data ValOp
     = NaN
@@ -145,12 +148,15 @@ data ValOp
     | PZero
     | NZero
     deriving(Eq,Show,Ord,Read,Bounded)
+    {-! derive: Binary !-}
 
 data ArchBits = BitsMax | BitsPtr | BitsUnknown
     deriving(Eq,Ord)
+    {-! derive: Binary !-}
 
 data TyBits = Bits {-# UNPACK #-} !Int | BitsArch !ArchBits |  BitsExt String
     deriving(Eq,Ord)
+    {-! derive: Binary !-}
 
 data TyHint
     = HintSigned
@@ -159,6 +165,7 @@ data TyHint
     | HintCharacter    -- a unicode character, implies unsigned
     | HintNone         -- no hint
     deriving(Eq,Ord)
+    {-! derive: Binary !-}
 
 data Ty
     = TyBits !TyBits !TyHint
@@ -166,6 +173,7 @@ data Ty
     | TyComplex Ty
     | TyVector !Int Ty
     deriving(Eq,Ord)
+    {-! derive: Binary !-}
 
 --runReadP :: ReadP a -> String -> Maybe a
 --runReadP rp s = case readP_to_S rp s of
@@ -249,6 +257,7 @@ data Op v
     | ValOp ValOp
     | ConvOp ConvOp v
     deriving(Eq,Show,Ord)
+    {-! derive: Binary !-}
 
 binopType :: BinOp -> Ty -> Ty -> Ty
 binopType Mulx  (TyBits (Bits i) h) _ = TyBits (Bits (i*2)) h
@@ -398,15 +407,3 @@ instance IsOperator (Op v) where
     isEagerSafe (UnOp o _) = isEagerSafe o
     isEagerSafe (ConvOp o _) = isEagerSafe o
     isEagerSafe _ = False
-
-{-!
-deriving instance Binary BinOp
-deriving instance Binary UnOp
-deriving instance Binary ConvOp
-deriving instance Binary ValOp
-deriving instance Binary ArchBits
-deriving instance Binary TyBits
-deriving instance Binary TyHint
-deriving instance Binary Ty
-deriving instance Binary Op
-!-}

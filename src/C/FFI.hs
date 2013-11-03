@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
+{-# OPTIONS_GHC -pgmF drift-ghc -F #-}
 module C.FFI(
     CallConv(..),
     Safety(..),
@@ -31,7 +31,4 @@ data FfiExport = FfiExport {
     ffiExportRetType  :: ExtType
     }
  deriving(Eq,Ord,Show,Typeable)
-
-{-!
-deriving instance Binary FfiExport
-!-}
+     {-! derive: Binary !-}

@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
+{-# OPTIONS_GHC -pgmF drift-ghc -F #-}
 module E.Demand(
     Demand(..),
     DemandSignature(..),
@@ -37,18 +37,23 @@ data Demand =
     | Error !SubDemand  -- diverges, might use arguments
     | Absent           -- Not used
     deriving(Eq,Ord,Typeable)
+        {-! derive: Binary !-}
 
 data SubDemand = None | Product ![Demand]
     deriving(Eq,Ord)
+        {-! derive: Binary !-}
 
 data DemandEnv = DemandEnv !(IdMap Demand) !Demand
     deriving(Eq,Ord)
+        {-! derive: Binary !-}
 
 data DemandType = (:=>) !DemandEnv ![Demand]
     deriving(Eq,Ord)
+        {-! derive: Binary !-}
 
 data DemandSignature = DemandSignature {-# UNPACK #-} !Int !DemandType
     deriving(Eq,Ord,Typeable)
+        {-! derive: Binary !-}
 
 idGlb = Absent
 
@@ -401,11 +406,3 @@ instance Show DemandEnv where
 
 instance Show DemandSignature where
     showsPrec _ (DemandSignature n dt) = showString "<" . shows n . showString "," . shows dt . showString ">"
-
-{-!
-deriving instance Binary Demand
-deriving instance Binary SubDemand
-deriving instance Binary DemandEnv
-deriving instance Binary DemandType
-deriving instance Binary DemandSignature
-!-}

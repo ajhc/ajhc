@@ -1,5 +1,5 @@
 {-# LANGUAGE NoMonoLocalBinds, NamedFieldPuns #-}
-{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
+{-# OPTIONS_GHC -pgmF drift-ghc -F #-}
 module FrontEnd.Class(
     printClassHierarchy,
     instanceToTopDecls,
@@ -67,6 +67,7 @@ data Inst = Inst {
     instHead    :: Qual Pred,
     instAssocs  :: [(Tycon,[Tyvar],[Tyvar],Sigma)]
     } deriving(Eq,Ord,Show)
+    {-! derive: Binary !-}
 
 instance PPrint a (Qual Pred) => PPrint a Inst where
     pprint Inst { instHead = h, instAssocs = [], instDerived = d } = (if d then text "*" else text " ") <> pprint h
@@ -86,6 +87,7 @@ data ClassType = ClassNormal | ClassTypeFamily | ClassDataFamily | ClassAlias
 -- Bool is true if data declaration instead of type declaration
 data AssociatedType = Assoc !Tycon !Bool [Tyvar] Kind
     deriving(Eq,Show)
+    {-! derive: Binary !-}
 
 data ClassRecord = ClassRecord {
     className    :: !Class, -- ^ can be a TypeConstructor if we are a type or data family
@@ -96,6 +98,7 @@ data ClassRecord = ClassRecord {
     classAssumps :: [(Name,Sigma)], -- ^ method signatures
     classAssocs  :: [AssociatedType]
     } deriving (Show,Eq)
+    {-! derive: Binary !-}
 
 newtype InstanceEnv = InstanceEnv {
     instanceEnv :: Map.Map (Name,Name) ([Tyvar],[Tyvar],Type) }
@@ -533,9 +536,3 @@ unaryPassDerivable = [
     class_Bounded
     ]
 -}
-
-{-!
-deriving instance Binary Inst
-deriving instance Binary AssociatedType
-deriving instance Binary ClassRecord
-!-}

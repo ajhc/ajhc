@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
+{-# OPTIONS_GHC -pgmF drift-ghc -F #-}
 {-# OPTIONS -funbox-strict-fields #-}
 -- |
 -- This module implements the Kind Inference algorithm, and the routines which
@@ -53,6 +53,7 @@ data KindEnv = KindEnv {
     kindEnvAssocs :: Map.Map Name (Int,Int),
     kindEnvClasses :: Map.Map Name [Kind]
     } deriving(Typeable,Show)
+        {-!derive: Monoid !-}
 
 instance Binary KindEnv where
     put KindEnv { kindEnv = a, kindEnvAssocs = b, kindEnvClasses = c } =
@@ -623,7 +624,3 @@ hoistType t = f t where
 fromHsTyVar (HsTyVar v) = return v
 fromHsTyVar (HsTyExpKind (Located _ t) _) = fromHsTyVar t
 fromHsTyVar _ = fail "fromHsTyVar"
-
-{-!
-deriving instance Monoid KindEnv
-!-}
