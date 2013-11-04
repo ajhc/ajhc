@@ -1,4 +1,5 @@
 {-# OPTIONS -w -funbox-strict-fields #-}
+{-# OPTIONS_GHC -pgmF drift-ghc -F #-}
 module Options(
     processOptions,
     Opt(..),
@@ -213,53 +214,7 @@ data Opt = Opt {
     optInis        ::  M.Map String String,    -- ^ options read from ini files
     optDumpSet     ::  S.Set FlagDump.Flag,    -- ^ Dump flags.
     optFOptsSet    ::  S.Set FlagOpts.Flag     -- ^ Flag options (-f\<opt\>).
-  }
-
--- Derive
-optAnnotate_s v =  optAnnotate_u  (const v)
-optAnnotate_u f r@Opt{optAnnotate  = x} = r{optAnnotate = f x}
-optArch_u f r@Opt{optArch  = x} = r{optArch = f x}
-optCCargs_u f r@Opt{optCCargs  = x} = r{optCCargs = f x}
-optColumns_s v =  optColumns_u  (const v)
-optColumns_u f r@Opt{optColumns  = x} = r{optColumns = f x}
-optCross_s v =  optCross_u  (const v)
-optCross_u f r@Opt{optCross  = x} = r{optCross = f x}
-optDefs_u f r@Opt{optDefs  = x} = r{optDefs = f x}
-optDeps_s v =  optDeps_u  (const v)
-optDeps_u f r@Opt{optDeps  = x} = r{optDeps = f x}
-optDump_u f r@Opt{optDump  = x} = r{optDump = f x}
-optExtensions_u f r@Opt{optExtensions  = x} = r{optExtensions = f x}
-optFOptsSet_u f r@Opt{optFOptsSet  = x} = r{optFOptsSet = f x}
-optFOpts_u f r@Opt{optFOpts  = x} = r{optFOpts = f x}
-optHlPath_u f r@Opt{optHlPath  = x} = r{optHlPath = f x}
-optHls_u f r@Opt{optHls  = x} = r{optHls = f x}
-optHoCache_s v =  optHoCache_u  (const v)
-optHoCache_u f r@Opt{optHoCache  = x} = r{optHoCache = f x}
-optIgnoreHo_s v =  optIgnoreHo_u  (const v)
-optIgnoreHo_u f r@Opt{optIgnoreHo  = x} = r{optIgnoreHo = f x}
-optIncdirs_u f r@Opt{optIncdirs  = x} = r{optIncdirs = f x}
-optIncs_u f r@Opt{optIncs  = x} = r{optIncs = f x}
-optKeepGoing_s v =  optKeepGoing_u  (const v)
-optKeepGoing_u f r@Opt{optKeepGoing  = x} = r{optKeepGoing = f x}
-optMainFunc_s v =  optMainFunc_u  (const v)
-optMainFunc_u f r@Opt{optMainFunc  = x} = r{optMainFunc = f x}
-optMode_s v =  optMode_u  (const v)
-optMode_u f r@Opt{optMode  = x} = r{optMode = f x}
-optNoAuto_s v =  optNoAuto_u  (const v)
-optNoAuto_u f r@Opt{optNoAuto  = x} = r{optNoAuto = f x}
-optNoWriteHo_s v =  optNoWriteHo_u  (const v)
-optNoWriteHo_u f r@Opt{optNoWriteHo  = x} = r{optNoWriteHo = f x}
-optOutName_s v =  optOutName_u  (const v)
-optOutName_u f r@Opt{optOutName  = x} = r{optOutName = f x}
-optStale_u f r@Opt{optStale  = x} = r{optStale = f x}
-optStatLevel_u f r@Opt{optStatLevel  = x} = r{optStatLevel = f x}
-optStop_s v =  optStop_u  (const v)
-optStop_u f r@Opt{optStop  = x} = r{optStop = f x}
-optVerbose_u f r@Opt{optVerbose  = x} = r{optVerbose = f x}
-optWorkDir_s v =  optWorkDir_u  (const v)
-optWorkDir_u f r@Opt{optWorkDir  = x} = r{optWorkDir = f x}
-optTargetsIni_s v =  optTargetsIni_u  (const v)
-optTargetsIni_u f r@Opt{optTargetsIni  = x} = r{optTargetsIni = f x}
+  } {-!derive: update !-}
 
 emptyOpt = Opt {
     optMode        = CompileExe,
