@@ -93,7 +93,7 @@ gc_mark_deeper(struct stack *stack, unsigned *number_redirects)
                         if(1 && (P_LAZY == GET_PTYPE(e->ptrs[i]))) {
                                 VALGRIND_MAKE_MEM_DEFINED(FROM_SPTR(e->ptrs[i]), sizeof(uintptr_t));
                                 if(!IS_LAZY(GETHEAD(FROM_SPTR(e->ptrs[i])))) {
-                                        *number_redirects++;
+                                        (*number_redirects)++;
                                         debugf(" *");
                                         e->ptrs[i] = (sptr_t)GETHEAD(FROM_SPTR(e->ptrs[i]));
                                 }
