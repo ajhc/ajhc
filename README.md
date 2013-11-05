@@ -53,33 +53,6 @@ Perhaps you can get internal overview with following compile flow image:
 
 ![](https://raw.github.com/ajhc/ajhc/arafura/docs/jhc_compile_flow.png)
 
-## Needing to install/build on Windows (experimental)
-
-### Install msys
-
-http://sourceforge.net/projects/mingw/files/Installer/mingw-get-inst/
-
-Install below.
-
-* C Compiler
-* MSYS Basic System
-* MinGW Developer ToolKit
-
-You should run cabal install on msys console.
-
-### Install Git for Windows
-
-http://msysgit.github.com/
-
-It's good choosing the below option.
-
-* "Checkout as-is, commit as-is"
-* "Run Git and included Unix tools from the Windows Command Prompt"
-
-### Install Haskell Platform
-
-http://www.haskell.org/platform/windows.html
-
 ## Future plan
 
 * No more depend on Perl (LWP and YAML).
