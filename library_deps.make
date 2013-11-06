@@ -76,4 +76,4 @@ bytestring-0.9.2.0.hl: lib/ext/bytestring.yaml haskell-extras-0.8.1.hl jhc-prim-
 	$(BUILD_EXTLIBS) $<
 JHC_EXT_LIBS = containers-0.3.0.0.hl Diff-0.2.0.hl html-1.0.1.2.hl HUnit-1.2.5.1.hl parsec-2.1.0.1.hl \
     pretty-1.0.1.2.hl QuickCheck-1.2.0.1.hl safe-0.3.3.hl smallcheck-0.6.1.hl xhtml-3000.2.1.hl \
-    transformers-0.2.1.0.hl filepath-1.3.0.1.hl deepseq-1.2.0.1.hl
+    transformers-0.2.1.0.hl filepath-1.3.0.1.hl deepseq-1.2.0.1.hl bytestring-0.9.2.0.hl
