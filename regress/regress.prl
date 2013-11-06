@@ -1,5 +1,5 @@
 #!/bin/sh
-ulimit -s 20480 # xxx Fix me: Too big stack for nofib.digits-of-e1 regress test.
+ulimit -s 30720 # xxx Fix me: Too big stack for nofib.digits-of-e1 regress test.
 exec /usr/bin/perl -x -S $0 ${1+"$@"}
 #!/usr/bin/perl
 
