@@ -206,7 +206,8 @@ sub run_test {
     }
     rlog "---- $name";
     my @ajhc  = $opt_p ? ("$ajhc_dir/ajhcp",'+RTS', "-S$rd/$name.jhcp_prof",@opt_rts,'-RTS')  :  ("$ajhc_dir/ajhc");
-    my @cmd = (@ajhc,"$cwd/$fn", ($verbose ? ('-v') : ()), ($opt_win ? ('-mwin32') : ()), @libs , @fast, '-o', "$rd/$name", @flags, @opts);
+    my $csrc = "--optc=\"$fbase.c\"" if -f "$fbase.c";
+    my @cmd = (@ajhc,"$cwd/$fn", ($verbose ? ('-v') : ()), ($opt_win ? ('-mwin32') : ()), ($csrc || ""), @libs , @fast, '-o', "$rd/$name", @flags, @opts);
     my $res = join(" ",@cmd) . " > '$rd/$name.jhc_out' 2>&1";
     my ($r,$time) = my_system $res;
     my $result = { name => $name, compile_command => $res, compile_status => $r, compile_results => "$rd/$name.jhc_out", compile_time => $time };
