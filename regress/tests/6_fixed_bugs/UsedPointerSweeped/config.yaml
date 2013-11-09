@@ -1,0 +1,1 @@
+jhc_flags: --optc="-D_JHC_JGC_NAIVEGC=1" -fffi

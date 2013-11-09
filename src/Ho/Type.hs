@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
+{-# OPTIONS_GHC -pgmF drift-ghc -F #-}
 module Ho.Type where
 
 import Data.Monoid
@@ -67,6 +67,7 @@ data CollectedHo = CollectedHo {
     choHo :: Ho, -- ^ cache of combined and renamed ho
     choVarMap :: IdMap (Maybe E) -- ^ cache of variable substitution map
     }
+    {-! derive: update !-}
 
 -- | The header contains basic information about the file, it should be enough to determine whether
 -- we can discard the file right away or consider it further.
@@ -129,6 +130,7 @@ data HoTcInfo = HoTcInfo {
     hoClassHierarchy :: ClassHierarchy,
     hoFieldMap :: FieldMap
     }
+    {-! derive: update, Monoid !-}
 
 data HoBuild = HoBuild {
     -- | Filled in by E generation
@@ -136,12 +138,14 @@ data HoBuild = HoBuild {
     hoEs :: [(TVr,E)],
     hoRules :: Rules
     }
+    {-! derive: update, Monoid !-}
 
 data Ho = Ho {
     hoModuleGroup :: ModuleGroup,
     hoTcInfo :: HoTcInfo,
     hoBuild :: HoBuild
     }
+    {-! derive: update !-}
 
 instance Monoid Ho where
     mempty = Ho (error "unknown module group") mempty mempty
@@ -181,12 +185,3 @@ instance Monoid HoBuild where
     }
 
  -}
-
-{-!
-deriving instance Update CollectedHo
-deriving instance Update HoTcInfo
-deriving instance Monoid HoTcInfo
-deriving instance Update HoBuild
-deriving instance Monoid HoBuild
-deriving instance Update Ho
-!-}

@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
+{-# OPTIONS_GHC -pgmF drift-ghc -F #-}
 module E.SSimplify(
     Occurance(..),
     cacheSimpOpts,
@@ -370,6 +370,7 @@ data Env = Env {
     envInScope :: IdMap Binding,
     envInScopeCache :: IdMap E
     }
+    {-! derive: Monoid !-}
 
 envSubst_u f r@Env{envSubst  = x} = r{envSubst = f x}
 envSubst_s v =  envSubst_u  (const v)
@@ -1080,7 +1081,3 @@ smAddBoundNamesIdSet nset = --trace ("addBoundNamesIdSet: "++show (size nset)) $
    do modifyIds (\ (used,bound) -> (nset `union` used, nset `union` bound) )
 
 --smAddBoundNamesIdMap = smAddNamesIdSet . idMapToIdSet
-
-{-!
-deriving instance Monoid Env
-!-}

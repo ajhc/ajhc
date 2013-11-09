@@ -15,6 +15,7 @@ import Jhc.Prim.Prim
 import Jhc.Prim.Rts
 import Jhc.Type.Basic
 import Jhc.Basics
+import Jhc.Order
 
 type FinalizerPtr  a = FunPtr (Ptr a -> IO ())
 
@@ -22,6 +23,12 @@ type FinalizerPtr  a = FunPtr (Ptr a -> IO ())
 -- location. The actual ForeignPtr heap location may contain more than the
 -- single BitsPtr_ argument.
 data ForeignPtr a = FP BitsPtr_
+
+instance Eq (ForeignPtr a) where
+    p == q  =  unsafeForeignPtrToPtr p == unsafeForeignPtrToPtr q
+
+instance Ord (ForeignPtr a) where
+    compare p q  =  compare (unsafeForeignPtrToPtr p) (unsafeForeignPtrToPtr q)
 
 -- | This function creates a plain ForeignPtr from a Ptr, a plain foreignptr
 -- may not have finalizers associated with it, hence this function may be pure.

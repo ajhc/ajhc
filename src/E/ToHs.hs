@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
+{-# OPTIONS_GHC -pgmF drift-ghc -F #-}
 module E.ToHs(compileToHs) where
 
 import Char
@@ -159,6 +159,7 @@ emptyEnvironment = Env {
     }
 
 data Collect = Coll { collNames :: Set.Set (Name,Int,Bool), collPrims :: Set.Set Prim }
+    {-! derive: Monoid !-}
 
 newtype TM a = TM { fromTM :: RWST Environment Collect Int IO a }
     deriving(MonadState Int,MonadReader Environment,MonadWriter Collect,Monad,Functor,MonadIO)
@@ -483,7 +484,3 @@ mangleIdent xs =  concatMap f xs where
         f '_' = "_u"
         f c | isAlphaNum c = [c]
         f c = '_':'x':showHex (ord c) ""
-
-{-!
-deriving instance Monoid Collect
-!-}

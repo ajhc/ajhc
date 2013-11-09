@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
+{-# OPTIONS_GHC -pgmF drift-ghc -F #-}
 module Grin.SSimplify(simplify,explicitRecurse) where
 
 import Control.Monad.Identity
@@ -41,6 +41,7 @@ data SEnv = SEnv {
     envPapp  :: IM.IntMap (Atom,[Val])
     --envPush  :: IM.IntMap Exp
     }
+    {-! derive: Monoid !-}
 
 newtype SState = SState { usedVars :: IS.IntSet }
 
@@ -48,6 +49,7 @@ data SCol = SCol {
     colStats :: Stats.Stat,
     colFreeVars :: GSet Var
     }
+    {-! derive: Monoid !-}
 
 {-
 data ExpInfo = ExpInfo {
@@ -428,8 +430,3 @@ explicitRecurse grin =  mapGrinFuncsM f grin where
             g (App n rs t) | n == name = App nname rs t
             g e = tickle g e
         return $ as :-> grinLet [createFuncDef True nname (as :-> g e) ] (App nname as (getType e))
-
-{-!
-deriving instance Monoid SCol
-deriving instance Monoid SEnv
-!-}

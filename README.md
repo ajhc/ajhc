@@ -13,11 +13,12 @@ This project is founded by [Metasepi Project](http://metasepi.org/).
 ## How to install
 
     $ sudo apt-get install haskell-platform libncurses5-dev gcc m4
+    $ cabal install drift
     $ cabal install ajhc
 
 ## How to build latest version
 
-    $ sudo apt-get install make locales autoconf haskell-derive-utils \
+    $ sudo apt-get install make locales autoconf drift \
       libconfig-yaml-perl graphviz haskell-platform cpphs pandoc hscolour po4a \
       libghc-temporary-dev libghc-haskeline-dev libghc-utf8-string-dev libghc-hssyck-dev \
       libghc-test-framework-th-dev libghc-test-framework-hunit-dev \
@@ -52,33 +53,6 @@ Perhaps you can get internal overview with following compile flow image:
 
 ![](https://raw.github.com/ajhc/ajhc/arafura/docs/jhc_compile_flow.png)
 
-## Needing to install/build on Windows (experimental)
-
-### Install msys
-
-http://sourceforge.net/projects/mingw/files/Installer/mingw-get-inst/
-
-Install below.
-
-* C Compiler
-* MSYS Basic System
-* MinGW Developer ToolKit
-
-You should run cabal install on msys console.
-
-### Install Git for Windows
-
-http://msysgit.github.com/
-
-It's good choosing the below option.
-
-* "Checkout as-is, commit as-is"
-* "Run Git and included Unix tools from the Windows Command Prompt"
-
-### Install Haskell Platform
-
-http://www.haskell.org/platform/windows.html
-
 ## Future plan
 
 * No more depend on Perl (LWP and YAML).
@@ -88,3 +62,9 @@ http://www.haskell.org/platform/windows.html
 * Write Linux kernel driver with Haskell.
 * Get smaller RTS. Benchmark the RTS for running on custom FPGA CPU.
 * Start rewritng NetBSD kernel with Ajhc.
+
+## License
+
+* Runtime: [MIT License](https://github.com/ajhc/ajhc/blob/master/rts/LICENSE)
+* Haskell libraries: [MIT License](https://github.com/ajhc/ajhc/blob/master/lib/LICENSE)
+* The others: [GPLv2 or Later](https://github.com/ajhc/ajhc/blob/arafura/COPYING)
