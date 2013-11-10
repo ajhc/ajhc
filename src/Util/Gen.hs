@@ -6,6 +6,7 @@ import Control.Monad.Writer
 import Data.List
 import Data.Maybe
 import System.Directory
+import Control.Applicative
 import Text.ParserCombinators.ReadP
 
 import GenUtil hiding(replicateM, intercalate)
