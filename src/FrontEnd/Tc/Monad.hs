@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
+{-# OPTIONS_GHC -pgmF drift-ghc -F #-}
 module FrontEnd.Tc.Monad(
     CoerceTerm(..),
     Tc(),
@@ -122,6 +122,7 @@ data Output = Output {
     tcWarnings       :: !(Seq.Seq Warning),
     outKnots         :: [(Name,Name)]
     }
+   {-! derive: Monoid !-}
 
 newtype Tc a = Tc (ReaderT TcEnv (WriterT Output IO) a)
     deriving(MonadFix,MonadIO,MonadReader TcEnv,MonadWriter Output,Functor)
@@ -560,7 +561,3 @@ withMetaVars mv ks sfunc bsfunc  = do
     taus <- mapM (newMetaVar Tau) ks
     varBind mv (sfunc taus)
     bsfunc taus
-
-{-!
-deriving instance Monoid Output
-!-}

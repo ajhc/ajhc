@@ -1,8 +1,9 @@
-{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
+{-# OPTIONS_GHC -pgmF drift-ghc -F #-}
 module Name.VConsts where
 
 import Control.Applicative
 import Data.Foldable
+import Data.Monoid
 import Data.Traversable
 
 -- This is much more verbose/complicated than it needs be.
@@ -75,9 +76,4 @@ data FuncNames a = FuncNames {
     func_runNoWrapper :: a,
     func_runRaw :: a
     }
-
-{-!
-deriving instance Functor FuncNames
-deriving instance Traversable FuncNames
-deriving instance Foldable FuncNames
-!-}
+    {-! derive: Functor, Traversable, Foldable !-}

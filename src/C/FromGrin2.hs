@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings, RecordWildCards, ViewPatterns #-}
-{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
+{-# OPTIONS_GHC -pgmF drift-ghc -F #-}
 module C.FromGrin2(compileGrin) where
 
 import Control.Monad.Identity
@@ -42,7 +42,7 @@ import qualified FlagOpts as FO
 -- C Monad
 ---------------
 
-data Todo = TodoReturn | TodoExp [Expression] | TodoDecl Name Type | TodoNothing
+data Todo = TodoReturn | TodoReturnVoid | TodoExp [Expression] | TodoDecl Name Type | TodoNothing
 
 data Written = Written {
     wRequires :: Requires,
@@ -52,6 +52,7 @@ data Written = Written {
     wEnums :: Map.Map Name Int,
     wFunctions :: Map.Map Name Function
     }
+    {-! derive: Monoid !-}
 
 -- special type representations when possible
 data TyRep
@@ -194,7 +195,6 @@ compileGrin grin = (LBS.fromChunks code, req)  where
 
 convertFunc :: Maybe FfiExport -> (Atom,Lam) -> C [Function]
 convertFunc ffie (n,as :-> body) = do
-        s <- localTodo TodoReturn (convertBody body)
         let bt = getType body
             mmalloc [TyINode] = [a_MALLOC]
             mmalloc [TyNode] = [a_MALLOC]
@@ -203,6 +203,8 @@ convertFunc ffie (n,as :-> body) = do
             fnname = nodeFuncName n
 
         fr <- convertTypes bt
+        s <- localTodo (if fr == voidType then TodoReturnVoid else TodoReturn) (convertBody body)
+
         as' <- flip mapM (zip [1 :: Int .. ] as) $ \ (ix,(Var v t)) -> do
             t' <- convertType t
             return $ if v == v0 then (name $ 'u':show ix,t') else (varName v,t')
@@ -359,6 +361,7 @@ convertBody Let { expDefs = defs, expBody = body } = do
     todo <- asks rTodo
     case todo of
         TodoReturn -> return (ss & mconcat rs);
+        TodoReturnVoid -> return (ss & mconcat rs);
         _ -> return (ss & goto done & mconcat (intersperse (goto done) rs) & label done);
 convertBody (e :>>= [] :-> e') = do
     ss <- localTodo TodoNothing (convertBody e)
@@ -460,6 +463,9 @@ convertBody (Error s t) = do
         TodoReturn -> do
             v <- g t
             return (jerr & creturn v)
+        TodoReturnVoid -> do
+            v <- g t
+            return (jerr & v & creturn emptyExpression)
 
 convertBody (BaseOp (StoreNode b) [n@NodeC {}]) = newNode region_heap (bool b wptr_t sptr_t) n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
 convertBody (BaseOp (StoreNode b) [n@NodeC {},region]) = newNode region (bool b wptr_t sptr_t) n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
@@ -540,6 +546,7 @@ simpleRet er = do
     x <- asks rTodo
     case x of
         TodoReturn -> return (creturn er)
+        TodoReturnVoid -> return (er & creturn emptyExpression)
         _ | isEmptyExpression er -> return mempty
         TodoNothing -> return (toStatement er)
         TodoExp [v] -> return (v =* er)
@@ -1022,7 +1029,3 @@ x =:: y = newTmpVar y x
 
 basicType' :: ExtType -> Type
 basicType' b = basicType (show b)
-
-{-!
-deriving instance Monoid Written
-!-}

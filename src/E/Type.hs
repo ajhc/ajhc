@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -F -pgmFderive -optF-F #-}
+{-# OPTIONS_GHC -pgmF drift-ghc -F #-}
 -- | The definitions related to jhc core
 
 module E.Type where
@@ -111,6 +111,7 @@ data ARules = ARules {
 data Lit e t = LitInt { litNumber :: Number, litType :: t }
     | LitCons  { litName :: Name, litArgs :: [e], litType :: t, litAliasFor :: Maybe E }
     deriving(Eq,Ord,Functor,Foldable,Traversable)
+        {-!derive: is !-}
 
 --------------------------------------
 -- Lambda Cube (it's just fun to say.)
@@ -129,6 +130,7 @@ data ESort =
     | EStarStar   -- ^ the supersort of boxed types
     | ESortNamed Name -- ^ user defined sorts
     deriving(Eq, Ord)
+    {-! derive: is !-}
 
 data E = EAp E E
     | ELam TVr E
@@ -149,6 +151,7 @@ data E = EAp E E
        eCaseAllFV  :: IdSet
        }
 	deriving(Eq, Ord)
+    {-! derive: is, from !-}
 
 --instance Functor (Lit e) where
 --    fmap f x = runIdentity $ fmapM (return . f) x
@@ -180,11 +183,7 @@ instance Show a => Show (TVr' a) where
 type TVr = TVr' E
 data TVr' e = TVr { tvrIdent :: !Id, tvrType :: e, tvrInfo :: Info.Info }
     deriving(Functor,Foldable,Traversable)
-
-tvrInfo_u f r@TVr{tvrInfo  = x} = r{tvrInfo = f x}
-tvrType_u f r@TVr{tvrType  = x} = r{tvrType = f x}
-tvrInfo_s v =  tvrInfo_u  (const v)
-tvrType_s v =  tvrType_u  (const v)
+        {-!derive: update !-}
 
 data Alt e = Alt (Lit TVr e) e
     deriving(Eq,Ord)
@@ -256,10 +255,3 @@ tVr x y = tvr { tvrIdent = x, tvrType = y }
 tvr = TVr { tvrIdent = emptyId, tvrType = Unknown, tvrInfo = Info.empty }
 
 --  Imported from other files :-
-
-{-!
-deriving instance Is Lit
-deriving instance Is ESort
-deriving instance Is E
-deriving instance From E
-!-}
