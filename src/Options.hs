@@ -377,7 +377,7 @@ processOptions = do
         _ -> return ()
     -- read targets.ini file
     cabalEtc <- getDataFileNameMaybe "etc"
-    Just home <- fmap (`mplus` Just "/") $ lookupEnv "HOME"
+    home <- fmap (++ "/") getHomeDirectory
     let fromMaybeToList Nothing  = []
         fromMaybeToList (Just s) = [s]
         oTarget = fromMaybeToList $ optTargetsIni o
@@ -416,7 +416,7 @@ findHoCache = do
         Just s -> do return (Just s)
         Just "-" -> do return Nothing
         Nothing | isNothing (optHoDir options) -> do
-            Just home <- fmap (`mplus` Just "/") $ lookupEnv "HOME"
+            home <- fmap (++ "/") getHomeDirectory
             let cd = home ++ "/.ajhc/cache"
             createDirectoryIfMissing True cd
             return (Just cd)
@@ -497,7 +497,7 @@ initialIncludes = unsafePerformIO $ do
 initialLibIncludes :: [String]
 initialLibIncludes = unsafePerformIO $ do
     ps <- lookupEnv "AJHC_LIBRARY_PATH"
-    h <- lookupEnv "HOME"
+    h <- fmap return getHomeDirectory
     let paths = h ++ ["/usr/local","/usr"]
         bases = ["/lib","/share"]
         vers = ["/ajhc-" ++ shortVersion, "/ajhc"]

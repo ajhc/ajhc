@@ -55,6 +55,7 @@ Perhaps you can get internal overview with following compile flow image:
 
 ## Future plan
 
+* Benchmark (speed, memory size, compare with eLua/mruby/.NET Micro Framework)
 * No more depend on Perl (LWP and YAML).
 * Port Haskell libraries on haskell-platform to Ajhc.
 * Understand jhc's region inference.

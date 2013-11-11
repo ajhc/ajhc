@@ -6,6 +6,7 @@ import Control.Monad.Writer
 import Data.List
 import Data.Maybe
 import System.Directory
+import Control.Applicative
 import Text.ParserCombinators.ReadP
 
 import GenUtil hiding(replicateM, intercalate)
@@ -36,12 +37,11 @@ shortenPath :: String -> IO String
 shortenPath x@('/':_) = do
     cd <- getCurrentDirectory
     pwd <- lookupEnv "PWD"
-    h <- lookupEnv "HOME"
+    h <- getHomeDirectory
     let f d = do
-            d <- d
             '/':rest <- getPrefix d x
             return rest
-    return $ fromJust $ f (return cd) `mplus` f pwd `mplus` liftM ("~/" ++) (f h) `mplus` return x
+    return $ fromMaybe x $ f cd <|> (>>=f) pwd <|> liftM ("~/" ++) (f h)
 shortenPath x = return x
 
 maybeDo :: Monad m => Maybe (m a) -> (m ())
