@@ -104,7 +104,9 @@ twiddleExp e = f e where
     f l@Let {} = do
         ds <- twiddle (expDefs l)
         b <- twiddle (expBody l)
-        return . updateLetProps $ l { expDefs = ds, expBody = b }
+        roots <- asks envRoots
+        let nroots = Set.fromList [ Var v t | (v,t) <- Set.toList (freeVars l), isNode t, v > v0] Set.\\ roots
+        return $ gcRoots (Set.toList nroots) (updateLetProps $ l { expDefs = ds, expBody = b })
     f (App a vs t) | fopts FO.Jgc = do
         roots <- asks envRoots
         let nroots = Set.fromList [ Var v t | x <- vs, (v,t) <- Set.toList (freeVars x), isNode t, v > v0] Set.\\ roots
