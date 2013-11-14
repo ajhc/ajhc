@@ -1,0 +1,105 @@
+% AjhcHaskellCompiler-KA.tex
+\begin{hcarentry}[new,section]{Ajhc Haskell Compiler}
+\report{Kiwamu Okabe}%11/13
+\status{experimental}
+\participants{John Meacham, Hiroki MIZUNO, Hidekazu SEGAWA}
+\makeheader
+
+\subsubsection*{What is it?}
+
+Ajhc is a Haskell compiler, and acronym for ``A fork of jhc''.
+
+Jhc (\url{http://repetae.net/computer/jhc/}) converts Haskell code into pure C language code running with jhc's runtime. And the runtime is written with 3000 lines (include comments) pure C code. It's a magic!
+
+Ajhc's mission is to keep contribution to jhc in the repository. Because the upstream author of jhc, John Meacham, can't pull the contribution speedily. (I think he is too busy to do it.) We should feedback jhc any changes. Also Ajhc aims to provide the Metasepi project with a method to rewrite NetBSD kernel using Haskell. The method is called Snatch-driven development.
+
+Ajhc is, so to speak, an accelerator to develop jhc.
+
+\WhatsNew
+
+\noindent Runtime:
+
+Ajhc now has thread-safe and reentrant runtime.
+The runtime supports pthread and custom thread
+that can shape forkOS API on tiny CPU with ChibiOS/RT.
+(\url{https://github.com/metasepi/chibios-arafura})
+
+\Separate
+
+\noindent GC:
+
+New Erlang style GC. It means Ajhc's Haskell context has own GC heap.
+Also new GC can run on tiny CPU such as Cortex-M3 with 64kB RAM.
+
+\Separate
+
+\noindent Document:
+
+We have translated Jhc User's Manual into Japanese.
+The translating into the other language will be also easy,
+because the translaters are using gettext.
+
+\noindent (\url{https://github.com/ajhc/ajhc/blob/arafura/po/ja.po})
+
+\subsubsection*{Demonstrations}
+
+\noindent \url{http://www.youtube.com/watch?v=n6cepTfnFoo}
+
+The touchable cube application is written with Haskell and compiled by Ajhc.
+In the demo, the application is breaked by ndk-gdb debugger when running GC.
+You could watch the demo source code at \url{https://github.com/ajhc/demo-android-ndk}.
+
+\Separate
+
+\noindent \url{http://www.youtube.com/watch?v=C9JsJXWyajQ}
+
+The demo is running code that compiled with Ajhc on Cortex-M3 board, mbed. It's a simple RSS reader for reddit.com, showing the RSS titles on Text LCD panel. You could watch the demo detail and source code at \url{https://github.com/ajhc/demo-cortex-m3}.
+
+\Separate
+
+\noindent \url{http://www.youtube.com/watch?v=zkSy0ZroRIs}
+
+The demo is running Haskell code without any OS.
+Also the clock exception handler is written with Haskell.
+
+\subsubsection*{Usage}
+
+You can install Ajhc from Hackage.
+
+\begin{verbatim}
+$ cabal install ajhc
+$ ajhc --version
+ajhc 0.8.0.9 (9c264872105597700e2ba403851cf3b
+236cb1646)
+compiled by ghc-7.6 on a x86_64 running linux
+$ echo 'main = print "hoge"' > Hoge.hs
+$ ajhc Hoge.hs
+$ ./hs.out
+"hoge"
+\end{verbatim}
+
+Please read ``Ajhc User's Manual'' to know more detail. (\url{http://ajhc.metasepi.org/manual.html})
+
+\FuturePlans
+
+Fix many BUGs. Try to rewrite (snatch) NetBSD kernel driver with Haskell. If we have luck, will port some library like array or vector from GHC world. After that, we are going to report back about developing Ajhc.
+
+\subsubsection*{License}
+
+GPL2 or later.
+
+\Contact
+  \begin{compactitem}
+    \item Mailing list: \url{http://groups.google.com/group/metasepi}
+    \item Bug tracker: \url{https://github.com/ajhc/ajhc/issues}
+    \item Metasepi team: \url{https://github.com/ajhc?tab=members}
+  \end{compactitem}
+
+\FurtherReading
+  \begin{compactitem}
+    \item Ajhc -- Haskell everywhere: \url{http://ajhc.metasepi.org/}
+    \item jhc: \url{http://repetae.net/computer/jhc/}
+    \item Metasepi: Project \url{http://metasepi.org/}
+    \item Snatch-driven-development: \url{http://www.slideshare.net/master\_q/20131020-osc-tokyoajhc}
+  \end{compactitem}
+\end{hcarentry}
