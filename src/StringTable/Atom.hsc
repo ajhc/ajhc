@@ -83,7 +83,8 @@ instance ToAtom Char where
 instance ToAtom CStringLen where
     toAtomIO (cs,len) = do
         if (len > (#const MAX_ENTRY_SIZE))
-            then fail "StringTable: atom is too big"
+            then do s <- peekCString cs
+                    fail $ "StringTable: atom is too big \"" ++ s ++ "\""
             else stAdd cs (fromIntegral len)
 
 instance ToAtom CString where
