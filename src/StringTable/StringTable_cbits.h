@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define MAX_ENTRY_SIZE 256
+#define MAX_ENTRY_SIZE 512
 #define VALID_BITMASK 0x1
 
 // always shift, then mask
