@@ -27,20 +27,22 @@ static void clear_used_bits(arena_t arena) A_UNUSED;
 static void s_cleanup_blocks(arena_t arena);
 static struct s_block *get_free_block(gc_t gc, arena_t arena, bool retry);
 static void *jhc_aligned_alloc(unsigned size);
+struct s_megablock *s_new_megablock(arena_t arena);
+void hs_foreignptr_env_helper(HsPtr env, HsPtr arg);
 
 static const void *nh_start, *nh_end;
 
 static bool
 gc_check_heap(entry_t *s)
 {
-        return (s < (entry_t *)nh_start || s > (entry_t *)nh_end);
+        return (s < (const entry_t *)nh_start || s > (const entry_t *)nh_end);
 }
 
 static void
 stack_grow(struct stack *s, unsigned grow)
 {
         s->size += grow;
-        s->stack = realloc(s->stack, sizeof(s->stack[0])*s->size);
+        s->stack = (entry_t **) realloc(s->stack, sizeof(s->stack[0])*s->size);
         assert(s->stack);
         debugf("stack:");
         for(unsigned i = 0; i < s->ptr; i++) {
@@ -255,7 +257,6 @@ jhc_alloc_fini(gc_t gc,arena_t arena) {
                 jhc_printf_stderr("arena: %p\n", arena);
                 jhc_printf_stderr("  block_used: %i\n", arena->block_used);
                 jhc_printf_stderr("  block_threshold: %i\n", arena->block_threshold);
-                struct s_cache *sc;
                 SLIST_FOREACH(sc,&arena->caches,next)
                         print_cache(sc);
         }
@@ -311,7 +312,7 @@ s_monoblock(arena_t arena, unsigned size, unsigned nptrs, unsigned flags) {
         b->u.m.num_ptrs = nptrs;
         SLIST_INSERT_HEAD(&arena->monolithic_blocks, b, link);
         b->used[0] = 1;
-        return (void *)b + b->color*sizeof(uintptr_t);
+        return (void *)(b + b->color*sizeof(uintptr_t));
 }
 
 // Allocate an array of count garbage collectable locations in the garbage
@@ -441,7 +442,7 @@ get_free_block(gc_t gc, arena_t arena, bool retry) {
                 if(__predict_false(!arena->current_megablock))
                         arena->current_megablock = s_new_megablock(arena);
                 struct s_megablock *mb = arena->current_megablock;
-                struct s_block *pg = mb->base + BLOCK_SIZE*mb->next_free;
+                struct s_block *pg = (struct s_block *)((char *)mb->base + BLOCK_SIZE*mb->next_free);
                 mb->next_free++;
                 if(mb->next_free == MEGABLOCK_SIZE / BLOCK_SIZE) {
                         SLIST_INSERT_HEAD(&arena->megablocks,mb, next);

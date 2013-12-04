@@ -3,19 +3,19 @@
 static jhc_mutex_t jhc_rts_mutex;
 
 void
-jhc_conc_init()
+jhc_conc_init(void)
 {
         jhc_mutex_init(&jhc_rts_mutex);
 }
 
 void
-jhc_rts_lock()
+jhc_rts_lock(void)
 {
         jhc_mutex_lock(&jhc_rts_mutex);
 }
 
 void
-jhc_rts_unlock()
+jhc_rts_unlock(void)
 {
         jhc_mutex_unlock(&jhc_rts_mutex);
 }

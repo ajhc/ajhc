@@ -14,14 +14,14 @@ char **jhc_argv;
 char *jhc_progname;
 
 #ifdef __WIN32__
-A_UNUSED char *jhc_options_os =  "mingw32";
-A_UNUSED char *jhc_options_arch = "i386";
+A_UNUSED const char *jhc_options_os =  "mingw32";
+A_UNUSED const char *jhc_options_arch = "i386";
 #elif defined(__ARM_EABI__)
-A_UNUSED char *jhc_options_os =  "nds";
-A_UNUSED char *jhc_options_arch = "ARM";
+A_UNUSED const char *jhc_options_os =  "nds";
+A_UNUSED const char *jhc_options_arch = "ARM";
 #else
-A_UNUSED char *jhc_options_os = "(unknown os)";
-A_UNUSED char *jhc_options_arch = "(unknown arch)";
+A_UNUSED const char *jhc_options_os = "(unknown os)";
+A_UNUSED const char *jhc_options_arch = "(unknown arch)";
 #endif
 
 void
@@ -40,7 +40,7 @@ jhc_exit(int n) {
 }
 
 void  A_NORETURN A_UNUSED  A_COLD
-jhc_error(char *s) {
+jhc_error(const char *s) {
         jhc_fflush_stdout();
         jhc_fputs_stderr(s);
         jhc_fputs_stderr("\n");
@@ -70,8 +70,8 @@ hs_init(int *argc, char **argv[])
 #if JHC_isPosix
                 struct utsname jhc_utsname;
                 if(!uname(&jhc_utsname)) {
-                        jhc_options_arch = jhc_utsname.machine;
-                        jhc_options_os   = jhc_utsname.sysname;
+                        jhc_options_arch = (const char *) jhc_utsname.machine;
+                        jhc_options_os   = (const char *) jhc_utsname.sysname;
                 }
 #endif
                 setlocale(LC_ALL,"");
