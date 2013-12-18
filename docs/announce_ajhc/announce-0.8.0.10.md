@@ -3,7 +3,7 @@ To: jhc@haskell.org, haskell-cafe@haskell.org, metasepi@googlegroups.com
 
 We are happy to announce Ajhc 0.8.0.10 as Christmas release!
 
-You can get Ajhc using "cabal install ajhc" command.
+You can get Ajhc using "cabal install drift && cabal install ajhc" command.
 The usage is found at Ajhc's project web site http://ajhc.metasepi.org/.
 The source code at https://github.com/ajhc/ajhc.
 
