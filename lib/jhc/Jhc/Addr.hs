@@ -25,12 +25,12 @@ INST_EQORDER((Ptr a),Ptr,Addr_,U)
 INST_EQORDER((FunPtr a),FunPtr,FunAddr_,U)
 
 {-# INLINE plusPtr #-}
-plusPtr :: Ptr a -> Int -> Ptr a
+plusPtr :: Ptr a -> Int -> Ptr b
 plusPtr (Ptr addr) off = case unboxInt off of
     off_ -> Ptr (addr `plusWordPtr` intToPtr__ off_)
 
 {-# INLINE minusPtr #-}
-minusPtr :: Ptr a -> Ptr a -> Int
+minusPtr :: Ptr a -> Ptr b -> Int
 minusPtr (Ptr a1) (Ptr a2) = boxInt (a1 `minusWP` a2)
 
 foreign import primitive "Sx" intToPtr__ :: Int__ -> Addr_
