@@ -32,6 +32,14 @@ typedef void *HsStablePtr;
 #define HS_BOOL_FALSE 0
 #define HS_BOOL_TRUE 1
 
+static inline int hs_peekbool(bool *b) {
+	return (false == (*b) ? HS_BOOL_FALSE : HS_BOOL_TRUE);
+}
+
+static inline void hs_pookbool(bool *b, int v) {
+	(*b) = (HS_BOOL_FALSE == v ? false : true);
+}
+
 void hs_init (int *argc, char **argv[]);
 void hs_exit (void);
 void hs_set_argv(int argc, char *argv[]);

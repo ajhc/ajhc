@@ -103,6 +103,19 @@ fromBool True   = 1
 toBool :: Num a => a -> Bool
 toBool  = (/= 0)
 
+-- |Storable Bool
+foreign import ccall "HsFFI.h hs_peekbool" c_hs_peekbool :: Ptr Bool -> IO Int
+foreign import ccall "HsFFI.h hs_pookbool" c_hs_pookbool :: Ptr Bool -> Int -> IO ()
+foreign import primitive "sizeOf.bits<bool>" sizeOfBool :: Int__ -> Int__
+foreign import primitive "alignmentOf.bits<bool>" alignmentOfBool :: Int__ -> Int__
+
+instance Storable Bool where
+    sizeOf     _ = Int (sizeOfBool 0#)
+    alignment  _ = Int (alignmentOfBool 0#)
+    peek p       = do i <- c_hs_peekbool p
+                      return $ toBool i
+    poke p       = c_hs_pookbool p . fromBool
+
 -- marshalling of Maybe values
 -- ---------------------------
 
