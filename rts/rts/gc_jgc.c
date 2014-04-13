@@ -183,7 +183,9 @@ gc_perform_gc(gc_t gc, arena_t arena)
         debugf("\n");
 
         gc_mark_deeper(&stack, &number_redirects); // Final marking
-        free(stack.stack);
+        if (stack.stack != NULL) {
+                free(stack.stack);
+        }
         s_cleanup_blocks(arena);
         if (JHC_STATUS) {
                 jhc_printf_stderr("%3u - %6u Used: %4u Thresh: %4u Ss: %5u Ps: %5u Rs: %5u Root: %3u\n",
