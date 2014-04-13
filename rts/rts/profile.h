@@ -33,7 +33,7 @@
 // void A_UNUSED profile_print_header(FILE *file, char *value_unit);
 void A_COLD jhc_print_profile(void);
 
-#if _JHC_PROFILE
+#if _JHC_PROFILE || _JHC_PROFILE_GCONLY
 struct profile_stack;
 extern struct profile_stack gc_alloc_time;
 extern struct profile_stack gc_gc_time;
@@ -44,6 +44,9 @@ void jhc_profile_pop(struct profile_stack *ps);
 #else
 #define profile_push(x)          do { } while(0)
 #define profile_pop(x)           do { } while(0)
+#endif
+
+#if !_JHC_PROFILE
 #define alloc_count(x,y)         do { } while(0)
 #define print_alloc_size_stats() do { } while(0)
 #endif
