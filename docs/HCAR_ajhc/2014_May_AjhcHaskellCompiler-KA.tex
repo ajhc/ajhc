@@ -2,7 +2,7 @@
 \begin{hcarentry}[new,section]{Ajhc Haskell Compiler}
 \report{Kiwamu Okabe}%11/13
 \status{experimental}
-\participants{John Meacham, Hiroki MIZUNO, Hidekazu SEGAWA}
+\participants{John Meacham, Hiroki MIZUNO, Hidekazu SEGAWA, Takayuki Muranushi}
 \makeheader
 
 \subsubsection*{What is it?}
@@ -11,37 +11,30 @@ Ajhc is a Haskell compiler, and acronym for ``A fork of jhc''.
 
 Jhc (\url{http://repetae.net/computer/jhc/}) converts Haskell code into pure C language code running with jhc's runtime. And the runtime is written with 3000 lines (include comments) pure C code. It's a magic!
 
-Ajhc's mission is to keep contribution to jhc in the repository. Because the upstream author of jhc, John Meacham, can't pull the contribution speedily. (I think he is too busy to do it.) We should feedback jhc any changes. Also Ajhc aims to provide the Metasepi project with a method to rewrite NetBSD kernel using Haskell. The method is called Snatch-driven development.
+Ajhc's mission is to keep contribution to jhc in the repository. Because the upstream author of jhc, John Meacham, can't pull the contribution speedily. (I think he is too busy to do it.) We should feedback jhc any changes. Also Ajhc aims to provide the Metasepi project with a method to rewrite NetBSD kernel using Haskell. The method is called Snatch-driven development {\url{http://www.slideshare.net/master_q/20131020-osc-tokyoajhc}}.
 
 Ajhc is, so to speak, an accelerator to develop jhc.
 
-\WhatsNew
-
-\noindent Runtime:
-
-Ajhc now has thread-safe and reentrant runtime.
-The runtime supports pthread and custom thread
-that can shape forkOS API on tiny CPU with ChibiOS/RT.
-(\url{https://github.com/metasepi/chibios-arafura})
-
-\Separate
-
-\noindent GC:
-
-New Erlang style GC. It means Ajhc's Haskell context has own GC heap.
-Also new GC can run on tiny CPU such as Cortex-M3 with 64kB RAM.
-
-\Separate
-
-\noindent Document:
-
-We have translated Jhc User's Manual into Japanese.
-The translating into the other language will be also easy,
-because the translaters are using gettext.
-
-\noindent (\url{https://github.com/ajhc/ajhc/blob/arafura/po/ja.po})
-
 \subsubsection*{Demonstrations}
+
+\noindent \url{https://www.youtube.com/watch?v=XEYcR5RG5cA}
+
+NetBSD kernel's HD Audio sound driver has interrupt handler.
+The interrupt handler of the demo is re-written by Haskell language using Ajhc.
+
+At the demo, run following operations.
+First, set breakpoint at the interrupt of finding headphone,
+and see Haskell function names on backtrace.
+Second, set breakpoint s_alloc() function, that allocate area
+in Haskell heap. Make sure of calling the function while anytime
+running kernel.
+Nevertheless, playing wav file does not break up.
+
+The source code is found at \url{https://github.com/metasepi/netbsd-arafura-s1}
+The interrupt handler source code at
+\url{https://github.com/metasepi/netbsd-arafura-s1/blob/fabd5d64f15058c198ba722058c3fb89f84d08a5/metasepi/sys/hssrc/Dev/Pci/Hdaudio/Hdaudio.hs#L15}.
+
+Discussion on mailing list: \url{http://www.haskell.org/pipermail/haskell-cafe/2014-February/112802.html}
 
 \noindent \url{http://www.youtube.com/watch?v=n6cepTfnFoo}
 
@@ -82,11 +75,15 @@ Please read ``Ajhc User's Manual'' to know more detail. (\url{http://ajhc.metase
 
 \FuturePlans
 
-Fix many BUGs. Try to rewrite (snatch) NetBSD kernel driver with Haskell. If we have luck, will port some library like array or vector from GHC world. After that, we are going to report back about developing Ajhc.
+Maintain Ajhc as compilable with latast GHC.
 
 \subsubsection*{License}
 
-GPL2 or later.
+\begin{compactitem}
+  \item Runtime: MIT License \url{https://github.com/ajhc/ajhc/blob/master/rts/LICENSE}
+  \item Haskell libraries: MIT License \url{https://github.com/ajhc/ajhc/blob/master/lib/LICENSE}
+  \item The others: GPLv2 or Later \url{https://github.com/ajhc/ajhc/blob/arafura/COPYING}
+\end{compactitem}
 
 \Contact
   \begin{compactitem}
