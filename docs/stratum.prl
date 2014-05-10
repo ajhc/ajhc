@@ -1,0 +1,18 @@
+#!/usr/bin/perl
+
+use strict;
+use Text::ASCIITable;
+
+my $t = Text::ASCIITable->new();
+
+$t->setCols('Stratum','Shown', 'Name', 'Examples', 'Abstraction');
+$t->addRow('0','V','value', '3, False..', 'λx . x');
+$t->addRow('1','T','type', 'Int, IO Char..', "∀α. [α] -> Int");
+$t->addRow('2','*','kind', '*, #, !, (#)', '* -> *');
+$t->addRow('3','**',"superkind", '**, ##', '(no axiom)');
+$t->addRow('4','□','box', '','"');
+$t->addRow('5','□□','boxbox','', '"');
+$t->addRow('6','□□□','boxboxbox','', '"');
+$t->addRow('...');
+
+print $t;
