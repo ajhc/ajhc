@@ -74,7 +74,7 @@ EXTRA_DIST = src/data rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
 	     src/StringTable/StringTable_cbits.c src/StringTable/StringTable_cbits.h src/cbits/md5sum.c jhc.1 \
 	     src/StringTable/Atom.hsc jhc.spec src/cbits/lookup3.c \
 	     manual.html lib/applicative examples/HelloWorld.hs examples/Calendar.hs \
-	     examples/Primes.hs src/FlagOpts.flags src/FlagDump.flags lib/ext compat
+	     examples/Primes.hs src/FlagOpts.flags src/FlagDump.flags lib/ext compat LICENSE
 
 dist-hook: $(BUILT_SOURCES)
 	if test -f _darcs; then \

@@ -33,6 +33,10 @@ AC_PATH_PROG([DRIFTGHC],[DrIFT], [])
 if test -z "$DRIFTGHC"; then
     echo [DrIFT not found: using preprocessed files]
 fi
+AC_PATH_PROG([CPPHS],[cpphs], [])
+if test -z "$CPPHS"; then
+    echo [cpphs not found, some libraries may not be able to be built.]
+fi
 
 AC_CHECK_PROGS([MINGW],[mingw-gcc mingw32-gcc i386-mingw32-gcc i586-mingw32msvc-gcc],
                [i386-mingw32-gcc])

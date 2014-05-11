@@ -274,3 +274,46 @@ getNamesFromHsPat p = execWriter (getNamesFromPat p) where
         tell [toName Val hsName]
         getNamesFromPat hsPat
     getNamesFromPat p = traverseHsPat_ getNamesFromPat p
+
+
+{-
+data HsOps m = HsOps {
+    opHsDecl :: HsDecl -> m HsDecl,
+    opHsExp  :: HsExp  -> m HsExp,
+    opHsPat  :: HsPat  -> m HsPat,
+    opHsType :: HsType -> m HsType
+    }
+
+class TraverseHsOps a where
+    traverseHsOps :: MonadSetSrcLoc m => HsOps m -> a -> m a
+
+instance TraverseHsOps HsType where
+    traverseHsOps HsOps { .. } = traverseHsType opHsType
+
+instance TraverseHsOps HsExp where
+    traverseHsOps HsOps { .. } e = f e where
+        f (HsLambda srcLoc hsPats hsExp) = withSrcLoc srcLoc $ do
+            hsPats <- mapM opHsPat hsPats
+            hsExp' <- opHsExp hsExp
+            return (HsLambda srcLoc hsPats hsExp')
+        f (HsExpTypeSig srcLoc hsExp hsQualType)  = withSrcLoc srcLoc $ do
+            hsExp' <- fn hsExp
+            return (HsExpTypeSig srcLoc hsExp' hsQualType)
+        f (HsRecConstr n fus) = do
+            fus' <- mapM (T.mapM fn) fus
+            return $ HsRecConstr n fus'
+        f (HsRecUpdate e fus) = do
+            fus' <- mapM (T.mapM fn) fus
+            e' <- fn e
+            return $ HsRecUpdate e' fus'
+        f (HsLocatedExp le) = HsLocatedExp `liftM` fnl le
+        f (HsLet hsDecls hsExp)  = do
+            ds <- mapM (traverseHsDeclHsExp fn) hsDecls
+            e <- fn hsExp
+            return $ HsLet ds e
+        f (HsDo hsStmts)  = HsDo `liftM` mapM (traverseHsStmtHsExp fn) hsStmts
+        f _ = error "FrontEnd.Syn.Traverse.traverseHsExp f unrecognized construct"
+        fnl (Located l e) = withSrcSpan l $ Located l `liftM` fn e
+
+        f e = traverseHsExp opHsExp e
+        -}

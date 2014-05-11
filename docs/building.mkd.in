@@ -7,13 +7,6 @@ also under darcs revision control however the build process from darcs is
 somewhat more involved. For information on getting the source code from darcs
 and building it, see the [Development Page](development.shtml).
 
-Getting the RPM
----------------
-
-There are source and binary rpms available:
-Binary RPM: <http://repetae.net/yum/@PACKAGE@-@VERSION@-@RPMRELEASE@.i686.rpm>.
-Source RPM: <http://repetae.net/yum/@PACKAGE@-@VERSION@-@RPMRELEASE@.src.rpm>.
-
 Building from the tarball
 -------------------------
 
