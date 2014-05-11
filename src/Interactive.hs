@@ -175,7 +175,7 @@ executeStatement stmt = do
     stmt' <- renameStatement mempty (stateImports is) (stateModule is) stmt
     procErrors $ do
     --printStatement stmt'
-    stmt'' <- expandTypeSynsStmt (hoTypeSynonyms hoE) (stateModule is) stmt'
+    stmt'' <- expandTypeSyns (hoTypeSynonyms hoE) stmt'
     stmt''' <- return $ FrontEnd.Infix.infixStatement (hoFixities hoE) stmt''
     procErrors $ do
     printStatement stmt'''

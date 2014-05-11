@@ -257,18 +257,21 @@ data HsConDecl
 hsConDeclArgs HsConDecl { hsConDeclConArg = as } = as
 hsConDeclArgs HsRecDecl { hsConDeclRecArg = as } = concat [ replicate (length ns) t | (ns,t) <- as]
 
-data HsBangType
-	 = HsBangedTy   { hsBangType :: HsType }
-	 | HsUnBangedTy { hsBangType :: HsType }
-  deriving(Eq,Show)
+type HsBangType = HsBangType' HsType
+data HsBangType' a
+	 = HsBangedTy   { hsBangType :: a }
+	 | HsUnBangedTy { hsBangType :: a }
+  deriving(Eq,Show,Functor,Traversable,Foldable)
 
-data HsRhs
-	 = HsUnGuardedRhs HsExp
-	 | HsGuardedRhss  [HsGuardedRhs]
-  deriving(Eq,Show)
+type HsRhs = HsRhs' HsExp
+data HsRhs' a
+	 = HsUnGuardedRhs a
+	 | HsGuardedRhss  [HsGuardedRhs' a]
+  deriving(Eq,Show,Functor,Traversable,Foldable)
 
-data HsGuardedRhs = HsGuardedRhs SrcLoc HsExp HsExp
-  deriving(Eq,Show)
+type HsGuardedRhs = HsGuardedRhs' HsExp
+data HsGuardedRhs' a = HsGuardedRhs SrcLoc a a
+  deriving(Eq,Show,Functor,Traversable,Foldable)
 
 data HsQualType = HsQualType {
     hsQualTypeContext :: HsContext,
