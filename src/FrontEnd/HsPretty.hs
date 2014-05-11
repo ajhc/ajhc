@@ -545,7 +545,7 @@ ppHsPat	HsPWildCard = char '_'
 ppHsPat	(HsPIrrPat (Located _ pat)) = char '~' <> ppHsPat pat
 ppHsPat	~(HsPBangPat (Located _ pat)) = char '!' <> ppHsPat pat
 
-ppHsPatField (HsPFieldPat name pat) = myFsep[ppHsQName name, equals, ppHsPat pat]
+ppHsPatField (HsField name pat) = myFsep[ppHsQName name, equals, ppHsPat pat]
 
 ------------------------- Case bodies  -------------------------
 ppHsAlt :: HsAlt -> Doc
@@ -569,7 +569,7 @@ ppHsStmt (HsLetStmt declList) = text "let"
 
 ------------------------- Record updates
 ppHsFieldUpdate :: HsFieldUpdate -> Doc
-ppHsFieldUpdate (HsFieldUpdate name exp) =
+ppHsFieldUpdate (HsField name exp) =
 		  myFsep[ppHsQName name,equals,ppHsExp exp]
 
 ------------------------- Names -------------------------

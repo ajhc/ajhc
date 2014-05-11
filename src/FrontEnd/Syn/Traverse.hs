@@ -103,10 +103,10 @@ traverseHsExp fn e = f e where
         hsExp' <- fnl hsExp
         return (HsBangPat hsExp')
     f (HsRecConstr n fus) = do
-        fus' <- mapM fFieldUpdate fus
+        fus' <- mapM (T.mapM fn) fus
         return $ HsRecConstr n fus'
     f (HsRecUpdate e fus) = do
-        fus' <- mapM fFieldUpdate fus
+        fus' <- mapM (T.mapM fn) fus
         e' <- fn e
         return $ HsRecUpdate e' fus'
     f (HsLocatedExp le) = HsLocatedExp `liftM` fnl le
@@ -116,9 +116,6 @@ traverseHsExp fn e = f e where
         return $ HsLet ds e
     f (HsDo hsStmts)  = HsDo `liftM` mapM (traverseHsStmtHsExp fn) hsStmts
     f _ = error "FrontEnd.Syn.Traverse.traverseHsExp f unrecognized construct"
-    fFieldUpdate (HsFieldUpdate n e) = do
-        e' <- fn e
-        return $ HsFieldUpdate n e'
     fnl (Located l e) = withSrcSpan l $ Located l `liftM` fn e
 
     {-
@@ -226,9 +223,8 @@ traverseHsPat fn p = f p where
           hsPat' <- fn hsPat
           return (HsPTypeSig srcLoc hsPat' qt)
     f (HsPRec hsName hsPatFields)  = do
-          hsPatFields' <- mapM fField hsPatFields
+          hsPatFields' <- mapM (T.mapM fn) hsPatFields
           return (HsPRec hsName hsPatFields')
-    fField (HsPFieldPat n p) = fn p >>= return . HsPFieldPat n
     fnl (Located l e) = withSrcSpan l (Located l `liftM` fn e)
 
 traverseHsRhsHsExp :: MonadSetSrcLoc m => (HsExp -> m HsExp) -> HsRhs -> m HsRhs

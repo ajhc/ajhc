@@ -178,9 +178,9 @@ checkPat e [] = case e of
 checkPat _ _ = patFail
 
 checkPatField :: HsFieldUpdate -> P HsPatField
-checkPatField (HsFieldUpdate n e) = do
+checkPatField (HsField n e) = do
 	p <- checkPat e []
-	return (HsPFieldPat n p)
+	return (HsField n p)
 
 patFail :: P a
 patFail = fail "Parse error in pattern"
@@ -279,7 +279,7 @@ checkStmt (HsQualifier e) = check1Expr e HsQualifier
 checkStmt s@(HsLetStmt _) = return s
 
 checkField :: HsFieldUpdate -> P HsFieldUpdate
-checkField (HsFieldUpdate n e) = check1Expr e (HsFieldUpdate n)
+checkField (HsField n e) = check1Expr e (HsField n)
 
 -----------------------------------------------------------------------------
 -- Check Equation Syntax

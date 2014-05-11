@@ -202,7 +202,7 @@ processStmt infixMap stmt = case stmt of
 
 
 processFUpdt :: SymbolMap -> HsFieldUpdate -> HsFieldUpdate
-processFUpdt infixMap (HsFieldUpdate qname exp) = HsFieldUpdate qname new_exp
+processFUpdt infixMap (HsField qname exp) = HsField qname new_exp
     where
         new_exp = fst $ processExp infixMap exp
 
@@ -248,7 +248,7 @@ processPat infixMap exp = case exp of
     HsPUnboxedTuple xs -> tf $ HsPUnboxedTuple (map pp xs)
     HsPList xs ->  tf $ HsPList (map pp xs)
     HsPParen xs -> tf $ HsPParen (pp xs)
-    HsPRec n xs -> tf $ HsPRec n [ HsPFieldPat n (pp p) | HsPFieldPat n p <- xs ]
+    HsPRec n xs -> tf $ HsPRec n [ HsField n (pp p) | HsField n p <- xs ]
     HsPAsPat n p -> tf $ HsPAsPat n (pp p)
     HsPTypeSig sl p qt -> tf $ HsPTypeSig sl (pp p) qt
     where

@@ -10,6 +10,8 @@ import Name.Names
 import Options
 import StringTable.Atom
 import StringTable.Atom()
+import Data.Traversable(Traversable)
+import Data.Foldable(Foldable)
 
 instance HasLocation HsAlt where
     srcLoc (HsAlt sl _ _ _) = sl
@@ -422,17 +424,16 @@ data HsPat
  deriving(Eq,Ord,Show)
  {-! derive: is !-}
 
-data HsPatField = HsPFieldPat HsName HsPat
-    deriving(Eq,Ord,Show)
+type HsPatField = HsField HsPat
+type HsFieldUpdate = HsField HsExp
+data HsField a = HsField HsName a
+    deriving(Eq,Ord,Show,Functor,Traversable,Foldable)
 
 data HsStmt
 	= HsGenerator SrcLoc HsPat HsExp       -- srcloc added by bernie
 	| HsQualifier HsExp
 	| HsLetStmt [HsDecl]
  deriving(Eq,Show)
-
-data HsFieldUpdate = HsFieldUpdate HsName HsExp
-  deriving(Eq,Show)
 
 data HsAlt = HsAlt SrcLoc HsPat HsRhs [HsDecl]
   deriving(Eq,Show)

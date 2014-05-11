@@ -904,14 +904,14 @@ fbinds :: { [HsFieldUpdate] }
       | fbind                         { [$1] }
 
 fbind :: { HsFieldUpdate }
-      : qvar '=' exp                  { HsFieldUpdate $1 $3 }
+      : qvar '=' exp                  { HsField $1 $3 }
 
 pfbinds :: { [HsFieldUpdate] }
       : pfbinds ',' pfbind              { $3 : $1 }
       | pfbind                         { [$1] }
 
 pfbind :: { HsFieldUpdate }
-      : qvar '=' pexp                  { HsFieldUpdate $1 $3 }
+      : qvar '=' pexp                  { HsField $1 $3 }
 
 -- -----------------------------------------------------------------------------
 -- Variables, Constructors and Operators.

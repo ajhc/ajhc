@@ -439,7 +439,7 @@ buildRecPat :: FieldMap -> Name -> [HsPatField] -> RM HsPat
 buildRecPat (FieldMap amp fls) n us = case mlookup (toName DataConstructor n) amp of
     Nothing -> failRename $ "Unknown Constructor: " ++ show n
     Just t -> do
-        let f (HsPFieldPat x p) = case  mlookup (toName FieldLabel x) fls of
+        let f (HsField x p) = case  mlookup (toName FieldLabel x) fls of
                 Nothing -> failRename $ "Field Label does not exist: " ++ show x
                 Just cs -> case lookup n [ (nameName x,(y)) | (x,y) <- cs ] of
                     Nothing -> failRename $ "Field Label does not belong to constructor: " ++ show (x,n)
@@ -453,11 +453,11 @@ buildRecPat (FieldMap amp fls) n us = case mlookup (toName DataConstructor n) am
         return $ HsPApp n rs
 
 instance Rename HsPatField where
-    rename (HsPFieldPat hsName hsPat) = do
+    rename (HsField hsName hsPat) = do
         --gt <- gets globalSubTable      -- field names are not shadowed by local definitions.
         hsName' <- renameName (toName FieldLabel hsName) --renameName hsName gt
         hsPat' <- rename hsPat
-        return (HsPFieldPat hsName' hsPat')
+        return (HsField hsName' hsPat')
 
 instance Rename HsRhs where
     rename (HsUnGuardedRhs hsExp) = HsUnGuardedRhs <$> rename hsExp
@@ -548,7 +548,7 @@ buildRecConstr (FieldMap amp fls) n us = do
     case mlookup (toName DataConstructor n) amp of
         Nothing -> failRename $ "Unknown Constructor: " ++ show n
         Just t -> do
-            let f (HsFieldUpdate x e) = case  mlookup (toName FieldLabel x) fls of
+            let f (HsField x e) = case  mlookup (toName FieldLabel x) fls of
                     Nothing -> failRename $ "Field Label does not exist: " ++ show x
                     Just cs -> case lookup n [ (nameName x,(y)) | (x,y) <- cs ] of
                         Nothing -> failRename $ "Field Label does not belong to constructor: " ++ show (x,n)
@@ -562,7 +562,7 @@ buildRecConstr (FieldMap amp fls) n us = do
 buildRecUpdate ::  FieldMap -> HsExp -> [HsFieldUpdate] -> RM HsExp
 buildRecUpdate (FieldMap amp fls) n us = do
         sl <- getSrcLoc
-        let f (HsFieldUpdate x e) = case  mlookup (toName FieldLabel x) fls of
+        let f (HsField x e) = case  mlookup (toName FieldLabel x) fls of
                 Nothing -> failRename $ "Field Label does not exist: " ++ show x
                 Just cs -> return [ (x,(y,hsParen e)) | (x,y) <- cs ]
         fm <- liftM concat $ mapM f us
@@ -618,12 +618,12 @@ instance Rename HsStmt where
         return (HsLetStmt hsDecls')
 
 instance Rename HsFieldUpdate where
-    rename (HsFieldUpdate hsName hsExp) = do
+    rename (HsField hsName hsExp) = do
 --        gt <- gets globalSubTable              -- field names are global and not shadowed
  --       hsName' <- renameName hsName gt      -- TODO field names should have own namespace
         hsName' <- renameName (toName FieldLabel hsName)      -- TODO field names should have own namespace
         hsExp' <- rename hsExp
-        return (HsFieldUpdate hsName' hsExp')
+        return (HsField hsName' hsExp')
 
 renameValName :: Name -> RM Name
 renameValName hsName = renameName (fromValishHsName hsName)

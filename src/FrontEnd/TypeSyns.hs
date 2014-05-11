@@ -363,10 +363,10 @@ renameHsFieldUpdate (HsFieldBind hsName) subTable
       hsName' <- renameHsName hsName subTable  -- do i need to rename this name?
       return (HsFieldBind hsName')
 -}
-renameHsFieldUpdate (HsFieldUpdate hsName hsExp) subTable = do
+renameHsFieldUpdate (HsField hsName hsExp) subTable = do
     hsName' <- renameHsName hsName undefined
     hsExp' <- renameHsExp hsExp subTable
-    return (HsFieldUpdate hsName' hsExp')
+    return (HsField hsName' hsExp')
 
 renameHsNames :: [HsName] -> SubTable -> ScopeSM ([HsName])
 renameHsNames ns _ = return ns
