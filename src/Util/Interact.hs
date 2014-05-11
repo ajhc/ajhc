@@ -1,6 +1,8 @@
 {-# OPTIONS_GHC -cpp #-}
 {-# LANGUAGE CPP #-}
 
+#include "hs_src_config.h"
+
 -- This module contains routines to provide an interactive shell prompt and is
 -- built on top of the readline library.
 
@@ -17,18 +19,24 @@ import Control.Monad.Identity
 import List
 import qualified Data.Map as Map
 import System
-#ifdef USE_EDITLINE
-import System.Console.Editline.Readline
-#else
-import System.Console.Readline
-#endif
 import System.Directory
 import IO
+#if    USE_EDITLINE
+   ;import System.Console.Editline.Readline
+#elif  USE_NOLINE
+   ;import System.Console.Readline
+#endif
 
 import GenUtil
 
-
 readLine :: String -> (String -> IO [String]) -> IO String
+#if !USE_EDITLINE && !USE_READLINE
+readLine s _ = do
+    putStr s
+    getLine
+addHistory :: String -> IO ()
+addHistory _ = return ()
+#else
 readLine prompt tabExpand =  do
     setCompletionEntryFunction (Just (\s -> tabExpand s))
     s <- readline prompt
@@ -36,7 +44,7 @@ readLine prompt tabExpand =  do
         Nothing -> putStrLn "Bye!" >> exitSuccess
         Just cs | all isSpace cs -> return ""
         Just s -> addHistory s >> return s
-
+#endif
 
 --simpleCommand :: String -> IO (Maybe String)
 
@@ -60,8 +68,6 @@ extra_help = [
     ("!command", "run shell command")
     ]
 
-
-
 basicParse :: Maybe String -> String ->  Either (String,String) String
 basicParse comm s = f (cleanupWhitespace s) where
     f xs | Just c <- comm, c `isPrefixOf` xs = Right ""
@@ -76,33 +82,33 @@ data InteractCommand = InteractCommand {
     }
 
 data Interact = Interact {
-    interactPrompt :: String,               -- ^ the prompt to use
-    interactCommands :: [InteractCommand],  -- ^ a list of commands
-    interactSettables :: [String],          -- ^ possible things that may be set
-    interactVersion :: String,              -- ^ version string to print
-    interactSet :: Map.Map String String,   -- ^ vars that are actually set
-    interactExpr :: Interact -> String -> IO Interact, -- ^ what to run on a bare expression
-    interactRC   :: [String],               -- ^ commands to run at startup
-    interactWords :: [String],              -- ^ list of words to autocomplete
-    interactEcho :: Bool,                   -- ^ whether to echo commands
-    interactCommandMode :: Bool,                -- ^ whether we are in command mode
-    interactHistFile :: Maybe String,       -- ^ filename to store history of commands in
-    interactComment :: Maybe String         -- ^ comment initializer
+    interactPrompt      :: String,                            -- ^ the prompt to use
+    interactCommands    :: [InteractCommand],                 -- ^ a list of commands
+    interactSettables   :: [String],                          -- ^ possible things that may be set
+    interactVersion     :: String,                            -- ^ version string to print
+    interactSet         :: Map.Map String String,             -- ^ vars that are actually set
+    interactExpr        :: Interact -> String -> IO Interact, -- ^ what to run on a bare expression
+    interactRC          :: [String],                          -- ^ commands to run at startup
+    interactWords       :: [String],                          -- ^ list of words to autocomplete
+    interactEcho        :: Bool,                              -- ^ whether to echo commands
+    interactCommandMode :: Bool,                              -- ^ whether we are in command mode
+    interactHistFile    :: Maybe String,                      -- ^ filename to store history of commands in
+    interactComment     :: Maybe String                       -- ^ comment initializer
     }
 
 emptyInteract = Interact {
-    interactPrompt = ">",
-    interactCommands = [],
-    interactSettables = [],
-    interactVersion = "(none)",
-    interactSet = Map.empty,
-    interactExpr = \i s -> putStrLn ("Unknown Command: " ++ s) >> return i,
-    interactRC = [],
-    interactWords = [],
-    interactEcho = False,
+    interactPrompt      = ">",
+    interactCommands    = [],
+    interactSettables   = [],
+    interactVersion     = "(none)",
+    interactSet         = Map.empty,
+    interactExpr        = \i s -> putStrLn ("Unknown Command: " ++ s) >> return i,
+    interactRC          = [],
+    interactWords       = [],
+    interactEcho        = False,
     interactCommandMode = False,
-    interactHistFile = Nothing,
-    interactComment = Nothing
+    interactHistFile    = Nothing,
+    interactComment     = Nothing
     }
 
 cleanupWhitespace s = reverse $ dropWhile isSpace (reverse $ dropWhile isSpace s)
@@ -170,7 +176,6 @@ runInteraction act s = do
             (_:_:_) -> putStrLn "Ambiguous command, possibilites are:" >> putStr  (unlines $ buildTableLL $ args cmd) >> return act
             [] -> (putStrLn $ "Unknown command (use :help for help): " ++ cmd)  >> return act
 
-
 -- | begin interactive interaction
 
 beginInteraction :: Interact -> IO ()
@@ -196,5 +201,3 @@ beginInteraction act = do
             _ -> return ()
         act' <- runInteraction act s
         go hist act'
-
-

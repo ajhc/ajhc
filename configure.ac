@@ -20,7 +20,7 @@ AC_ARG_WITH(rpmrelease,
             [  --with-rpmrelease=RPMRELEASE  specify rpm release number],
 	    [RPMRELEASE=$withval], [RPMRELEASE=1])
 
-AC_PROGRAM_REQUIRE(hc,ghc,     [  --with-hc=<haskell compiler>    Specify location of ghc.])
+AC_PROGRAM_REQUIRE(hc,ghc,[  --with-hc=<haskell compiler>    Specify location of ghc.])
 if test -z "$HC"; then
     echo "The ghc compiler was not found, please specify a location for it with the --with-hc flag"
     exit 1
@@ -37,18 +37,18 @@ fi
 AC_CHECK_PROGS([MINGW],[mingw-gcc mingw32-gcc i386-mingw32-gcc i586-mingw32msvc-gcc],
                [i386-mingw32-gcc])
 
+USE_READLINE=0
+USE_EDITLINE=0
 GHC=$HC
 GHCFLAGS="-hide-all-packages -package base"
 GHC_CHECK_MODULE(Data.Generics.Instances,syb,,,[])
 GHC_CHECK_MODULE(System.Time,old-time,,,[])
 GHC_CHECK_MODULE(Text.PrettyPrint.HughesPJ,pretty,,,[])
-GHC_CHECK_MODULE(System.Console.Readline,readline,,,[
-     GHC_CHECK_MODULE(System.Console.Editline.Readline,editline,,
-         GHCFLAGS="$GHCFLAGS -DUSE_EDITLINE"
-         ,[
-          echo "no suitable readline found: install the 'readline' or 'editline' package."
-          exit 1
-      ])
+
+AC_ARG_ENABLE([line],[  --disable-line do not depend on readline or editline],[],[
+    GHC_CHECK_MODULE(System.Console.Readline,readline,,[USE_READLINE=1],[
+        GHC_CHECK_MODULE(System.Console.Editline.Readline,editline,,[USE_EDITLINE=1] ,[])
+    ])
 ])
 
 GHC_CHECK_MODULE(System,base,,[] ,[ GHCINC="$GHCINC -i$srcdir/compat/haskell98"])
@@ -81,6 +81,8 @@ AC_SUBST(EXTRA_PACKAGES)
 AC_SUBST(GHCFLAGS)
 AC_SUBST(GHCINC)
 AC_SUBST(HAS_MONOID_DOC)
+AC_SUBST(USE_READLINE)
+AC_SUBST(USE_EDITLINE)
 AC_SUBST(HC)
 AC_SUBST(HCFLAGS)
 AC_SUBST(HSC2HS)

@@ -2,5 +2,7 @@
 #define HS_SRC_CONFIG
 
 #define HAS_MONOID_DOC @HAS_MONOID_DOC@
+#define USE_READLINE @USE_READLINE@
+#define USE_EDITLINE @USE_EDITLINE@
 
 #endif
