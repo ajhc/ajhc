@@ -63,6 +63,7 @@ if test -z "$HSC2HS"; then
     exit 1
 fi
 
+HAS_MONOID_DOC=1
 TRY_COMPILE_GHC([
 import Text.PrettyPrint.HughesPJ
 import Data.Monoid
