@@ -1,4 +1,4 @@
-{-# LANGUAGE DoRec,NoMonoLocalBinds #-}
+{-# LANGUAGE RecursiveDo,NoMonoLocalBinds #-}
 -- | determine export\/imports for modules via fixpoint recursion
 
 module FrontEnd.Exports(determineExports,ModInfo(..)) where

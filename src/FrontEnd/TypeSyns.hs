@@ -17,7 +17,6 @@ type SubTable = ()
 -- the monadic state
 
 data ScopeState = ScopeState {
-    currentModule  :: Module,
     errors         :: [Warning],
     synonyms       :: TypeSynonyms,
     srcLoc         :: !SrcLoc
@@ -39,11 +38,10 @@ expandTypeSyns syns m = ans where
     startState = ScopeState {
         errors         = [],
         synonyms       =  syns,
-        srcLoc         = bogusASrcLoc,
-        currentModule  = hsModuleName m
+        srcLoc         = bogusASrcLoc
         }
 
-    (rm, fs) = runState (renameDecls m) startState
+    (rm, fs) = runState (expand m) startState
     ans = do
         mapM_ addWarning (errors fs)
         return rm
@@ -53,8 +51,7 @@ expandTypeSynsStmt syns mod m = ans where
     startState = ScopeState {
         errors         = [],
         synonyms       =  syns,
-        srcLoc         = bogusASrcLoc,
-        currentModule  = mod
+        srcLoc         = bogusASrcLoc
         }
 
     (rm, fs) = runState (renameHsStmt m ()) startState
@@ -62,26 +59,35 @@ expandTypeSynsStmt syns mod m = ans where
         mapM_ addWarning (errors fs)
         return rm
 
+class Expand a where
+    expand :: a -> ScopeSM a
+    expandList :: [a] -> ScopeSM [a]
+    expandList = mapM expand
+
+instance Expand a => Expand [a] where
+    expand xs = expandList xs
+
 -- This is Bryn's modification to make the code a bit easier to understand for
 -- functions like renameHsNames, renameHsFileUpdates
 mapRename :: (a -> SubTable -> ScopeSM a) -> [a] -> SubTable -> ScopeSM [a]
 mapRename renameIndividual individuals subTable
     = mapM (`renameIndividual` subTable) individuals
 
-renameDecls :: HsModule -> ScopeSM HsModule
-renameDecls tidy = do
-        decls' <- renameHsDecls (hsModuleDecls tidy) undefined
+instance Expand HsModule where
+    expand tidy = do
+        decls' <- expand (hsModuleDecls tidy)
         return tidy { hsModuleDecls = decls' }
 
-renameHsDecls :: [HsDecl] -> SubTable -> ScopeSM ([HsDecl])
-renameHsDecls decls subtable = do
-    ans <- mapRename renameHsDecl (expandTypeSigs decls) subtable
-    return ans
+instance Expand HsDecl where
+    expand x = renameHsDecl x ()
+    expandList decls = do
+        let expandTypeSigs ds =  (concatMap f ds) where
+            f (HsTypeSig sl ns qt) =  [ HsTypeSig sl [n] qt | n <- ns]
+            f d = [d]
+        mapM expand (expandTypeSigs decls)
 
-expandTypeSigs :: [HsDecl] -> [HsDecl]
-expandTypeSigs ds =  (concatMap f ds) where
-    f (HsTypeSig sl ns qt) =  [ HsTypeSig sl [n] qt | n <- ns]
-    f d = return d
+renameHsDecls :: [HsDecl] -> SubTable -> ScopeSM ([HsDecl])
+renameHsDecls ds _ = expand ds
 
 renameHsDecl :: HsDecl -> SubTable -> ScopeSM (HsDecl)
 renameHsDecl (HsPatBind srcLoc hsPat hsRhs {-where-} hsDecls) subTable = withSrcLoc srcLoc $ do
@@ -106,12 +112,11 @@ renameHsDecl (HsFunBind hsMatches) subTable = do
     return (HsFunBind hsMatches')
 
 renameHsDecl (HsTypeSig srcLoc hsNames hsQualType) subTable = withSrcLoc srcLoc $ do
-    hsNames' <- renameHsNames hsNames subTable
     hsQualType' <- renameHsQualType hsQualType subTable
-    return (HsTypeSig srcLoc hsNames' hsQualType')
+    return (HsTypeSig srcLoc hsNames hsQualType')
 
 renameHsDecl dl@HsDataDecl { hsDeclContext = hsContext, hsDeclCons = hsConDecls  } subTable = do
-    hsContext' <- renameHsContext hsContext subTable
+    hsContext' <- expand hsContext
     hsConDecls' <- renameHsConDecls hsConDecls subTable
     return dl { hsDeclContext = hsContext', hsDeclCons = hsConDecls' }
 renameHsDecl (HsTypeDecl srcLoc name hsNames t) subTable = withSrcLoc srcLoc $ do
@@ -129,9 +134,6 @@ renameHsDecl (HsInstDecl srcLoc hsQualType hsDecls) subTable = withSrcLoc srcLoc
     hsQualType' <- renameHsClassHead hsQualType
     hsDecls' <- renameHsDecls hsDecls subTable
     return (HsInstDecl srcLoc hsQualType' hsDecls')
-renameHsDecl (HsInfixDecl srcLoc assoc int hsNames) subTable = withSrcLoc srcLoc $ do
-    hsNames' <- renameHsNames hsNames subTable
-    return $ HsInfixDecl srcLoc assoc int hsNames'
 renameHsDecl (HsPragmaRules rs) subTable = do
     rs' <- mapM (`renameHsRule` subTable) rs
     return $ HsPragmaRules rs'
@@ -148,17 +150,19 @@ renameHsRule prules@HsRule { hsRuleSrcLoc = srcLoc, hsRuleFreeVars = fvs, hsRule
 
 renameHsQualType :: HsQualType -> SubTable -> ScopeSM (HsQualType)
 renameHsQualType (HsQualType hsContext hsType) subTable = do
-      hsContext' <- renameHsContext hsContext subTable
+      hsContext' <- expand hsContext
       hsType' <- renameHsType hsType subTable
       return (HsQualType hsContext' hsType')
 renameHsClassHead :: HsClassHead -> ScopeSM (HsClassHead)
 renameHsClassHead HsClassHead { .. }  = do
-      hsClassHeadContext <- renameHsContext hsClassHeadContext ()
+      hsClassHeadContext <- expand hsClassHeadContext
       hsClassHeadArgs <- mapM (flip renameHsType ()) hsClassHeadArgs
       return HsClassHead { .. }
 
-renameHsContext :: HsContext -> SubTable -> ScopeSM (HsContext)
-renameHsContext = mapRename renameHsAsst
+instance Expand HsAsst where
+    expand a = renameHsAsst a ()
+instance Expand HsQualType where
+    expand a = renameHsQualType a ()
 
 renameHsAsst :: HsAsst -> SubTable -> ScopeSM (HsAsst)
 renameHsAsst (HsAsst hsName1  hsName2s) subTable = do
@@ -241,13 +245,15 @@ renameHsMatches = mapRename renameHsMatch
 
 renameHsMatch :: HsMatch -> SubTable -> ScopeSM HsMatch
 renameHsMatch (HsMatch srcLoc hsName hsPats hsRhs {-where-} hsDecls) subTable = withSrcLoc srcLoc $ do
-    hsName' <- renameHsName hsName subTable
-    subTable' <- updateSubTableWithHsPats subTable hsPats srcLoc
-    hsPats' <- renameHsPats hsPats subTable'
-    subTable'' <- updateSubTableWithHsDecls subTable' hsDecls
-    hsDecls' <- renameHsDecls hsDecls subTable''
-    hsRhs' <- renameHsRhs hsRhs subTable''
-    return (HsMatch srcLoc hsName' hsPats' hsRhs' {-where-} hsDecls')
+    hsPats' <- expand hsPats
+    hsDecls' <- expand hsDecls
+    hsRhs' <- expand hsRhs
+    return (HsMatch srcLoc hsName hsPats' hsRhs' {-where-} hsDecls')
+
+instance Expand HsPat where
+    expand x = renameHsPat x ()
+instance Expand HsRhs where
+    expand x = renameHsRhs x ()
 
 renameHsPats :: [HsPat] -> SubTable -> ScopeSM ([HsPat])
 renameHsPats = mapRename renameHsPat
@@ -267,16 +273,17 @@ renameHsRhs (HsGuardedRhss hsGuardedRhss) subTable = do
       hsGuardedRhss' <- renameHsGuardedRhsList hsGuardedRhss subTable
       return (HsGuardedRhss hsGuardedRhss')
 
+instance Expand HsExp where
+    expand x = renameHsExp x ()
+
 renameHsExp :: HsExp -> SubTable -> ScopeSM HsExp
 renameHsExp (HsLambda srcLoc hsPats hsExp) subTable = withSrcLoc srcLoc $ do
-    subTable' <- updateSubTableWithHsPats subTable hsPats srcLoc
-    hsPats' <- renameHsPats hsPats subTable'
-    hsExp' <- renameHsExp hsExp subTable'
+    hsPats' <- expand hsPats
+    hsExp' <- expand hsExp
     return (HsLambda srcLoc hsPats' hsExp')
 renameHsExp (HsLet hsDecls hsExp) subTable = do
-    subTable' <- updateSubTableWithHsDecls subTable hsDecls
-    hsDecls' <- renameHsDecls hsDecls subTable'
-    hsExp' <- renameHsExp hsExp subTable'
+    hsDecls' <- expand hsDecls
+    hsExp' <- expand hsExp
     return (HsLet hsDecls' hsExp')
 renameHsExp (HsCase hsExp hsAlts) subTable = do
     hsExp' <- renameHsExp hsExp subTable
@@ -295,11 +302,10 @@ renameHsExp (HsListComp hsExp hsStmts) subTable = do
     hsExp' <- renameHsExp hsExp subTable'
     return (HsListComp hsExp' hsStmts')
 renameHsExp (HsExpTypeSig srcLoc hsExp hsQualType) subTable = do
-    hsExp' <- renameHsExp hsExp subTable
-    subTable' <- updateSubTableWithHsQualType subTable hsQualType
-    hsQualType' <- renameHsQualType hsQualType subTable'
+    hsExp' <- expand hsExp
+    hsQualType' <- expand hsQualType
     return (HsExpTypeSig srcLoc hsExp' hsQualType')
-renameHsExp e subTable = traverseHsExp (flip renameHsExp subTable) e
+renameHsExp e _ = traverseHsExp expand e
 
 renameHsAlts :: [HsAlt] -> SubTable -> ScopeSM [HsAlt]
 renameHsAlts = mapRename renameHsAlt
@@ -308,11 +314,9 @@ renameHsAlts = mapRename renameHsAlt
 
 renameHsAlt :: HsAlt -> SubTable -> ScopeSM (HsAlt)
 renameHsAlt (HsAlt srcLoc hsPat hsGuardedAlts {-where-} hsDecls) subTable = withSrcLoc srcLoc $ do
-    subTable' <- updateSubTableWithHsPats subTable [hsPat] srcLoc
-    hsPat' <- renameHsPat hsPat subTable'
-    subTable'' <- updateSubTableWithHsDecls subTable' hsDecls
-    hsDecls' <- renameHsDecls hsDecls subTable''
-    hsGuardedAlts' <- renameHsRhs hsGuardedAlts subTable''
+    hsPat' <- expand hsPat
+    hsDecls' <- expand hsDecls
+    hsGuardedAlts' <- expand hsGuardedAlts
     return (HsAlt srcLoc hsPat' hsGuardedAlts' hsDecls')
 
 renameHsGuardedRhsList :: [HsGuardedRhs] -> SubTable -> ScopeSM [HsGuardedRhs]
@@ -332,11 +336,10 @@ renameHsGuardedRhs (HsGuardedRhs srcLoc hsExp1 hsExp2) subTable = withSrcLoc src
 -- the first section of a list comprehension.
 
 renameHsStmts :: [HsStmt] -> SubTable -> ScopeSM (([HsStmt],SubTable))
-renameHsStmts (hsStmt:hsStmts) subTable = do
-      subTable' <- updateSubTableWithHsStmt subTable hsStmt
-      hsStmt' <- renameHsStmt hsStmt subTable'
-      (hsStmts',subTable'') <- renameHsStmts hsStmts subTable'
-      return ((hsStmt':hsStmts'),subTable'')
+renameHsStmts (hsStmt:hsStmts) _ = do
+      hsStmt' <- renameHsStmt hsStmt ()
+      (hsStmts',subTable'') <- renameHsStmts hsStmts ()
+      return ((hsStmt':hsStmts'),())
 renameHsStmts [] subTable = do
       return ([],subTable)
 
@@ -368,9 +371,6 @@ renameHsFieldUpdate (HsField hsName hsExp) subTable = do
     hsExp' <- renameHsExp hsExp subTable
     return (HsField hsName' hsExp')
 
-renameHsNames :: [HsName] -> SubTable -> ScopeSM ([HsName])
-renameHsNames ns _ = return ns
-
 -- This looks up a replacement name in the subtable.
 -- Regardless of whether the name is found, if it's not qualified
 -- it will be qualified with the current module's prefix.
@@ -378,94 +378,6 @@ renameHsName :: HsName -> SubTable -> ScopeSM (HsName)
 renameHsName hsName _ = return hsName
 
 renameTypeHsName hsName subTable  =  return hsName
-
----------------------------------------
--- utility functions
-
--- clobberHsName(s) is called by the updateSubTableWith* functions to
--- deal with newly declared identifiers
-
--- clobberHsName(s) adds new mappings to the SubTable.
--- If a name already appeared, it's mapping is altered to the new one.
-
--- clobberHsNamesAndUpdateIdentTable also adds a mapping from this
--- renamed name to its source location and binding type
-
-clobberHsNamesAndUpdateIdentTable :: [(HsName,SrcLoc)] -> SubTable ->  ScopeSM (SubTable)
-clobberHsNamesAndUpdateIdentTable ((hsName,srcLoc):hsNamesAndASrcLocs) subTable  = do
-      subTable'  <- clobberHsName hsName subTable
-      subTable'' <- clobberHsNamesAndUpdateIdentTable hsNamesAndASrcLocs subTable'
-      return (subTable'')
-clobberHsNamesAndUpdateIdentTable [] subTable  = return (subTable)
-
-{-
-clobberHsNameAndUpdateIdentTable :: HsName -> SrcLoc -> SubTable -> Binding -> ScopeSM (SubTable)
-clobberHsNameAndUpdateIdentTable hsName srcLoc subTable binding
-  = do
-      unique <- getUnique
-      currModule <- getCurrentModule
-      let
-        hsName'     = renameAndQualify hsName unique currModule
-        subTable'   = addToFM (addToFM subTable hsName hsName') hsName' hsName'
-      addToIdentTable hsName' (srcLoc, binding)
-      incUnique
-      return (subTable')
--}
-
--- takes a list of names and a subtable. adds the associations
--- [name -> renamedName] to the table and returns it.
-clobberHsNames :: [HsName] -> SubTable -> ScopeSM (SubTable)
-clobberHsNames (hsName:hsNames) subTable
-  = do
-      subTable'  <- clobberHsName  hsName  subTable
-      subTable'' <- clobberHsNames hsNames subTable'
-      return (subTable'')
-clobberHsNames [] subTable
-  = return subTable
-
-clobberHsName :: HsName -> SubTable -> ScopeSM (SubTable)
-clobberHsName hsName subTable = return subTable
-
---------------------------------------------------------
-----This section of code updates the current SubTable to reflect the present scope
-
-updateSubTableWithHsDecls :: SubTable -> [HsDecl] ->  ScopeSM (SubTable)
-updateSubTableWithHsDecls subTable []  = return subTable
-updateSubTableWithHsDecls subTable (hsDecl:hsDecls) = do
-    let hsNamesAndASrcLocs = getHsNamesAndASrcLocsFromHsDecl hsDecl
-    subTable'  <- clobberHsNamesAndUpdateIdentTable hsNamesAndASrcLocs subTable
-    subTable'' <- updateSubTableWithHsDecls subTable' hsDecls
-    return (subTable'')
-
-updateSubTableWithHsPats :: SubTable -> [HsPat] -> SrcLoc -> ScopeSM (SubTable)
-updateSubTableWithHsPats subTable (hsPat:hsPats) srcLoc  = do
-    let hsNamesAndASrcLocs = zip (getNamesFromHsPat hsPat) (repeat srcLoc)
-    subTable'  <- clobberHsNamesAndUpdateIdentTable hsNamesAndASrcLocs subTable
-    subTable'' <- updateSubTableWithHsPats subTable' hsPats srcLoc
-    return subTable''
-updateSubTableWithHsPats subTable [] _srcLoc = do return (subTable)
-
--- Only one HsStmt should be added at a time because each new identifier is only valid
--- below the point at which it is defined
-
-updateSubTableWithHsStmt :: SubTable -> HsStmt -> ScopeSM (SubTable)
-updateSubTableWithHsStmt subTable hsStmt = do
-    let hsNamesAndASrcLocs = getHsNamesAndASrcLocsFromHsStmt hsStmt
-    subTable' <- clobberHsNamesAndUpdateIdentTable hsNamesAndASrcLocs subTable
-    return (subTable')
-
-----------------------------------------------------------
--- the following updateSubTableWith* functions do not need to alter the identTable aswell
---
-
--- takes an HsQualType (a type signature) and adds the names of its variables
--- to the current subTable
-
-updateSubTableWithHsQualType :: SubTable -> HsQualType -> ScopeSM (SubTable)
-updateSubTableWithHsQualType subTable hsQualType = do
-      let hsNames = nub $ getHsNamesFromHsQualType hsQualType
-      subTable' <- clobberHsNames hsNames subTable
-      return (subTable')
 
 getHsNamesAndASrcLocsFromHsDecl :: HsDecl -> [(HsName, SrcLoc)]
 getHsNamesAndASrcLocsFromHsDecl (HsPatBind srcLoc (HsPVar hsName) _ _) = [(hsName, srcLoc)]

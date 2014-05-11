@@ -1,4 +1,4 @@
-{-# LANGUAGE DoRec,ViewPatterns #-}
+{-# LANGUAGE RecursiveDo,ViewPatterns #-}
 module E.PrimOpt(performPrimOpt) where
 
 import Control.Monad.Fix()
