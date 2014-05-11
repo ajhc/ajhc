@@ -136,7 +136,7 @@ CFILES = src/StringTable/StringTable_cbits.o src/cbits/md5sum.o src/cbits/lookup
 	mkdir -p `echo $@ | sed -e 's@/[^/]*$$@@'`
 	$(HC) $(MY_CFLAGS) $< -c -o $@
 
-jhc: src/Main.hs  $(HSFILES) $(BUILT_SOURCES) src/StringTable/Atom.hs $(CFILES)
+jhc$(EXEEXT): src/Main.hs  $(HSFILES) $(BUILT_SOURCES) src/StringTable/Atom.hs $(CFILES)
 	$(BUILD_STOW) $(HC) $(GHCOPTS) --make $< $(CFILES) -o $@
 
 jhcp: src/Main.hs $(BUILT_SOURCES) $(HSFILES) src/StringTable/Atom.hs $(CFILES)
@@ -164,8 +164,8 @@ HSBOOT= src/DataConstructors.hs-boot src/FrontEnd/Tc/Class.hs-boot src/Grin/Grin
 src/Info/Properties.hs: src/data/props.txt utils/gen_props.prl
 	perl $(srcdir)/utils/gen_props.prl $< > $@ || rm -f $@
 
-src/Name/Prim.hs: utils/op_names.prl src/data/names.txt
-	perl $< > $@ || rm -f $@
+src/Name/Prim.hs: src/data/names.txt  utils/op_names.prl 
+	perl utils/op_names.prl -i $< > $@ || rm -f $@
 
 src/RawFiles.hs: $(RAWFILES)
 	perl $(srcdir)/utils/op_raw.prl $(basename $@) $^ > $@
