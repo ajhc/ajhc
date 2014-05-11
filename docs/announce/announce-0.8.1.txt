@@ -1,0 +1,34 @@
+After a hiatus, jhc 0.8.1 is released.
+
+http://repetae.net/computer/jhc
+
+- New license, jhc is now released under a permissive BSD style licence rather
+  than the GPL. The license is compatible with that of ghc allowing code mixing
+  between them.
+
+- New library layout based around the standards, there are now haskell98 and
+  haskell2010 packages that are guarenteed to be future proof strictly
+  compatible with the respective standards. A package haskell-extras contains
+  the additonal libraries from ghc's base.
+
+- Native support for complex and vector SIMD primitives, exposed via type
+  functions.  for instance 'foo :: Complex_ Float32_' for hardware accelerated
+  complex 32 bit floats for instance. These are unboxed only for now, full
+  library Num support in the works.
+
+- support for android as a target, you must install the android NDK to use this.
+
+- Support for embedded ARM architectures imported from Kiwamu Okabe's branch
+  allowing targeting bare hardware with no OS.
+
+- user defined kinds, introduced with the 'kind' keyword otherwise looking like
+  'type' declarations.
+
+- export/import lists now allow namespace qualifiers kind, class, type, or data
+  to explicitly only import or export the specific named entity. As an
+  extension allowed by this, classes and types no longer are in the same
+  namespace and can share names.
+
+- ForeignPtr's now have working finalizers when collected by the RTS.
+
+- CTYPE pragma to allow promoting arbitrary C types to FFIable entities.
