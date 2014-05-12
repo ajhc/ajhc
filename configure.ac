@@ -45,9 +45,33 @@ USE_READLINE=0
 USE_EDITLINE=0
 GHC=$HC
 GHCFLAGS="-hide-all-packages -package base"
-GHC_CHECK_MODULE(Data.Generics.Instances,syb,,,[])
-GHC_CHECK_MODULE(System.Time,old-time,,,[])
-GHC_CHECK_MODULE(Text.PrettyPrint.HughesPJ,pretty,,,[])
+MPACK=""
+
+AC_DEFUN([NEEDS_PACKAGE],[GHC_CHECK_MODULE($1,$2,,,[MPACK="$MPACK module '$1' from package '$2'
+"])])
+NEEDS_PACKAGE([Codec.Compression.Zlib],zlib)
+NEEDS_PACKAGE([Control.Monad.Reader],[mtl])
+NEEDS_PACKAGE([Data.Array],[array])
+NEEDS_PACKAGE([Data.Binary],[binary])
+NEEDS_PACKAGE([Data.ByteString.UTF8],[utf8-string])
+NEEDS_PACKAGE([Data.ByteString.Unsafe],[bytestring])
+NEEDS_PACKAGE([Data.Generics.Instances],syb)
+NEEDS_PACKAGE([Data.Graph.Inductive.Graph],fgl)
+NEEDS_PACKAGE([Data.IntSet],[containers])
+NEEDS_PACKAGE([Data.Yaml.Syck],HsSyck)
+NEEDS_PACKAGE([System.Cmd],[process])
+NEEDS_PACKAGE([System.Directory],[directory])
+NEEDS_PACKAGE([System.FilePath],[filepath])
+NEEDS_PACKAGE([System.Posix],[unix])
+NEEDS_PACKAGE([System.Random],[random])
+NEEDS_PACKAGE([System.Time],old-time)
+NEEDS_PACKAGE([Text.PrettyPrint.HughesPJ],pretty)
+NEEDS_PACKAGE([Text.Regex],regex-compat)
+if test -n "$MPACK"; then
+    echo "Some packages were not found:"
+    echo "$MPACK"
+    exit 1
+fi
 
 AC_ARG_ENABLE([line],[  --disable-line do not depend on readline or editline],[],[
     GHC_CHECK_MODULE(System.Console.Readline,readline,,[USE_READLINE=1],[

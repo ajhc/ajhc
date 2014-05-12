@@ -37,7 +37,7 @@ HSFILES=src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/
 	src/Util/UnionSolve.hs src/Util/UniqueMonad.hs src/Util/Util.hs src/Util/VarName.hs src/Version/Config.hs src/Version/Version.hs \
 	src/Support/IniParse.hs src/E/Lint.hs src/Util/Progress.hs src/Grin/StorageAnalysis.hs src/Util/YAML.hs src/Grin/Main.hs \
         src/E/Main.hs src/Util/GMap.hs src/Util/ExitCodes.hs src/Support/TempDir.hs src/E/PrimDecode.hs \
-        src/DerivingDrift/StandardRules.hs src/FrontEnd/Exports.hs
+        src/DerivingDrift/StandardRules.hs src/FrontEnd/Exports.hs src/Support/Inst.hs
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
 GHCPROFOPTS= -prof -auto-all -osuf prof.o -hisuf prof.hi
@@ -47,24 +47,19 @@ GHCINC=  -i @GHCINC@ -i$(srcdir)/drift_processed \
 	 -i$(srcdir)/src -i$(builddir)/src -odir $(builddir)/src -hidir $(builddir)/src \
 	 -I$(srcdir)/src -I$(builddir)/src
 
-PACKAGES= -hide-all-packages -package base -package fgl -package regex-compat -package random -package array -package directory \
-          -package bytestring -package binary -package mtl -package containers \
-	  -package unix -package utf8-string -package zlib -package HsSyck \
-	  -package filepath -package process
-
 GHCLANG= -XTypeFamilies -XViewPatterns -XUndecidableInstances -XOverlappingInstances \
-	-XRecordWildCards -XRecursiveDo -XTupleSections -XParallelListComp \
-	-XGeneralizedNewtypeDeriving -XScopedTypeVariables -XFlexibleInstances \
-	-XTypeSynonymInstances -XMultiParamTypeClasses -XDeriveDataTypeable \
-	-XNoMonoLocalBinds -XNamedFieldPuns \
-	-XForeignFunctionInterface -XUnliftedFFITypes -XImplicitParams -XUnboxedTuples \
-	-XStandaloneDeriving -XDeriveFunctor -XDeriveFoldable -XDeriveTraversable -XDeriveGeneric \
-	-XFlexibleContexts -XConstrainedClassMethods -XFunctionalDependencies -XMagicHash \
-	-XPolymorphicComponents -XExistentialQuantification -XUnicodeSyntax -XPostfixOperators \
-	-XPatternGuards -XLiberalTypeSynonyms -XRankNTypes -XTypeOperators \
-	-XEmptyDataDecls -XKindSignatures
+         -XRecordWildCards -XRecursiveDo -XTupleSections -XParallelListComp \
+         -XGeneralizedNewtypeDeriving -XScopedTypeVariables -XFlexibleInstances \
+         -XTypeSynonymInstances -XMultiParamTypeClasses -XDeriveDataTypeable \
+         -XNoMonoLocalBinds -XNamedFieldPuns \
+         -XForeignFunctionInterface -XUnliftedFFITypes -XImplicitParams -XUnboxedTuples \
+         -XStandaloneDeriving -XDeriveFunctor -XDeriveFoldable -XDeriveTraversable -XDeriveGeneric \
+         -XFlexibleContexts -XConstrainedClassMethods -XFunctionalDependencies -XMagicHash \
+         -XPolymorphicComponents -XExistentialQuantification -XUnicodeSyntax -XPostfixOperators \
+         -XPatternGuards -XLiberalTypeSynonyms -XRankNTypes -XTypeOperators \
+         -XEmptyDataDecls -XKindSignatures -XBangPatterns
 
-GHCOPTS= $(HSOPTS) -XBangPatterns -O @GHCFLAGS@ $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
+GHCOPTS= $(HSOPTS) -O @GHCFLAGS@ $(GHCDEBUGOPTS) $(GHCINC) $(GHCLANG)
 
 LIB_OPTIONS=$(RTSOPTS) $(JHC_TEST)  -L- -L.
 include library_deps.make

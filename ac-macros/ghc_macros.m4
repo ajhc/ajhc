@@ -23,7 +23,7 @@ GHCLIBS=""
 for l in $LIBS ; do
   GHCLIBS="$GHCLIBS -optl$l"
 done
-if AC_TRY_COMMAND($GHC $GHCFLAGS $GHCLDFLAGS -o conftest conftest.hs $GHCLIBS) && test -s conftest
+if AC_TRY_COMMAND([$GHC $GHCFLAGS $GHCLDFLAGS -o conftest conftest.hs $GHCLIBS > /dev/null 2>&1]) && test -s conftest
 then
 dnl Don't remove the temporary files here, so they can be examined.
   ifelse([$2], , :, [$2])
