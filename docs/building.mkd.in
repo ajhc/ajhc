@@ -11,16 +11,18 @@ Building from the tarball
 -------------------------
 
 jhc is also distributed via a autoconf/automake style tarball. Building jhc
-has the following dependencies:
+has the following dependencies, many of them are included with ghc
+distributions so run ./configure first and it will report any that are missing.
 
  * GHC 6.12.1 or better
- * haskell library [binary](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/binary)
- * haskell library [zlib](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/zlib)
- * haskell library [utf8-string](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/utf8-string)
- * haskell library [readline](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/readline)
- * haskell library [fgl](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/fgl)
- * haskell library [regex-compat](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/regex-compat)
- * haskell library [HsSyck](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/HsSyck)
+ * [binary](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/binary)
+ * [zlib](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/zlib)
+ * [utf8-string](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/utf8-string)
+ * [readline](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/readline)
+ * [fgl](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/fgl)
+ * [regex-compat](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/regex-compat)
+ * [HsSyck](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/HsSyck)
+ * [mtl](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/mtl)
 
 You can get the tarball
 at <http://repetae.net/dist/@PACKAGE@-@VERSION@.tar.gz>. In order
@@ -43,4 +45,5 @@ haskell98, and a few other libraries for use by jhc in addition to the
 sourcecode for these libraries. You can rebuild them if you wish simply by
 deleting the '.hl' files in your build directory and doing a 'make libs'.
 however it is recommended you work with the development darcs tree if you plan
-on modifying the base libraries.
+on modifying the base libraries. external libraries may be added to the jhc
+build tree by adding an appropriate file in lib/ext/
