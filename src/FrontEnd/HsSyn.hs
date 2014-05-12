@@ -169,12 +169,17 @@ data HsDecl
         hsDeclDecls     :: [HsDecl]
         }
     | HsDefaultDecl { hsDeclSrcLoc :: SrcLoc, hsDeclType :: HsType }
-    | HsTypeSig	{ 
-        hsDeclSrcLoc :: SrcLoc, 
-        hsDeclNames :: [HsName], 
+    | HsTypeSig	{
+        hsDeclSrcLoc   :: SrcLoc,
+        hsDeclNames    :: [HsName],
         hsDeclQualType :: HsQualType }
     | HsFunBind  [HsMatch]
-    | HsPatBind	 SrcLoc HsPat HsRhs {-where-} [HsDecl]
+    | HsPatBind	 {
+        hsDeclSrcLoc :: SrcLoc,
+        hsDeclPat    :: HsPat,
+        hsDeclRhs    :: HsRhs,
+        hsDeclDecls  :: [HsDecl]
+        }
     | HsActionDecl {
         hsDeclSrcLoc   :: SrcLoc,
         hsDeclPat      :: HsPat,

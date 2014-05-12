@@ -129,7 +129,7 @@ wrapInAsPatEnv e typ = do
 
 newHsVar ns = do
     nn <- newUniq
-    return $ toName Val (ns ++ "@",show nn)
+    return $ toName Val (ns ++ "@","tmp" ++ show nn)
 
 isTypePlaceholder :: HsName -> Bool
 isTypePlaceholder (getModule -> Just m) = m `elem` [toModule "Wild@",toModule "As@"]
