@@ -13,7 +13,7 @@ module Fixer.VMap(
     )where
 
 import Data.Monoid(Monoid(..))
-import Data.Typeable
+import qualified Data.Typeable as T -- qualified to avoid clashing with T.Proxy
 import List(intersperse)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -28,10 +28,10 @@ data VMap p n = VMap {
     vmapArgs    :: Map.Map (n,Int) (VMap p n),
     vmapNodes   :: Either (Proxy p) (Set.Set n)
     }
-    deriving(Typeable)
+    deriving(T.Typeable)
 
 data Proxy p = Proxy p | DepthExceeded
-    deriving(Eq,Ord,Typeable)
+    deriving(Eq,Ord,T.Typeable)
 
 instance Show p => Show (Proxy p) where
     showsPrec n (Proxy p) = showsPrec n p
