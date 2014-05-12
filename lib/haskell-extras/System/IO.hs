@@ -42,6 +42,7 @@ module System.IO(
     ) where
 
 import Foreign.Ptr
+import Jhc.Basics
 import Jhc.Handle
 import Jhc.IO
 import Jhc.Num

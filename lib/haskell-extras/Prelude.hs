@@ -6,7 +6,9 @@ module Prelude(
     Either(Left, Right),
     Ordering(LT, EQ, GT),
     Char, String, Int, Integer, Float, Double, Rational, IO,
-    module Jhc.Basics, -- for list
+    module Jhc.Prim.Prim,
+  --  ([]),(:),
+ --   module Jhc.Basics, -- for list
 --  List type: []((:), [])
 --  Tuple types: (,)((,)), (,,)((,,)), etc.
 --  Trivial type: ()(())
@@ -65,6 +67,7 @@ module Prelude(
 
 import Jhc.Basics
 import Jhc.Float
+import Jhc.Prim.Prim
 
 import Jhc.Inst.Enum()
 import Jhc.Inst.Num()
@@ -85,7 +88,6 @@ import Jhc.Order
 import Prelude.IO
 import Prelude.Text
 import qualified Prelude.CType as Char
---import qualified Data.Char as Char(isSpace,ord,chr)
 
 import Jhc.Class.Real
 

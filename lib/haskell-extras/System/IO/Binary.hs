@@ -6,6 +6,8 @@ import Foreign.C.Types
 import Foreign.C.String
 import Foreign.Ptr
 import Foreign.C.Error
+import Jhc.Prim.Bits
+import Jhc.Type.Word
 
 -- | Lazily read a file as a sequence of bytes.
 
