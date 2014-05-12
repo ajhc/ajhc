@@ -116,9 +116,12 @@ traverseHsExp fn e = f e where
         e <- fn hsExp
         return $ HsLet ds e
     f (HsDo hsStmts)  = HsDo `liftM` mapM (traverseHsStmtHsExp fn) hsStmts
-    f _ = error "FrontEnd.Syn.Traverse.traverseHsExp f unrecognized construct"
+    f h = error $ "FrontEnd.Syn.Traverse.traverseHsExp f unrecognized construct: " ++ show h
     fnl (Located l e) = withSrcSpan l $ Located l `liftM` fn e
 
+
+instance TraverseHsOps HsAlt where
+    traverseHsOps HsOps { .. } (HsAlt sl p rhs ds) = HsAlt sl <$> opHsPat p <*> T.traverse opHsExp rhs <*> T.traverse opHsDecl ds
     {-
 -- not done
     f (HsRecUpdate hsExp hsFieldUpdates)  = do
@@ -284,9 +287,9 @@ data HsOps m = HsOps {
     opHsStmt :: HsStmt -> m HsStmt
     }
 
-hsOpsDefault :: (Applicative m, MonadSetSrcLoc m) => HsOps m
-hsOpsDefault = HsOps { .. } where
-    f x = traverseHsOps hsOpsDefault x
+hsOpsDefault :: (Applicative m, MonadSetSrcLoc m) => HsOps m -> HsOps m
+hsOpsDefault hops = HsOps { .. } where
+    f x = traverseHsOps hops x
     opHsDecl = f
     opHsExp  = f
     opHsPat  = f
@@ -299,6 +302,11 @@ class TraverseHsOps a where
     -- act on the argument itself
     directHsOps   :: (Applicative m,MonadSetSrcLoc m) => HsOps m -> a -> m a
     directHsOps _ x = return x
+
+instance TraverseHsOps HsModule where
+    traverseHsOps  HsOps { .. } HsModule { hsModuleDecls = d,.. } = do
+        e <- mapM opHsDecl d
+        return HsModule { hsModuleDecls = e, .. }
 
 instance TraverseHsOps HsType where
     traverseHsOps HsOps { .. } = traverseHsType opHsType
@@ -326,6 +334,13 @@ instance TraverseHsOps HsDecl where
             return HsClassDecl { .. }
         f HsClassAliasDecl { .. } = withSrcLoc hsDeclSrcLoc $ do
             return HsClassAliasDecl { .. }
+        f HsInstDecl { .. } = withSrcLoc hsDeclSrcLoc $ do
+            hsDeclClassHead <- traverseHsOps hops hsDeclClassHead
+            hsDeclDecls <- mapM opHsDecl hsDeclDecls
+            return HsInstDecl { .. }
+        f HsTypeSig { .. } = withSrcLoc hsDeclSrcLoc $ do
+            hsDeclQualType <- traverseHsOps hops hsDeclQualType
+            return HsTypeSig { .. }
         f HsActionDecl { .. } = withSrcLoc hsDeclSrcLoc $ do
             hsDeclPat <- opHsPat hsDeclPat
             hsDeclExp <- opHsExp hsDeclExp
@@ -333,6 +348,11 @@ instance TraverseHsOps HsDecl where
         f (HsFunBind ms) = HsFunBind <$> traverseHsOps hops ms
         f d = traverseHsDeclHsExp opHsExp d
 
+instance TraverseHsOps HsClassHead where
+    traverseHsOps hops@HsOps { .. } HsClassHead { .. } = 
+        mch <$> traverseHsOps hops hsClassHeadContext <*> mapM opHsType hsClassHeadArgs where
+            mch hsClassHeadContext hsClassHeadArgs = HsClassHead { .. }
+        
 instance TraverseHsOps HsMatch where
     traverseHsOps HsOps { .. } HsMatch { .. } = withSrcLoc hsMatchSrcLoc $ do
         hsMatchPats <- mapM opHsPat hsMatchPats
@@ -358,8 +378,8 @@ instance TraverseHsOps HsQualType where
         hsQualTypeType <- opHsType hops hsQualTypeType
         return HsQualType { .. }
 
-instance (T.Traversable f,TraverseHsOps a) => TraverseHsOps (f a) where
-    traverseHsOps hops x = T.traverse (traverseHsOps hops) x
+--instance (T.Traversable f,TraverseHsOps a) => TraverseHsOps (f a) where
+--    traverseHsOps hops x = T.traverse (traverseHsOps hops) x
 
 instance TraverseHsOps HsAsst where
     traverseHsOps HsOps { .. } (HsAsstEq a b) = HsAsstEq <$> opHsType a <*> opHsType b
@@ -395,9 +415,10 @@ instance TraverseHsOps HsExp where
             e <- opHsExp hsExp
             return $ HsLet ds e
         f (HsDo hsStmts)  = HsDo `liftM` mapM opHsStmt hsStmts
+        f (HsCase e as) = HsCase <$> opHsExp e <*> traverseHsOps hops as
         f e = traverseHsExp opHsExp e
 
---instance TraverseHsOps a => TraverseHsOps [a] where
---    traverseHsOps hops xs = T.traverse (traverseHsOps hops) xs
---instance TraverseHsOps a => TraverseHsOps (HsField a) where
---    traverseHsOps hops x = T.traverse (traverseHsOps hops) x
+instance TraverseHsOps a => TraverseHsOps [a] where
+    traverseHsOps hops xs = mapM (traverseHsOps hops) xs
+instance TraverseHsOps a => TraverseHsOps (HsField a) where
+    traverseHsOps hops x = T.traverse (traverseHsOps hops) x

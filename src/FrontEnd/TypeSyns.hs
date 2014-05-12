@@ -1,4 +1,4 @@
-module FrontEnd.TypeSyns(expandTypeSyns) where
+module FrontEnd.TypeSyns(expandTypeSyns,dumpit) where
 
 import Control.Applicative
 import Control.Monad.State
@@ -28,15 +28,27 @@ instance MonadSrcLoc ScopeSM where
     getSrcLoc = gets srcLoc
 instance MonadSetSrcLoc ScopeSM where
     withSrcLoc sl a = modify (\s -> s { srcLoc = sl `mappend` srcLoc s}) >> a
+instance MonadSetSrcLoc IO where
+    withSrcLoc sl a = a
+instance MonadSrcLoc IO where
+    getSrcLoc = return bogusASrcLoc
 
-expandTypeSyns :: (Expand x,MonadWarn m) => TypeSynonyms -> x -> m x
+expandTypeSyns :: (Expand x,TraverseHsOps x,MonadWarn m) => TypeSynonyms -> x -> m x
 expandTypeSyns syns m = ans where
     startState = ScopeState { .. } where
         errors   = []
         synonyms = syns
         srcLoc   = bogusASrcLoc
-    (rm, fs) = runState (expand m) startState
+   -- (rm, fs) = runState (expand m) startState
+    (rm, fs) = runState (doit m) startState
     ans = mapM_ addWarning (errors fs) >> return rm
+    doit = traverseHsOps ops
+    ops = hsOpsDefault ops { opHsType = removeSynonymsFromType syns }
+
+dumpit z = do
+    let ops = hsOpsDefault ops { opHsType = (\x -> do print x; return x) }
+    traverseHsOps ops z
+
 
 class Expand a where
     expand :: a -> ScopeSM a
@@ -77,9 +89,9 @@ instance Expand HsDecl where
             hsContext' <- expand hsContext
             hsConDecls' <- expand hsConDecls
             return dl { hsDeclContext = hsContext', hsDeclCons = hsConDecls' }
-        f (HsTypeDecl srcLoc name hsNames t) = withSrcLoc srcLoc $ do
-            t' <- renameHsType' False t
-            return (HsTypeDecl srcLoc name hsNames t')
+--        f (HsTypeDecl srcLoc name hsNames t) = withSrcLoc srcLoc $ do
+--            t' <- renameHsType' False t
+--            return (HsTypeDecl srcLoc name hsNames t')
         f decl@HsActionDecl { hsDeclSrcLoc = srcLoc, hsDeclExp = e }  = withSrcLoc srcLoc $ do
             e <- expand e
             return decl { hsDeclExp = e }
@@ -133,12 +145,9 @@ instance Expand a => Expand (HsBangType' a) where
 instance Expand HsType where
     expand x = renameHsType x
 
-renameHsType = renameHsType' True
-renameHsType' dovar t = pp t where
-    pp t | not dovar = return t
-    pp t = do
-        syns <- gets synonyms
-        removeSynonymsFromType syns t
+renameHsType t = do
+    syns <- gets synonyms
+    removeSynonymsFromType syns t
 
 -- note that for renameHsMatch, the 'wheres' dominate the 'pats'
 
