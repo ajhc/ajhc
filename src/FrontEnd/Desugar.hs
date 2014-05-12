@@ -140,6 +140,7 @@ replaceVarNamesInPat name p = f name p where
     f name HsPWildCard = HsPWildCard
     f name (HsPIrrPat pat) = HsPIrrPat $ fmap (f name) pat
     f name (HsPBangPat pat) = HsPBangPat $ fmap (f name) pat
+    f name (HsPTypeSig sl pat ty) = HsPTypeSig sl (f name pat) ty
     f name p = error $ "replaceVarNamesInPat: " ++ show (name,p)
 
 desugarRhs :: (HsRhs) -> PatSM (HsRhs)
