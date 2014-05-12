@@ -33,7 +33,7 @@ import Data.Char (intToDigit,ord)
 import Foreign
 import Foreign.C
 import System.IO
-import System.IO.Unsafe (unsafePerformIO)
+import System.IO.Unsafe (unsafePerformIO) as US
 
 type Hash = ABCDE
 data ABCDE = ABCDE !Word32 !Word32 !Word32 !Word32 !Word32
@@ -59,7 +59,7 @@ sha1String ss = sha1Bytes (toUTF ss) where
 
 
 sha1Bytes :: [Word8] -> Hash
-sha1Bytes ss = unsafePerformIO $ do
+sha1Bytes ss = US.unsafePerformIO $ do
     let len = length ss
         plen = sha1_step_1_2_plength len
     allocaBytes plen $ \ptr -> do
@@ -100,7 +100,7 @@ sha1file fp = do
     hClose h
     return hash
 
-big_endian = unsafePerformIO $ do
+big_endian = US.unsafePerformIO $ do
     let x :: Word32
         x = 0x12345678
     s <- with x $ \ptr -> peekCStringLen (castPtr ptr,4)

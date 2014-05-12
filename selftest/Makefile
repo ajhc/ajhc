@@ -1,4 +1,4 @@
-INC= -i -i../drift_processed -i../src
+INC= -i -i../drift_processed -i../src -i../compat/haskell98
 GHCOPTS= -fallow-overlapping-instances -fallow-undecidable-instances -fglasgow-exts \
 	 -XBangPatterns $(INC) -XTypeFamilies -XViewPatterns -XRecordWildCards \
 	 -O -package QuickCheck -ignore-package lang  -optc-std=c99 -optc-g \
@@ -10,7 +10,8 @@ GHCOPTS= -fallow-overlapping-instances -fallow-undecidable-instances -fglasgow-e
 
 HC= ghc
 
-all: md5 sha1 TestParse cff SelfTest UnionSolve TempDir
+TESTPROGS=md5 sha1 TestParse cff SelfTest UnionSolve TempDir
+all: $(TESTPROGS)
 
 UnionSolve: UnionSolve.hs ../src/Util/UnionSolve.hs
 	ghc $(INC) --make $<
@@ -21,4 +22,4 @@ TempDir: TempDir.hs ../src/Support/TempDir.hs
 	$(HC) $(GHCOPTS) --make $< -o $@  -I../src/cbits ../src/cbits/md5sum.c ../src/StringTable/StringTable_cbits.c ../src/cbits/lookup3.c
 
 clean:
-	rm -f -- md5 sha1 TestParse cff SelfTest
+	rm -f -- *.o *.hi $(TESTPROGS)

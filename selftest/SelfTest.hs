@@ -106,7 +106,7 @@ testName = do
     qc "name.setModule" $ \t a b c ->  nn b && nn c ==> setModule (toModule c) (toName t (a :: Maybe Module,b)) == toName t (c,b)
     qc "name.show" $ \ t a b -> nn a && nn b ==> show (toName t (a,b)) == a ++ "." ++ b
     qc "name.quote" $ \ t a b -> nn a && nn b ==> let n = toName t (a,b) in fromQuotedName (quoteName n) == Just n
-    qc "name.noquote" $ \ t a b -> t /= QuotedName && nn b ==> collect t $ fromQuotedName (toName t (a :: Maybe Module,b)) == Nothing
+    qc "name.noquote" $ \ t a b -> t /= QuotedName && nn b ==> collect t (fromQuotedName (toName t (a :: Maybe Module,b)) == Nothing)
     qc "name.acc" prop_acc
     qc "name.tup" $ \n -> n >= 0 ==> fromUnboxedNameTuple (unboxedNameTuple RawType n) == Just n
     qc "name.overlap" $ \t -> (isTypeNamespace t,isValNamespace t) /= (True,True)
@@ -126,7 +126,6 @@ testHasSize = do
     qc "hasSize.gt" prop_gt
     qc "hasSize.gte" prop_gte
     qc "hasSize.lte" prop_lte
-
 
 testInfo = do
     putStrLn "Testing Info"
@@ -149,7 +148,6 @@ testInfo = do
     print (x'',getProperty prop_METHOD x'', getProperty prop_INSTANCE x'')
     print (getProperties x')
 
-
 testBinary = do
     let test = ("hello",3::Int,toAtom "Up and Atom!")
         fn = "/tmp/jhc.test.bin"
@@ -169,7 +167,6 @@ testBinary = do
     print $ x `asTypeOf` nf
     z <- Info.lookup nfo
     if (z /= t) then fail "Info Test Failed" else return ()
-
 
 deriving instance Bounded NameType
 deriving instance Enum Op.ValOp
@@ -198,6 +195,6 @@ instance Arbitrary Module where
         f "" = f "X"
         f s = toModule s
 
-instance Arbitrary Char where
-    arbitrary     = Test.QuickCheck.choose ('\32', '\128')
-    coarbitrary c = variant (fromEnum c `rem` 4)
+--instance Arbitrary Char where
+--    arbitrary     = Test.QuickCheck.choose ('\32', '\128')
+--    coarbitrary c = variant (fromEnum c `rem` 4)
