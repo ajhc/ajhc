@@ -23,7 +23,7 @@ import System.Directory
 import IO
 #if    USE_EDITLINE
    ;import System.Console.Editline.Readline
-#elif  USE_NOLINE
+#elif  USE_READLINE
    ;import System.Console.Readline
 #endif
 
