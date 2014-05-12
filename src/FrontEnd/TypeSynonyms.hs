@@ -64,14 +64,16 @@ declsToTypeSynonyms tsin ds = f tsin gr [] where
             warn (head [ sl | (_,(_,_,sl)) <- ns]) TypeSynonymRecursive ("Recursive type synonyms:" <+> show (fsts ns))
             f tsin xs rs
     f tsin (Left (n,(as,body,sl)):xs) rs = do
-        body' <- removeSynonymsFromType tsin body
+        body' <- evalTypeSyms sl tsin body
         f (tsInsert n (as,body',sl) tsin) xs ((n,(as,body',sl)):rs)
     f _ [] rs = return $ TypeSynonyms (Map.fromList rs)
 
 tsInsert x y (TypeSynonyms xs) = TypeSynonyms (Map.insert x y xs)
 
-removeSynonymsFromType :: MonadWarn m => TypeSynonyms -> HsType -> m HsType
-removeSynonymsFromType syns t = evalTypeSyms  syns t
+removeSynonymsFromType :: (MonadSrcLoc m, MonadWarn m) => TypeSynonyms -> HsType -> m HsType
+removeSynonymsFromType syns t = do
+    sl <- getSrcLoc
+    evalTypeSyms sl syns t
 
 quantifyHsType :: [HsName] -> HsQualType -> HsType
 quantifyHsType inscope t
@@ -84,9 +86,9 @@ quantifyHsType inscope t
     fv (HsTyExists vs qt) = tell $ snub (execWriter (fv $ hsQualTypeType qt)) \\ map hsTyVarBindName vs
     fv x = traverseHsType (\x -> fv x >> return x) x >> return ()
 
-evalTypeSyms :: MonadWarn m => TypeSynonyms -> HsType -> m HsType
-evalTypeSyms (TypeSynonyms tmap) t = execUniqT 1 (eval [] t) where
-    eval stack x@(HsTyCon n) | Just (args, t, sl) <- Map.lookup (toName TypeConstructor n) tmap = do
+evalTypeSyms :: MonadWarn m => SrcLoc -> TypeSynonyms -> HsType -> m HsType
+evalTypeSyms sl (TypeSynonyms tmap) ot = execUniqT 1 (eval [] ot) where
+    eval stack x@(HsTyCon n) | Just (args, t, sldef) <- Map.lookup (toName TypeConstructor n) tmap = do
         let excess = length stack - length args
         if (excess < 0) then do
             lift $ warn sl TypeSynonymPartialAp ("Partially applied typesym:" <+> show n <+> "need" <+> show (- excess) <+> "more arguments.")

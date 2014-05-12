@@ -286,6 +286,15 @@ data HsOps m = HsOps {
     opHsStmt :: HsStmt -> m HsStmt
     }
 
+-- | provides a default hsOps that recurses further down the tree for undeclared
+-- operations. In order to tie the knot properly, you need to pass its return
+-- value into itself, as in.
+--
+-- let ops = (hsOpsDefault ops) { opHsType = custom type handler }
+--
+-- NOTE: if you forget the parentheses around hsopsdefault ops, your program
+-- will still typecheck and compile, but it will behave incorrectly.
+
 hsOpsDefault :: (Applicative m, MonadSetSrcLoc m) => HsOps m -> HsOps m
 hsOpsDefault hops = HsOps { .. } where
     f x = traverseHsOps hops x
@@ -375,18 +384,24 @@ instance TraverseHsOps HsDecl where
             where dr hsDeclType =  HsPragmaSpecialize { .. }
 
 instance TraverseHsOps HsRule where
-    traverseHsOps HsOps { .. } HsRule { .. } = return HsRule { .. }
+    traverseHsOps hops HsRule { .. } = hr <$>
+            ah hsRuleLeftExpr <*> ah hsRuleRightExpr <*> f hsRuleFreeVars where
+        f xs = T.traverse (T.traverse (T.traverse ah)) xs
+        hr hsRuleLeftExpr hsRuleRightExpr hsRuleFreeVars = HsRule { .. }
+        ah x = applyHsOps hops x
 
 instance TraverseHsOps HsClassHead where
     traverseHsOps hops@HsOps { .. } HsClassHead { .. } =
-        mch <$> applyHsOps hops hsClassHeadContext <*> mapM opHsType hsClassHeadArgs where
+        mch <$> applyHsOps hops hsClassHeadContext <*> T.traverse opHsType hsClassHeadArgs where
             mch hsClassHeadContext hsClassHeadArgs = HsClassHead { .. }
 
 instance TraverseHsOps HsMatch where
     traverseHsOps HsOps { .. } HsMatch { .. } = withSrcLoc hsMatchSrcLoc $ do
         hsMatchPats <- mapM opHsPat hsMatchPats
         hsMatchRhs <- T.traverse opHsExp hsMatchRhs
+        hsMatchDecls <- T.traverse opHsDecl hsMatchDecls
         return HsMatch { .. }
+
 instance TraverseHsOps HsConDecl where
     traverseHsOps HsOps { .. } HsConDecl { .. } = withSrcLoc hsConDeclSrcLoc $ do
         hsConDeclConArg <- mapM (T.mapM opHsType) hsConDeclConArg
@@ -399,21 +414,18 @@ instance TraverseHsOps HsPat where
     applyHsOps ho x = opHsPat ho x
     traverseHsOps hops@HsOps { .. } x = f x where
         f (HsPTypeSig sl p qt) = HsPTypeSig sl <$>
-            opHsPat p <*> traverseHsOps hops qt
+            opHsPat p <*> applyHsOps hops qt
         f x = traverseHsPat opHsPat x
 
 instance TraverseHsOps HsQualType where
     traverseHsOps hops HsQualType { .. } = do
-        hsQualTypeContext <- traverseHsOps hops hsQualTypeContext
+        hsQualTypeContext <- applyHsOps hops hsQualTypeContext
         hsQualTypeType <- opHsType hops hsQualTypeType
         return HsQualType { .. }
 
---instance (T.Traversable f,TraverseHsOps a) => TraverseHsOps (f a) where
---    traverseHsOps hops x = T.traverse (traverseHsOps hops) x
-
 instance TraverseHsOps HsAsst where
     traverseHsOps HsOps { .. } (HsAsstEq a b) = HsAsstEq <$> opHsType a <*> opHsType b
-    traverseHsOps _ x = return x
+    traverseHsOps _ x = pure x
 
 instance TraverseHsOps HsStmt where
     applyHsOps = opHsStmt
@@ -441,7 +453,7 @@ instance TraverseHsOps HsExp where
         f e = traverseHsExp opHsExp e
 
 instance (TraverseHsOps a,T.Traversable f) => TraverseHsOps (f a) where
-    traverseHsOps hops xs = T.traverse (traverseHsOps hops) xs
+    traverseHsOps hops xs = T.traverse (applyHsOps hops) xs
 --instance TraverseHsOps a => TraverseHsOps [a] where
 --    traverseHsOps hops xs = mapM (traverseHsOps hops) xs
 --instance TraverseHsOps a => TraverseHsOps (HsField a) where

@@ -247,7 +247,7 @@ unificationError t1 t2 = do
     diagnosis <- getErrorContext
     let Left msg = typeError (Unification $ "attempted to unify " ++
             prettyPrintType t1 ++ " with " ++ prettyPrintType t2) diagnosis
-    liftIO $ processIOErrors
+    liftIO $ processIOErrors "unification"
     liftIO $ putErrLn msg
     liftIO $ exitFailure
 
@@ -520,7 +520,7 @@ instance Monad Tc where
     Tc a >> Tc b = Tc $ a >> b
     fail s = Tc $ do
         st <- ask
-        liftIO $ processIOErrors
+        liftIO $ processIOErrors "typechecking"
         Left x <- typeError (Failure s) (tcDiagnostics st)
         liftIO $ fail x
 

@@ -15,6 +15,7 @@ import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Data.IORef
+import System.IO
 import System.IO.Unsafe
 
 import FrontEnd.SrcLoc
@@ -49,9 +50,13 @@ pad n s = case length s of
     x | x >= n -> s
     x -> s ++ replicate (n - x) ' '
 
-processIOErrors :: IO ()
-processIOErrors = do
+processIOErrors :: String -> IO ()
+processIOErrors s = do
     ws <- readIORef ioWarnings
+    unless (null ws || null s) $ do
+        hFlush stdout
+        hFlush stderr
+        putErrLn $ "\nDiagnostic from " ++ s
     processErrors' True ws
     writeIORef ioWarnings []
 

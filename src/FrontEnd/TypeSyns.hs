@@ -39,16 +39,17 @@ expandTypeSyns syns m = ans where
         errors   = []
         synonyms = syns
         srcLoc   = bogusASrcLoc
-   -- (rm, fs) = runState (expand m) startState
-    (rm, fs) = runState (doit m) startState
+    (rm, fs) = runState action startState
     ans = mapM_ addWarning (errors fs) >> return rm
-    doit = traverseHsOps ops
-    ops = hsOpsDefault ops { opHsType = removeSynonymsFromType syns }
+    doit x = applyHsOps ops x
+    opHsDecl td@HsTypeDecl {} = return td
+    opHsDecl d = traverseHsOps ops d
+    ops = (hsOpsDefault ops) { opHsDecl, opHsType = removeSynonymsFromType syns }
+    action = if False then expand m else doit m
 
 dumpit z = do
-    let ops = hsOpsDefault ops { opHsType = (\x -> do print x; return x) }
+    let ops = (hsOpsDefault ops) { opHsType = (\x -> do print x; return x) }
     traverseHsOps ops z
-
 
 class Expand a where
     expand :: a -> ScopeSM a

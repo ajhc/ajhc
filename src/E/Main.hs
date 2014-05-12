@@ -125,7 +125,7 @@ processDecls cho ho' tiData = withStackStatus "processDecls" $  do
         theProps = fromList [ (toId x,y) | (x,y) <- Map.toList $ tiProps tiData]
     ds' <- convertDecls tiData theProps
         (hoClassHierarchy $ hoTcInfo ho') allAssumps  fullDataTable decls
-    processIOErrors
+    processIOErrors "decl conversion"
     let ds = classInstances ++ [ (v,lc) | (n,v,lc) <- ds', v `notElem` fsts classInstances ]
     -- Build rules from instances, specializations, and user specified rules and catalysts
     let augmentedClassHierarchy = hoClassHierarchy (hoTcInfo ho) `augmentClassHierarchy` hoClassHierarchy (hoTcInfo ho')
@@ -302,7 +302,7 @@ processDecls cho ho' tiData = withStackStatus "processDecls" $  do
     wdump FD.Stats $
         Stats.printLStat (optStatLevel options) "MainPass Stats" (progStats prog)
 
-    processIOErrors
+    processIOErrors "optimization pass"
 
     lintCheckProgram (putErrLn "After the workwrap/CPR") prog
 

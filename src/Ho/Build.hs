@@ -456,7 +456,7 @@ loadModules modOpt targets libs sloc need = do
     ms1 <- forM (rights need) $ \fn -> do
         fetchSource modOpt done_ref [fn] Nothing
     forM_ (map (,sloc) $ lefts need) $ resolveDeps modOpt done_ref
-    processIOErrors
+    processIOErrors "module loading"
     done <- readIORef done_ref
     let needed = (ms1 ++ lefts need)
     (chash,cug) <- toCompUnitGraph done needed

@@ -126,16 +126,17 @@ tiModules htc ms = do
     thisTypeSynonyms <- declsToTypeSynonyms (hoTypeSynonyms htc) $ concat
         [ filter isHsTypeDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms]
     let ts = thisTypeSynonyms `mappend` hoTypeSynonyms htc
+
+    -- expand synonyms and refix expressions
     let f x = expandTypeSyns ts (modInfoHsModule x) >>=
             return . FrontEnd.Infix.infixHsModule fixityMap >>=
             \z -> return x { modInfoHsModule = z }
     ms <- mapM f ms
-    processIOErrors
     let ds = concat [ hsModuleDecls $ modInfoHsModule m | m <- ms ]
-
     wdump FD.Decls $ do
         putStrLn "  ---- processed decls ---- "
         putStrLn $ HsPretty.render (HsPretty.ppHsDecls ds)
+    processIOErrors "synonym expansion and fixity processing"
 
     -- kind inference for all type constructors type variables and classes in the module
     let classAndDataDecls = filter (or' [isHsDataDecl, isHsClassDecl, isHsClassAliasDecl]) ds
@@ -145,7 +146,7 @@ tiModules htc ms = do
          do {putStrLn " \n ---- kind information ---- \n";
              putStrLn $ PPrint.render $ pprint kindInfo}
 
-    processIOErrors
+    processIOErrors "kind inference"
 
     let localDConsEnv = dataConsEnv kindInfo classAndDataDecls
     wdump FD.Dcons $ do
@@ -292,5 +293,5 @@ tiModules htc ms = do
             tiProps        = pragmaProps,
             tiAllAssumptions = allAssumps
         }
-    processIOErrors
+    processIOErrors "module typechecking"
     return (hoEx,tiData)

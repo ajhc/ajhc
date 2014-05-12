@@ -68,7 +68,7 @@ determineExports defs ae ms = do
                 putStrLn $ " -- Exports: " ++ show (modInfoName m)
                 mapM_ putStrLn (sort [ show (nameType n) ++ " " ++ show n | n <- modInfoExport m])
     mapM_ g ms
-    processIOErrors
+    processIOErrors "import/export processing"
     return ms
 
 determineExports' :: [(Name,[Name])] -> [(Module,[Name])] -> [ModInfo] -> IO [ModInfo]
