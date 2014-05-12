@@ -1,12 +1,10 @@
 module Util.UniqueMonad(UniqT,Uniq, runUniq, runUniqT, execUniq1, execUniq, execUniqT) where
 
-
 import GenUtil
 import Data.Unique
 import Control.Monad.State
 import Control.Monad.Reader
 import Control.Monad.Identity
-
 
 instance UniqueProducer IO where
     newUniq = do

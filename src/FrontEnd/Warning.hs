@@ -40,8 +40,7 @@ addWarn t m = do
     warn sl t m
 
 warn :: MonadWarn m => SrcLoc -> WarnType -> String -> m ()
-warn s t m = addWarning Warning
-    { warnSrcLoc = s, warnType = t, warnMessage = m }
+warn warnSrcLoc warnType warnMessage = addWarning Warning { .. }
 
 err :: MonadWarn m => WarnType -> String -> m ()
 err t m = warn bogusASrcLoc t m
@@ -70,14 +69,12 @@ processErrors ws = processErrors' True ws >> return ()
 processErrors' :: Bool -> [Warning] -> IO Bool
 processErrors' _ [] = return False
 processErrors' doDie ws = putErrLn "" >> mapM_ s (snub ws) >> when (die && doDie) exitFailure >> return die where
---    ws' = filter ((`notElem` ignore) . warnType ) $ snub ws
-    s Warning { warnSrcLoc = sl, warnType = t, warnMessage = m }
-        | sl == bogusASrcLoc = putErrLn $ msg t m
-    s Warning { warnSrcLoc = SrcLoc { srcLocFileName = fn, srcLocLine = -1 },
-                warnType = t ,warnMessage = m } = putErrLn (unpackPS fn ++ ": "  ++ msg t m)
-    s Warning { warnSrcLoc = SrcLoc { srcLocFileName = fn, srcLocLine = l },
-                warnType = t ,warnMessage = m } = putErrLn (unpackPS fn ++ ":" ++ pad 3 (show l) ++  " - "  ++ msg t m)
+    s Warning { warnSrcLoc = srcLoc@SrcLoc { .. }, .. }
+        | srcLoc == bogusASrcLoc = putErrLn $ msg warnType warnMessage
+        | srcLocLine == -1 = putErrLn (unpackPS srcLocFileName ++ ": " ++ msg warnType warnMessage)
+        | otherwise = putErrLn (unpackPS srcLocFileName ++ ":" ++ pad 3 (show srcLocLine) ++  " - "  ++ msg warnType warnMessage)
     die = (any warnIsFatal (map warnType ws)) && not (optKeepGoing options)
+    --ws' = filter ((`notElem` ignore) . warnType ) $ snub ws
 
 data WarnType
     = AmbiguousExport Module [Name]
@@ -128,21 +125,21 @@ instance Show Warning where
 msg t m = (if warnIsFatal t then "Error: " else "Warning: ") ++ m
 
 _warnings = [
-    ("deprecations", "warn about uses of functions & types that are deprecated"),
-    ("duplicate-exports", "warn when an entity is exported multiple times"),
-    ("hi-shadowing", "warn when a .hi file in the current directory shadows a library"),
-    ("incomplete-patterns", "warn when a pattern match could fail"),
-    ("misc", "enable miscellaneous warnings"),
-    ("missing-fields", "warn when fields of a record are uninitialised"),
-    ("missing-methods", "warn when class methods are undefined"),
-    ("missing-signatures", "warn about top-level functions without signatures"),
-    ("name-shadowing", "warn when names are shadowed"),
-    ("overlapping-patterns", "warn about overlapping patterns"),
-    ("simple-patterns", "warn about lambda-patterns that can fail"),
-    ("type-defaults", "warn when defaulting happens"),
-    ("unused-binds", "warn about bindings that are unused"),
-    ("unused-imports", "warn about unnecessary imports"),
-    ("unused-matches", "warn about variables in patterns that aren't used")
+    ("deprecations"         ,"warn about uses of functions & types that are deprecated")        ,
+    ("duplicate-exports"    ,"warn when an entity is exported multiple times")                  ,
+    ("hi-shadowing"         ,"warn when a .hi file in the current directory shadows a library") ,
+    ("incomplete-patterns"  ,"warn when a pattern match could fail")                            ,
+    ("misc"                 ,"enable miscellaneous warnings")                                   ,
+    ("missing-fields"       ,"warn when fields of a record are uninitialised")                  ,
+    ("missing-methods"      ,"warn when class methods are undefined")                           ,
+    ("missing-signatures"   ,"warn about top-level functions without signatures")               ,
+    ("name-shadowing"       ,"warn when names are shadowed")                                    ,
+    ("overlapping-patterns" ,"warn about overlapping patterns")                                 ,
+    ("simple-patterns"      ,"warn about lambda-patterns that can fail")                        ,
+    ("type-defaults"        ,"warn when defaulting happens")                                    ,
+    ("unused-binds"         ,"warn about bindings that are unused")                             ,
+    ("unused-imports"       ,"warn about unnecessary imports")                                  ,
+    ("unused-matches"       ,"warn about variables in patterns that aren't used")
     ]
 
 ----------------

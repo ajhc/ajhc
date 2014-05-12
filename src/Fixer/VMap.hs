@@ -13,10 +13,10 @@ module Fixer.VMap(
     )where
 
 import Data.Monoid(Monoid(..))
-import qualified Data.Typeable as T -- qualified to avoid clashing with T.Proxy
 import List(intersperse)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import qualified Data.Typeable as T -- qualified to avoid clashing with T.Proxy
 
 import Doc.DocLike
 import Fixer.Fixer

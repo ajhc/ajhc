@@ -99,4 +99,3 @@ mixInt x y = hashInt x - hashInt y
 
 mixInt3 :: Int -> Int -> Int -> Int
 mixInt3 x y z = (hashInt x - hashInt y) `xor` hashInt z
-

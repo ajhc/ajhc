@@ -19,7 +19,6 @@ data ScopeState = ScopeState {
     srcLoc   :: !SrcLoc
     }
 
--- The monadic type
 type ScopeSM = State ScopeState
 
 instance MonadWarn ScopeSM where
@@ -32,10 +31,10 @@ instance MonadSetSrcLoc ScopeSM where
 
 expandTypeSyns :: (Expand x,MonadWarn m) => TypeSynonyms -> x -> m x
 expandTypeSyns syns m = ans where
-    startState = ScopeState {
-        errors   = [],
-        synonyms = syns,
-        srcLoc   = bogusASrcLoc }
+    startState = ScopeState { .. } where
+        errors   = []
+        synonyms = syns
+        srcLoc   = bogusASrcLoc
     (rm, fs) = runState (expand m) startState
     ans = mapM_ addWarning (errors fs) >> return rm
 

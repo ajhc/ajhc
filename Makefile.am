@@ -164,7 +164,7 @@ HSBOOT= src/DataConstructors.hs-boot src/FrontEnd/Tc/Class.hs-boot src/Grin/Grin
 src/Info/Properties.hs: src/data/props.txt utils/gen_props.prl
 	perl $(srcdir)/utils/gen_props.prl $< > $@ || rm -f $@
 
-src/Name/Prim.hs: src/data/names.txt  utils/op_names.prl 
+src/Name/Prim.hs: src/data/names.txt  utils/op_names.prl
 	perl utils/op_names.prl -i $< > $@ || rm -f $@
 
 src/RawFiles.hs: $(RAWFILES)

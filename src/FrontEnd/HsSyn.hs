@@ -168,8 +168,8 @@ data HsDecl
         hsDeclClassHead :: HsClassHead,
         hsDeclDecls     :: [HsDecl]
         }
-    | HsDefaultDecl SrcLoc HsType
-    | HsTypeSig	 SrcLoc [HsName] HsQualType
+    | HsDefaultDecl { hsDeclSrcLoc :: SrcLoc, hsDeclType :: HsType }
+    | HsTypeSig	{ hsDeclSrcLoc :: SrcLoc, hsDeclNames :: [HsName], hsDeclQualType :: HsQualType }
     | HsFunBind  [HsMatch]
     | HsPatBind	 SrcLoc HsPat HsRhs {-where-} [HsDecl]
     | HsActionDecl {
@@ -296,10 +296,10 @@ data HsType
        hsTypeType :: HsQualType }
     | HsTyExpKind {
         hsTyLType :: LHsType,
-        hsTyKind :: HsKind }
+        hsTyKind  :: HsKind }
     | HsTyStrictType {
         hsTyStrict :: !Bool,
-        hsTyLType :: LHsType
+        hsTyLType  :: LHsType
     }
     -- the following is used internally
     | HsTyAssoc
