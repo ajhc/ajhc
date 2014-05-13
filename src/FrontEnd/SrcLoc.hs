@@ -121,3 +121,8 @@ instance Show SrcSpan where
     show SrcSpan { srcSpanBegin =  sl1, srcSpanEnd = sl2 }
       | sl1 == sl2 = show sl1
       | otherwise = show sl1 ++ "-" ++ show sl2
+
+instance MonadSetSrcLoc IO where
+    withSrcLoc sl a = a
+instance MonadSrcLoc IO where
+    getSrcLoc = return bogusASrcLoc
