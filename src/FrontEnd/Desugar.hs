@@ -7,6 +7,7 @@
 
 module FrontEnd.Desugar (doToExp, listCompToExp, desugarHsModule, desugarHsStmt) where
 
+--import Control.Applicative
 import Control.Monad.State
 
 import FrontEnd.HsSyn
@@ -14,15 +15,9 @@ import FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse
 import Name.Name
 import Name.Names
+import Util.UniqueMonad
 
-type PatState = Int
-
-getUnique = do
-    n <- get
-    put (n + 1)
-    return n
-
-type PatSM = State PatState
+type PatSM = Uniq
 
 instance MonadSrcLoc PatSM where
 instance MonadSetSrcLoc PatSM where
@@ -47,15 +42,25 @@ newPatVarName = nameName $ toName Val ("patvar@0"::String)
  rhs1 = head $ zip "abc" [1,2,3]
 -}
 
--- first argument is imported synonyms
+-- hops = (hsOpsDefault hops) {
+--     opHsStmt = desugarStmt
+--     }
+
+-- hops' = hops {
+--     opHsList = (opHsList hops) {
+--         opHsDecl' = \xs -> concat <$> mapM desugarDecl xs
+--     }
+-- }
 
 desugarHsModule :: HsModule -> HsModule
 desugarHsModule m = hsModuleDecls_s ds' m where
-    (ds', _) = runState (dsm (hsModuleDecls m)) (0::Int)
+    (ds', _) = runUniq 0 (dsm (hsModuleDecls m)) -- (0::Int)
     dsm ds = fmap concat $ mapM desugarDecl ds
+--desugarHsModule m = m' where
+--    (m', _) = runUniq 0 (traverseHsOps hops' m)
 
 desugarHsStmt :: Monad m => HsStmt -> m HsStmt
-desugarHsStmt s = return $ fst $ runState (desugarStmt s) (0::Int)
+desugarHsStmt s = return $ fst $ runUniq 0 (desugarStmt s)
 
 desugarDecl :: HsDecl -> PatSM [HsDecl]
 desugarDecl (HsFunBind matches) = do
@@ -70,7 +75,7 @@ desugarDecl pb@(HsPatBind sloc (HsPVar n) rhs wheres) = do
 
 desugarDecl pb@(HsPatBind sloc pat rhs wheres) = do
     rhs <- desugarRhs rhs
-    unique <- getUnique
+    unique <- newUniq
     let newRhsName = toName Val ("patrhs@" ++ show unique)
     newWheres <- mapM desugarDecl wheres
     let newTopDeclForRhs
@@ -141,7 +146,7 @@ replaceVarNamesInPat name p = f name p where
     f name (HsPIrrPat pat) = HsPIrrPat $ fmap (f name) pat
     f name (HsPBangPat pat) = HsPBangPat $ fmap (f name) pat
     f name (HsPTypeSig sl pat ty) = HsPTypeSig sl (f name pat) ty
-    f name p = error $ "replaceVarNamesInPat: " ++ show (name,p)
+--    f name p = error $ "replaceVarNamesInPat: " ++ show (name,p)
 
 desugarRhs :: (HsRhs) -> PatSM (HsRhs)
 desugarRhs  = traverseHsRhsHsExp desugarExp
@@ -167,7 +172,7 @@ desugarExp (HsLambda sloc pats e) = z where
     f (HsPVar x) = return (x,[])
     f (HsPAsPat n p) = return (n,[(n,p)])
     f p = do
-        unique <- getUnique
+        unique <- newUniq
         let n = nameName $ toName Val ("lambind@" ++ show unique)
         return (n,[(n,p)])
 desugarExp (HsLet decls e) = do

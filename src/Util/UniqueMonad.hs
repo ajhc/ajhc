@@ -1,10 +1,11 @@
-module Util.UniqueMonad(UniqT,Uniq, runUniq, runUniqT, execUniq1, execUniq, execUniqT) where
+module Util.UniqueMonad(UniqT,Uniq, runUniq, runUniqT, execUniq1, execUniq, execUniqT, UniqueProducer(..)) where
 
-import GenUtil
-import Data.Unique
-import Control.Monad.State
-import Control.Monad.Reader
+import Control.Applicative
 import Control.Monad.Identity
+import Control.Monad.Reader
+import Control.Monad.State
+import Data.Unique
+import GenUtil
 
 instance UniqueProducer IO where
     newUniq = do
@@ -41,7 +42,7 @@ instance (Monad m, Monad (t m), MonadTrans t, UniqueProducer m) => UniqueProduce
 
 -- | Unique integer generator monad transformer.
 newtype UniqT m a = UniqT (StateT Int m a)
-    deriving(Monad,  MonadTrans, Functor, MonadFix, MonadPlus)
+    deriving(Monad, Applicative, MonadTrans, Functor, MonadFix, MonadPlus)
 
 instance MonadReader s m => MonadReader s (UniqT m) where
     ask = UniqT $  ask
