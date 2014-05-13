@@ -88,6 +88,8 @@ fi
 HS_HAS_INSTANCE(MONOID_DOC,Monoid Doc,[Text.PrettyPrint.HughesPJ Data.Monoid])
 HS_HAS_INSTANCE(SHOW_IDENTITY,Show (Identity a),[Control.Monad.Identity])
 HS_HAS_INSTANCE(TRAVERSABLE_INTMAP,Traversable IM.IntMap,[Data.Traversable [Data.IntMap as IM]])
+HS_HAS_INSTANCE(TRAVERSABLE_TUPLE,Traversable ((,) a), [Data.Traversable])
+HS_HAS_INSTANCE(TRAVERSABLE_TUPLE3,Traversable ((,) a b), [Data.Traversable])
 
 jlibpath=${datadir}/$PACKAGE-$SHORTVERSION
 jetcpath=${sysconfdir}/$PACKAGE-$SHORTVERSION

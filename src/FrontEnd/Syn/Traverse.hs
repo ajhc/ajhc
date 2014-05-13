@@ -10,7 +10,7 @@ import FrontEnd.HsSyn
 import FrontEnd.SrcLoc
 import Name.Name
 import Support.FreeVars
-import Support.Inst()
+import Util.Inst()
 
 --instance FreeVars HsType (Set.Set HsName) where
 --    freeVars t = execWriter (f t) where
