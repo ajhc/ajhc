@@ -40,7 +40,7 @@ HSFILES=src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/
         src/DerivingDrift/StandardRules.hs src/FrontEnd/Exports.hs src/Support/Inst.hs
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
-GHCPROFOPTS= -prof -auto-all -osuf prof.o -hisuf prof.hi
+GHCPROFOPTS= -prof -fprof-auto -rtsopts -auto-all -osuf prof.o -hisuf prof.hi
 GHCSELFTESTOPTS= -osuf test.o -hisuf test.hi -DEXPORT_SELFTEST=,_selftest
 GHCNONSELFTESTOPTS= -DEXPORT_SELFTEST=
 GHCINC=  -i @GHCINC@ -i$(srcdir)/drift_processed \

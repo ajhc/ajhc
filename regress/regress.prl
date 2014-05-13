@@ -199,7 +199,9 @@ sub run_test {
             return;
         }
     }
-    rlog "---- $name";
+    frlog "---- $name";
+    print ".";
+    STDOUT->flush;
     my @jhc  = $opt_p ? ("$jhc_dir/jhcp",'+RTS', "-S$rd/$name.jhcp_prof",@opt_rts,'-RTS')  :  ("$jhc_dir/jhc");
     my @cmd = (@jhc,"$cwd/$fn", ($verbose ? ('-v') : ()), ($opt_win ? ('-mwin32') : ()), @libs , @fast, '-o', "$rd/$name", @flags, @opts);
     my $res = join(" ",@cmd) . " > '$rd/$name.jhc_out' 2>&1";
@@ -208,7 +210,7 @@ sub run_test {
     push @res, $result;
     if($must_fail) {
         if($r == 0) {
-            rlog "Compilation Succeeded When It shouldn't!";
+            rlog "$name - Compilation Succeeded When It shouldn't!";
             $error++;
             $result->{compile_status} = 'BAD';
             return;
@@ -228,7 +230,7 @@ sub run_test {
         }
     }
     unless($r == 0) {
-        rlog "Compilation Failed: $r";
+        rlog "Compilation Failed: $name $r";
         my $msg = `tail $result->{compile_results}`;
         rlog $msg;
         $error++;
@@ -246,7 +248,7 @@ sub run_test {
     $result->{run_status} = $r;
     $result->{run_time} = $time;
     unless($r == 0) {
-        rlog "-- Run Failed: $r";
+        rlog "-- $name Run Failed: $r";
         $error++;
         if(statf($r) eq 'INT') {done()};
         return;

@@ -28,8 +28,6 @@ import Control.Monad.Reader
 import Control.Monad.Writer
 import Control.Monad.State
 
-
-
 newtype RWS r w s a = RWS { runRWS' :: r -> s -> (# a, s, w #) }
 
 runRWS :: RWS r w s a -> r -> s -> (a,s,w)
@@ -46,6 +44,9 @@ instance (Monoid w) => Monad (RWS r w s) where
 		(# a, s',  w #) -> case runRWS' (k a) r s' of
                     (# b, s'', w' #) -> let !w'' = w `mappend` w'
                         in (# b, s'', w'' #)
+        RWS x >> RWS y   = RWS $ \r s -> case x r s of
+            (# _, s', w' #) -> case y r s' of
+                (# a, s'', w'' #) -> (# a, s'', w' `mappend` w'' #)
 
 --instance (Monoid w) => MonadFix (RWS r w s) where
 --	mfix f = RWS $ \r s -> let (a, s', w) = runRWS (f a) r s in (a, s', w)
@@ -81,7 +82,6 @@ mapRWS f m = RWS $ \r s -> f (runRWS m r s)
 
 withRWS :: (r' -> s -> (r, s)) -> RWS r w s a -> RWS r' w s a
 withRWS f m = RWS $ \r s -> uncurry (runRWS m) (f r s)
-
 
 newtype RWST r w s m a = RWST { runRWST :: r -> s -> m (a, s, w) }
 
@@ -129,7 +129,6 @@ instance (Monoid w) => MonadTrans (RWST r w s) where
 
 instance (Monoid w, MonadIO m) => MonadIO (RWST r w s m) where
 	liftIO = lift . liftIO
-
 
 evalRWST :: (Monad m) => RWST r w s m a -> r -> s -> m (a, w)
 evalRWST m r s = do
