@@ -7,6 +7,7 @@ module FrontEnd.TypeSynonyms (
     showSynonym
     ) where
 
+import Control.Applicative(Applicative)
 import Control.Monad.Writer
 import Data.Binary
 import Data.List
@@ -57,7 +58,7 @@ showSynonyms pprint (TypeSynonyms m) = vcat (map f (Map.toList m)) where
 -- | convert a set of type synonym declarations to a synonym map used for efficient synonym
 -- expansion, expanding out the body of synonyms along the way.
 
-declsToTypeSynonyms :: MonadWarn m => TypeSynonyms -> [HsDecl] -> m TypeSynonyms
+declsToTypeSynonyms :: (Applicative m,MonadWarn m) => TypeSynonyms -> [HsDecl] -> m TypeSynonyms
 declsToTypeSynonyms tsin ds = f tsin gr [] where
     gr = G.scc $ G.newGraph [ (toName TypeConstructor name,( args , quantifyHsType args (HsQualType [] t) , sl)) | (HsTypeDecl sl name args' t) <- ds, let args = [ n | ~(HsTyVar n) <- args'] ] fst (Set.toList . freeVars . (\ (_,(_,t,_)) -> t))
     f tsin (Right ns:xs) rs = do
@@ -70,7 +71,7 @@ declsToTypeSynonyms tsin ds = f tsin gr [] where
 
 tsInsert x y (TypeSynonyms xs) = TypeSynonyms (Map.insert x y xs)
 
-removeSynonymsFromType :: (MonadSrcLoc m, MonadWarn m) => TypeSynonyms -> HsType -> m HsType
+removeSynonymsFromType :: (Applicative m,MonadSrcLoc m, MonadWarn m) => TypeSynonyms -> HsType -> m HsType
 removeSynonymsFromType syns t = do
     sl <- getSrcLoc
     evalTypeSyms sl syns t
@@ -86,7 +87,7 @@ quantifyHsType inscope t
     fv (HsTyExists vs qt) = tell $ snub (execWriter (fv $ hsQualTypeType qt)) \\ map hsTyVarBindName vs
     fv x = traverseHsType (\x -> fv x >> return x) x >> return ()
 
-evalTypeSyms :: MonadWarn m => SrcLoc -> TypeSynonyms -> HsType -> m HsType
+evalTypeSyms :: (Applicative m,Monad m,MonadWarn m) => SrcLoc -> TypeSynonyms -> HsType -> m HsType
 evalTypeSyms sl (TypeSynonyms tmap) ot = execUniqT 1 (eval [] ot) where
     eval stack x@(HsTyCon n) | Just (args, t, sldef) <- Map.lookup (toName TypeConstructor n) tmap = do
         let excess = length stack - length args

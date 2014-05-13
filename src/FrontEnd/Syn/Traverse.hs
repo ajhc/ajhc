@@ -23,13 +23,13 @@ instance FreeVars HsType (Set.Set Name) where
         f (HsTyCon v) = tell (Set.singleton $ toName TypeConstructor v)
         f t = traverseHsType_ f t
 
-traverse_ :: Monad m => (a -> m b) -> a -> m a
-traverse_ fn x = fn x >> return x
+traverse_ :: Applicative m => (a -> m b) -> a -> m a
+traverse_ fn x = fn x *> pure x
 
-traverseHsExp_ :: MonadSetSrcLoc m => (HsExp -> m ()) -> HsExp -> m ()
-traverseHsExp_ fn e = traverseHsExp (traverse_ fn) e >> return ()
+traverseHsExp_ :: (Monad m,Applicative m,MonadSetSrcLoc m) => (HsExp -> m ()) -> HsExp -> m ()
+traverseHsExp_ fn e = traverseHsExp (traverse_ fn) e *> pure ()
 
-traverseHsExp :: MonadSetSrcLoc m => (HsExp -> m HsExp) -> HsExp -> m HsExp
+traverseHsExp :: (Monad m,MonadSetSrcLoc m) => (HsExp -> m HsExp) -> HsExp -> m HsExp
 traverseHsExp fn e = f e where
     fns = mapM fn
     f e@HsVar {} = return e
@@ -152,41 +152,42 @@ traverseHsExp fn e = f e where
 
 -}
 
-traverseHsType_ :: Monad m => (HsType -> m b) -> HsType -> m ()
-traverseHsType_ fn p = traverseHsType (traverse_ fn) p >> return ()
+traverseHsType_ :: Applicative m => (HsType -> m b) -> HsType -> m ()
+traverseHsType_ fn p = traverseHsType (traverse_ fn) p *> pure ()
 
-traverseHsType :: Monad m => (HsType -> m HsType) -> HsType -> m HsType
-traverseHsType f (HsTyFun a b) = return HsTyFun `ap` f a `ap` f b
-traverseHsType f (HsTyTuple xs) = do
-    xs <- mapM f xs
-    return $ HsTyTuple xs
-traverseHsType f (HsTyUnboxedTuple xs) = do
-    xs <- mapM f xs
-    return $ HsTyUnboxedTuple xs
-traverseHsType f (HsTyApp a b) = return HsTyApp `ap` f a `ap` f b
-traverseHsType f (HsTyForall vs qt) = doQual HsTyForall f vs qt
-traverseHsType f (HsTyExists vs qt) = doQual HsTyExists f vs qt
-traverseHsType _ x@HsTyVar {} = return x
-traverseHsType _ x@HsTyCon {} = return x
-traverseHsType f HsTyExpKind { .. } = do
-    hsTyLType <- T.mapM f hsTyLType
-    return HsTyExpKind { .. }
-traverseHsType f (HsTyEq a b) = return HsTyEq `ap` f a `ap` f b
-traverseHsType f (HsTyStrictType a b ) = return HsTyStrictType `ap` return a `ap` T.mapM f b
-traverseHsType _ HsTyAssoc = return HsTyAssoc
+traverseHsType :: Applicative m => (HsType -> m HsType) -> HsType -> m HsType
+traverseHsType fn t = f t where
+    f (HsTyFun a1 a2) = HsTyFun <$> fn a1 <*> fn a2
+    f (HsTyTuple a1) = HsTyTuple <$> T.traverse fn a1
+    f (HsTyUnboxedTuple a1) = HsTyUnboxedTuple <$> T.traverse fn a1
+    f (HsTyApp a1 a2) = HsTyApp <$> fn a1 <*> fn a2
+    f (HsTyForall vs qt) = doQual HsTyForall f vs qt
+    f (HsTyExists vs qt) = doQual HsTyExists f vs qt
+    f x@HsTyVar {} = pure x
+    f x@HsTyCon {} = pure x
+    f HsTyExpKind { .. } = h <$> T.traverse fn hsTyLType
+        where h hsTyLType = HsTyExpKind { .. }
+--    f HsTyExpKind { .. } = do
+ --   hsTyLType <- T.mapM f hsTyLType
+  --  return HsTyExpKind { .. }
+    f (HsTyEq a1 a2) = HsTyEq <$> fn a1 <*> fn a2
+    --f (HsTyEq a b) = return HsTyEq `ap` f a `ap` f b
+    f (HsTyStrictType a1 a2) = HsTyStrictType <$> pure a1 <*> T.traverse fn a2
+--    f (HsTyStrictType a b ) = return HsTyStrictType `ap` return a `ap` T.mapM f b
+    f HsTyAssoc = pure HsTyAssoc
 
-doQual :: Monad m => (a -> HsQualType -> b) -> (HsType -> m HsType) -> a -> HsQualType -> m b
-doQual hsTyForall f vs qt = do
-    x <- f $ hsQualTypeType qt
-    cntx <- flip mapM (hsQualTypeContext qt) $ \v -> case v of
-        x@HsAsst {} -> return x
-        HsAsstEq a b -> return HsAsstEq `ap` f a `ap` f b
-    return $ hsTyForall vs qt { hsQualTypeContext = cntx, hsQualTypeType = x }
+doQual :: Applicative m => (a -> HsQualType -> b) -> (HsType -> m HsType) -> a -> HsQualType -> m b
+doQual hsTyForall f vs qt = cr <$> cntx <*> f (hsQualTypeType qt) where
+    cr cntx x = hsTyForall vs qt { hsQualTypeContext = cntx, hsQualTypeType = x }
+    cntx = flip T.traverse (hsQualTypeContext qt) $ \v -> case v of
+         x@HsAsst {} -> pure x
+         HsAsstEq a b -> HsAsstEq <$> f a <*> f b
+--    return $ hsTyForall vs qt { hsQualTypeContext = cntx, hsQualTypeType = x }
 
-traverseHsPat_ :: MonadSetSrcLoc m => (HsPat -> m b) -> HsPat -> m ()
-traverseHsPat_ fn p = traverseHsPat (traverse_ fn) p >> return ()
+traverseHsPat_ :: (Monad m,Applicative m,MonadSetSrcLoc m) => (HsPat -> m b) -> HsPat -> m ()
+traverseHsPat_ fn p = traverseHsPat (traverse_ fn) p *> pure ()
 
-traverseHsPat :: MonadSetSrcLoc m => (HsPat -> m HsPat) -> HsPat -> m HsPat
+traverseHsPat :: (Monad m,MonadSetSrcLoc m) => (HsPat -> m HsPat) -> HsPat -> m HsPat
 traverseHsPat fn p = f p where
     f p@HsPVar {} = return p
     f p@HsPLit {} = return p
@@ -230,19 +231,19 @@ traverseHsPat fn p = f p where
           return (HsPRec hsName hsPatFields')
     fnl (Located l e) = withSrcSpan l (Located l `liftM` fn e)
 
-traverseHsRhsHsExp :: MonadSetSrcLoc m => (HsExp -> m HsExp) -> HsRhs -> m HsRhs
+traverseHsRhsHsExp :: (Monad m,MonadSetSrcLoc m) => (HsExp -> m HsExp) -> HsRhs -> m HsRhs
 traverseHsRhsHsExp fn d = f d where
-    f (HsUnGuardedRhs e) = fn e >>= return . HsUnGuardedRhs
-    f (HsGuardedRhss rs) = return HsGuardedRhss `ap` mapM g rs
-    g (HsGuardedRhs sl e1 e2) = return (HsGuardedRhs sl) `ap` fn e1 `ap` fn e2
+    f (HsUnGuardedRhs a1) = HsUnGuardedRhs `liftM` fn a1
+    f (HsGuardedRhss a1) = HsGuardedRhss `liftM` mapM g a1
+    g (HsGuardedRhs sl a1 a2) = HsGuardedRhs sl `liftM` fn a1 `ap` fn a2
 
-traverseHsStmtHsExp :: MonadSetSrcLoc m => (HsExp -> m HsExp) -> HsStmt -> m HsStmt
+traverseHsStmtHsExp :: (Monad m,MonadSetSrcLoc m) => (HsExp -> m HsExp) -> HsStmt -> m HsStmt
 traverseHsStmtHsExp fn d = f d where
     f (HsGenerator sl p e) = withSrcLoc sl $ HsGenerator sl p `liftM` fn e
     f (HsQualifier e) = HsQualifier `liftM` fn e
     f (HsLetStmt ds) = HsLetStmt `liftM` mapM (traverseHsDeclHsExp fn) ds
 
-traverseHsDeclHsExp :: MonadSetSrcLoc m => (HsExp -> m HsExp) -> HsDecl -> m HsDecl
+traverseHsDeclHsExp :: (Monad m,MonadSetSrcLoc m) => (HsExp -> m HsExp) -> HsDecl -> m HsDecl
 traverseHsDeclHsExp fn d = f d where
     f (HsPatBind srcLoc hsPat hsRhs {-where-} hsDecls) = withSrcLoc srcLoc $ do
         hsDecls'  <- mapM (traverseHsDeclHsExp fn) hsDecls
@@ -299,7 +300,6 @@ data HsOps' f m = HsOps' {
     opHsOps'  :: HsOps m
     }
 
-
 -- | provides a default hsOps that recurses further down the tree for undeclared
 -- operations. In order to tie the knot properly, you need to pass its return
 -- value into itself, as in.
@@ -317,7 +317,7 @@ hsOpsDefault hops = HsOps { .. } where
     opHsPat  = f
     opHsStmt = f
     opHsType = f
-    opHsList = HsOps' { 
+    opHsList = HsOps' {
         opHsDecl' = T.traverse opHsDecl,
         opHsExp'  = T.traverse opHsExp,
         opHsPat'  = T.traverse opHsPat,
@@ -325,7 +325,7 @@ hsOpsDefault hops = HsOps { .. } where
         opHsType' = T.traverse opHsType,
         opHsOps'  = hops
         }
-    opHsMaybe = HsOps' { 
+    opHsMaybe = HsOps' {
         opHsDecl' = T.traverse opHsDecl,
         opHsExp'  = T.traverse opHsExp,
         opHsPat'  = T.traverse opHsPat,
@@ -342,7 +342,7 @@ hsOpsDefault hops = HsOps { .. } where
 --     opHsPat  = f
 --     opHsStmt = f
 --     opHsType = f
---     opHsList = HsOps' { 
+--     opHsList = HsOps' {
 --         opHsDecl' = T.traverse opHsDecl,
 --         opHsExp'  = T.traverse opHsExp,
 --         opHsPat'  = T.traverse opHsPat,
@@ -350,7 +350,7 @@ hsOpsDefault hops = HsOps { .. } where
 --         opHsType' = T.traverse opHsType,
 --         opHsOps'  = hops
 --         }
---     opHsMaybe = HsOps' { 
+--     opHsMaybe = HsOps' {
 --         opHsDecl' = T.traverse opHsDecl,
 --         opHsExp'  = T.traverse opHsExp,
 --         opHsPat'  = T.traverse opHsPat,
@@ -360,13 +360,14 @@ hsOpsDefault hops = HsOps { .. } where
 --         }
 
 class TraverseHsOps a where
-    applyHsOps'  :: (MonadSetSrcLoc m,Applicative m,T.Traversable f) => 
+    -- experimental traversable overloading.
+    applyHsOps'  :: (MonadSetSrcLoc m,Applicative m,T.Traversable f) =>
         HsOps' f m -> f a -> m (f a)
     applyHsOps' HsOps' { .. } fa = T.traverse (applyHsOps opHsOps') fa
-                                                    
-    -- act on the direct children of the argument
+
+    -- act on the direct children of the argument.
     traverseHsOps :: (Applicative m,MonadSetSrcLoc m) => HsOps m -> a -> m a
-    -- act on the argument itself or its children
+    -- act on the argument itself or its children.
     applyHsOps   :: (Applicative m,MonadSetSrcLoc m) => HsOps m -> a -> m a
     applyHsOps os x = traverseHsOps os x
 
@@ -387,47 +388,27 @@ instance TraverseHsOps HsDecl where
     traverseHsOps hops@HsOps { .. } x = g x where
         thops x = applyHsOps hops x
         g x = withSrcLoc (srcLoc x) $ f x
-        f HsTypeFamilyDecl { .. } = do
-            hsDeclTArgs <- thops hsDeclTArgs
-            return HsTypeFamilyDecl { .. }
-        f HsTypeDecl { .. } = do
-            hsDeclTArgs <- thops hsDeclTArgs
-            hsDeclType <- opHsType hsDeclType
-            return HsTypeDecl { .. }
-        f HsDefaultDecl { .. } = do
-            hsDeclType <- opHsType hsDeclType
-            return HsDefaultDecl { .. }
-        f HsDataDecl { .. } = do
-            hsDeclContext <- thops hsDeclContext
-            hsDeclCons <- thops hsDeclCons
-            return HsDataDecl { .. }
-        f HsClassDecl { .. } = do
-            hsDeclClassHead <- thops hsDeclClassHead
-            hsDeclDecls <- thops hsDeclDecls
-            return HsClassDecl { .. }
-        f HsClassAliasDecl { .. } = do
-            hsDeclTypeArgs <- mapM opHsType hsDeclTypeArgs
-            hsDeclContext <- thops hsDeclContext
-            hsDeclClasses <- thops hsDeclClasses
-            hsDeclDecls <- thops hsDeclDecls
-            return HsClassAliasDecl { .. }
-        f HsInstDecl { .. } = do
-            hsDeclClassHead <- thops hsDeclClassHead
-            hsDeclDecls <- thops hsDeclDecls
-            return HsInstDecl { .. }
-        f HsTypeSig { .. } = do
-            hsDeclQualType <- thops hsDeclQualType
-            return HsTypeSig { .. }
-        f HsActionDecl { .. } = do
-            hsDeclPat <- thops hsDeclPat
-            hsDeclExp <- thops hsDeclExp
-            return HsActionDecl { .. }
+        f HsTypeFamilyDecl { .. } = h <$> thops hsDeclTArgs
+            where h hsDeclTArgs = HsTypeFamilyDecl { .. }
+        f HsTypeDecl { .. } = h <$> thops hsDeclTArgs <*> thops hsDeclType
+            where h hsDeclTArgs hsDeclType = HsTypeDecl { .. }
+        f HsDefaultDecl { .. } = h <$> thops hsDeclType
+            where h hsDeclType = HsDefaultDecl { .. }
+        f HsDataDecl { .. } = h <$> thops hsDeclContext <*> thops hsDeclCons
+            where h hsDeclContext hsDeclCons = HsDataDecl { .. }
+        f HsClassDecl { .. } = h <$> thops hsDeclClassHead <*> thops hsDeclDecls
+            where h hsDeclClassHead hsDeclDecls = HsClassDecl { .. }
+        f HsClassAliasDecl { .. } = h <$> thops hsDeclTypeArgs <*> thops hsDeclContext <*> thops hsDeclClasses <*> thops hsDeclDecls
+            where h hsDeclTypeArgs hsDeclContext hsDeclClasses hsDeclDecls = HsClassAliasDecl { .. }
+        f HsInstDecl { .. } = h <$> thops hsDeclClassHead <*> thops hsDeclDecls
+            where h hsDeclClassHead hsDeclDecls = HsInstDecl { .. }
+        f HsTypeSig { .. } = h <$> thops hsDeclQualType
+            where h hsDeclQualType = HsTypeSig { .. }
+        f HsActionDecl { .. } = h <$> thops hsDeclPat <*> thops hsDeclExp
+            where h hsDeclPat hsDeclExp = HsActionDecl { .. }
         f (HsFunBind ms) = HsFunBind <$> thops ms
-        f HsPatBind { .. } = do
-            hsDeclPat <- thops hsDeclPat
-            hsDeclRhs <- thops hsDeclRhs
-            hsDeclDecls <- thops hsDeclDecls
-            return HsPatBind { .. }
+        f HsPatBind { .. } = h <$> thops hsDeclPat <*> thops hsDeclRhs <*> thops hsDeclDecls
+            where h hsDeclPat hsDeclRhs hsDeclDecls = HsPatBind { .. }
         f HsSpaceDecl { .. } = dr <$> opHsExp hsDeclExp <*> thops hsDeclQualType
             where dr hsDeclExp hsDeclQualType =  HsSpaceDecl { .. }
         f HsForeignDecl { .. } = dr <$> thops hsDeclQualType
@@ -456,32 +437,47 @@ instance TraverseHsOps HsClassHead where
             mch hsClassHeadContext hsClassHeadArgs = HsClassHead { .. }
 
 instance TraverseHsOps HsMatch where
-    traverseHsOps hops HsMatch { .. } = withSrcLoc hsMatchSrcLoc $ do
-        hsMatchPats <- applyHsOps hops hsMatchPats
-        hsMatchRhs <- applyHsOps hops hsMatchRhs
-        hsMatchDecls <- applyHsOps hops hsMatchDecls
-        return HsMatch { .. }
+    traverseHsOps hops m = withSrcLoc (hsMatchSrcLoc m) $ f m where
+        f HsMatch { .. } = h <$> thops hsMatchPats <*> thops hsMatchRhs <*> thops hsMatchDecls
+            where h hsMatchPats hsMatchRhs hsMatchDecls = HsMatch { .. }
+        thops x = applyHsOps hops x
 
 instance TraverseHsOps HsConDecl where
-    traverseHsOps HsOps { .. } HsConDecl { .. } = withSrcLoc hsConDeclSrcLoc $ do
-        hsConDeclConArg <- mapM (T.mapM opHsType) hsConDeclConArg
-        return HsConDecl { .. }
-    traverseHsOps HsOps { .. } HsRecDecl { .. } = withSrcLoc hsConDeclSrcLoc $ do
-        hsConDeclRecArg <- mapM (T.mapM (T.mapM opHsType)) hsConDeclRecArg
-        return HsRecDecl { .. }
+    traverseHsOps hops d = withSrcLoc (srcLoc d) $ f d where
+        thops x = applyHsOps hops x
+        f HsConDecl { .. } = h <$> thops hsConDeclConArg
+            where h hsConDeclConArg = HsConDecl { .. }
+        f HsRecDecl { .. } = h <$> thops hsConDeclRecArg
+            where h hsConDeclRecArg = HsRecDecl { .. }
 
 instance TraverseHsOps HsPat where
     applyHsOps ho x = opHsPat ho x
     traverseHsOps hops@HsOps { .. } x = f x where
+        fn x = applyHsOps hops x
         f (HsPTypeSig sl p qt) = HsPTypeSig sl <$>
             opHsPat p <*> applyHsOps hops qt
-        f x = traverseHsPat opHsPat x
+        f p@HsPVar {} = pure p
+        f p@HsPLit {} = pure p
+        f (HsPNeg a1) = HsPNeg <$> fn a1
+        f (HsPInfixApp a1 a2 a3) = HsPInfixApp <$> fn a1 <*> pure a2 <*> fn a3
+        f (HsPApp d1 a1) = HsPApp d1 <$> fn a1
+        f (HsPTuple a1) = HsPTuple <$> fn a1
+        f (HsPUnboxedTuple a1) = HsPUnboxedTuple <$> fn a1
+        f (HsPList a1) = HsPList <$> fn a1
+        f (HsPParen a1) = HsPParen <$> fn a1
+        f (HsPAsPat d1 a1) = HsPAsPat d1 <$> fn a1
+        f HsPWildCard = pure HsPWildCard
+        f (HsPIrrPat a1) = HsPIrrPat <$> fn a1
+        f (HsPBangPat a1) = HsPBangPat <$> fn a1
+        f (HsPRec d1 a1) = HsPRec d1 <$> fn a1
 
 instance TraverseHsOps HsQualType where
-    traverseHsOps hops HsQualType { .. } = do
-        hsQualTypeContext <- applyHsOps hops hsQualTypeContext
-        hsQualTypeType <- opHsType hops hsQualTypeType
-        return HsQualType { .. }
+    traverseHsOps hops HsQualType { .. } = h <$> applyHsOps hops hsQualTypeContext <*> applyHsOps hops hsQualTypeType
+        where h hsQualTypeContext hsQualTypeType = HsQualType { .. }
+    -- traverseHsOps hops HsQualType { .. } = do
+    --     hsQualTypeContext <- applyHsOps hops hsQualTypeContext
+    --     hsQualTypeType <- opHsType hops hsQualTypeType
+    --     return HsQualType { .. }
 
 instance TraverseHsOps HsAsst where
     traverseHsOps HsOps { .. } (HsAsstEq a b) = HsAsstEq <$> opHsType a <*> opHsType b
@@ -497,20 +493,49 @@ instance TraverseHsOps HsStmt where
 instance TraverseHsOps HsExp where
     applyHsOps = opHsExp
     traverseHsOps hops@HsOps { .. } e = g e where
-        thops x = applyHsOps hops x
+        fn x = applyHsOps hops x
         g e = withSrcLoc (srcLoc e) $ f e
         f (HsLambda srcLoc hsPats hsExp) =
-            HsLambda srcLoc <$> thops hsPats <*> opHsExp hsExp
+            HsLambda srcLoc <$> fn hsPats <*> opHsExp hsExp
         f (HsLet hsDecls hsExp) =
-            HsLet <$> thops hsDecls <*> opHsExp hsExp
-        f (HsCase e as) = HsCase <$> opHsExp e <*> thops as
-        f (HsDo hsStmts)  = HsDo <$> thops hsStmts
+            HsLet <$> fn hsDecls <*> opHsExp hsExp
+        f (HsCase e as) = HsCase <$> opHsExp e <*> fn as
+        f (HsDo hsStmts)  = HsDo <$> fn hsStmts
         f (HsExpTypeSig srcLoc hsExp hsQualType) =
-            HsExpTypeSig srcLoc <$> opHsExp hsExp <*> thops hsQualType
-        f (HsRecConstr n fus) = HsRecConstr n <$> thops fus
-        f (HsRecUpdate e fus) = HsRecUpdate <$> opHsExp e <*> thops fus
-        f (HsListComp e ss) = HsListComp <$> opHsExp e <*> thops ss
-        f e = traverseHsExp opHsExp e
+            HsExpTypeSig srcLoc <$> opHsExp hsExp <*> fn hsQualType
+        f (HsRecConstr n fus) = HsRecConstr n <$> fn fus
+        f (HsRecUpdate e fus) = HsRecUpdate <$> opHsExp e <*> fn fus
+        f (HsListComp e ss) = HsListComp <$> opHsExp e <*> fn ss
+        -- only exp
+        f e@HsVar {} = pure e
+        f e@HsCon {} = pure e
+        f e@HsLit {} = pure e
+        f e@HsError {} = pure e
+        f (HsLocatedExp le) = HsLocatedExp <$> fn le
+        f (HsAsPat hsName hsExp)= HsAsPat hsName <$> fn hsExp
+        f (HsWildCard x) = pure (HsWildCard x)
+        f (HsIrrPat hsExp) = HsIrrPat <$> fn hsExp
+        f (HsBangPat hsExp) = HsBangPat <$> fn hsExp
+        f (HsIf hsExp1 hsExp2 hsExp3)  = liftA3 HsIf (fn hsExp1) (fn hsExp2) (fn hsExp3)
+        f (HsTuple hsExps) = HsTuple <$> fn hsExps
+        f (HsUnboxedTuple hsExps) = HsUnboxedTuple <$> fn hsExps
+        f (HsList hsExps) = HsList <$> fn hsExps
+        f (HsParen hsExp) = HsParen <$> fn hsExp
+        f (HsLeftSection hsExp1 hsExp2) = HsLeftSection <$> fn hsExp1 <*> fn hsExp2
+        f (HsRightSection hsExp1 hsExp2) = HsRightSection <$> fn hsExp1 <*> fn hsExp2
+        f (HsEnumFrom hsExp)  = HsEnumFrom <$> fn hsExp
+        f (HsEnumFromTo hsExp1 hsExp2) = HsEnumFromTo <$> fn hsExp1 <*> fn hsExp2
+        f (HsEnumFromThen hsExp1 hsExp2) = HsEnumFromThen <$> fn hsExp1 <*> fn hsExp2
+        f (HsEnumFromThenTo a1 a2 a3) = HsEnumFromThenTo <$> fn a1 <*> fn a2 <*> fn a3
+        f (HsInfixApp a1 a2 a3) = HsInfixApp <$> fn a1 <*> fn a2 <*> fn a3
+        f (HsApp a1 a2) = HsApp <$> fn a1 <*> fn a2
+        f (HsNegApp a1) = HsNegApp <$> fn a1
+        --f h = error $ "FrontEnd.Syn.Traverse.traverseHsExp f unrecognized construct: " ++ show h
+
+instance TraverseHsOps e => TraverseHsOps (Located e) where
+    traverseHsOps hops (Located l e) = withSrcSpan l (Located l <$> applyHsOps hops e)
+
+--        f e = traverseHsExp opHsExp e
 
 --instance TraverseHsOps a => TraverseHsOps [a] where
 --    applyHsOps hops xs = applyHsOps' (opHsList hops) xs

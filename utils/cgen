@@ -1,0 +1,41 @@
+#!/usr/bin/perl
+
+use strict;
+use v5.12;
+
+use Getopt::Long;
+
+my $i = 2;
+my $fn = "fn";
+my $pfix = "";
+my $l = 0;
+my $tab = " "x($i*4);
+
+GetOptions("l" => \$l, "f=s" => \$fn, "i=i" => \$i, "p=s" => \$pfix) or die;
+
+my $c = shift @ARGV;
+
+if (!$l) {
+    # record syntax applicative traversal
+    my @vs = map { "$pfix$_" } @ARGV;
+    say "${tab}f $c { .. } = h <\$> ", join ( " <*> ",map { "$fn $_" } @vs);
+    say "$tab    where h ", join (" ", @vs), " = $c { .. }";
+    exit 0;
+}
+
+my $a = shift @ARGV;
+
+if ($a =~ /^[0-9]+$/) {
+    $a = "m"x$a;
+}
+
+# direct args
+my $nds = 0;
+$nds++ while $a =~ s/^p//;
+
+my $n = length $a;
+my @ds = map { "d$_" } (1 .. $nds);
+my @vs = map { "a$_" } (1 .. $n);
+
+my @fns = map { substr($a,$_ - 1,1) eq 'm' ? "$fn a$_" : "pure a$_" }  (1 .. $n);
+say "${tab}f ($c ", join(' ',@ds,@vs), ") = ",join(" ",$c,@ds), " <\$> ", join (" <*> ", @fns)

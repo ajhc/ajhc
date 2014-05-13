@@ -1,0 +1,4 @@
+
+set wildignore+=drift_processed,tmp,regress/results,*.hl
+"nmap ,t byek:r !utils/cgen <C-R>0
+nmap ,t byek:r !utils/cgen -l <C-R>0

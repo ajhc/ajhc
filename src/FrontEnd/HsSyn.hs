@@ -16,6 +16,9 @@ import Data.Foldable(Foldable)
 instance HasLocation HsAlt where
     srcLoc (HsAlt sl _ _ _) = sl
 
+instance HasLocation HsConDecl where
+    srcLoc d = hsConDeclSrcLoc d
+
 instance HasLocation HsExp where
     srcLoc (HsCase _ xs) = srcLoc xs
     srcLoc (HsExpTypeSig sl _ _) = sl

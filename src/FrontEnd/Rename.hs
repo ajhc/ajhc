@@ -805,7 +805,7 @@ getCurrentModule = asks envModule
 instance MonadSrcLoc RM where
     getSrcLoc = asks envSrcLoc
 instance MonadSetSrcLoc RM where
-    withSrcLoc sl a = local (\s -> s { envSrcLoc = sl `mappend` envSrcLoc s}) a
+    withSrcLoc' sl a = local (\s -> s { envSrcLoc = sl `mappend` envSrcLoc s}) a
 instance OptionMonad RM where
     getOptions = asks envOptions
 

@@ -86,12 +86,22 @@ located ss x = Located (srcSpan ss) x
 class Monad m => MonadSrcLoc m where
     getSrcLoc  :: m SrcLoc
     getSrcSpan :: m SrcSpan
-    getSrcSpan = getSrcLoc >>= return . srcSpan
-    getSrcLoc = getSrcSpan >>= return . srcLoc
+    getSrcSpan = liftM srcSpan getSrcLoc
+    getSrcLoc = liftM srcLoc getSrcSpan
 
-class MonadSrcLoc m => MonadSetSrcLoc m where
-    withSrcLoc :: SrcLoc -> m a -> m a
-    withSrcSpan :: SrcSpan -> m a -> m a
+class Applicative m => MonadSetSrcLoc m where
+    withSrcLoc' :: SrcLoc -> m a -> m a
+    withSrcSpan' :: SrcSpan -> m a -> m a
+    withSrcLoc' sl a = withSrcSpan (srcSpan sl) a
+    withSrcSpan' ss a = withSrcLoc (srcLoc ss) a
+
+instance MonadSetSrcLoc m => WithSrcLoc (m a) where
+    withSrcLoc = withSrcLoc'
+    withSrcSpan = withSrcSpan'
+
+class WithSrcLoc a where
+    withSrcLoc :: SrcLoc -> a -> a
+    withSrcSpan :: SrcSpan -> a -> a
     withSrcLoc sl a = withSrcSpan (srcSpan sl) a
     withSrcSpan ss a = withSrcLoc (srcLoc ss) a
 
@@ -101,12 +111,12 @@ withLocation l = withSrcSpan (srcSpan l)
 instance Monoid w => MonadSrcLoc (Writer w) where
     getSrcLoc = return mempty
 instance Monoid w => MonadSetSrcLoc (Writer w) where
-    withSrcLoc _ a = a
+    withSrcLoc' _ a = a
 
 instance MonadSrcLoc Identity where
     getSrcLoc = return mempty
 instance MonadSetSrcLoc Identity where
-    withSrcLoc _ a = a
+    withSrcLoc' _ a = a
 
 -----------------
 -- show instances
@@ -123,6 +133,6 @@ instance Show SrcSpan where
       | otherwise = show sl1 ++ "-" ++ show sl2
 
 instance MonadSetSrcLoc IO where
-    withSrcLoc sl a = a
+    withSrcLoc' sl a = a
 instance MonadSrcLoc IO where
     getSrcLoc = return bogusASrcLoc

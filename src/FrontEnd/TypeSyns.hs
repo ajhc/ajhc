@@ -21,7 +21,7 @@ instance MonadWarn ScopeSM where
 instance MonadSrcLoc ScopeSM where
     getSrcLoc = gets srcLoc
 instance MonadSetSrcLoc ScopeSM where
-    withSrcLoc sl a = modify (\s -> s { srcLoc = sl `mappend` srcLoc s}) >> a
+    withSrcLoc' sl a = modify (\s -> s { srcLoc = sl `mappend` srcLoc s}) >> a
 
 expandTypeSyns :: (TraverseHsOps a,MonadWarn m) => TypeSynonyms -> a -> m a
 expandTypeSyns syns m = mapM_ addWarning (errors fs) >> return rm where

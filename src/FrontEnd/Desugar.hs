@@ -21,7 +21,7 @@ type PatSM = Uniq
 
 instance MonadSrcLoc PatSM where
 instance MonadSetSrcLoc PatSM where
-    withSrcLoc _ a = a
+    withSrcLoc' _ a = a
 
 -- a new (unique) name introduced in pattern selector functions
 newPatVarName :: HsName

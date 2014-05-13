@@ -13,6 +13,7 @@ module FrontEnd.TypeSigs (collectSigs,
                  SigEnv,
                  listSigsToSigEnv) where
 
+import Control.Applicative(Applicative)
 import Control.Monad.Identity
 import Control.Monad.Writer
 import qualified Data.Map as Map
@@ -25,7 +26,7 @@ import FrontEnd.Tc.Type
 import Name.Name
 
 newtype SC a = SC (Writer [HsDecl] a)
-    deriving(Monad)
+    deriving(Monad,Applicative,Functor)
 
 fromSC :: SC () -> [HsDecl]
 fromSC (SC m) = execWriter m
@@ -35,7 +36,7 @@ addSigs ds = SC $ tell ds
 
 instance MonadSrcLoc SC where
 instance MonadSetSrcLoc SC where
-    withSrcLoc _ a = a
+    withSrcLoc' _ a = a
 
 collectSigEnv :: KindEnv -> HsStmt -> SigEnv
 collectSigEnv kindInfo stmt = sigEnv where

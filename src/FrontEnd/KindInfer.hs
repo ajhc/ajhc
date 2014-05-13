@@ -17,6 +17,7 @@ module FrontEnd.KindInfer (
     getConstructorKinds
     ) where
 
+import Control.Applicative(Applicative)
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.Writer
@@ -94,12 +95,12 @@ data KiEnv  = KiEnv {
     }
 
 newtype Ki a = Ki (ReaderT KiEnv IO a)
-    deriving(Monad,MonadReader KiEnv,MonadIO,Functor,MonadWarn)
+    deriving(Monad, Applicative, MonadReader KiEnv,MonadIO,Functor,MonadWarn)
 
 instance MonadSrcLoc Ki where
     getSrcLoc = asks kiSrcLoc
 instance MonadSetSrcLoc Ki where
-    withSrcLoc sl = local (\s -> s { kiSrcLoc = sl })
+    withSrcLoc' sl = local (\s -> s { kiSrcLoc = sl })
 
 restrictKindEnv :: (Name -> Bool) -> KindEnv -> KindEnv
 restrictKindEnv f ke = ke { kindEnv = Map.filterWithKey (\k _ -> f k) (kindEnv ke) }

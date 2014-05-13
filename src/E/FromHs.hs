@@ -7,6 +7,7 @@ module E.FromHs(
     ) where
 
 import Char
+import Control.Applicative(Applicative)
 import Control.Monad.Error
 import Control.Monad.Identity
 import Control.Monad.RWS
@@ -313,7 +314,7 @@ data CeEnv = CeEnv {
     }
 
 newtype C a = Ce (RWST CeEnv [Warning] Int IO a)
-    deriving(Monad,Functor,MonadIO,MonadReader CeEnv,MonadState Int,MonadError IOError)
+    deriving(Monad,Applicative,Functor,MonadIO,MonadReader CeEnv,MonadState Int,MonadError IOError)
 
 instance MonadWarn C where
     addWarning w = liftIO (addWarning w)
@@ -322,7 +323,7 @@ instance MonadSrcLoc C where
     getSrcLoc = asks ceSrcLoc
 
 instance MonadSetSrcLoc C where
-    withSrcLoc sl = local (\ce -> ce { ceSrcLoc = sl })
+    withSrcLoc' sl = local (\ce -> ce { ceSrcLoc = sl })
 
 instance UniqueProducer C where
     newUniq = do

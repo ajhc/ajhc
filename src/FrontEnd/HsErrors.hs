@@ -6,6 +6,7 @@ module FrontEnd.HsErrors(
     hsDeclLocal
     ) where
 
+import Control.Applicative(Applicative)
 import FrontEnd.Class
 import FrontEnd.HsSyn
 import FrontEnd.SrcLoc
@@ -13,7 +14,7 @@ import FrontEnd.Syn.Traverse
 import FrontEnd.Warning
 import Name.Name
 
-hsType :: (MonadSrcLoc m, MonadWarn m) => HsType -> m ()
+hsType :: (Applicative m,MonadSrcLoc m, MonadWarn m) => HsType -> m ()
 --hsType x@HsTyForall {} = do
 --    addWarn "h98-forall" "Explicit quantification is a non-haskell98 feature"
 --    hsQualType (hsTypeType x)
