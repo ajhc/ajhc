@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -cpp #-}
+{-# OPTIONS_GHC -cpp -fno-warn-unused-imports #-}
 {-# LANGUAGE CPP #-}
 
 #include "hs_src_config.h"
@@ -7,10 +7,8 @@
 module Util.Inst() where
 
 import Control.Applicative
-import Data.Foldable
-import Data.Traversable
-import Control.Monad.Identity
-import Data.Monoid
+import Control.Monad.Identity(Identity(..))
+import Data.Monoid(Monoid(..))
 #if !HAS_TRAVERSABLE_INTMAP
 import qualified Data.Map as Map
 import qualified Data.IntMap as IM
@@ -25,7 +23,7 @@ instance Monoid (IO ()) where
 instance Monoid Bool where
     mempty = False
     mappend a b = a || b
-    mconcat = or
+    mconcat = Prelude.or
 
 #if !HAS_SHOW_IDENTITY
 instance Show a => Show (Identity a) where
