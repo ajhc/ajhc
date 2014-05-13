@@ -1,23 +1,18 @@
 tests:
-   T3219:
-     skip: known_bug
-
    T1470:
      skip: MultiParamTypeClasses
    T2572:
      skip: ScopedTypeVars
    T2799:
      skip: GADTs
+   T3409:
+     skip: TypeFamilies
    T3346:
      skip: TypeFamilies
    T3955:
      skip: GNTD
    syn-perf:
      skip: InfixTypes
-   tc092:
-     skip: known_bug
-   tc095:
-     skip: known_bug
    tc102:
      skip:  ScopedTypeVars
    tc105:
@@ -54,8 +49,6 @@ tests:
      skip:  FunDeps
    tc141:
      skip:  FunDeps
-   tc148:
-     skip:  known_bug
    tc152:
      skip:  FunDeps
    tc156:
@@ -64,8 +57,6 @@ tests:
      skip:  FunDeps
    tc168:
      skip:  FunDeps
-   tc175:
-     skip:  known_bug
    tc177:
      skip:  FunDeps
    tc179:
@@ -74,8 +65,6 @@ tests:
      skip:  FunDeps
    tc181:
      skip:  FunDeps
-   tc183:
-     skip:  known_bug
    T3342:
      skip: ViewPatterns
    tc109:
@@ -86,9 +75,28 @@ tests:
      skip:  FunDeps
    tc135:
      skip:  Scoped
+   tc176:
+     skip:  OverlappingInstances
+
+#bugs
    tc174:
      skip:  known_bug
    tc178:
      skip:  known_bug
+   T3219:
+     skip: known_bug
+   tc092:
+     skip: known_bug
+   tc095:
+     skip: known_bug
+   tc148:
+     skip:  known_bug
+   tc175:
+     skip:  known_bug
+   tc183:
+     skip:  known_bug
+   tc120:
+     skip:  known_feature
+
 
 

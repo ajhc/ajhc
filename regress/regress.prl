@@ -27,6 +27,7 @@ my $opt_timeout=60*5;
 my $opt_help;
 my $opt_man;
 my $opt_tc;
+my $opt_kb;
 my $verbose;
 
 Getopt::Long::Configure ("bundling", "auto_help");
@@ -42,6 +43,7 @@ GetOptions(
     p => \$opt_p,
     v => \$verbose,
     t => \$opt_tc,
+    'noskip=s' => \$opt_kb,
     'win' => \$opt_win,
     'rts=s' =>\@opt_rts,
     clean => \$opt_clean,
@@ -177,7 +179,11 @@ sub combine_yaml {
 sub run_test {
     my ($cwd, $y, $name, $ln, $fn) = @_;
     $fn = $y->{progname} unless defined $fn;
-    return if defined $y->{skip};
+    if ($opt_kb) {
+        return unless defined $y->{skip} && $y->{skip} eq $opt_kb;
+    } else {
+        return if defined $y->{skip};
+    }
     my $must_fail = (0 + $y->{jhc_exit_code}) != 0;
     my $no_run = $y->{run} eq 'no';
     my @flags = @{$y->{jhc_flags}};

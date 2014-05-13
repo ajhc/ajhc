@@ -34,8 +34,9 @@ main = wrapMain $ do
     hSetEncoding stdout utf8
     hSetEncoding stderr utf8
     o <- processOptions
-    when (dump FD.Atom) $
+    when (dump FD.Atom) $ do
         addAtExit dumpStringTableStats
+        addAtExit dumpToFile
     -- set temporary directory
     maybeDo $ do x <- optWorkDir o; return $ setTempDir x
     let darg = progressM $ do
