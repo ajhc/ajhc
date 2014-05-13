@@ -41,38 +41,36 @@ fi
 AC_CHECK_PROGS([MINGW],[mingw-gcc mingw32-gcc i386-mingw32-gcc i586-mingw32msvc-gcc],
                [i386-mingw32-gcc])
 
-USE_READLINE=0
-USE_EDITLINE=0
 GHC=$HC
 GHCFLAGS="-hide-all-packages -package base"
-MPACK=""
 
-AC_DEFUN([NEEDS_PACKAGE],[GHC_CHECK_MODULE($1,$2,,,[MPACK="$MPACK module '$1' from package '$2'
-"])])
-NEEDS_PACKAGE([Codec.Compression.Zlib],zlib)
-NEEDS_PACKAGE([Control.Monad.Reader],[mtl])
-NEEDS_PACKAGE([Data.Array],[array])
-NEEDS_PACKAGE([Data.Binary],[binary])
-NEEDS_PACKAGE([Data.ByteString.UTF8],[utf8-string])
-NEEDS_PACKAGE([Data.ByteString.Unsafe],[bytestring])
-NEEDS_PACKAGE([Data.Generics.Instances],syb)
-NEEDS_PACKAGE([Data.Graph.Inductive.Graph],fgl)
-NEEDS_PACKAGE([Data.IntSet],[containers])
-NEEDS_PACKAGE([Data.Yaml.Syck],HsSyck)
-NEEDS_PACKAGE([System.Cmd],[process])
-NEEDS_PACKAGE([System.Directory],[directory])
-NEEDS_PACKAGE([System.FilePath],[filepath])
-NEEDS_PACKAGE([System.Posix],[unix])
-NEEDS_PACKAGE([System.Random],[random])
-NEEDS_PACKAGE([System.Time],old-time)
-NEEDS_PACKAGE([Text.PrettyPrint.HughesPJ],pretty)
-NEEDS_PACKAGE([Text.Regex],regex-compat)
+MPACK=""
+HS_NEEDS_PACKAGE([Codec.Compression.Zlib],zlib)
+HS_NEEDS_PACKAGE([Control.Monad.Reader],[mtl])
+HS_NEEDS_PACKAGE([Data.Array],[array])
+HS_NEEDS_PACKAGE([Data.Binary],[binary])
+HS_NEEDS_PACKAGE([Data.ByteString.UTF8],[utf8-string])
+HS_NEEDS_PACKAGE([Data.ByteString.Unsafe],[bytestring])
+HS_NEEDS_PACKAGE([Data.Generics.Instances],syb)
+HS_NEEDS_PACKAGE([Data.Graph.Inductive.Graph],fgl)
+HS_NEEDS_PACKAGE([Data.IntSet],[containers])
+HS_NEEDS_PACKAGE([Data.Yaml.Syck],HsSyck)
+HS_NEEDS_PACKAGE([System.Cmd],[process])
+HS_NEEDS_PACKAGE([System.Directory],[directory])
+HS_NEEDS_PACKAGE([System.FilePath],[filepath])
+HS_NEEDS_PACKAGE([System.Posix],[unix])
+HS_NEEDS_PACKAGE([System.Random],[random])
+HS_NEEDS_PACKAGE([System.Time],old-time)
+HS_NEEDS_PACKAGE([Text.PrettyPrint.HughesPJ],pretty)
+HS_NEEDS_PACKAGE([Text.Regex],regex-compat)
 if test -n "$MPACK"; then
     echo "Some packages were not found:"
     echo "$MPACK"
     exit 1
 fi
 
+USE_READLINE=0
+USE_EDITLINE=0
 AC_ARG_ENABLE([line],[  --disable-line do not depend on readline or editline],[],[
     GHC_CHECK_MODULE(System.Console.Readline,readline,,[USE_READLINE=1],[
         GHC_CHECK_MODULE(System.Console.Editline.Readline,editline,,[USE_EDITLINE=1] ,[])
@@ -87,13 +85,9 @@ if test -z "$HSC2HS"; then
     exit 1
 fi
 
-HAS_MONOID_DOC=1
-TRY_COMPILE_GHC([
-import Text.PrettyPrint.HughesPJ
-import Data.Monoid
-instance Monoid Doc
-main = putStrLn "hello"
-],[HAS_MONOID_DOC=0],[HAS_MONOID_DOC=1])
+HS_HAS_INSTANCE(MONOID_DOC,Monoid Doc,[Text.PrettyPrint.HughesPJ Data.Monoid])
+HS_HAS_INSTANCE(SHOW_IDENTITY,Show (Identity a),[Control.Monad.Identity])
+HS_HAS_INSTANCE(TRAVERSABLE_INTMAP,Traversable IM.IntMap,[Data.Traversable [Data.IntMap as IM]])
 
 jlibpath=${datadir}/$PACKAGE-$SHORTVERSION
 jetcpath=${sysconfdir}/$PACKAGE-$SHORTVERSION
