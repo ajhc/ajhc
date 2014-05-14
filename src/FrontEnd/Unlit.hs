@@ -4,7 +4,6 @@ module FrontEnd.Unlit(unlit) where
 -- "Report on the Programming Language Haskell",
 --   version 1.2, appendix C.
 
-
 import Char
 
 data Classified = Program String | Blank | Comment
@@ -38,7 +37,6 @@ unclassify (Include i f) = '#':' ':show i ++ ' ':f
 unclassify Blank       = ""
 unclassify Comment     = ""
 
-
 -- | Remove literate comments leaving normal haskell source.
 
 unlit ::
@@ -67,7 +65,6 @@ message "\"\"" n p c = "Line "++show n++": "++p++ " line before "++c++" line.\n"
 message []     n p c = "Line "++show n++": "++p++ " line before "++c++" line.\n"
 message file   n p c = "In file " ++ file ++ " at line "++show n++": "++p++ " line before "++c++" line.\n"
 
-
 -- Re-implementation of 'lines', for better efficiency (but decreased laziness).
 -- Also, importantly, accepts non-standard DOS and Mac line ending characters.
 inlines s = lines' s id
@@ -77,4 +74,3 @@ inlines s = lines' s id
   lines' ('\^M':s)      acc = acc [] : lines' s id	-- MacOS
   lines' ('\n':s)       acc = acc [] : lines' s id	-- Unix
   lines' (c:s)          acc = lines' s (acc . (c:))
-

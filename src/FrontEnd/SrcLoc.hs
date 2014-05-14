@@ -11,7 +11,7 @@ import Data.Generics
 import PackedString
 
 data SrcLoc = SrcLoc {
-        srcLocFileName :: PackedString,
+        srcLocFileName :: !PackedString,
         srcLocLine :: {-# UNPACK #-} !Int,
         srcLocColumn :: {-# UNPACK #-} !Int
         }
@@ -28,6 +28,7 @@ fileNameUnknown = packString "(unknown)"
 fileNameGenerated = packString "(generated)"
 
 bogusASrcLoc = SrcLoc fileNameUnknown (-1) (-1)
+eofSrcLoc    = SrcLoc fileNameUnknown maxBound (-1)
 bogusSrcSpan = SrcSpan bogusASrcLoc bogusASrcLoc
 
 instance Monoid SrcLoc where
@@ -62,20 +63,14 @@ instance HasLocation (Located a) where
     srcSpan (Located x _) = x
 
 data Located x = Located SrcSpan x
-    deriving(Ord,Show,Data,Typeable,Eq)
+    deriving(Ord,Data,Typeable,Eq,Functor,Foldable,Traversable)
     {-! derive: Binary !-}
+
+instance Show a => Show (Located a) where
+    showsPrec n (Located p x) =  showsPrec 10 x . showChar '@' . shows p
 
 fromLocated :: Located x -> x
 fromLocated (Located _ x) = x
-
-instance Functor Located where
-    fmap f (Located l x) = Located l (f x)
-
-instance Foldable Located where
-    foldMap f (Located l x) = f x
-
-instance Traversable Located where
-    traverse f (Located l x) = Located l <$> f x
 
 located ss x = Located (srcSpan ss) x
 
@@ -125,14 +120,18 @@ instance MonadSetSrcLoc Identity where
 instance Show SrcLoc where
     show (SrcLoc fn l c) = unpackPS fn ++ f l ++ f c where
         f (-1) = ""
+        f n | n == maxBound = "EOF"
         f n = ':':show n
 
 instance Show SrcSpan where
-    show SrcSpan { srcSpanBegin =  sl1, srcSpanEnd = sl2 }
+    show SrcSpan { srcSpanBegin = sl1, srcSpanEnd = sl2 }
       | sl1 == sl2 = show sl1
-      | otherwise = show sl1 ++ "-" ++ show sl2
+      | slf sl1 == slf sl2 = slf sl1 ++ ":" ++ nums
+      | otherwise =  show sl1 ++ "-" ++ show sl2 where
+            nums | srcLocLine sl1 == srcLocLine sl2 = f sl1 ++ "-" ++ show (srcLocColumn sl2)
+                 | otherwise = f sl1 ++ "-" ++ f sl2
+            f s = show (srcLocLine s) ++ ":" ++ show (srcLocColumn s)
+            slf = unpackPS . srcLocFileName
 
 instance MonadSetSrcLoc IO where
     withSrcLoc' sl a = a
-instance MonadSrcLoc IO where
-    getSrcLoc = return bogusASrcLoc
