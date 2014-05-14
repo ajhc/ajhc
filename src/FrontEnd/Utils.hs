@@ -27,7 +27,7 @@ getDeclName d =  runIdentity $ maybeGetDeclName d
 -- | Convert name to what it was before renaming.
 
 hsNameToOrig :: HsName -> HsName
-hsNameToOrig n = hsNameIdent_u (hsIdentString_u dn) n where
+hsNameToOrig n = hsNameIdent_u dn n where
     dn xs = case dropWhile isDigit xs of
         ('_':xs) -> xs
         _ -> error $ "hsNameToOrig: " ++ show n

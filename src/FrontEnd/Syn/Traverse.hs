@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fwarn-unused-matches  -fwarn-type-defaults #-}
+{-# OPTIONS_GHC -fwarn-unused-matches  -fwarn-incomplete-patterns -fwarn-type-defaults #-}
 module FrontEnd.Syn.Traverse where
 
 import Control.Applicative
@@ -229,6 +229,7 @@ traverseHsPat fn p = f p where
     f (HsPRec hsName hsPatFields)  = do
           hsPatFields' <- mapM (T.mapM fn) hsPatFields
           return (HsPRec hsName hsPatFields')
+    f p@HsPatExp {} = return p
     fnl (Located l e) = withSrcSpan l (Located l `liftM` fn e)
 
 traverseHsRhsHsExp :: (Monad m,MonadSetSrcLoc m) => (HsExp -> m HsExp) -> HsRhs -> m HsRhs
@@ -454,22 +455,22 @@ instance TraverseHsOps HsPat where
     applyHsOps ho x = opHsPat ho x
     traverseHsOps hops@HsOps { .. } x = f x where
         fn x = applyHsOps hops x
-        f (HsPTypeSig sl p qt) = HsPTypeSig sl <$>
-            opHsPat p <*> applyHsOps hops qt
-        f p@HsPVar {} = pure p
-        f p@HsPLit {} = pure p
-        f (HsPNeg a1) = HsPNeg <$> fn a1
+        f (HsPTypeSig sl p qt)   = HsPTypeSig sl <$> fn p <*> fn qt
+        f p@HsPVar {}            = pure p
+        f p@HsPLit {}            = pure p
+        f (HsPNeg a1)            = HsPNeg <$> fn a1
         f (HsPInfixApp a1 a2 a3) = HsPInfixApp <$> fn a1 <*> pure a2 <*> fn a3
-        f (HsPApp d1 a1) = HsPApp d1 <$> fn a1
-        f (HsPTuple a1) = HsPTuple <$> fn a1
-        f (HsPUnboxedTuple a1) = HsPUnboxedTuple <$> fn a1
-        f (HsPList a1) = HsPList <$> fn a1
-        f (HsPParen a1) = HsPParen <$> fn a1
-        f (HsPAsPat d1 a1) = HsPAsPat d1 <$> fn a1
-        f HsPWildCard = pure HsPWildCard
-        f (HsPIrrPat a1) = HsPIrrPat <$> fn a1
-        f (HsPBangPat a1) = HsPBangPat <$> fn a1
-        f (HsPRec d1 a1) = HsPRec d1 <$> fn a1
+        f (HsPApp d1 a1)         = HsPApp d1 <$> fn a1
+        f (HsPTuple a1)          = HsPTuple <$> fn a1
+        f (HsPUnboxedTuple a1)   = HsPUnboxedTuple <$> fn a1
+        f (HsPList a1)           = HsPList <$> fn a1
+        f (HsPParen a1)          = HsPParen <$> fn a1
+        f (HsPAsPat d1 a1)       = HsPAsPat d1 <$> fn a1
+        f HsPWildCard            = pure HsPWildCard
+        f (HsPIrrPat a1)         = HsPIrrPat <$> fn a1
+        f (HsPBangPat a1)        = HsPBangPat <$> fn a1
+        f (HsPRec d1 a1)         = HsPRec d1 <$> fn a1
+        f (HsPatExp e)           = HsPatExp <$> fn e
 
 instance TraverseHsOps HsQualType where
     traverseHsOps hops HsQualType { .. } = h <$> applyHsOps hops hsQualTypeContext <*> applyHsOps hops hsQualTypeType
@@ -530,6 +531,8 @@ instance TraverseHsOps HsExp where
         f (HsInfixApp a1 a2 a3) = HsInfixApp <$> fn a1 <*> fn a2 <*> fn a3
         f (HsApp a1 a2) = HsApp <$> fn a1 <*> fn a2
         f (HsNegApp a1) = HsNegApp <$> fn a1
+        f (HsWords ws)  = HsWords <$> fn ws
+        f (HsBackTick e)  = HsBackTick <$> fn e
         --f h = error $ "FrontEnd.Syn.Traverse.traverseHsExp f unrecognized construct: " ++ show h
 
 instance TraverseHsOps e => TraverseHsOps (Located e) where
