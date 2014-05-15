@@ -6,7 +6,7 @@ jhc_SOURCES = src/Main.hs $(HSFILES) $(BUILT_SOURCES) $(HSBOOT) $(DRIFTFILES)
 
 BUILT_SOURCES= src/RawFiles.hs src/FrontEnd/HsParser.hs src/FlagDump.hs \
 	       src/FlagOpts.hs src/Name/Prim.hs src/Info/Properties.hs $(DRIFTFILES) \
-	       src/FrontEnd/Lex/Lexer.hs src/FrontEnd/Lex/Parser.hs src/FrontEnd/Lex/Lexer.hs
+	       src/FrontEnd/Lex/Parser.hs src/FrontEnd/Lex/Lexer.hs
 
 MY_CINCLUDES= -I$(srcdir)/src/data -I$(srcdir)/src/StringTable -I$(srcdir)/src/cbits -I$(builddir)/src/cbits
 MY_CFLAGS= $(MY_CINCLUDES) -optc-std=c99 -optc-O2 -optc-Wall
@@ -66,12 +66,13 @@ GHCOPTS= $(HSOPTS) -O @GHCFLAGS@ $(GHCDEBUGOPTS) $(GHCINC) $(GHCLANG)
 LIB_OPTIONS=$(RTSOPTS) $(JHC_TEST)  -L- -L.
 include library_deps.make
 
-EXTRA_DIST = src/data rts utils docs src/FrontEnd/HsParser.y src/FrondEnd/Lex/Parser.y $(BUILT_SOURCES) \
+EXTRA_DIST = src/data rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
              lib/jhc lib/jhc-prim lib/haskell-extras lib/haskell98 lib/haskell2010 lib/flat-foreign $(JHC_LIBS) $(JHC_EXT_LIBS) \
 	     src/StringTable/StringTable_cbits.c src/StringTable/StringTable_cbits.h src/cbits/md5sum.c jhc.1 \
 	     src/StringTable/Atom.hsc jhc.spec src/cbits/lookup3.c \
 	     manual.html lib/applicative examples/HelloWorld.hs examples/Calendar.hs \
-	     examples/Primes.hs src/FlagOpts.flags src/FlagDump.flags lib/ext compat LICENSE
+	     examples/Primes.hs src/FlagOpts.flags src/FlagDump.flags lib/ext compat LICENSE \
+	     src/FrontEnd/Lex/Lexer.x src/FrontEnd/Lex/Parser.y.pp
 
 dist-hook: $(BUILT_SOURCES)
 	if test -f _darcs; then \
@@ -305,10 +306,13 @@ show_elibs: lib/ext/*.cabal  lib/ext/*.yaml
 	m4 -P src/data/prelude.m4 $< > $@
 
 %.hs: %.pp.hs
-	perl utils/preproc.prl  $< > $@
+	perl $(srcdir)/utils/preproc.prl  $< > $@
 
 %.y: %.pp.y utils/preproc.prl
-	perl utils/preproc.prl  $< > $@
+	perl $(srcdir)/utils/preproc.prl  $< > $@
+
+%: %.pp $(srcdir)/utils/preproc.prl
+	perl $(srcdir)/utils/preproc.prl  $< > $@
 
 TESTS=HelloWorld Primes
 
