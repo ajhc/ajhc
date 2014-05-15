@@ -24,16 +24,20 @@ instance Traversable IM.IntMap where
     traverse f mp = (IM.fromAscList . Map.toAscList) `fmap`  (traverse f . Map.fromAscList . IM.toAscList $ mp)
 #endif
 
-#if !HAS_TRAVERSABLE_TUPLE
+
+#if !HAS_FOLDABLE_TUPLE
 instance Foldable ((,) a) where
     foldMap = foldMapDefault
 instance Traversable  ((,) a) where
     traverse f (x,y) = (,) x <$> f y
 #endif
 
-#if !HAS_TRAVERSABLE_TUPLE3
+#if !HAS_FUNCTOR_TUPLE3
 instance Functor ((,,) a b) where
     fmap = fmapDefault
+#endif
+
+#if !HAS_FOLDABLE_TUPLE3
 instance Foldable ((,,) a b) where
     foldMap = foldMapDefault
 instance Traversable  ((,,) a b) where

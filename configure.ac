@@ -10,10 +10,9 @@ VERSION_PATCH=$(echo $VERSION | cut -d'.' -f3)
 
 SHORTVERSION="$VERSION_MAJOR.$VERSION_MINOR"
 
+AS_TMPDIR
 AC_CANONICAL_HOST
-
 AC_PROG_LN_S
-
 AC_C_BIGENDIAN([BYTE_ORDER=BIG_ENDIAN],[BYTE_ORDER=LITTLE_ENDIAN],[BYTE_ORDER=PDP_ENDIAN])
 
 AC_ARG_WITH(rpmrelease,
@@ -87,9 +86,11 @@ fi
 
 HS_HAS_INSTANCE(MONOID_DOC,Monoid Doc,[Text.PrettyPrint.HughesPJ Data.Monoid])
 HS_HAS_INSTANCE(SHOW_IDENTITY,Show (Identity a),[Control.Monad.Identity])
-HS_HAS_INSTANCE(TRAVERSABLE_INTMAP,Traversable IM.IntMap,[Data.Traversable [Data.IntMap as IM]])
-HS_HAS_INSTANCE(TRAVERSABLE_TUPLE,Traversable ((,) a), [Data.Traversable])
-HS_HAS_INSTANCE(TRAVERSABLE_TUPLE3,Traversable ((,) a b), [Data.Traversable])
+HS_HAS_INSTANCE(TRAVERSABLE_INTMAP,Traversable Data.IntMap.IntMap,[Data.Traversable Data.IntMap])
+HS_HAS_INSTANCE(FUNCTOR_TUPLE,Functor ((,) a), [Control.Monad.Instances])
+HS_HAS_INSTANCE(FOLDABLE_TUPLE,Foldable ((,) a), [Data.Foldable])
+HS_HAS_INSTANCE(FUNCTOR_TUPLE3,Functor ((,,) a b), [Control.Monad.Instances])
+HS_HAS_INSTANCE(FOLDABLE_TUPLE3,Foldable ((,,) a b), [Data.Foldable])
 
 jlibpath=${datadir}/$PACKAGE-$SHORTVERSION
 jetcpath=${sysconfdir}/$PACKAGE-$SHORTVERSION
@@ -100,6 +101,8 @@ AC_DEFINE_DIR(JLIBPATH,jlibpath)
 AC_DEFINE_DIR(JETCPATH,jetcpath)
 
 dnl AX_CREATE_STDINT_H([cbits/_stdint.h])
+
+rmdir -f $tmp > /dev/null 2>&1
 
 AC_SUBST(BYTE_ORDER)
 AC_SUBST(EXTRA_PACKAGES)
