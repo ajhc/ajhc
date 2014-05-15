@@ -5,7 +5,8 @@ bin_PROGRAMS = jhc
 jhc_SOURCES = src/Main.hs $(HSFILES) $(BUILT_SOURCES) $(HSBOOT) $(DRIFTFILES)
 
 BUILT_SOURCES= src/RawFiles.hs src/FrontEnd/HsParser.hs src/FlagDump.hs \
-	       src/FlagOpts.hs src/Name/Prim.hs src/Info/Properties.hs $(DRIFTFILES)
+	       src/FlagOpts.hs src/Name/Prim.hs src/Info/Properties.hs $(DRIFTFILES) \
+	       src/FrontEnd/Lex/Lexer.hs src/FrontEnd/Lex/Parser.hs src/FrontEnd/Lex/Lexer.hs
 
 MY_CINCLUDES= -I$(srcdir)/src/data -I$(srcdir)/src/StringTable -I$(srcdir)/src/cbits -I$(builddir)/src/cbits
 MY_CFLAGS= $(MY_CINCLUDES) -optc-std=c99 -optc-O2 -optc-Wall
@@ -37,7 +38,8 @@ HSFILES=src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/
 	src/Util/UnionSolve.hs src/Util/UniqueMonad.hs src/Util/Util.hs src/Util/VarName.hs src/Version/Config.hs src/Version/Version.hs \
 	src/Support/IniParse.hs src/E/Lint.hs src/Util/Progress.hs src/Grin/StorageAnalysis.hs src/Util/YAML.hs src/Grin/Main.hs \
         src/E/Main.hs src/Util/GMap.hs src/Util/ExitCodes.hs src/Support/TempDir.hs src/E/PrimDecode.hs \
-        src/DerivingDrift/StandardRules.hs src/FrontEnd/Exports.hs
+        src/DerivingDrift/StandardRules.hs src/FrontEnd/Exports.hs \
+	src/FrontEnd/Lex/Parser.hs src/FrontEnd/Lex/Parse.hs src/FrontEnd/Lex/Lexer.hs
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
 GHCPROFOPTS= -prof -fprof-auto -rtsopts -auto-all -osuf prof.o -hisuf prof.hi
@@ -64,7 +66,7 @@ GHCOPTS= $(HSOPTS) -O @GHCFLAGS@ $(GHCDEBUGOPTS) $(GHCINC) $(GHCLANG)
 LIB_OPTIONS=$(RTSOPTS) $(JHC_TEST)  -L- -L.
 include library_deps.make
 
-EXTRA_DIST = src/data rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
+EXTRA_DIST = src/data rts utils docs src/FrontEnd/HsParser.y src/FrondEnd/Lex/Parser.y $(BUILT_SOURCES) \
              lib/jhc lib/jhc-prim lib/haskell-extras lib/haskell98 lib/haskell2010 lib/flat-foreign $(JHC_LIBS) $(JHC_EXT_LIBS) \
 	     src/StringTable/StringTable_cbits.c src/StringTable/StringTable_cbits.h src/cbits/md5sum.c jhc.1 \
 	     src/StringTable/Atom.hsc jhc.spec src/cbits/lookup3.c \
@@ -165,9 +167,6 @@ src/Name/Prim.hs: src/data/names.txt  utils/op_names.prl
 src/RawFiles.hs: $(RAWFILES)
 	perl $(srcdir)/utils/op_raw.prl $(basename $@) $^ > $@
 
-src/FrontEnd/HsParser.hs: src/FrontEnd/HsParser.y
-	happy -a -g -c $< -o $@
-
 .SECONDARY: _darcs/hashed_inventory src/data/shortchange.txt
 
 ChangeLog:
@@ -204,6 +203,9 @@ i: $(BUILT_SOURCES)
 
 i2: $(BUILT_SOURCES)
 	$(HC) --interactive $(GHCOPTS)  $(CFILES)
+
+ltest: src/FrontEnd/Lex/Parse.hs $(BUILT_SOURCES)
+	$(HC) $(GHCOPTS)  $(CFILES) --make $< -o $@
 
 lint:
 	perl utils/hslint.prl `darcs wh -s | sed -e 's/^..//' -e 's/ .*$$//' | grep '.hs$$'`
@@ -291,6 +293,22 @@ show_elibs: lib/ext/*.cabal  lib/ext/*.yaml
 
 %: examples/%.hs jhc $(JHC_LIBS)
 	./jhc -L- -L$(srcdir) -L. --no-cache $(JHC_TEST) $< -o $@ # 2>&1 | tee $@.log
+
+%.hs: %.x
+	alex -g $< -o $@
+	-sed -i -e 's/^\(ignorePendingBytes (p,c,ps,s) = \).*/\1 (p,c,[],s)/' $@
+
+%.hs: %.y
+	happy -a -g -c $< -o $@
+
+%: %.m4
+	m4 -P src/data/prelude.m4 $< > $@
+
+%.hs: %.pp.hs
+	perl utils/preproc.prl  $< > $@
+
+%.y: %.pp.y utils/preproc.prl
+	perl utils/preproc.prl  $< > $@
 
 TESTS=HelloWorld Primes
 

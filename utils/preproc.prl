@@ -1,0 +1,21 @@
+#!/usr/bin/perl
+
+use v5.12;
+#use strict;
+#use warnings;
+
+my $accum;
+
+while(<>) {
+    next if /^#--/;
+    if (/^#<(.*)/) {
+        eval "print($1)";
+    } elsif (/^#def\s+(\w+)\s+(.*)$/) {
+        eval "sub $1 { my (\$a,\$b,\$c,\$d,\$e) = \@_; print($2) }"
+    } elsif (/^#(.*)/) {
+        eval $1;
+    } else {
+        print;
+    }
+}
+
