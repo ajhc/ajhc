@@ -1,6 +1,5 @@
 #!/usr/bin/perl
 
-
 use warnings;
 use strict;
 
@@ -92,7 +91,6 @@ foreach (@l) {
 }
 print "\n";
 
-
 foreach (keys %h) {
     if ($h{$_}{hname}) {
         print "one \"$_\" = Right \$ Set.insert $h{$_}{hname}\n";
@@ -103,13 +101,10 @@ foreach (keys %h) {
 }
 print "one x = Left x\n";
 
-
-
 print "\n{-# NOINLINE process #-}\n";
 print "process s xs = foldr f (s,[]) (map one xs) where\n";
 print "   f (Right g) (s,xs) = (g s,xs)\n";
 print "   f (Left x) (s,xs) = (s,x:xs)\n";
-
 
 my $help = "";
 $Text::Wrap::columns = 72;
@@ -132,7 +127,3 @@ print "\n{-# NOINLINE helpMsg #-}\n";
 print "helpMsg = \"$help\"\n";
 
 print "helpFlags = [" . join(", ",map { "\"$_\"" } sort keys %h) . "]\n\n";
-
-
-
-

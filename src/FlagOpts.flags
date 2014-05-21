@@ -15,8 +15,8 @@ m4 pass haskell source through m4 preprocessor
 prelude implicitly import Prelude
 type-families type/data family support
 user-kinds user defined kinds
-forall - forall keyword for rank-n types and explicit quantification
-exists - exists keyword for existential types recognized
+forall forall keyword for rank-n types and explicit quantification
+exists exists keyword for existential types recognized
 bang-patterns - bang patterns
 
 !Typechecking
@@ -41,6 +41,9 @@ jgc   use the jgc garbage collector
 profile enable profiling code in generated executable
 debug enable debugging code in generated executable
 raw just evaluate main to WHNF and nothing else.
+
+!Experimental
+new-parser use new parser based on different layout rule.
 
 !Default settings
 @default inline-pragmas rules wrapper defaulting type-analysis monomorphism-restriction global-optimize full-int prelude

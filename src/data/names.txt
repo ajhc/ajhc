@@ -172,3 +172,8 @@ Tuple Jhc@.(#)
 # superkinds
 HashHash  Jhc@.##
 StarStar  Jhc@.**
+
+# placeholders
+UnknownType:u:
+
+DotDot  ..

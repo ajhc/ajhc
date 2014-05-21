@@ -5,7 +5,7 @@
 -- appropriate errors in the desugaring pass.
 
 {
-module FrontEnd.Lex.Parser (parse) where
+module FrontEnd.Lex.Parser (parse,parseDecls,parseStmt) where
 
 import Control.Monad.Error
 import FrontEnd.HsSyn
@@ -46,72 +46,146 @@ import Name.Name
 
 %monad { Either String } { (>>=) } { return }
 %name parse exp
+%name parseDecls decls
+%name parseStmt stmt
 %tokentype { Lexeme }
 %%
 
 -- some combinators for generating rules
-#def maybe "m_$a : " . ($b // $a) . "  { Just \$1 }\n   |  { Nothing }\n"
-#def clist "rev_cl_$a : rev_cl_$a ',' $a  { \$3:\$1 }\n   | $a { [\$1] }\n cl_$a : rev_cl_$a { reverse \$1 }\n"
-#def eclist "rev_ecl_$a : rev_ecl_$a ',' $a  { \$3:\$1 }\n   | { [] }\n ecl_$a : rev_ecl_$a { reverse \$1 }\n"
-#def slist "rev_sl_$a : rev_sl_$a $a  { \$2:\$1 }\n   | $a { [\$1] }\n sl_$a : rev_sl_$a { reverse \$1 }\n"
+#def 'qw' maybe "m_$a : " . ($b // $a) . "  { Just \$1 }\n   |  { Nothing }\n"
+#def 'qw' clist "rev_cl_$a : rev_cl_$a ',' $a  { \$3:\$1 }\n   | $a { [\$1] }\n cl_$a : rev_cl_$a { reverse \$1 }\n"
+#def 'qw' slist "rev_sl_$a : rev_sl_$a semis $a  { \$3:\$1 }\n   | $a { [\$1] }\n sl_$a : rev_sl_$a { reverse \$1 }\n"
+#def 'qw' eclist "rev_ecl_$a : rev_ecl_$a ',' $a  { \$3:\$1 }\n   | { [] }\n ecl_$a : rev_ecl_$a { reverse \$1 }\n"
+#def 'qw' wlist "rev_wl_$a : rev_wl_$a $a  { \$2:\$1 }\n   | $a { [\$1] }\n wl_$a : rev_wl_$a { reverse \$1 }\n"
+#def 'qw' ewlist "rev_ewl_$a : rev_ewl_$a $a  { \$2:\$1 }\n   | { [] }\n ewl_$a : rev_ewl_$a { reverse \$1 }\n"
+
+--stmt { HsStmt }
+--    : pat '<-'
+
+pat :: { HsPat }
+    : aexp { HsPatExp $1 }
+pats :: { HsPat }
+    : wl_aexp { HsPatExp $ hsWords $1 }
+
+decls :: { [HsDecl] }
+      : optsemis sl_decl optsemis  { $2 }
+      | optsemis                   { [] }
+
+decl :: { HsDecl }
+    : pats '=' exp   { HsPatBind { hsDeclSrcLoc = srcLoc $2,
+                       hsDeclPat = $1, hsDeclRhs = (HsUnGuardedRhs $3),
+                       hsDeclDecls = [] } }
+
+exp :: { HsExp }
+    : exp0 '::'  { $1 }   -- TODO type
+    | exp0       { $1 }
+
+exp0  :: { HsExp }
+    : exp1 { $1 }
+    | aexp exp0 { $1 `cat` $2 }
+
+exp1 :: { HsExp }
+    : 'if' exp 'then' exp 'else' exp { HsIf (espan $1 $3 $ $2) (espan $3 $5 $4) (eloc $5 $6) }
+    | '\\' wl_pat '->' exp { HsLambda $1 $2 $4 }
+    | 'let' '{' decls '}' 'in' exp { HsLet $3 $6 }
+    | 'do' '{' sl_stmt  '}'       { HsDo $3 }
+    | 'case' exp 'of' '{' sl_alt '}'  { espan $1 $6 $ HsCase (espan $1 $3 $2) $5 }
+    | aexp  { $1 }
+
+stmt :: { HsStmt }
+      : pat '<-' exp      { HsGenerator $2 $1 $3 }
+      | exp               { HsQualifier $1 }
+      | 'let' '{' decls '}'    { HsLetStmt  $3 }
+
+#slist stmt
+
+alt :: { HsAlt }
+    : pats '->' exp { HsAlt $2 $1 (HsUnGuardedRhs $3) [] }
+
+aexp :: { HsExp }
+    : '(' ecl_exp ')' { espan $1 $3 $ mtuple $2 }
+    | '(#' ecl_exp '#)' { espan $1 $3 $ HsUnboxedTuple $2 }
+    | '[' ']' { espan $1 $2 $ HsList [] }
+    | '[' list ']' { espan $1 $3 $2 }
+    | '_' { HsWildCard $1 }
+    | var { HsVar $1 }
+    | con { HsCon $1 }
+    | varop { HsVar $1 }
+    | conop { HsCon $1 }
+    | '`' var '`' { espan $1 $3 $ HsBackTick (HsVar $2) }
+    | '`' con '`' { espan $1 $3 $ HsBackTick (HsCon $2) }
+    | lit { HsLit $1 }
+
+fbind :: { (Name,Maybe HsExp) }
+    : uqvar '=' exp  { ($1,Just (eloc $2 $3)) }
+    | uqvar { ($1,Nothing) }
+
+list :: { HsExp }
+    : cl_exp               { HsList $1 }
+    | exp '..'             { HsEnumFrom $1 }
+    | exp ',' exp '..'     { HsEnumFromThen $1 $3 }
+    | exp '..' exp         { HsEnumFromTo $1 $3 }
+    | exp ',' exp '..' exp { HsEnumFromThenTo $1 $3 $5 }
 
 lit :: { HsLiteral }
     : LInteger  { HsInt $ read $1 }
     | LChar     { HsChar $ read $1 }
     | LString   { HsString $ read $1 }
 
-expp :: { HsExp }
-    : '(' ecl_exp ')' { espan $1 $3 $ mtuple $2 }
-    | '(#' ecl_exp '#)' { espan $1 $3 $ HsUnboxedTuple $2 }
-    | '[' ecl_exp ']' { espan $1 $3 $ HsList $2 }
-    | '[' exp '..' ']' { espan $1 $4 $ HsEnumFrom $2 }
-    | '[' exp ',' exp '..' ']' { espan $1 $5 $ HsEnumFromThen $2 $4 }
-    | '[' exp '..' exp ']' { espan $1 $5 $ HsEnumFromTo $2 $4 }
-    | '[' exp ',' exp '..' exp ']' { espan $1 $7 $ HsEnumFromThenTo $2 $4 $6 }
-    | '_' { HsWildCard $1 }
-    | var { HsVar $1 }
-    | con { HsCon $1 }
-    | lit { HsLit $1 }
-
-list :: { HsExp }   
---    : exp  { HsList [$1] }
-    : cl_exp               { HsList $1 }
-    | exp '..'             { HsEnumFrom $1 }
-    | exp ',' exp '..'     { HsEnumFromThen $1 $3 }
-    | exp '..' exp         { HsEnumFromTo $1 $3 }
-    | exp ',' exp '..' exp { HsEnumFromThenTo $1 $3 $5 }
-    |                      { HsList [] }
-
-pat :: { HsExp }
-    : expp { $1 }
+#clist exp
+#eclist exp
+#wlist aexp
+#ewlist aexp
+#wlist pat
+#slist alt
+#slist decl
 
 var :: { Name }
-    : LVarId  { (toName UnknownType $1) }
+    : uqvar { $1 }
     | LQVarId  {(toName UnknownType $1) }
+
+uqvar :: { Name }
+    : LVarId  { (toName UnknownType $1) }
+
 con :: { Name }
     : LConId  { (toName UnknownType $1) }
     | LQConId { (toName UnknownType $1) }
 
-exp :: { HsExp }
-    : 'if' exp 'then' exp 'else' exp { HsIf (espan $1 $3 $ $2) (espan $3 $5 $4) $6 }
---    | '\' rsl_pat '->' exp { HsLambda $1 $2 $4 }
-    |  sl_expp { HsWords $1 }
-    | expp { $1 }
+conop :: { Name }
+    : LConSym  { (toName UnknownType $1) }
+    | LQConSym { (toName UnknownType $1) }
 
+varop :: { Name }
+    : LVarSym  { (toName UnknownType $1) }
+    | LQVarSym { (toName UnknownType $1) }
 
-#maybe 'comma', "','"
-#maybe 'semi', "';'"
+-- punctuation.
 
-#clist 'exp'
-#eclist 'exp'
-#slist 'expp'
-#slist 'pat'
+#[def optpunc   qq[
+opt$a :: { () }
+      : $b            { () }
+      | {- empty -}   { () }
+${a}s :: { () }
+       : opt${a}s $b  { () }
+opt${a}s :: { () }
+       : ${a}s	      { () }
+       | {- empty -}  { () } ]
+#]
+
+#optpunc 'semi',"';'"
 
 {
-happyError = fail "parse error"
+happyError _ts = Left "parse error"
 
 mtuple [x] = HsParen x
 mtuple xs = HsTuple xs
+
+hsWords [] = error "hsWords []"
+hsWords [x] = x
+hsWords xs = HsWords xs
+
+x `cat` HsWords ws = HsWords (x:ws)
+x `cat` y = HsWords [x,y]
 
 eloc p e =  HsLocatedExp (Located (srcSpan p) e)
 espan p1 p2 e =  HsLocatedExp (Located (SrcSpan p1 p2) e)

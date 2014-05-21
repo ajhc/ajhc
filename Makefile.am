@@ -72,7 +72,7 @@ EXTRA_DIST = src/data rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
 	     src/StringTable/Atom.hsc jhc.spec src/cbits/lookup3.c \
 	     manual.html lib/applicative examples/HelloWorld.hs examples/Calendar.hs \
 	     examples/Primes.hs src/FlagOpts.flags src/FlagDump.flags lib/ext compat LICENSE \
-	     src/FrontEnd/Lex/Lexer.x src/FrontEnd/Lex/Parser.y.pp
+	     src/FrontEnd/Lex/Lexer.x src/FrontEnd/Lex/Parser.y.pp  src/FrontEnd/Lex/Parser.y
 
 dist-hook: $(BUILT_SOURCES)
 	if test -f _darcs; then \
@@ -205,7 +205,7 @@ i: $(BUILT_SOURCES)
 i2: $(BUILT_SOURCES)
 	$(HC) --interactive $(GHCOPTS)  $(CFILES)
 
-ltest: src/FrontEnd/Lex/Parse.hs $(BUILT_SOURCES)
+ltest: src/FrontEnd/Lex/Parse.hs $(BUILT_SOURCES) src/FrontEnd/Lex/Lexer.hs
 	$(HC) $(GHCOPTS)  $(CFILES) --make $< -o $@
 
 lint:
@@ -292,6 +292,7 @@ libs: $(JHC_LIBS) $(JHC_EXT_LIBS)
 show_elibs: lib/ext/*.cabal  lib/ext/*.yaml
 	-perl utils/build_extlibs.prl -l $^
 
+
 %: examples/%.hs jhc $(JHC_LIBS)
 	./jhc -L- -L$(srcdir) -L. --no-cache $(JHC_TEST) $< -o $@ # 2>&1 | tee $@.log
 
@@ -305,14 +306,15 @@ show_elibs: lib/ext/*.cabal  lib/ext/*.yaml
 %: %.m4
 	m4 -P src/data/prelude.m4 $< > $@
 
+%.y: %.y.pp $(srcdir)/utils/preproc.prl
+	perl $(srcdir)/utils/preproc.prl  $< > $@
+
+
 %.hs: %.pp.hs
 	perl $(srcdir)/utils/preproc.prl  $< > $@
 
-%.y: %.pp.y utils/preproc.prl
-	perl $(srcdir)/utils/preproc.prl  $< > $@
-
-%: %.pp $(srcdir)/utils/preproc.prl
-	perl $(srcdir)/utils/preproc.prl  $< > $@
+#%.y: %.pp.y utils/preproc.prl
+#	perl $(srcdir)/utils/preproc.prl  $< > $@
 
 TESTS=HelloWorld Primes
 

@@ -6,16 +6,33 @@ use v5.12;
 
 my $accum;
 
+my %fproto;
+
+sub meval ($) {
+#    print STDERR "$_[0]\n";
+    eval "$_[0]";
+}
+
 while(<>) {
     next if /^#--/;
     if (/^#<(.*)/) {
-        eval "print($1)";
-    } elsif (/^#def\s+(\w+)\s+(.*)$/) {
-        eval "sub $1 { my (\$a,\$b,\$c,\$d,\$e) = \@_; print($2) }"
+        meval "print($1)";
+    } elsif (/^#\[def\s+('\w+')?\s*(\w+)\s+(.*)$/) {
+        $fproto{$2} = defined $1 ? meval $1 : '';
+        my $x = $3;
+        while (<>) {
+           last if  $_ =~ /^#\]/;
+           $x .= $_;
+        }
+        meval "sub $2 { my (\$a,\$b,\$c,\$d,\$e) = \@_; print($x) }"
+    } elsif (/^#def\s+('\w+')?\s*(\w+)\s+(.*)$/) {
+        $fproto{$2} = defined $1 ? meval $1 : '';
+        meval "sub $2 { my (\$a,\$b,\$c,\$d,\$e) = \@_; print($3) }"
+    } elsif (/^#(\w+)\s+(.*)/ && exists $fproto{$1}) {
+        meval "$1 $fproto{$1}($2)";
     } elsif (/^#(.*)/) {
-        eval $1;
+        meval $1;
     } else {
         print;
     }
 }
-

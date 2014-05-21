@@ -57,7 +57,7 @@ data HsImportDecl = HsImportDecl {
     }
   deriving(Eq,Show,Ord)
 
-data HsAssoc = HsAssocNone | HsAssocLeft | HsAssocRight
+data HsAssoc = HsAssocNone | HsAssocLeft | HsAssocRight | HsAssocPrefix | HsAssocPrefixy
   deriving(Eq,Show,Ord)
   {-! derive: Binary !-}
 
@@ -68,13 +68,13 @@ data HsDecl
     = HsTypeFamilyDecl {
         hsDeclSrcLoc  :: SrcLoc,
         hsDeclData    :: !Bool,
-        hsDeclName    :: Name,
+        hsDeclName    :: !Name,
         hsDeclTArgs   :: [HsType],
         hsDeclHasKind :: Maybe HsKind
         }
     | HsTypeDecl	 {
         hsDeclSrcLoc :: SrcLoc,
-        hsDeclName   :: Name,
+        hsDeclName   :: !Name,
         hsDeclTArgs  :: [HsType],
         hsDeclType   :: HsType
         }
@@ -91,7 +91,7 @@ data HsDecl
         }
     | HsInfixDecl   {
         hsDeclSrcLoc :: SrcLoc,
-        hsDeclAssoc  :: HsAssoc,
+        hsDeclAssoc  :: !HsAssoc,
         hsDeclInt    :: !Int,
         hsDeclNames  :: [Name]
         }
@@ -102,7 +102,7 @@ data HsDecl
         }
     | HsClassAliasDecl {
         hsDeclSrcLoc   :: SrcLoc,
-        hsDeclName     :: Name,
+        hsDeclName     :: !Name,
         hsDeclTypeArgs :: [HsType],
         {- rhs -} hsDeclContext :: HsContext,
                   hsDeclClasses :: HsContext,
@@ -358,7 +358,7 @@ data HsPat
     -- | scoped type variable extension
     | HsPTypeSig SrcLoc HsPat HsQualType
     -- | advanced patterns need to be parsed as expressions
-    | HsPatExp LHsExp
+    | HsPatExp HsExp
  deriving(Eq,Ord,Show)
  {-! derive: is !-}
 

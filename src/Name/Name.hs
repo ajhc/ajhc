@@ -36,6 +36,7 @@ import Data.Data
 
 import C.FFI
 import Data.Binary
+import Data.Word
 import Doc.DocLike
 import Doc.PPrint
 import GenUtil
@@ -57,6 +58,20 @@ data NameType
     | UnknownType
     | QuotedName
     deriving(Ord,Eq,Enum,Read,Show)
+
+{-
+ - TODO:
+  We cache pertinent information about a name in a single byte for easy access.
+    [qocrrss0]             [q-xrr110]
+    ss 0 term              q 0 not quoted
+       1 type                1 quoted
+       2 sort              x 0  class
+    rr 0 unqualified         1  field
+       1 qualified         c 0 not constructor
+       2 prim                1 constructor
+       3 composition       o 0 not operator
+                             1 operator
+-}
 
 isTypeNamespace TypeConstructor = True
 isTypeNamespace ClassName = True
