@@ -176,4 +176,22 @@ StarStar  Jhc@.**
 # placeholders
 UnknownType:u:
 
-DotDot  ..
+Bang         !
+Dot          .
+DotDot       ..
+Hash         #
+Minus        -
+Quest        ?
+QuestQuest   ??
+Star         *
+StarBang     *!
+alias        alias
+as           as
+closed       closed
+derive       derive
+exists       exists
+family       family
+forall       forall
+hiding       hiding
+kind         kind
+qualified    qualified

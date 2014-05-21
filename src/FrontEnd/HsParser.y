@@ -976,15 +976,15 @@ qvarid :: { HsName }
 
 varid :: { HsName }
       : VARID                 { $1 }
-      | 'as'                  { as_name }
-      | 'alias'               { toName UnknownType "alias" }
-      | 'kind'                { toName UnknownType "kind" }
-      | 'closed'              { toName UnknownType "closed" }
-      | 'family'              { toName UnknownType "family" }
-      | 'qualified'           { qualified_name }
-      | 'hiding'              { hiding_name }
-      | 'forall'              { toName UnknownType "forall" }
-      | 'exists'              { toName UnknownType "exists" }
+      | 'as'                  { u_as }
+      | 'alias'               { u_alias }
+      | 'kind'                { u_kind }
+      | 'closed'              { u_closed }
+      | 'family'              { u_family }
+      | 'qualified'           { u_qualified }
+      | 'hiding'              { u_hiding }
+      | 'forall'              { u_forall }
+      | 'exists'              { u_exists }
 
 qconid :: { HsName }
       : conid                 { $1 }
@@ -1010,23 +1010,23 @@ qvarsymm :: { HsName }
 
 varsym :: { HsName }
       : VARSYM                { $1 }
-      | '-'                   { minus_name }
-      | '!'                   { pling_name }
-      | 'bang!'               { pling_name }
-      | '?'                   { toName UnknownType "?" }
-      | '??'                  { toName UnknownType "??" }
-      | '*!'                  { toName UnknownType "*!" }
-      | '*'                   { star_name }
-      | '#'                   { hash_name }
-      | '.'                   { dot_name }
+      | '-'                   { u_Minus }
+      | '!'                   { u_Bang }
+      | 'bang!'               { u_Bang }
+      | '?'                   { u_Quest }
+      | '??'                  { u_QuestQuest }
+      | '*!'                  { u_StarBang }
+      | '*'                   { u_Star }
+      | '#'                   { u_Hash }
+      | '.'                   { u_Dot }
 
 varsymm :: { HsName } -- varsym not including '-'
       : VARSYM                { $1 }
-      | '!'                   { pling_name }
-      | 'bang!'               { pling_name }
-      | '*'                   { star_name }
-      | '#'                   { hash_name }
-      | '.'                   { dot_name }
+      | '!'                   { u_Bang }
+      | 'bang!'               { u_Bang }
+      | '*'                   { u_Star }
+      | '#'                   { u_Hash }
+      | '.'                   { u_Dot }
 
 qvarsym1 :: { HsName }
       : QVARSYM               { $1 }
@@ -1090,15 +1090,6 @@ happyError = parseError "Parse error"
 readInteger x = fromIntegral x
 readRational x = x
 
-as_name	              = toName UnknownType  "as"
-derive_name	      = toName UnknownType  "derive"
-qualified_name        = toName UnknownType  "qualified"
-hiding_name	      = toName UnknownType  "hiding"
-minus_name	      = toName UnknownType  "-"
-pling_name	      = toName UnknownType  "!"
-star_name	      = toName UnknownType  "*"
-hash_name	      = toName UnknownType  "#"
-dot_name	      = toName UnknownType  "."
 main_mod	      = toModule "Main"
 
 tuple_con_name i      = toName DataConstructor (toModule "Jhc.Prim.Prim","("++replicate i ','++")")
