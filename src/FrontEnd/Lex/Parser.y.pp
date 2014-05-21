@@ -12,6 +12,7 @@ import FrontEnd.HsSyn
 import FrontEnd.Lex.Lexer
 import FrontEnd.SrcLoc
 import Name.Name
+import Name.Names
 
 }
 
@@ -21,28 +22,25 @@ import Name.Name
 #map { token('LSpecial',$_) } qw/{ } , ; [ ] ` ( )/
 #map { token('LSpecial',$_) } qw/(# #) ∀ ∃/
 #map { token('LReservedId',$_) } qw/as case class data default deriving do else hiding if import in infix infixl infixr instance let module newtype of qualified then type where/
-#map { token('LReservedId',$_) } qw/kind alias prefix prefixy forall exists/
+#map { token('LReservedId',$_) } qw/kind alias prefixx prefixy forall exists family closed/
 #map { token('LReservedOp',$_) } qw/.. : :: = \\\\ | <- -> @ ~ =>/
 
---  LSpecial { L _ LSpecial $$ }
---  LReservedId { L _ LReservedId $$ }
---  LReservedOp { L _ LReservedOp $$ }
-  '_' { L $$ LVarId "_" }
+ '_' { L $$ LVarId "_" }
 
-  LVarId { L _ LVarId $$ }
-  LQVarId { L _ LQVarId $$ }
-  LConId { L _ LConId $$ }
-  LQConId { L _ LQConId $$ }
-  LVarSym { L _ LVarSym $$ }
+  LVarId   { L _ LVarId $$ }
+  LQVarId  { L _ LQVarId $$ }
+  LConId   { L _ LConId $$ }
+  LQConId  { L _ LQConId $$ }
+  LVarSym  { L _ LVarSym $$ }
   LQVarSym { L _ LQVarSym $$ }
-  LConSym { L _ LConSym $$ }
+  LConSym  { L _ LConSym $$ }
   LQConSym { L _ LQConSym $$ }
 
   LInteger { L _ LInteger $$ }
-  LFloat { L _ LFloat $$ }
-  LChar { L _ LChar $$ }
-  LString { L _ LString $$ }
-  LEOF { L _ LEOF $$ }
+  LFloat   { L _ LFloat $$ }
+  LChar    { L _ LChar $$ }
+  LString  { L _ LString $$ }
+  LEOF     { L _ LEOF $$ }
 
 %monad { Either String } { (>>=) } { return }
 %name parse exp
@@ -54,10 +52,6 @@ import Name.Name
 
 -- some combinators for generating rules
 #def 'qw' maybe "m_$a : " . ($b // $a) . "  { Just \$1 }\n   |  { Nothing }\n"
-#def 'qw' clist "rev_cl_$a : rev_cl_$a ',' $a  { \$3:\$1 }\n   | $a { [\$1] }\n cl_$a : rev_cl_$a { reverse \$1 }\n"
-#def 'qw' slist "rev_sl_$a : rev_sl_$a semis $a  { \$3:\$1 }\n   | $a { [\$1] }\n sl_$a : rev_sl_$a { reverse \$1 }\n"
-#def 'qw' eslist "rev_esl_$a : rev_esl_$a semis $a  { \$3:\$1 }\n   | { [] }\n esl_$a : rev_esl_$a { reverse \$1 }\n"
--- #def 'qw' eclist "rev_ecl_$a : rev_ecl_$a ',' $a  { \$3:\$1 }\n   | { [] }\n ecl_$a : rev_ecl_$a { reverse \$1 }\n"
 #def 'qw' wlist "rev_wl_$a : rev_wl_$a $a  { \$2:\$1 }\n   | $a { [\$1] }\n wl_$a : rev_wl_$a { reverse \$1 }\n"
 #def 'qw' ewlist "rev_ewl_$a : rev_ewl_$a $a  { \$2:\$1 }\n   | { [] }\n ewl_$a : rev_ewl_$a { reverse \$1 }\n"
 
@@ -70,27 +64,28 @@ cl_$a : rev_cl_$a { reverse \$1 }
 ecl_$a
     : cl_$a { \$1 }
     |       { [] }
+cl2_$a
+    : $a ',' cl_$a { \$1:\$3 }
 ]
 #]
 
 module :: { HsModule }
     : '{' impdecls decls '}'  { hsModule {
-        hsModuleName = toModule "Main",
-        hsModuleSrcLoc = $1,
+        hsModuleName    = toModule "Main",
+        hsModuleExports = Just [HsEVar (toName Val "main")],
+        hsModuleSrcLoc  = $1,
         hsModuleImports = $2,
-        hsModuleDecls = $3
+        hsModuleDecls   = $3
     } }
-    | 'module' modid maybeexports 'where' '{' impdecls decls '}' { hsModule {
-        hsModuleName = $2,
+    | 'module' modid m_exports 'where' '{' impdecls decls '}' { hsModule {
+        hsModuleName    = $2,
         hsModuleExports = $3,
-        hsModuleSrcLoc = $1,
+        hsModuleSrcLoc  = $1,
         hsModuleImports = $6,
-        hsModuleDecls = $7
+        hsModuleDecls   = $7
         } }
 
-maybeexports :: { Maybe [HsExportSpec] }
-      :  exports                              { Just $1 }
-      |  {- empty -}                          { Nothing }
+#maybe exports
 
 pat :: { HsPat }
     : aexp { HsPatExp $1 }
@@ -98,10 +93,33 @@ pats :: { HsPat }
     : wl_aexp { HsPatExp $ hsWords $1 }
 
 decl :: { HsDecl }
-    : pats '=' exp   { HsPatBind { hsDeclSrcLoc = srcLoc $2,
-                       hsDeclPat = $1, hsDeclRhs = (HsUnGuardedRhs $3),
-                       hsDeclDecls = [] } }
+    : pats srcloc rhs optwhere  { HsPatBind {
+        hsDeclSrcLoc = $2,
+        hsDeclPat = $1,
+        hsDeclRhs = $3,
+        hsDeclDecls = $4 } }
     | cl_var '::' qualtype { HsTypeSig $2 $1 $3 }
+    | 'type' con ewl_atype '=' type
+                      { HsTypeDecl {
+                        hsDeclSrcLoc = $1,
+                        hsDeclName = $2,
+                        hsDeclTArgs = $3,
+                        hsDeclType = $5 } }
+    | assoc INT cl_varconop  { HsInfixDecl (fst $1) (snd $1) $2 $3 }
+
+rhs :: { HsRhs }
+    : '=' exp   { HsUnGuardedRhs $2 }
+    | wl_gdrh   { HsGuardedRhss $1 }
+
+gdrh :: { HsGuardedRhs }
+      : '|' exp '=' exp        { HsGuardedRhs $1 $2 $4 }
+
+assoc :: { (SrcLoc,HsAssoc) }
+    : 'infix'  { ($1,HsAssocNone) }
+    | 'infixl'  { ($1,HsAssocLeft) }
+    | 'infixr'  { ($1,HsAssocRight) }
+    | 'prefixx'  { ($1,HsAssocPrefix) }
+    | 'prefixy'  { ($1,HsAssocPrefixy) }
 
 impdecl :: { HsImportDecl }
     : 'import' optqualified modid maybeas maybeimpspec { HsImportDecl $1 $3 $2 $4 $5 }
@@ -132,8 +150,28 @@ export :: { HsExportSpec }
       |  con '(' ecl_varcon ')'       { HsEThingWith $1 $3 }
       |  'module' modid               { HsEModuleContents $2 }
 
+type :: { HsType }
+      : btype '->' type               { HsTyFun $1 $3 }
+      | btype                         { $1 }
+--      | 'forall' tbinds '.' qualtype  { HsTyForall { hsTypeVars = reverse $2, hsTypeType = $4 } }
+--      | 'exists' tbinds '.' qualtype  { HsTyExists { hsTypeVars = reverse $2, hsTypeType = $4 } }
+
+btype :: { HsType }
+      : btype atype                   { HsTyApp $1 $2 }
+      | atype                         { $1 }
+
+atype :: { HsType }
+      : con                    { HsTyCon $1 }
+      | var                    { HsTyVar $1 }
+      | '(' cl2_type ')'       { HsTyTuple $2 }
+      | '(#' ecl_type '#)'     { HsTyUnboxedTuple $2 }
+      | '[' type ']'           { HsTyApp (HsTyCon tc_List) $2 }
+      | '(' type ')'           { $2 }
+      | '(' type '=' type ')'  { HsTyEq $2 $4 }
+
 qualtype :: { HsQualType }
-    : 'type' { error "qualtype" }
+ --     : context '=>' type             { HsQualType $1 $3 }
+      : type                          { HsQualType [] $1 }
 
 exp :: { HsExp }
     : exp0 '::' qualtype { HsExpTypeSig $2 $1 $3 }
@@ -160,42 +198,59 @@ alt :: { HsAlt }
     : pats '->' exp { HsAlt $2 $1 (HsUnGuardedRhs $3) [] }
 
 aexp :: { HsExp }
-    : '(' ecl_exp ')' { espan $1 $3 $ mtuple $2 }
+    : '(' ecl_exp ')'   { espan $1 $3 $ mtuple $2 }
     | '(#' ecl_exp '#)' { espan $1 $3 $ HsUnboxedTuple $2 }
-    | '[' ']' { espan $1 $2 $ HsList [] }
-    | '[' list ']' { espan $1 $3 $2 }
-    | '_' { HsWildCard $1 }
-    | var { HsVar $1 }
-    | con { HsCon $1 }
-    | varop { HsVar $1 }
-    | conop { HsCon $1 }
-    | '`' var '`' { espan $1 $3 $ HsBackTick (HsVar $2) }
-    | '`' con '`' { espan $1 $3 $ HsBackTick (HsCon $2) }
-    | lit { HsLit $1 }
+    | '[' ']'           { espan $1 $2 $ HsList [] }
+    | '[' list ']'      { espan $1 $3 $2 }
+    | '_'               { HsWildCard $1 }
+    | var               { HsVar $1 }
+    | con               { HsCon $1 }
+    | varop             { HsVar $1 }
+    | conop             { HsCon $1 }
+    | '`' var '`'       { espan $1 $3 $ HsBackTick (HsVar $2) }
+    | '`' con '`'       { espan $1 $3 $ HsBackTick (HsCon $2) }
+    | lit               { HsLit $1 }
 
 fbind :: { (Name,Maybe HsExp) }
     : uqvar '=' exp  { ($1,Just (eloc $2 $3)) }
     | uqvar { ($1,Nothing) }
 
+optwhere :: { [HsDecl] }
+      : 'where' '{' decls  '}'                { $3 }
+      | {- empty -}                           { [] }
+
 list :: { HsExp }
-    : cl_exp               { HsList $1 }
-    | exp '..'             { HsEnumFrom $1 }
-    | exp ',' exp '..'     { HsEnumFromThen $1 $3 }
-    | exp '..' exp         { HsEnumFromTo $1 $3 }
-    | exp ',' exp '..' exp { HsEnumFromThenTo $1 $3 $5 }
+    : cl_exp                  { HsList $1 }
+    | cl_exp '..'             {% case $1 of
+        [x]   -> return $ HsEnumFrom x
+        [x,y] -> return $ HsEnumFromThen x y
+        _ -> fail "parse error in list comprehension" }
+    | cl_exp '..' exp         {% case $1 of
+        [x]   -> return $ HsEnumFromTo x $3
+        [x,y] -> return $ HsEnumFromThenTo x y $3
+        _ -> fail "parse error in list comprehension" }
+--    | exp '..'                { HsEnumFrom $1 }
+--    | exp '..' exp            { HsEnumFromTo $1 $3 }
+--    | exp0 ',' exp0 '..' exp0 { HsEnumFromThenTo $1 $3 $5 }
 
 lit :: { HsLiteral }
     : LInteger  { HsInt $ read $1 }
     | LChar     { HsChar $ read $1 }
     | LString   { HsString $ read $1 }
 
+INT :: { Int }
+    : LInteger { read $1 }
+
 #clist exp
+#clist type
 #clist var
 #clist varcon
+#clist varconop
 #clist export
-#eclist exp
 #wlist aexp
+#wlist gdrh
 #ewlist aexp
+#ewlist atype
 #wlist pat
 
 #[def oslist   qq[
@@ -219,6 +274,15 @@ var :: { Name }
 
 uqvar :: { Name }
     : LVarId  { (toName UnknownType $1) }
+    | 'as'                  { u_as }
+    | 'alias'               { u_alias }
+    | 'kind'                { u_kind }
+    | 'closed'              { u_closed }
+    | 'family'              { u_family }
+    | 'qualified'           { u_qualified }
+    | 'hiding'              { u_hiding }
+    | 'forall'              { u_forall }
+    | 'exists'              { u_exists }
 
 con :: { Name }
     : LConId  { (toName UnknownType $1) }
@@ -227,10 +291,19 @@ con :: { Name }
 varcon
     : var { $1 }
     | con { $1 }
+    | '(' varop ')' { $2 }
+    | '(' conop ')' { $2 }
+
+varconop
+    : varop { $1 }
+    | conop { $1 }
+    | '`' var '`' { $2 }
+    | '`' con '`' { $2 }
 
 conop :: { Name }
     : LConSym  { (toName UnknownType $1) }
     | LQConSym { (toName UnknownType $1) }
+    | ':'      { (toName UnknownType ":") }
 
 varop :: { Name }
     : LVarSym  { (toName UnknownType $1) }
@@ -252,7 +325,7 @@ opt${a}s :: { () }
 #optpunc 'semi',"';'"
 #optpunc 'comma',"','"
 
-srcloc :: { SrcLoc } :       { bogusASrcLoc }
+srcloc :: { SrcLoc } :       {%^ \ (L sl _ _) -> return sl }
 
 {
 happyError [] = Left "parse error at EOF"

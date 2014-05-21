@@ -163,7 +163,7 @@ fetchSource modOpt done_ref fs mm = do
     (mod,m,ds) <- case mlookup hash (knownSourceMap done) of
         Just (m,ds) -> return (Left lbs,m,ds)
         Nothing -> do
-            (hmod,_) <- parseHsSource modOpt  fn lbs
+            (hmod,_) <- parseHsSource modOpt fn lbs
             let m = hsModuleName hmod
                 ds = hsModuleRequires hmod
             writeIORef done_ref (knownSourceMap_u (Map.insert hash (m,ds)) done)

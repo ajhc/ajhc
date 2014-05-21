@@ -524,6 +524,7 @@ ppHsExp (HsExpTypeSig pos exp ty) =
 	myFsep[ppHsExp exp, text "::", ppHsQualType ty]
 ppHsExp (HsLocatedExp (Located _ x)) = ppHsExp x
 ppHsExp (HsBackTick e) = char '`' <> ppHsExp e <> char '`'
+ppHsExp HsWords { .. } = char '«' <> hsep (map ppHsExp hsExpExps) <> char '»'
 ppHsExp e = text $ show e
 
 ------------------------- Patterns -----------------------------

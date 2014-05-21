@@ -27,6 +27,15 @@ fileNameCommandLine = packString "(command line)"
 fileNameUnknown = packString "(unknown)"
 fileNameGenerated = packString "(generated)"
 
+srcLocRelative
+    :: SrcLoc    -- The forced location
+    -> SrcLoc    -- saved natural location
+    -> SrcLoc    -- current natural location
+    -> SrcLoc    -- result
+srcLocRelative floc nloc cloc = floc { srcLocLine = sll, srcLocColumn = slc } where
+    sll = srcLocLine cloc - srcLocLine nloc + srcLocLine floc
+    slc = srcLocColumn cloc - srcLocColumn nloc  + srcLocColumn floc
+
 bogusASrcLoc = SrcLoc fileNameUnknown (-1) (-1)
 eofSrcLoc    = SrcLoc fileNameUnknown maxBound (-1)
 bogusSrcSpan = SrcSpan bogusASrcLoc bogusASrcLoc
