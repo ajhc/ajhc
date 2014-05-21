@@ -493,6 +493,8 @@ class Monad m => OptionMonad m where
     getOptions = return options
 
 instance OptionMonad Identity
+instance OptionMonad IO
+
 
 newtype OptT m a = OptT (ReaderT Opt m a)
     deriving(MonadIO,Monad,Functor,MonadTrans)

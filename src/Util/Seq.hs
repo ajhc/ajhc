@@ -1,104 +1,44 @@
---------------------------------------------------------------------------------
-{-| Module      :  Seq
-    Copyright   :  (c) Daan Leijen 2002
-    License     :  BSD-style
+module Util.Seq(
+            Seq()
 
-    Maintainer  :  daan@cs.uu.nl
-    Stability   :  provisional
-    Portability :  portable
-
-  An implementation of John Hughes's efficient catenable sequence type. A lazy sequence
-  @Seq a@ can be concatenated in /O(1)/ time. After
-  construction, the sequence in converted in /O(n)/ time into a list.
-
-  Modified by John Meacham for use in jhc
--}
----------------------------------------------------------------------------------}
-module Util.Seq( -- * Type
-            Seq
-            -- * Operators
-          , (<>)
-
-            -- * Construction
-          , empty
-          , single
           , singleton
           , cons
-          , append
+          , snoc
 
-            -- * Conversion
           , toList
+          , appendToList
           , fromList
+          , Util.Seq.concat
           ) where
 
-import Data.Monoid(Monoid(..))
+import Control.Applicative
 import Control.Monad
+import Data.Foldable(Foldable(..))
+import Data.Monoid(Monoid(..))
+import Data.Traversable(Traversable(..))
 
-{--------------------------------------------------------------------
-  Operators
---------------------------------------------------------------------}
-infixr 5 <>
-
--- | /O(1)/. Append two sequences, see 'append'.
-(<>) :: Seq a -> Seq a -> Seq a
-s <> t
-  = append s t
-
-{--------------------------------------------------------------------
-  Type
---------------------------------------------------------------------}
--- | Sequences of values @a@.
 newtype Seq a = Seq ([a] -> [a])
 
-
-{--------------------------------------------------------------------
-  Construction
---------------------------------------------------------------------}
--- | /O(1)/. Create an empty sequence.
-empty :: Seq a
-empty
-  = Seq (\ts -> ts)
-
--- | /O(1)/. Create a sequence of one element.
-single :: a -> Seq a
-single x
-  = Seq (\ts -> x:ts)
-
--- | /O(1)/. Create a sequence of one element.
 singleton :: a -> Seq a
-singleton x = single x
+singleton x = Seq (\ts -> x:ts)
 
--- | /O(1)/. Put a value in front of a sequence.
 cons :: a -> Seq a -> Seq a
-cons x (Seq f)
-  = Seq (\ts -> x:f ts)
+cons x (Seq f) = Seq (\ts -> x:f ts)
 
--- | /O(1)/. Append two sequences.
-append :: Seq a -> Seq a -> Seq a
-append (Seq f) (Seq g)
-  = Seq (\ts -> f (g ts))
+snoc :: Seq a -> a ->  Seq a
+snoc (Seq f) x = Seq (\ts -> f (x:ts))
 
-
-{--------------------------------------------------------------------
-  Conversion
---------------------------------------------------------------------}
--- | /O(n)/. Convert a sequence to a list.
 toList :: Seq a -> [a]
-toList (Seq f)
-  = f []
+toList (Seq f) = f []
 
--- | /O(n)/. Create a sequence from a list.
+appendToList :: Seq a -> [a] -> [a]
+appendToList (Seq f) xs = f xs
+
 fromList :: [a] -> Seq a
-fromList xs
-  = Seq (\ts -> xs++ts)
-
-
---tell x = W.tell (Util.Seq.singleton x)
---tells xs = W.tell (Util.Seq.fromList xs)
-
+fromList xs = Seq (\ts -> xs++ts)
 
 concat :: Seq (Seq a) -> Seq a
-concat (Seq f) = (foldr Util.Seq.append Util.Seq.empty (f []))
+concat (Seq f) = (Prelude.foldr mappend mempty (f []))
 
 instance Functor Util.Seq.Seq where
     --fmap f xs = Seq.fromList (map f (Seq.toList xs))
@@ -107,15 +47,23 @@ instance Functor Util.Seq.Seq where
 instance Monad Util.Seq.Seq where
     --a >>= b  = mconcat ( fmap b (Seq.toList a))
     a >>= b  = Util.Seq.concat (fmap b a)
-    return x = Util.Seq.single x
-    fail _ = Util.Seq.empty
+    return = singleton
+    fail _ = mempty
+
+instance Applicative Seq where
+    pure = return
+    (<*>) = ap
+
+instance Traversable Seq where
+    traverse f (Seq g) = fmap fromList (traverse f (g []))
+
+instance Foldable Util.Seq.Seq where
+    foldMap f s = mconcat (map f (toList s))
 
 instance MonadPlus Util.Seq.Seq where
     mplus = mappend
-    mzero = Util.Seq.empty
-
+    mzero = mempty
 
 instance Monoid (Seq a) where
-    mempty = empty
-    mappend = append
-
+    mempty = Seq (\xs -> xs)
+    Seq f `mappend` Seq g = Seq (\xs -> f (g xs))

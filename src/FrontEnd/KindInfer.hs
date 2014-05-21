@@ -31,7 +31,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Traversable as T
 
-import Doc.DocLike
+import Doc.DocLike hiding ((<>))
 import Doc.PPrint
 import FrontEnd.HsSyn
 import FrontEnd.SrcLoc
@@ -432,12 +432,12 @@ kiDecl d = withSrcLoc (srcLoc d) (f d) where
             [fromHsTyVar -> Just classArg] = hsClassHeadArgs
         zipWithM_ kiType' ks hsClassHeadArgs
         mapM_ kiPred hsClassHeadContext
-        let rn = Seq.toList $ everything (Seq.<>) (mkQ Seq.empty g) newClassBodies
+        let rn = Seq.toList $ everything (<>) (mkQ mempty g) newClassBodies
             newClassBodies = map typeFromSig $ filter isHsTypeSig sigsAndDefaults
             typeFromSig (HsTypeSig _sloc _names qualType) = qualType
             typeFromSig _ = error "KindInfer.typeFromSig: bad."
-            g (HsTyVar n') | hsNameToOrig n' == hsNameToOrig classArg = Seq.single (toName TypeVal n')
-            g _ = Seq.empty
+            g (HsTyVar n') | hsNameToOrig n' == hsNameToOrig classArg = Seq.singleton (toName TypeVal n')
+            g _ = mempty
         carg <- lookupKind KindSimple (toName TypeVal classArg)
         mapM_ (\n -> lookupKind KindSimple n >>= unify carg ) rn
         local (\e -> e { kiWhere = InClass }) $ mapM_ kiDecl sigsAndDefaults

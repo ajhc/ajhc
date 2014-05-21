@@ -253,7 +253,7 @@ match lup vs = \e1 e2 -> liftM Seq.toList $ execWriterT (un e1 e2 () etherealIds
     un (EVar TVr { tvrIdent = i, tvrType =  t}) (EVar TVr {tvrIdent = j, tvrType =  u}) mm c | i == j = un t u mm c
     un (EVar TVr { tvrIdent = i, tvrType =  t}) (EVar TVr {tvrIdent = j, tvrType =  u}) mm c | isEtherealId i || isEtherealId j  = fail "Expressions don't match"
     un (EVar tvr@TVr { tvrIdent = i, tvrType = t}) b mm c
-        | i `member` bvs = tell (Seq.single (tvr,b))
+        | i `member` bvs = tell (Seq.singleton (tvr,b))
         | otherwise = fail $ "Expressions do not unify: " ++ show tvr ++ show b
     un a (EVar tvr) mm c | Just b <- lup (tvrIdent tvr), not $ isEVar b = un a b mm c
 

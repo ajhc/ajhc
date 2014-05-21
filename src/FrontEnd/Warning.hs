@@ -86,11 +86,14 @@ data WarnType
     | AmbiguousName Name [Name]
     | DuplicateInstances
     | InvalidDecl
+    | InvalidFFIType
+    | LexError
+    | WarnFailure
     | MissingDep String
     | MissingModule Module
     | MultiplyDefined Name [SrcLoc]
-    | InvalidFFIType
     | OccursCheck
+    | ParseError
     | PrimitiveBadType
     | PrimitiveUnknown Atom
     | TypeSynonymPartialAp
@@ -111,6 +114,7 @@ warnIsFatal w = f w where
     f DuplicateInstances {} = True
     f MissingDep {} = True
     f MissingModule {} = True
+    f WarnFailure {} = True
     f MultiplyDefined {} = True
     f OccursCheck {} = True
     f TypeSynonymPartialAp {} = True
@@ -119,6 +123,8 @@ warnIsFatal w = f w where
     f UnificationError {} = True
     f UnknownDeriving {} = True
     f UnsupportedFeature {} = True
+    f ParseError {} = True
+    f LexError {} = True
     f _ = False
 
 instance Show Warning where

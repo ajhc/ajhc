@@ -549,7 +549,7 @@ match lup vs = \e1 e2 -> liftM Seq.toList $ execWriterT (un e1 e2 etherealIds) w
         un a (ELit litCons { litArgs = [a1], litName = tc_Arrow, litType = EPi tvr { tvrType = getType a2 } (getType a1) }) c
         un b a2 c
     un (EVar tvr@TVr { tvrIdent = i, tvrType = t}) b c
-        | i `member` bvs = tell (Seq.single (tvr,b))
+        | i `member` bvs = tell (Seq.singleton (tvr,b))
         | otherwise = fail $ "Expressions do not unify: " ++ show tvr ++ show b
     un a (EVar tvr) c | Just b <- lup (tvrIdent tvr), not $ isEVar b = un a b c
     --un a b c | Just a' <- followAlias undefined a = un a' b c

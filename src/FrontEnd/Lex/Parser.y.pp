@@ -10,7 +10,9 @@ module FrontEnd.Lex.Parser (parse,parseDecls,parseStmt,parseModule) where
 import Control.Monad.Error
 import FrontEnd.HsSyn
 import FrontEnd.Lex.Lexer
+import FrontEnd.Lex.ParseMonad
 import FrontEnd.SrcLoc
+import FrontEnd.Warning
 import Name.Name
 import Name.Names
 
@@ -42,7 +44,7 @@ import Name.Names
   LString  { L _ LString $$ }
   LEOF     { L _ LEOF $$ }
 
-%monad { Either String } { (>>=) } { return }
+%monad { P } { (>>=) } { return }
 %name parse exp
 %name parseDecls decls
 %name parseStmt stmt
@@ -328,8 +330,13 @@ opt${a}s :: { () }
 srcloc :: { SrcLoc } :       {%^ \ (L sl _ _) -> return sl }
 
 {
-happyError [] = Left "parse error at EOF"
-happyError (t:_) = Left $ "parse error at " ++ show t
+
+happyError [] = do
+    addWarn ParseError "parse error at EOF"
+    parseNothing
+happyError (L sl _ t:_) = do
+    warn sl ParseError $ "parse error at " ++ show t
+    parseNothing
 
 mtuple [x] = HsParen x
 mtuple xs = HsTuple xs
