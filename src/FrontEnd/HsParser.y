@@ -1099,7 +1099,6 @@ pling_name	      = toName UnknownType  "!"
 star_name	      = toName UnknownType  "*"
 hash_name	      = toName UnknownType  "#"
 dot_name	      = toName UnknownType  "."
-prelude_mod	      = toModule "Prelude"
 main_mod	      = toModule "Main"
 
 tuple_con_name i      = toName DataConstructor (toModule "Jhc.Prim.Prim","("++replicate i ','++")")

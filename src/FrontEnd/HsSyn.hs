@@ -4,14 +4,14 @@ import Data.Binary
 import Data.Generics
 
 import C.FFI
+import Data.Foldable(Foldable)
+import Data.Traversable(Traversable)
 import FrontEnd.SrcLoc
 import Name.Name
 import Name.Names
 import Options
 import StringTable.Atom
 import StringTable.Atom()
-import Data.Traversable(Traversable)
-import Data.Foldable(Foldable)
 
 type LHsType = Located HsType
 type LHsExp = Located HsExp
@@ -436,6 +436,15 @@ instance HasLocation HsTyVarBind where
     srcLoc = hsTyVarBindSrcLoc
 
 -- default values
+hsModule = HsModule {
+    hsModuleName    = error "unknown module name",
+    hsModuleSrcLoc  = bogusASrcLoc,
+    hsModuleExports = Nothing,
+    hsModuleImports = [],
+    hsModuleDecls   = [],
+    hsModuleOptions = [],
+    hsModuleOpt     = error "hsModuleOpt"
+    }
 
 hsDataDecl = HsDataDecl {
     hsDeclDeclType = DeclTypeData,

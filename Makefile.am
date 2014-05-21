@@ -205,7 +205,7 @@ i: $(BUILT_SOURCES)
 i2: $(BUILT_SOURCES)
 	$(HC) --interactive $(GHCOPTS)  $(CFILES)
 
-ltest: src/FrontEnd/Lex/Parse.hs $(BUILT_SOURCES) src/FrontEnd/Lex/Lexer.hs
+ltest: src/FrontEnd/Lex/Parse.hs $(BUILT_SOURCES) src/FrontEnd/Lex/Lexer.hs src/FrontEnd/Lex/*.hs $(HSFILES)
 	$(HC) $(GHCOPTS)  $(CFILES) --make $< -o $@
 
 lint:

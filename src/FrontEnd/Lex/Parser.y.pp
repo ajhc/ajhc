@@ -57,20 +57,40 @@ import Name.Name
 #def 'qw' clist "rev_cl_$a : rev_cl_$a ',' $a  { \$3:\$1 }\n   | $a { [\$1] }\n cl_$a : rev_cl_$a { reverse \$1 }\n"
 #def 'qw' slist "rev_sl_$a : rev_sl_$a semis $a  { \$3:\$1 }\n   | $a { [\$1] }\n sl_$a : rev_sl_$a { reverse \$1 }\n"
 #def 'qw' eslist "rev_esl_$a : rev_esl_$a semis $a  { \$3:\$1 }\n   | { [] }\n esl_$a : rev_esl_$a { reverse \$1 }\n"
-#def 'qw' eclist "rev_ecl_$a : rev_ecl_$a ',' $a  { \$3:\$1 }\n   | { [] }\n ecl_$a : rev_ecl_$a { reverse \$1 }\n"
+-- #def 'qw' eclist "rev_ecl_$a : rev_ecl_$a ',' $a  { \$3:\$1 }\n   | { [] }\n ecl_$a : rev_ecl_$a { reverse \$1 }\n"
 #def 'qw' wlist "rev_wl_$a : rev_wl_$a $a  { \$2:\$1 }\n   | $a { [\$1] }\n wl_$a : rev_wl_$a { reverse \$1 }\n"
 #def 'qw' ewlist "rev_ewl_$a : rev_ewl_$a $a  { \$2:\$1 }\n   | { [] }\n ewl_$a : rev_ewl_$a { reverse \$1 }\n"
 
---stmt { HsStmt }
---    : pat '<-'
+#[def 'qw' clist qq[
+rev_cl_$a
+    : rev_cl_$a ',' $a  { \$3:\$1 }
+    | $a { [\$1] }
 
-module :: { [HsDecl] }
---    : '{' impdecls '}'  { [] }
---    | 'module' con 'where' '{' impdecls '}' { [] }
-    : '{' impdecls decls '}'  { $3 }
-    | 'module' con 'where' '{' impdecls decls '}' { $6 }
---    | '{' decls '}'  { $2 }
---    | 'module' con 'where' '{' decls '}' { $5 }
+cl_$a : rev_cl_$a { reverse \$1 }
+ecl_$a
+    : cl_$a { \$1 }
+    |       { [] }
+]
+#]
+
+module :: { HsModule }
+    : '{' impdecls decls '}'  { hsModule {
+        hsModuleName = toModule "Main",
+        hsModuleSrcLoc = $1,
+        hsModuleImports = $2,
+        hsModuleDecls = $3
+    } }
+    | 'module' modid maybeexports 'where' '{' impdecls decls '}' { hsModule {
+        hsModuleName = $2,
+        hsModuleExports = $3,
+        hsModuleSrcLoc = $1,
+        hsModuleImports = $6,
+        hsModuleDecls = $7
+        } }
+
+maybeexports :: { Maybe [HsExportSpec] }
+      :  exports                              { Just $1 }
+      |  {- empty -}                          { Nothing }
 
 pat :: { HsPat }
     : aexp { HsPatExp $1 }
@@ -98,8 +118,19 @@ maybeas :: { Maybe Module }
       | {- empty -}          { Nothing }
 
 maybeimpspec :: { Maybe (Bool, [HsExportSpec]) }
---      : impspec                               { Just $1 }
-      : {- empty -}                           { Nothing }
+      : exports                               { Just (False,$1) }
+      | 'hiding' exports                      { Just (True,$2) }
+      | {- empty -}                           { Nothing }
+
+exports :: { [HsExportSpec] }
+    : '(' ecl_export ')'     { $2 }
+
+export :: { HsExportSpec }
+      :  var                          { HsEVar $1 }
+      |  con                          { HsEAbs $1 }
+      |  con '(' '..' ')'             { HsEThingAll $1 }
+      |  con '(' ecl_varcon ')'       { HsEThingWith $1 $3 }
+      |  'module' modid               { HsEModuleContents $2 }
 
 qualtype :: { HsQualType }
     : 'type' { error "qualtype" }
@@ -160,6 +191,8 @@ lit :: { HsLiteral }
 
 #clist exp
 #clist var
+#clist varcon
+#clist export
 #eclist exp
 #wlist aexp
 #ewlist aexp
@@ -191,6 +224,10 @@ con :: { Name }
     : LConId  { (toName UnknownType $1) }
     | LQConId { (toName UnknownType $1) }
 
+varcon
+    : var { $1 }
+    | con { $1 }
+
 conop :: { Name }
     : LConSym  { (toName UnknownType $1) }
     | LQConSym { (toName UnknownType $1) }
@@ -213,6 +250,7 @@ opt${a}s :: { () }
 #]
 
 #optpunc 'semi',"';'"
+#optpunc 'comma',"','"
 
 srcloc :: { SrcLoc } :       { bogusASrcLoc }
 
