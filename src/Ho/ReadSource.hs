@@ -34,6 +34,7 @@ import Util.Gen
 import Version.Config(revision,version)
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
+import qualified FrontEnd.Lex.Parse as FLP
 
 preprocessHs :: Opt -> FilePath -> LBS.ByteString -> IO LBS.ByteString
 preprocessHs options fn lbs = preprocess (fst $ collectFileOpts options fn (LBSU.toString $ LBS.take 2048 lbs)) fn lbs
@@ -125,7 +126,11 @@ parseHsSource options fn lbs = do
     unless ogood $
         warn (bogusASrcLoc { srcLocFileName = packString fn })
             UnknownOption "Invalid options in OPTIONS pragma"
-    case runParserWithMode (parseModeOptions fileOpts') { parseFilename = fn } parse  s'  of
+    if fopts' fileOpts' FO.NewParser
+    then do
+        p <- FLP.parse fileOpts' fn s'
+        return (p,LBSU.fromString s')
+    else case runParserWithMode (parseModeOptions fileOpts') { parseFilename = fn } parse  s'  of
                       (ws,ParseOk e) -> processErrors ws >> return (e { hsModuleOpt = fileOpts' },LBSU.fromString s')
                       (_,ParseFailed sl err) -> putErrDie $ show sl ++ ": " ++ err
 

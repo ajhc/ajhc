@@ -113,7 +113,10 @@ data HsDecl
         hsDeclClassHead :: HsClassHead,
         hsDeclDecls     :: [HsDecl]
         }
-    | HsDefaultDecl { hsDeclSrcLoc :: SrcLoc, hsDeclType :: HsType }
+    | HsDefaultDecl {
+        hsDeclSrcLoc :: SrcLoc,
+        hsDeclType   :: HsType
+        }
     | HsTypeSig	{
         hsDeclSrcLoc   :: SrcLoc,
         hsDeclNames    :: [Name],
@@ -145,10 +148,10 @@ data HsDecl
         hsDeclQualType :: HsQualType
         }
     | HsForeignExport {
-        hsDeclSrcLoc :: SrcLoc,
+        hsDeclSrcLoc    :: SrcLoc,
         hsDeclFFIExport :: FfiExport,
-        hsDeclName :: Name,
-        hsDeclQualType ::HsQualType
+        hsDeclName      :: Name,
+        hsDeclQualType  :: HsQualType
         }
     | HsPragmaProps SrcLoc String [Name]
     | HsPragmaRules [HsRule]
@@ -254,15 +257,15 @@ data HsType
 
 data HsTyVarBind = HsTyVarBind {
     hsTyVarBindSrcLoc :: SrcLoc,
-    hsTyVarBindName :: Name,
-    hsTyVarBindKind :: Maybe HsKind }
-  deriving(Data,Typeable,Eq,Ord,Show)
+    hsTyVarBindName   :: Name,
+    hsTyVarBindKind   :: Maybe HsKind
+    } deriving(Data,Typeable,Eq,Ord,Show)
   {-! derive: Binary, update !-}
 
 hsTyVarBind = HsTyVarBind {
     hsTyVarBindSrcLoc = bogusASrcLoc,
-    hsTyVarBindName = undefined,
-    hsTyVarBindKind = Nothing
+    hsTyVarBindName   = undefined,
+    hsTyVarBindKind   = Nothing
     }
 
 data HsAsst = HsAsst Name [Name] | HsAsstEq HsType HsType
@@ -287,11 +290,11 @@ data HsLiteral
 
 data HsErrorType
     = HsErrorPatternFailure
-    | HsErrorSource
     | HsErrorFieldSelect
+    | HsErrorRecordUpdate
+    | HsErrorSource
     | HsErrorUnderscore
     | HsErrorUninitializedField
-    | HsErrorRecordUpdate
  deriving(Eq,Show,Ord)
 
 data HsExp
@@ -335,26 +338,26 @@ data HsExp
 
 data HsClassHead = HsClassHead {
     hsClassHeadContext :: HsContext,
-    hsClassHead :: Name,
-    hsClassHeadArgs :: [HsType] }
- deriving(Eq,Show,Ord)
+    hsClassHead        :: Name,
+    hsClassHeadArgs    :: [HsType]
+    } deriving(Eq,Show,Ord)
     {-! derive: update !-}
 
 data HsPat
-    = HsPVar { hsPatName :: Name }
-    | HsPLit { hsPatLit :: HsLiteral }
-    | HsPNeg HsPat
+    = HsPVar     { hsPatName :: Name }
+    | HsPApp     { hsPatName :: Name, hsPatPats :: [HsPat] }
+    | HsPAsPat   { hsPatName :: Name, hsPatPat  :: HsPat }
+    | HsPBangPat { hsPatLPat :: LHsPat }
+    | HsPIrrPat  { hsPatLPat :: LHsPat }
+    | HsPLit     { hsPatLit  :: HsLiteral }
     | HsPInfixApp HsPat Name HsPat
-    | HsPApp { hsPatName :: Name, hsPatPats :: [HsPat] }
-    | HsPTuple [HsPat]
-    | HsPUnboxedTuple [HsPat]
     | HsPList [HsPat]
+    | HsPNeg HsPat
     | HsPParen HsPat
     | HsPRec Name [HsPatField]
-    | HsPAsPat { hsPatName :: Name, hsPatPat :: HsPat }
+    | HsPTuple [HsPat]
+    | HsPUnboxedTuple [HsPat]
     | HsPWildCard
-    | HsPIrrPat { hsPatLPat :: LHsPat }
-    | HsPBangPat { hsPatLPat :: LHsPat }
     -- | scoped type variable extension
     | HsPTypeSig SrcLoc HsPat HsQualType
     -- | advanced patterns need to be parsed as expressions
@@ -406,25 +409,10 @@ instance HasLocation HsImportDecl where
     srcLoc x = hsImportDeclSrcLoc x
 
 instance HasLocation HsDecl where
-    srcLoc HsTypeDecl	  { hsDeclSrcLoc = sl } = sl
-    srcLoc HsTypeFamilyDecl { hsDeclSrcLoc = sl } = sl
-    srcLoc HsDeclDeriving { hsDeclSrcLoc = sl } = sl
-    srcLoc HsSpaceDecl    { hsDeclSrcLoc = sl } = sl
-    srcLoc HsDataDecl	  { hsDeclSrcLoc = sl } = sl
-    srcLoc HsInfixDecl    { hsDeclSrcLoc = sl } = sl
-    srcLoc HsPragmaSpecialize { hsDeclSrcLoc = sl } = sl
     srcLoc (HsPragmaRules rs) = srcLoc rs
-    srcLoc HsForeignDecl  { hsDeclSrcLoc = sl } = sl
-    srcLoc HsActionDecl   { hsDeclSrcLoc = sl } = sl
-    srcLoc (HsForeignExport sl _ _ _) = sl
-    srcLoc (HsClassDecl	 sl _ _) = sl
-    srcLoc HsClassAliasDecl { hsDeclSrcLoc = sl } = sl
-    srcLoc (HsInstDecl	 sl _ _) = sl
-    srcLoc (HsDefaultDecl sl _) = sl
-    srcLoc (HsTypeSig	 sl _ _) = sl
     srcLoc (HsFunBind     ms) = srcLoc ms
-    srcLoc (HsPatBind	 sl _ _ _) = sl
     srcLoc (HsPragmaProps sl _ _) = sl
+    srcLoc d = hsDeclSrcLoc d
 
 instance HasLocation HsRule where
     srcLoc HsRule { hsRuleSrcLoc = sl } = sl

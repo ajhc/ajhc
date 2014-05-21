@@ -118,6 +118,8 @@ traverseHsExp fn e = f e where
         e <- fn hsExp
         return $ HsLet ds e
     f (HsDo hsStmts)  = HsDo `liftM` mapM (traverseHsStmtHsExp fn) hsStmts
+    f (HsWords ws) = HsWords <$> T.traverse fn ws
+    f (HsBackTick e) = HsBackTick <$> fn e
     f h = error $ "FrontEnd.Syn.Traverse.traverseHsExp f unrecognized construct: " ++ show h
     fnl (Located l e) = withSrcSpan l $ Located l `liftM` fn e
 
@@ -496,43 +498,40 @@ instance TraverseHsOps HsExp where
     traverseHsOps hops@HsOps { .. } e = g e where
         fn x = applyHsOps hops x
         g e = withSrcLoc (srcLoc e) $ f e
-        f (HsLambda srcLoc hsPats hsExp) =
-            HsLambda srcLoc <$> fn hsPats <*> opHsExp hsExp
-        f (HsLet hsDecls hsExp) =
-            HsLet <$> fn hsDecls <*> opHsExp hsExp
-        f (HsCase e as) = HsCase <$> opHsExp e <*> fn as
-        f (HsDo hsStmts)  = HsDo <$> fn hsStmts
-        f (HsExpTypeSig srcLoc hsExp hsQualType) =
-            HsExpTypeSig srcLoc <$> opHsExp hsExp <*> fn hsQualType
-        f (HsRecConstr n fus) = HsRecConstr n <$> fn fus
-        f (HsRecUpdate e fus) = HsRecUpdate <$> opHsExp e <*> fn fus
-        f (HsListComp e ss) = HsListComp <$> opHsExp e <*> fn ss
+        f (HsCase e as)                      = HsCase <$> opHsExp e <*> fn as
+        f (HsDo hsStmts)                     = HsDo <$> fn hsStmts
+        f (HsExpTypeSig srcLoc e hsQualType) = HsExpTypeSig srcLoc <$> opHsExp e <*> fn hsQualType
+        f (HsLambda srcLoc hsPats e)         = HsLambda srcLoc <$> fn hsPats <*> opHsExp e
+        f (HsLet hsDecls e)                  = HsLet <$> fn hsDecls <*> opHsExp e
+        f (HsListComp e ss)                  = HsListComp <$> opHsExp e <*> fn ss
+        f (HsRecConstr n fus)                = HsRecConstr n <$> fn fus
+        f (HsRecUpdate e fus)                = HsRecUpdate <$> opHsExp e <*> fn fus
         -- only exp
-        f e@HsVar {} = pure e
-        f e@HsCon {} = pure e
-        f e@HsLit {} = pure e
-        f e@HsError {} = pure e
-        f (HsLocatedExp le) = HsLocatedExp <$> fn le
-        f (HsAsPat hsName hsExp)= HsAsPat hsName <$> fn hsExp
-        f (HsWildCard x) = pure (HsWildCard x)
-        f (HsIrrPat hsExp) = HsIrrPat <$> fn hsExp
-        f (HsBangPat hsExp) = HsBangPat <$> fn hsExp
-        f (HsIf hsExp1 hsExp2 hsExp3)  = liftA3 HsIf (fn hsExp1) (fn hsExp2) (fn hsExp3)
-        f (HsTuple hsExps) = HsTuple <$> fn hsExps
-        f (HsUnboxedTuple hsExps) = HsUnboxedTuple <$> fn hsExps
-        f (HsList hsExps) = HsList <$> fn hsExps
-        f (HsParen hsExp) = HsParen <$> fn hsExp
-        f (HsLeftSection hsExp1 hsExp2) = HsLeftSection <$> fn hsExp1 <*> fn hsExp2
-        f (HsRightSection hsExp1 hsExp2) = HsRightSection <$> fn hsExp1 <*> fn hsExp2
-        f (HsEnumFrom hsExp)  = HsEnumFrom <$> fn hsExp
-        f (HsEnumFromTo hsExp1 hsExp2) = HsEnumFromTo <$> fn hsExp1 <*> fn hsExp2
-        f (HsEnumFromThen hsExp1 hsExp2) = HsEnumFromThen <$> fn hsExp1 <*> fn hsExp2
+        f e@HsCon {}                  = pure e
+        f e@HsError {}                = pure e
+        f e@HsLit {}                  = pure e
+        f e@HsVar {}                  = pure e
+        f (HsApp a1 a2)               = HsApp <$> fn a1 <*> fn a2
+        f (HsAsPat hsName e)          = HsAsPat hsName <$> fn e
+        f (HsBackTick e)              = HsBackTick <$> fn e
+        f (HsBangPat e)               = HsBangPat <$> fn e
+        f (HsEnumFrom e)              = HsEnumFrom <$> fn e
+        f (HsEnumFromThen e1 e2)      = HsEnumFromThen <$> fn e1 <*> fn e2
         f (HsEnumFromThenTo a1 a2 a3) = HsEnumFromThenTo <$> fn a1 <*> fn a2 <*> fn a3
-        f (HsInfixApp a1 a2 a3) = HsInfixApp <$> fn a1 <*> fn a2 <*> fn a3
-        f (HsApp a1 a2) = HsApp <$> fn a1 <*> fn a2
-        f (HsNegApp a1) = HsNegApp <$> fn a1
-        f (HsWords ws)  = HsWords <$> fn ws
-        f (HsBackTick e)  = HsBackTick <$> fn e
+        f (HsEnumFromTo e1 e2)        = HsEnumFromTo <$> fn e1 <*> fn e2
+        f (HsIf e1 e2 e3)             = liftA3 HsIf (fn e1) (fn e2) (fn e3)
+        f (HsInfixApp a1 a2 a3)       = HsInfixApp <$> fn a1 <*> fn a2 <*> fn a3
+        f (HsIrrPat hsExp)            = HsIrrPat <$> fn hsExp
+        f (HsLeftSection e1 e2)       = HsLeftSection <$> fn e1 <*> fn e2
+        f (HsList hsExps)             = HsList <$> fn hsExps
+        f (HsLocatedExp le)           = HsLocatedExp <$> fn le
+        f (HsNegApp a1)               = HsNegApp <$> fn a1
+        f (HsParen e)                 = HsParen <$> fn e
+        f (HsRightSection e1 e2)      = HsRightSection <$> fn e1 <*> fn e2
+        f (HsTuple es)                = HsTuple <$> fn es
+        f (HsUnboxedTuple es)         = HsUnboxedTuple <$> fn es
+        f (HsWildCard x)              = pure (HsWildCard x)
+        f (HsWords ws)                = HsWords <$> fn ws
         --f h = error $ "FrontEnd.Syn.Traverse.traverseHsExp f unrecognized construct: " ++ show h
 
 instance TraverseHsOps e => TraverseHsOps (Located e) where

@@ -17,6 +17,8 @@ module Options(
     dump,
     wdump,
     fopts,
+    wdump',
+    fopts',
     flint,
     fileOptions,
     withOptions,
@@ -466,6 +468,13 @@ fopts s = s `S.member` optFOptsSet options
 wdump :: (Monad m) => FlagDump.Flag -> m () -> m ()
 wdump f = when (dump f)
 
+-- | Test whether an option flag is set.
+fopts' :: Opt -> FlagOpts.Flag -> Bool
+fopts' opt s = s `S.member` optFOptsSet opt
+-- | Do the action when the suplied dump flag is set.
+wdump' :: (Monad m) => Opt -> FlagDump.Flag -> m () -> m ()
+wdump' opt f = when $ f `S.member` optDumpSet opt
+
 -- | Is the \"lint\" option flag set?
 flint :: Bool
 flint = FlagOpts.Lint `S.member` optFOptsSet options
@@ -494,7 +503,6 @@ class Monad m => OptionMonad m where
 
 instance OptionMonad Identity
 instance OptionMonad IO
-
 
 newtype OptT m a = OptT (ReaderT Opt m a)
     deriving(MonadIO,Monad,Functor,MonadTrans)
