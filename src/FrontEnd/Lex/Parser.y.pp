@@ -5,7 +5,7 @@
 -- appropriate errors in the desugaring pass.
 
 {
-module FrontEnd.Lex.Parser (parse,parseDecls,parseStmt) where
+module FrontEnd.Lex.Parser (parse,parseDecls,parseStmt,parseModule) where
 
 import Control.Monad.Error
 import FrontEnd.HsSyn
@@ -48,6 +48,7 @@ import Name.Name
 %name parse exp
 %name parseDecls decls
 %name parseStmt stmt
+%name parseModule module
 %tokentype { Lexeme }
 %%
 
@@ -55,6 +56,7 @@ import Name.Name
 #def 'qw' maybe "m_$a : " . ($b // $a) . "  { Just \$1 }\n   |  { Nothing }\n"
 #def 'qw' clist "rev_cl_$a : rev_cl_$a ',' $a  { \$3:\$1 }\n   | $a { [\$1] }\n cl_$a : rev_cl_$a { reverse \$1 }\n"
 #def 'qw' slist "rev_sl_$a : rev_sl_$a semis $a  { \$3:\$1 }\n   | $a { [\$1] }\n sl_$a : rev_sl_$a { reverse \$1 }\n"
+#def 'qw' eslist "rev_esl_$a : rev_esl_$a semis $a  { \$3:\$1 }\n   | { [] }\n esl_$a : rev_esl_$a { reverse \$1 }\n"
 #def 'qw' eclist "rev_ecl_$a : rev_ecl_$a ',' $a  { \$3:\$1 }\n   | { [] }\n ecl_$a : rev_ecl_$a { reverse \$1 }\n"
 #def 'qw' wlist "rev_wl_$a : rev_wl_$a $a  { \$2:\$1 }\n   | $a { [\$1] }\n wl_$a : rev_wl_$a { reverse \$1 }\n"
 #def 'qw' ewlist "rev_ewl_$a : rev_ewl_$a $a  { \$2:\$1 }\n   | { [] }\n ewl_$a : rev_ewl_$a { reverse \$1 }\n"
@@ -62,22 +64,48 @@ import Name.Name
 --stmt { HsStmt }
 --    : pat '<-'
 
+module :: { [HsDecl] }
+--    : '{' impdecls '}'  { [] }
+--    | 'module' con 'where' '{' impdecls '}' { [] }
+    : '{' impdecls decls '}'  { $3 }
+    | 'module' con 'where' '{' impdecls decls '}' { $6 }
+--    | '{' decls '}'  { $2 }
+--    | 'module' con 'where' '{' decls '}' { $5 }
+
 pat :: { HsPat }
     : aexp { HsPatExp $1 }
 pats :: { HsPat }
     : wl_aexp { HsPatExp $ hsWords $1 }
 
-decls :: { [HsDecl] }
-      : optsemis sl_decl optsemis  { $2 }
-      | optsemis                   { [] }
-
 decl :: { HsDecl }
     : pats '=' exp   { HsPatBind { hsDeclSrcLoc = srcLoc $2,
                        hsDeclPat = $1, hsDeclRhs = (HsUnGuardedRhs $3),
                        hsDeclDecls = [] } }
+    | cl_var '::' qualtype { HsTypeSig $2 $1 $3 }
+
+impdecl :: { HsImportDecl }
+    : 'import' optqualified modid maybeas maybeimpspec { HsImportDecl $1 $3 $2 $4 $5 }
+
+modid :: { Module }
+    : con { toModule (show $1) }
+
+optqualified :: { Bool }
+      : 'qualified'                           { True  }
+      | {- empty -}                           { False }
+
+maybeas :: { Maybe Module }
+      : 'as' modid           { Just $2 }
+      | {- empty -}          { Nothing }
+
+maybeimpspec :: { Maybe (Bool, [HsExportSpec]) }
+--      : impspec                               { Just $1 }
+      : {- empty -}                           { Nothing }
+
+qualtype :: { HsQualType }
+    : 'type' { error "qualtype" }
 
 exp :: { HsExp }
-    : exp0 '::'  { $1 }   -- TODO type
+    : exp0 '::' qualtype { HsExpTypeSig $2 $1 $3 }
     | exp0       { $1 }
 
 exp0  :: { HsExp }
@@ -88,16 +116,14 @@ exp1 :: { HsExp }
     : 'if' exp 'then' exp 'else' exp { HsIf (espan $1 $3 $ $2) (espan $3 $5 $4) (eloc $5 $6) }
     | '\\' wl_pat '->' exp { HsLambda $1 $2 $4 }
     | 'let' '{' decls '}' 'in' exp { HsLet $3 $6 }
-    | 'do' '{' sl_stmt  '}'       { HsDo $3 }
-    | 'case' exp 'of' '{' sl_alt '}'  { espan $1 $6 $ HsCase (espan $1 $3 $2) $5 }
+    | 'do' '{' stmts  '}'       { HsDo $3 }
+    | 'case' exp 'of' '{' alts '}'  { espan $1 $6 $ HsCase (espan $1 $3 $2) $5 }
     | aexp  { $1 }
 
 stmt :: { HsStmt }
       : pat '<-' exp      { HsGenerator $2 $1 $3 }
       | exp               { HsQualifier $1 }
       | 'let' '{' decls '}'    { HsLetStmt  $3 }
-
-#slist stmt
 
 alt :: { HsAlt }
     : pats '->' exp { HsAlt $2 $1 (HsUnGuardedRhs $3) [] }
@@ -133,12 +159,26 @@ lit :: { HsLiteral }
     | LString   { HsString $ read $1 }
 
 #clist exp
+#clist var
 #eclist exp
 #wlist aexp
 #ewlist aexp
 #wlist pat
-#slist alt
-#slist decl
+
+#[def oslist   qq[
+${a}s : rev_$a { reverse \$1 }
+rev_$a
+    : rev_$a ';' $a { \$3 : \$1 }
+    | rev_$a ';'    { \$1 }
+    | $a            { [\$1] }
+    | {- empty -}   { [] }
+]
+#]
+
+#oslist 'decl'
+#oslist 'impdecl'
+#oslist 'alt'
+#oslist 'stmt'
 
 var :: { Name }
     : uqvar { $1 }
@@ -168,14 +208,17 @@ opt$a :: { () }
 ${a}s :: { () }
        : opt${a}s $b  { () }
 opt${a}s :: { () }
-       : ${a}s	      { () }
+       : ${a}s        { () }
        | {- empty -}  { () } ]
 #]
 
 #optpunc 'semi',"';'"
 
+srcloc :: { SrcLoc } :       { bogusASrcLoc }
+
 {
-happyError _ts = Left "parse error"
+happyError [] = Left "parse error at EOF"
+happyError (t:_) = Left $ "parse error at " ++ show t
 
 mtuple [x] = HsParen x
 mtuple xs = HsTuple xs

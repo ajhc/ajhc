@@ -119,17 +119,17 @@ module GenUtil(
     UniqueProducer(..)
     ) where
 
+import CPUTime
 import Char(isAlphaNum, isSpace, toLower, ord, chr)
+import Control.Exception
 import List
 import Monad
-import qualified System.IO as IO
-import System.IO.Error (isDoesNotExistError)
-import Control.Exception
 import Prelude hiding (catch)
-import qualified System
 import Random(StdGen, newStdGen, Random(randomR))
+import System.IO.Error (isDoesNotExistError)
 import Time
-import CPUTime
+import qualified System
+import qualified System.IO as IO
 
 {-# SPECIALIZE snub :: [String] -> [String] #-}
 {-# SPECIALIZE snub :: [Int] -> [Int] #-}

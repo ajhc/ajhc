@@ -1040,7 +1040,7 @@ literal :: { HsExp }
       | STRING                { HsLit (HsString $1) }
       | USTRING               { HsLit (HsStringPrim $1) }
 
- srcloc :: { SrcLoc } :       {% getSrcLoc }
+srcloc :: { SrcLoc } :       {% getSrcLoc }
 
 -- -----------------------------------------------------------------------------
 -- Layout
