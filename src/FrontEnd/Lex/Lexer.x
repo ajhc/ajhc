@@ -37,7 +37,7 @@ $nl        = [\n\r]
 @reservedid =
 	as|case|class|data|default|deriving|do|else|hiding|if|
 	import|in|infix|infixl|infixr|instance|let|module|newtype|
-	of|qualified|then|type|where
+	of|qualified|then|type|where|foreign
 
 @reservedop =
 	".." | ":" | "::" | "=" | \\ | "|" | "<-" | "->" | "@" | "~" | "=>"

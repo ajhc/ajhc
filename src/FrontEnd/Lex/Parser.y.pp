@@ -25,7 +25,7 @@ import Name.Names
 #map { token('LSpecial',$_) } qw/{ } , ; [ ] ` ( )/
 #map { token('LSpecial',$_) } qw/(# #) ∀ ∃/
 #map { token('LReservedId',$_) } qw/as case class data default deriving do else hiding if import in infix infixl infixr instance let module newtype of qualified then type where/
-#map { token('LReservedId',$_) } qw/kind alias prefixx prefixy forall exists family closed/
+#map { token('LReservedId',$_) } qw/kind alias prefixx prefixy forall exists family closed foreign/
 #map { token('LReservedOp',$_) } qw/.. : :: = \\\\ | <- -> @ ~ =>/
 
  '_' { L $$ LVarId "_" }
@@ -115,9 +115,6 @@ decl :: { HsDecl }
                         hsDeclTArgs = $3,
                         hsDeclType = $5 } }
     | assoc INT cl_varconop  { HsInfixDecl (fst $1) (snd $1) $2 $3 }
-    -- | 'data' mCTYPE ctype '::' kind srcloc deriving
-    --       {% checkDataHeader $3 `thenP` \(cs,c,t) ->
-    --          returnP hsDataDecl { hsDeclSrcLoc = $6, hsDeclContext = cs, hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $7, hsDeclHasKind = Just $5, hsDeclCTYPE = $2 } }
     | 'data' qualtype mconstrs deriving {% do
         (cs,c,t) <- checkDataHeader $2
         return hsDataDecl {
@@ -132,10 +129,17 @@ decl :: { HsDecl }
             hsDeclCons = [$4] } }
     | 'instance' classhead optwhere { HsInstDecl $1 $2 $3 }
     | 'class' classhead optwhere { HsClassDecl $1 $2 $3 }
+    | 'foreign' 'import' wl_var mstring '::' qualtype
+                    {% doForeign $2 (toName Val "import":reverse $4) $5 $7  }
+    | 'foreign' wl_var mstring '::' qualtype
+                    {% doForeign $2 (reverse $3) $4 $6  }
+-- FFI parts
+mstring :: { Maybe (String,Name) }
+mstring : LString var    { Just ($1,$2) }
+        | {- empty -}    { Nothing }
 
 classhead :: { HsClassHead }
     : qualtype {% qualTypeToClassHead $1 }
-
 
 mconstrs :: { [HsConDecl] }
     : '=' bl_constr { $2 }
@@ -259,12 +263,12 @@ atype :: { HsType }
       | '(' type '=' type ')'  { HsTyEq $2 $4 }
 
 qualtype :: { HsQualType }
-      : type '=>' type             {% withSrcLoc $2 $ checkContext $1 >>= return . flip HsQualType $3 }
-      | type                       { HsQualType [] $1 }
+      : type '=>' type   {% withSrcLoc $2 $ checkContext $1 >>= return . flip HsQualType $3 }
+      | type             { HsQualType [] $1 }
 
 exp :: { HsExp }
     : exp0 '::' qualtype { HsExpTypeSig $2 $1 $3 }
-    | exp0       { $1 }
+    | exp0               { $1 }
 
 exp0  :: { HsExp }
     : exp1 { $1 }
@@ -325,14 +329,12 @@ list :: { HsExp }
         [x]   -> return $ HsEnumFromTo x $3
         [x,y] -> return $ HsEnumFromThenTo x y $3
         _ -> fail "parse error in list comprehension" }
---    | exp '..'                { HsEnumFrom $1 }
---    | exp '..' exp            { HsEnumFromTo $1 $3 }
---    | exp0 ',' exp0 '..' exp0 { HsEnumFromThenTo $1 $3 $5 }
 
 lit :: { HsLiteral }
     : LInteger  { HsInt $ read $1 }
     | LChar     { HsChar $ read $1 }
     | LString   { HsString $ read $1 }
+    | LFloat    { HsFrac  $ read $1 }
 
 INT :: { Int }
     : LInteger { read $1 }
@@ -340,6 +342,7 @@ INT :: { Int }
 #map { clist $_ } qw/exp stmt type var varcon varconop export con fielddecl fixvar/
 #blist constr
 #wlist aexp
+#wlist var
 #wlist gdrh
 #wlist batype
 #wlist gdrh_case

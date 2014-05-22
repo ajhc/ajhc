@@ -6,15 +6,21 @@ module FrontEnd.Lex.Post(
     checkPattern,
     checkSconType,
     checkValDef,
+    doForeign,
     qualTypeToClassHead,
     fixupHsDecls
 ) where
 
+import C.FFI
 import Control.Applicative
+import Data.Char
+import Data.Monoid
 import FrontEnd.HsSyn
 import FrontEnd.Lex.ParseMonad
 import FrontEnd.SrcLoc
 import Name.Names
+import PackedString
+import qualified Data.Set as Set
 import qualified Data.Traversable as T
 import qualified FrontEnd.Lex.Fixity as F
 
@@ -185,46 +191,70 @@ qualTypeToClassHead qt = do
         (HsTyCon className,as) -> return HsClassHead { hsClassHeadContext = hsQualTypeContext qt, hsClassHead = className, hsClassHeadArgs = as }
         _ -> fail "Invalid Class Head"
 
+doForeign :: Monad m => SrcLoc -> [Name] -> Maybe (String,Name) -> HsQualType -> m HsDecl
+doForeign srcLoc names ms qt = ans where
+    ans = do
+        (mstring,vname@(nameParts -> (_,Nothing,cname)),names') <- case ms of
+            Just (s,n) -> return (Just s,n,names)
+            Nothing -> do
+                (n:ns) <- return $ reverse names
+                return (Nothing,n,reverse ns)
+        let f ["import","primitive"] cname = return $ HsForeignDecl srcLoc (FfiSpec (Import cname mempty) Safe Primitive) vname qt
+            f ["import","dotnet"] cname = return $ HsForeignDecl srcLoc (FfiSpec (Import cname mempty) Safe DotNet) vname qt
+            f ("import":rs) cname = do
+                let (safe,conv) = pconv rs
+                im <- parseImport conv mstring vname
+                conv <- return (if conv == CApi then CCall else conv)
+                return $ HsForeignDecl srcLoc (FfiSpec im safe conv) vname qt
+            f ("export":rs) cname = do
+                let (safe,conv) = pconv rs
+                return $ HsForeignExport srcLoc (FfiExport cname safe conv undefined undefined) vname qt
+            f _ _ = error "ParseUtils: bad."
+        f (map show names') (maybe cname id mstring) where
+    pconv rs = g Safe CCall rs where
+        g _ cc ("safe":rs) = g Safe cc rs
+        g _ cc ("unsafe":rs) = g Unsafe cc rs
+        g s _  ("ccall":rs)  = g s CCall rs
+        g s _  ("capi":rs)  = g s CApi rs
+        g s _  ("stdcall":rs) = g s StdCall rs
+        g s c  [] = (s,c)
+        g _ _ rs = error $ "FrontEnd.ParseUtils: unknown foreign flags " ++ show rs
+
+-- FFI parsing
+
+parseExport :: Monad m => String -> Name -> m String
+parseExport cn hn =
+    case words cn of
+      [x] | isCName x -> return x
+      []              -> return (show hn)
+      _               -> fail ("Invalid cname in export declaration: "++show cn)
+
+parseImport :: Monad m => CallConv -> Maybe String -> Name -> m FfiType
+parseImport _ Nothing hn = return $ Import (show hn) mempty
+parseImport cc (Just cn) hn =
+    case words cn of
+      ["dynamic"]   -> return Dynamic
+      ["wrapper"]   -> return Wrapper
+      []            -> return $ Import (show hn) mempty
+      ("static":xs) -> parseIS cc xs
+      xs            -> parseIS cc xs
+
+parseIS cc rs = f Set.empty rs where
+    f s ['&':n] | isCName n = return $ ImportAddr n $ Requires s
+    f s [n]     | isCName n = return $ Import     n $ Requires s
+    f s ["&",n] | isCName n = return $ ImportAddr n $ Requires s
+    f s (i:r)               = f (Set.insert (cc,packString i) s) r
+    f s x                   = fail ("Syntax error parsing foreign import: "++show x)
+
+isCName []     = False
+isCName (c:cs) = p1 c && all p2 cs
+    where p1 c = isAlpha c    || any (c==) oa
+          p2 c = isAlphaNum c || any (c==) oa
+          oa   = "_-$"
+
+
+
 {-
-
-module FrontEnd.ParseUtils (
-	  splitTyConApp		-- HsType -> P (Name,[HsType])
-	, mkRecConstrOrUpdate	-- HsExp -> [HsFieldUpdate] -> P HsExp
-	, checkPrec		-- Integer -> P Int
-	, checkContext		-- HsType -> P HsContext
-	, checkDataHeader	-- HsQualType -> P (HsContext,Name,[Name])
-	, checkPattern		-- HsExp -> P HsPat
-	, checkPatterns
-	, checkExpr		-- HsExp -> P HsExp
-	, checkValDef		-- SrcLoc -> HsExp -> HsRhs -> [HsDecl] -> P HsDecl
-	, checkUnQual		-- Name -> P Name
-        , readInteger
-        , readRational
-        , fixupHsDecls
-        , parseError
-        , parseExport
-        , qualTypeToClassHead
-        , doForeign
-        , doForeignEq
- ) where
-
-import Char
-import Data.Maybe
-import Data.Monoid
-import Ratio
-import qualified Data.Set as Set
-import qualified Data.Traversable as T
-
-import C.FFI
-import FrontEnd.HsSyn
-import FrontEnd.ParseMonad
-import FrontEnd.SrcLoc
-import Name.Name
-import Name.Names
-import PackedString
-
-parseError :: String -> P a
-parseError = fail
 
 splitTyConApp :: HsType -> P (Name,[HsType])
 splitTyConApp t0 = split t0 []
@@ -455,69 +485,9 @@ sameFun :: Name -> HsDecl -> Bool
 sameFun name (HsFunBind matches@(_:_)) = name == (matchName $ head matches)
 sameFun _ _ = False
 
-doForeign :: Monad m => SrcLoc -> [Name] -> Maybe (String,Name) -> HsQualType -> m HsDecl
-doForeign srcLoc names ms qt = ans where
-    ans = do
-        (mstring,vname@(nameParts -> (_,Nothing,cname)),names') <- case ms of
-            Just (s,n) -> return (Just s,n,names)
-            Nothing -> do
-                (n:ns) <- return $ reverse names
-                return (Nothing,n,reverse ns)
-        let f ["import","primitive"] cname = return $ HsForeignDecl srcLoc (FfiSpec (Import cname mempty) Safe Primitive) vname qt
-            f ["import","dotnet"] cname = return $ HsForeignDecl srcLoc (FfiSpec (Import cname mempty) Safe DotNet) vname qt
-            f ("import":rs) cname = do
-                let (safe,conv) = pconv rs
-                im <- parseImport conv mstring vname
-                conv <- return (if conv == CApi then CCall else conv)
-                return $ HsForeignDecl srcLoc (FfiSpec im safe conv) vname qt
-            f ("export":rs) cname = do
-                let (safe,conv) = pconv rs
-                return $ HsForeignExport srcLoc (FfiExport cname safe conv undefined undefined) vname qt
-            f _ _ = error "ParseUtils: bad."
-        f (map show names') (maybe cname id mstring) where
-    pconv rs = g Safe CCall rs where
-        g _ cc ("safe":rs) = g Safe cc rs
-        g _ cc ("unsafe":rs) = g Unsafe cc rs
-        g s _  ("ccall":rs)  = g s CCall rs
-        g s _  ("capi":rs)  = g s CApi rs
-        g s _  ("stdcall":rs) = g s StdCall rs
-        g s c  [] = (s,c)
-        g _ _ rs = error $ "FrontEnd.ParseUtils: unknown foreign flags " ++ show rs
 
 doForeignEq :: Monad m => SrcLoc -> [Name] -> Maybe (String,Name) -> HsQualType -> HsExp -> m HsDecl
 doForeignEq srcLoc names ms qt e = undefined
-
--- FFI parsing
-
-parseExport :: Monad m => String -> Name -> m String
-parseExport cn hn =
-    case words cn of
-      [x] | isCName x -> return x
-      []              -> return (show hn)
-      _               -> fail ("Invalid cname in export declaration: "++show cn)
-
-parseImport :: Monad m => CallConv -> Maybe String -> Name -> m FfiType
-parseImport _ Nothing hn = return $ Import (show hn) mempty
-parseImport cc (Just cn) hn =
-    case words cn of
-      ["dynamic"]   -> return Dynamic
-      ["wrapper"]   -> return Wrapper
-      []            -> return $ Import (show hn) mempty
-      ("static":xs) -> parseIS cc xs
-      xs            -> parseIS cc xs
-
-parseIS cc rs = f Set.empty rs where
-    f s ['&':n] | isCName n = return $ ImportAddr n $ Requires s
-    f s [n]     | isCName n = return $ Import     n $ Requires s
-    f s ["&",n] | isCName n = return $ ImportAddr n $ Requires s
-    f s (i:r)               = f (Set.insert (cc,packString i) s) r
-    f s x                   = fail ("Syntax error parsing foreign import: "++show x)
-
-isCName []     = False
-isCName (c:cs) = p1 c && all p2 cs
-    where p1 c = isAlpha c    || any (c==) oa
-          p2 c = isAlphaNum c || any (c==) oa
-          oa   = "_-$"
 
 -- collects all the HsMatch equations from any FunBinds
 -- from a list of HsDecls
