@@ -111,10 +111,11 @@ checkPattern e = checkPat e [] where
             p <- checkPat e []
             return (HsField n p)
 
-patShuntSpec = F.shuntSpec { F.lookupToken, F.application } where
+patShuntSpec = F.shuntSpec { F.lookupToken, F.application, F.operator } where
     lookupToken (HsBackTick t) = return (Right (F.L,9))
     lookupToken t = return (Left t)
     application e1 e2 = return $ HsApp e1 e2
+    operator t as = return $ foldr HsApp t as
 
 fixupHsDecls :: [HsDecl] -> [HsDecl]
 fixupHsDecls ds = f ds where

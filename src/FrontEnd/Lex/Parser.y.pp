@@ -164,7 +164,7 @@ atype :: { HsType }
       | var                    { HsTyVar $1 }
       | '(' cl2_type ')'       { HsTyTuple $2 }
       | '(#' ecl_type '#)'     { HsTyUnboxedTuple $2 }
-      | '[' type ']'           { HsTyApp (HsTyCon tc_List) $2 }
+      | '[' type ']'           { HsTyApp (HsTyCon (toName UnknownType "[]")) $2 }
       | '(' type ')'           { $2 }
       | '(' type '=' type ')'  { HsTyEq $2 $4 }
 
@@ -204,8 +204,8 @@ aexp :: { HsExp }
     | '_'               { HsWildCard $1 }
     | var               { HsVar $1 }
     | con               { HsCon $1 }
-    | varop             { HsVar $1 }
-    | conop             { HsCon $1 }
+    | varop             { HsBackTick (HsVar $1) }
+    | conop             { HsBackTick (HsCon $1) }
     | '`' var '`'       { espan $1 $3 $ HsBackTick (HsVar $2) }
     | '`' con '`'       { espan $1 $3 $ HsBackTick (HsCon $2) }
     | lit               { HsLit $1 }

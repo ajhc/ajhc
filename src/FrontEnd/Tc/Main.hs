@@ -336,6 +336,8 @@ tiExpr expr@(HsLet decls e) typ = deNameContext Nothing "in the let binding" exp
             return (HsLet rs e')
     f bgs []
 
+tiExpr (HsLocatedExp (Located sl e)) typ = tiExpr e typ
+
 tiExpr e typ = fail $ "tiExpr: not implemented for: " ++ show (e,typ)
 
 tcWheres :: [HsDecl] -> Tc ([HsDecl],TypeEnv)
@@ -658,7 +660,6 @@ tcMiscDecl d = withContext (locMsg (srcLoc d) "in the declaration" "") $ f d whe
             (ctx,(_,[a])) = chToClassHead ke cHead
         assertEntailment ctx [ IsIn s a | s <- supers]
         return []
-
 
 tcRule prule@HsRule { hsRuleUniq = uniq, hsRuleFreeVars = vs, hsRuleLeftExpr = e1, hsRuleRightExpr = e2, hsRuleSrcLoc = sloc } =
     withContext (locMsg sloc "in the RULES pragma" $ hsRuleString prule) ans where

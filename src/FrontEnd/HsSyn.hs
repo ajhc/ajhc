@@ -459,6 +459,7 @@ hsParen x@HsParen {} = x
 hsParen x@HsLit {} = x
 hsParen x@HsTuple {} = x
 hsParen x@HsUnboxedTuple {} = x
+hsParen x@HsBackTick {} = x
 hsParen x = HsParen x
 
 hsNameIdent_u f n = mapName (id,f) n

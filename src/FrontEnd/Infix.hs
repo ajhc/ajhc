@@ -22,12 +22,16 @@ import Data.Binary
 import Data.Monoid
 import qualified Data.Map as Map
 
+import Control.Monad.Identity
 import FrontEnd.HsSyn
+import FrontEnd.SrcLoc
+import FrontEnd.Syn.Traverse
 import Name.Name
+import Options
 import Support.MapBinaryInstance
 import Util.HasSize
-
-----------------------------------------------------------------------------
+import qualified FlagOpts as FO
+import qualified FrontEnd.Lex.Fixity as F
 
 type FixityInfo = (Int, HsAssoc)
 type SymbolMap = Map.Map Name FixityInfo
@@ -42,9 +46,7 @@ instance Binary FixityMap where
 restrictFixityMap :: (Name -> Bool) -> FixityMap -> FixityMap
 restrictFixityMap f (FixityMap fm) = FixityMap (Map.filterWithKey (\k _ -> f k) fm)
 
-
 ----------------------------------------------------------------------------
-
 
  -- Some constants:
 
@@ -63,21 +65,48 @@ defaultFixity = (9, HsAssocLeft)
 terminalFixity :: (Int, HsAssoc)    -- Fixity given to variables, etc. Used to terminate descent.
 terminalFixity = (10, HsAssocLeft)
 
-
 ----------------------------------------------------------------------------
 
   -- infixer(): The exported top-level function. See header for usage.
 
 infixHsModule :: FixityMap -> HsModule -> HsModule
-infixHsModule (FixityMap ism) m = hsModuleDecls_u f m where
-    f = map (processDecl ism)
-    --ism = buildSMap is
+infixHsModule (FixityMap ism) m =  ans where
+    ans = if fopts' (hsModuleOpt m) FO.NewParser
+        then domod m
+        else hsModuleDecls_u (map (processDecl ism)) m
+    expShuntSpec = F.shuntSpec { F.lookupToken, F.application , F.operator} where
+        lookupToken (HsBackTick bt) = backtick bt
+        lookupToken (HsParen (HsBackTick bt)) = return $ Left bt
+        lookupToken (HsParen v) = return (Left v)
+        lookupToken (HsAsPat x v) = mr (HsAsPat x) v
+        lookupToken (HsLocatedExp (Located sl v)) = mr (HsLocatedExp . Located sl) v
+        lookupToken t = return (Left t)
+        application e1 e2 = return $ HsApp e1 (hsParen e2)
+        operator (HsBackTick t) as = return $ foldl HsApp t (map hsParen as)
+        operator (HsLocatedExp (Located sl (HsBackTick t))) as = return $ foldl HsApp (HsLocatedExp (Located sl t)) (map hsParen as)
+        backtick bt = f bt where
+            f (HsVar v) = g v
+            f (HsCon v) = g v
+            f (HsAsPat _ v) = backtick v
+            g v = return $ case Map.lookup v ism of
+                Just (n,HsAssocLeft) -> Right (F.L,n)
+                Just (n,HsAssocRight) -> Right (F.R,n)
+                Just (n,HsAssocNone) -> Right (F.N,n)
+                Nothing -> Right (F.L,9)
+
+        mr x v = do
+            n <- lookupToken v
+            case n of
+                Left v -> return $ Left $ x v
+                Right {} -> return n
+    domod = runIdentity . traverseHsOps ops
+    ops = (hsOpsDefault ops) { opHsExp } where
+        opHsExp (HsWords es) = F.shunt expShuntSpec es >>= traverseHsOps ops
+        opHsExp (HsParen (HsBackTick bt)) = traverseHsOps ops bt
+        opHsExp e = traverseHsOps ops e
 
 infixStatement :: FixityMap -> HsStmt -> HsStmt
 infixStatement (FixityMap ism) m = processStmt ism m
-
-
-
 
 --infixer :: [HsDecl] -> TidyModule -> TidyModule
 --infixer infixRules tidyMod =
@@ -88,7 +117,6 @@ infixStatement (FixityMap ism) m = processStmt ism m
 --    where
 --        process field = map (processDecl infixMap) (field tidyMod)
 --        infixMap = buildSMap infixRules
-
 
 ----------------------------------------------------------------------------
 
@@ -103,7 +131,6 @@ buildFixityMap ds = FixityMap (Map.fromList $ concatMap f ds)  where
         --make_key a_name = case a_name of
         --    (Qual a_module name)   -> (a_module, name)
         --    (UnQual name)          -> (unqualModule, name)
-
 
 --buildSMap infixRules =
 --    foldl myAddToFM emptyFM $ concat $ map formatDecl infixRules
@@ -132,7 +159,6 @@ lookupSM infixMap  exp = case exp of
 --                    UnQual name        -> lookupDftFM infixMap defaultFixity (unqualModule, name)
 --    _           -> error $ "Operator (" ++ show exp ++ ") is invalid."
 
-
 -----------------------------------------------------------------------------
 
   --  Functions used to sift through the syntax to find expressions to
@@ -151,7 +177,6 @@ processDecl infixMap decl = case decl of
         proc_rule prules@HsRule { hsRuleLeftExpr = e1, hsRuleRightExpr = e2} =
              prules { hsRuleLeftExpr = fst $ processExp infixMap e1, hsRuleRightExpr = fst $ processExp infixMap e2 }
 
-
 processMatch :: SymbolMap -> HsMatch -> HsMatch
 processMatch infixMap (HsMatch srcloc qname pats rhs decls) =
     HsMatch srcloc qname (map (procPat infixMap) pats) new_rhs new_decls
@@ -159,12 +184,10 @@ processMatch infixMap (HsMatch srcloc qname pats rhs decls) =
         new_rhs = processRhs infixMap rhs
         new_decls = map (processDecl infixMap) decls
 
-
 processRhs :: SymbolMap -> HsRhs -> HsRhs
 processRhs infixMap rhs = case rhs of
     HsUnGuardedRhs exp     -> HsUnGuardedRhs $ fst $ processExp infixMap exp
     HsGuardedRhss  rhss    -> HsGuardedRhss $ map (processGRhs infixMap) rhss
-
 
 processGRhs :: SymbolMap -> HsGuardedRhs -> HsGuardedRhs
 processGRhs infixMap (HsGuardedRhs srcloc e1 e2) = HsGuardedRhs srcloc new_e1 new_e2
@@ -172,26 +195,22 @@ processGRhs infixMap (HsGuardedRhs srcloc e1 e2) = HsGuardedRhs srcloc new_e1 ne
         new_e1 = fst $ processExp infixMap e1
         new_e2 = fst $ processExp infixMap e2
 
-
 processAlt :: SymbolMap -> HsAlt -> HsAlt
 processAlt infixMap (HsAlt srcloc pat g_alts decls) = HsAlt srcloc (procPat infixMap pat) new_g_alts new_decls
     where
         new_g_alts = processGAlts infixMap g_alts
         new_decls = map (processDecl infixMap) decls
 
-
 processGAlts :: SymbolMap -> HsRhs -> HsRhs
 processGAlts infixMap g_alts = case g_alts of
     HsUnGuardedRhs exp     -> HsUnGuardedRhs $ fst $ processExp infixMap exp
     HsGuardedRhss galts    -> HsGuardedRhss $ map (processGAlt infixMap) galts
-
 
 processGAlt :: SymbolMap -> HsGuardedRhs -> HsGuardedRhs
 processGAlt infixMap (HsGuardedRhs srcloc e1 e2) = HsGuardedRhs srcloc new_e1 new_e2
     where
         new_e1 = fst $ processExp infixMap e1
         new_e2 = fst $ processExp infixMap e2
-
 
 processStmt :: SymbolMap -> HsStmt -> HsStmt
 processStmt infixMap stmt = case stmt of
@@ -200,12 +219,10 @@ processStmt infixMap stmt = case stmt of
     HsLetStmt decls                -> HsLetStmt $ map (processDecl infixMap) decls
  -- _                           -> error "Bad HsStmt data passed to processStmt."
 
-
 processFUpdt :: SymbolMap -> HsFieldUpdate -> HsFieldUpdate
 processFUpdt infixMap (HsField qname exp) = HsField qname new_exp
     where
         new_exp = fst $ processExp infixMap exp
-
 
 procPat sm p = fst $ processPat sm p
 processPat :: SymbolMap -> HsPat -> (HsPat, FixityInfo)
@@ -257,7 +274,6 @@ processPat infixMap exp = case exp of
         tf x = (x,terminalFixity)
 
 -----------------------------------------------------------------------------
-
 
     {- processExp():   Where the syntax tree reshaping actually takes
                      place. Assumes the parser that created the syntax
