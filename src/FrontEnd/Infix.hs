@@ -24,9 +24,12 @@ import qualified Data.Map as Map
 
 import Control.Monad.Identity
 import FrontEnd.HsSyn
+import FrontEnd.Lex.ParseMonad
+import FrontEnd.Lex.Post
 import FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse
 import Name.Name
+import Name.Names
 import Options
 import Support.MapBinaryInstance
 import Util.HasSize
@@ -67,23 +70,40 @@ terminalFixity = (10, HsAssocLeft)
 
 ----------------------------------------------------------------------------
 
-  -- infixer(): The exported top-level function. See header for usage.
+-- infixer(): The exported top-level function. See header for usage.
 
 infixHsModule :: FixityMap -> HsModule -> HsModule
 infixHsModule (FixityMap ism) m =  ans where
     ans = if fopts' (hsModuleOpt m) FO.NewParser
         then domod m
         else hsModuleDecls_u (map (processDecl ism)) m
-    expShuntSpec = F.shuntSpec { F.lookupToken, F.application , F.operator} where
+    (expShuntSpec,pexpShuntSpec) = (expShuntSpec,pexpShuntSpec) where
+        pexpShuntSpec = expShuntSpec {
+            F.operator = paren_operator, F.trailingOps }
+        expShuntSpec = F.shuntSpec {
+            F.lookupToken,
+            F.application ,
+            F.operator,
+            F.lookupUnary }
         lookupToken (HsBackTick bt) = backtick bt
-        lookupToken (HsParen (HsBackTick bt)) = return $ Left bt
-        lookupToken (HsParen v) = return (Left v)
+        lookupToken v@(HsVar bt) | isOpLike bt = backtick v
+        lookupToken v@(HsCon bt) | isOpLike bt = backtick v
+        lookupToken (HsParen v@(HsVar n)) | isOpLike n = return (Left v)
+        lookupToken (HsParen v@(HsCon n)) | isOpLike n = return (Left v)
+        lookupToken v@(HsParen _) = return (Left v)
         lookupToken (HsAsPat x v) = mr (HsAsPat x) v
         lookupToken (HsLocatedExp (Located sl v)) = mr (HsLocatedExp . Located sl) v
         lookupToken t = return (Left t)
+        lookupUnary t = return Nothing
         application e1 e2 = return $ HsApp e1 (hsParen e2)
         operator (HsBackTick t) as = return $ foldl HsApp t (map hsParen as)
         operator (HsLocatedExp (Located sl (HsBackTick t))) as = return $ foldl HsApp (HsLocatedExp (Located sl t)) (map hsParen as)
+        operator (HsVar v) [e] | v == v_sub = return $ HsNegApp (hsParen e)
+        operator t as = return $ foldl HsApp t (map hsParen as)
+        paren_operator (HsVar v) [e] | v == v_sub = return $ HsNegApp (hsParen e)
+        paren_operator t [e] = return $ HsRightSection (hsParen e) t
+        paren_operator t as = operator t as
+        trailingOps e t = return $ HsLeftSection t (hsParen e)
         backtick bt = f bt where
             f (HsVar v) = g v
             f (HsCon v) = g v
@@ -93,17 +113,21 @@ infixHsModule (FixityMap ism) m =  ans where
                 Just (n,HsAssocRight) -> Right (F.R,n)
                 Just (n,HsAssocNone) -> Right (F.N,n)
                 Nothing -> Right (F.L,9)
-
         mr x v = do
             n <- lookupToken v
             case n of
                 Left v -> return $ Left $ x v
                 Right {} -> return n
-    domod = runIdentity . traverseHsOps ops
-    ops = (hsOpsDefault ops) { opHsExp } where
+    domod m = case runP (traverseHsOps ops m) (hsModuleOpt m) of
+        (ws,~(Just v)) -> if null ws then v else error $ unlines (map show ws)
+    ops = (hsOpsDefault ops) { opHsExp, opHsPat } where
         opHsExp (HsWords es) = F.shunt expShuntSpec es >>= traverseHsOps ops
         opHsExp (HsParen (HsBackTick bt)) = traverseHsOps ops bt
         opHsExp e = traverseHsOps ops e
+        opHsPat (HsPatExp e) = do
+            e <- opHsExp e
+            checkPattern' e
+        opHsPat p = traverseHsOps ops p
 
 infixStatement :: FixityMap -> HsStmt -> HsStmt
 infixStatement (FixityMap ism) m = processStmt ism m

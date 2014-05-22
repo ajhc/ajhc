@@ -433,6 +433,7 @@ instance Rename HsPat where
         buildRecPat fls hsName' hsPatFields'
     rename (HsPAsPat hsName hsPat) = HsPAsPat <$> renameValName hsName <*> rename hsPat
     rename (HsPTypeSig sl hsPat qt)  = HsPTypeSig sl <$> rename hsPat <*> rename qt
+    rename (HsPatExp e) = HsPatExp <$> rename e
     rename p = traverseHsPat rename p
 
 buildRecPat :: FieldMap -> Name -> [HsPatField] -> RM HsPat
@@ -839,7 +840,8 @@ instance DeNameable HsPat where
 --    deName mod p
 
 instance DeNameable HsAlt where
-    deName _ n = n
+    deName mod (HsAlt sl p rhs ds) = HsAlt sl (dn p) (dn rhs) ds where
+        dn x = deName mod x
 
 instance DeNameable HsExp where
     deName mod e = f e where

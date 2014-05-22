@@ -280,6 +280,14 @@ getNamesFromHsPat p = execWriter (getNamesFromPat p) where
     getNamesFromPat (HsPAsPat hsName hsPat) = do
         tell [toName Val hsName]
         getNamesFromPat hsPat
+    getNamesFromPat (HsPatExp e) = f e where
+        f (HsVar v) = do
+            tell [toName Val v]
+        f (HsAsPat v e) = do
+            tell [toName Val v]
+            f e
+        f e = traverseHsExp_ f e
+
     getNamesFromPat p = traverseHsPat_ getNamesFromPat p
 
 data HsOps m = HsOps {
@@ -498,14 +506,14 @@ instance TraverseHsOps HsExp where
     traverseHsOps hops@HsOps { .. } e = g e where
         fn x = applyHsOps hops x
         g e = withSrcLoc (srcLoc e) $ f e
-        f (HsCase e as)                      = HsCase <$> opHsExp e <*> fn as
+        f (HsCase e as)                      = HsCase <$> fn e <*> fn as
         f (HsDo hsStmts)                     = HsDo <$> fn hsStmts
-        f (HsExpTypeSig srcLoc e hsQualType) = HsExpTypeSig srcLoc <$> opHsExp e <*> fn hsQualType
-        f (HsLambda srcLoc hsPats e)         = HsLambda srcLoc <$> fn hsPats <*> opHsExp e
-        f (HsLet hsDecls e)                  = HsLet <$> fn hsDecls <*> opHsExp e
-        f (HsListComp e ss)                  = HsListComp <$> opHsExp e <*> fn ss
+        f (HsExpTypeSig srcLoc e hsQualType) = HsExpTypeSig srcLoc <$> fn e <*> fn hsQualType
+        f (HsLambda srcLoc hsPats e)         = HsLambda srcLoc <$> fn hsPats <*> fn e
+        f (HsLet hsDecls e)                  = HsLet <$> fn hsDecls <*> fn e
+        f (HsListComp e ss)                  = HsListComp <$> fn e <*> fn ss
         f (HsRecConstr n fus)                = HsRecConstr n <$> fn fus
-        f (HsRecUpdate e fus)                = HsRecUpdate <$> opHsExp e <*> fn fus
+        f (HsRecUpdate e fus)                = HsRecUpdate <$> fn e <*> fn fus
         -- only exp
         f e@HsCon {}                  = pure e
         f e@HsError {}                = pure e

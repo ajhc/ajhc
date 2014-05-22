@@ -92,8 +92,6 @@ module :: { HsModule }
 
 pat :: { HsPat }
     : aexp {% checkPattern $1  }
-pats :: { HsPat }
-    : wl_aexp { HsPatExp $ hsWords $1 }
 
 decl :: { HsDecl }
     : exp srcloc rhs optwhere  {% checkValDef $2 $1 $3 $4 }
@@ -112,6 +110,13 @@ rhs :: { HsRhs }
 
 gdrh :: { HsGuardedRhs }
       : '|' exp '=' exp        { HsGuardedRhs $1 $2 $4 }
+
+rhs_case :: { HsRhs }
+    : '->' exp   { HsUnGuardedRhs $2 }
+    | wl_gdrh_case   { HsGuardedRhss $1 }
+
+gdrh_case :: { HsGuardedRhs }
+      : '|' exp '->' exp        { HsGuardedRhs $1 $2 $4 }
 
 assoc :: { (SrcLoc,HsAssoc) }
     : 'infix'  { ($1,HsAssocNone) }
@@ -194,18 +199,19 @@ stmt :: { HsStmt }
       | 'let' '{' decls '}'    { HsLetStmt  (fixupHsDecls $3) }
 
 alt :: { HsAlt }
-    : pat '->' exp { HsAlt $2 $1 (HsUnGuardedRhs $3) [] }
+    : srcloc pat rhs_case optwhere { HsAlt $1 $2 $3 $4 }
+ --   : pat '->' exp { HsAlt $2 $1 (HsUnGuardedRhs $3) [] }
 
 aexp :: { HsExp }
     : '(' ecl_exp ')'   { espan $1 $3 $ mtuple $2 }
     | '(#' ecl_exp '#)' { espan $1 $3 $ HsUnboxedTuple $2 }
-    | '[' ']'           { espan $1 $2 $ HsList [] }
+--    | '[' ']'           { espan $1 $2 $ HsList [] }
     | '[' list ']'      { espan $1 $3 $2 }
     | '_'               { HsWildCard $1 }
     | var               { HsVar $1 }
     | con               { HsCon $1 }
-    | varop             { HsBackTick (HsVar $1) }
-    | conop             { HsBackTick (HsCon $1) }
+    | varop             { HsVar $1 }
+    | conop             { HsCon $1 }
     | '`' var '`'       { espan $1 $3 $ HsBackTick (HsVar $2) }
     | '`' con '`'       { espan $1 $3 $ HsBackTick (HsCon $2) }
     | lit               { HsLit $1 }
@@ -219,7 +225,8 @@ optwhere :: { [HsDecl] }
       | {- empty -}                           { [] }
 
 list :: { HsExp }
-    : cl_exp                  { HsList $1 }
+    : ecl_exp                 { HsList $1 }
+    | exp '|' cl_stmt         { HsListComp $1 $3 }
     | cl_exp '..'             {% case $1 of
         [x]   -> return $ HsEnumFrom x
         [x,y] -> return $ HsEnumFromThen x y
@@ -240,14 +247,10 @@ lit :: { HsLiteral }
 INT :: { Int }
     : LInteger { read $1 }
 
-#clist exp
-#clist type
-#clist var
-#clist varcon
-#clist varconop
-#clist export
+#map { clist $_ } qw/exp stmt type var varcon varconop export/
 #wlist aexp
 #wlist gdrh
+#wlist gdrh_case
 #ewlist aexp
 #ewlist atype
 #wlist pat

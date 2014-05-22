@@ -8,6 +8,7 @@
 module FrontEnd.Desugar (doToExp, listCompToExp, desugarHsModule, desugarHsStmt) where
 
 --import Control.Applicative
+import Control.Monad.Identity
 import Control.Monad.State
 
 import FrontEnd.HsSyn
@@ -130,6 +131,8 @@ replaceVarNamesInPat name p = f name p where
        | name1 == name2 = HsPVar $ newPatVarName
        | otherwise = HsPWildCard
     f _ p@(HsPLit _) = p
+    f name (HsPatExp e) = HsPatExp $ g e
+    f name (HsPNeg pat) = HsPNeg $ f name pat
     f name (HsPNeg pat) = HsPNeg $ f name pat
     f name (HsPInfixApp pat1 conName pat2) = HsPInfixApp (f name pat1) conName (f name pat2)
     f name (HsPApp conName pats) = HsPApp conName (map (f name) pats)
@@ -146,6 +149,12 @@ replaceVarNamesInPat name p = f name p where
     f name (HsPIrrPat pat) = HsPIrrPat $ fmap (f name) pat
     f name (HsPBangPat pat) = HsPBangPat $ fmap (f name) pat
     f name (HsPTypeSig sl pat ty) = HsPTypeSig sl (f name pat) ty
+
+    g (HsVar (toName Val -> name2))
+       | name == name2 = HsVar newPatVarName
+       | otherwise = (HsWildCard bogusASrcLoc)
+    g e = runIdentity $ traverseHsExp (return . g) e
+
 --    f name p = error $ "replaceVarNamesInPat: " ++ show (name,p)
 
 desugarRhs :: (HsRhs) -> PatSM (HsRhs)
@@ -250,7 +259,8 @@ listCompToExp newName exp ss = hsParen `liftM` f ss where
     --f ((HsGenerator srcLoc pat e):[HsQualifier q]) | isHsPVar pat = hsParen $ HsApp (HsApp (HsVar f_filter)  (hsParen $ HsLambda srcLoc [pat] q) ) e
     f ((HsGenerator srcLoc pat e):HsQualifier q:ss) | isLazyPat pat, Just exp' <- g ss = do
         npvar <- newName
-        return $ hsApp (HsVar v_foldr)  [HsLambda srcLoc [pat,HsPVar npvar] $ hsIf q (hsApp (HsCon dc_Cons) [exp',HsVar npvar]) (HsVar npvar), HsList [],e]
+        return $ hsApp (HsVar v_foldr)  [HsLambda srcLoc [pat,HsPVar npvar] $ 
+            hsIf q (hsApp (HsCon dc_Cons) [exp',HsVar npvar]) (HsVar npvar), HsList [],e]
     f ((HsGenerator srcLoc pat e):ss) | isLazyPat pat = do
         ss' <- f ss
         return $ hsParen $ HsVar v_concatMap `app`  HsLambda srcLoc [pat] ss' `app` e

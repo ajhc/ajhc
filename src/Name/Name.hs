@@ -14,6 +14,7 @@ module Name.Name(
     isConstructorLike,
     isTypeNamespace,
     isValNamespace,
+    isOpLike,
     mainModule,
     preludeModule,
     mapName,
@@ -36,7 +37,6 @@ import Data.Data
 
 import C.FFI
 import Data.Binary
-import Data.Word
 import Doc.DocLike
 import Doc.PPrint
 import GenUtil
@@ -91,6 +91,9 @@ newtype Name = Name Atom
 
 isConstructorLike n =  isUpper x || x `elem` ":("  || xs == "->" || xs == "[]" where
     (_,_,xs@(x:_)) = nameParts n
+
+isOpLike n  = x `elem` "!#$%&*+./<=>?@\\^-~:|" where
+    (_,_,(x:_)) = nameParts n
 
 fromTypishHsName, fromValishHsName :: Name -> Name
 fromTypishHsName name

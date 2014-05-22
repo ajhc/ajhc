@@ -280,7 +280,7 @@ tiExpr expr@(HsLambda sloc ps e) typ = do
 
 tiExpr (HsIf e e1 e2) typ = do
     dn <- getDeName
-    withContext (simpleMsg $ "in the if expression\n   if " ++ show (dn e) ++ "...") $ do
+    withContext (simpleMsg $ "in the if expression\n   if " ++ render (ppHsExp (dn e)) ++ "...") $ do
     e <- tcExpr e tBool
     e1 <- tcExpr e1 typ
     e2 <- tcExpr e2 typ
@@ -362,7 +362,9 @@ deNameContext sl desc e action = do
 
 tcAlt ::  Sigma -> Sigma -> HsAlt -> Tc HsAlt
 
-tcAlt scrutinee typ alt@(HsAlt sloc pat gAlts wheres)  = withContext (locMsg sloc "in the alternative" $ render $ ppHsAlt alt) $ do
+tcAlt scrutinee typ alt@(HsAlt sloc pat gAlts wheres) = do
+    dn <- getDeName
+    withContext (locMsg sloc "in the alternative" $ render $ ppHsAlt (dn alt)) $ do
     scrutinee <- evalType scrutinee
     (pat',env) <- tcPat pat scrutinee
     localEnv env $ do

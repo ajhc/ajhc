@@ -3,6 +3,7 @@ module FrontEnd.Lex.Post(
     checkContext,
     checkValDef,
     checkPattern,
+    checkPattern',
     fixupHsDecls
 
 ) where
@@ -44,11 +45,11 @@ checkValDef srcloc lhs rhs whereBinds = withSrcLoc srcloc $ ans lhs where
     ans (HsLocatedExp (Located sl e)) = withSrcSpan sl $ ans e
     ans lhs = case isFunLhs lhs [] of
         Just (f,es) -> do
-            ps <- mapM checkPattern es
-            return (HsFunBind [HsMatch srcloc f ps rhs whereBinds])
+--            ps <- mapM checkPattern es
+            return (HsFunBind [HsMatch srcloc f (map HsPatExp es) rhs whereBinds])
         Nothing     -> do
-            lhs <- checkPattern lhs
-            return (HsPatBind srcloc lhs rhs whereBinds)
+--            lhs <- checkPattern lhs
+            return (HsPatBind srcloc (HsPatExp lhs) rhs whereBinds)
     isFunLhs (HsInfixApp l (HsVar ( op)) r) es = Just (op, l:r:es)
     isFunLhs (HsApp (HsVar ( f)) e) es = Just (f, e:es)
     isFunLhs (HsApp (HsParen f) e) es = isFunLhs f (e:es)
@@ -58,7 +59,10 @@ checkValDef srcloc lhs rhs whereBinds = withSrcLoc srcloc $ ans lhs where
 -- A variable binding is parsed as an HsPatBind.
 
 checkPattern :: HsExp -> P HsPat
-checkPattern e = checkPat e [] where
+checkPattern e = return $ HsPatExp e
+
+checkPattern' :: HsExp -> P HsPat
+checkPattern' e = checkPat e [] where
     checkPat :: HsExp -> [HsPat] -> P HsPat
     checkPat (HsCon c) args = return (HsPApp c args)
     checkPat (HsApp f x) args = do
@@ -66,8 +70,9 @@ checkPattern e = checkPat e [] where
             checkPat f (x:args)
     checkPat (HsLocatedExp (Located sl e)) xs = withSrcSpan sl $ checkPat e xs
     checkPat e [] = case e of
-            HsVar x   -> return (HsPVar x)
+            HsVar x            -> return (HsPVar x)
             HsLit l            -> return (HsPLit l)
+            HsError { hsExpErrorType = HsErrorUnderscore } -> return HsPWildCard
             HsInfixApp l op r  -> do
                 l <- checkPat l []
                 r <- checkPat r []
@@ -111,6 +116,8 @@ checkPattern e = checkPat e [] where
             p <- checkPat e []
             return (HsField n p)
 
+-- The top level pattern parsing to determine whether it is a function
+-- or pattern definition is done without knowledge of precedence
 patShuntSpec = F.shuntSpec { F.lookupToken, F.application, F.operator } where
     lookupToken (HsBackTick t) = return (Right (F.L,9))
     lookupToken t = return (Left t)
