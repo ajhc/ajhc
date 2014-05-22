@@ -22,6 +22,12 @@ type PWritten = (Seq.Seq Warning)
 newtype P a = P { unP :: PEnv -> (PWritten,Maybe a) }
 --    deriving(Monad,MonadReader PEnv, MonadWriter PWritten,Applicative,Functor)
 
+parseErrorK :: String -> P a
+parseErrorK s = do
+    addWarn ParseError s
+    sl <- getSrcLoc
+    return (error $ "parseError: " ++ show (sl,s))
+
 instance Functor P where
     fmap f (P m) = P $ \e -> fmap (fmap f) (m e)
 instance Applicative P where

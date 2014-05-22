@@ -491,8 +491,8 @@ ktype :: { HsType }
 
 gtycon :: { HsName }
       : qcon                          { $1 }
-      | '(' ')'                       { unit_tycon_name }
-      | '(' '->' ')'                  { fun_tycon_name }
+      | '(' ')'                       { tc_Unit }
+      | '(' '->' ')'                  { tc_Arrow }
       | '[' ']'                       { list_tycon_name }
       | '(' commas ')'                { tuple_tycon_name $2 }
 
@@ -1097,8 +1097,6 @@ tuple_con_name i      = toName DataConstructor (toModule "Jhc.Prim.Prim","("++re
 unit_con	      = HsCon { {-hsExpSrcSpan = bogusSrcSpan,-} hsExpName = dc_Unit }
 tuple_con i	      = HsCon { {-hsExpSrcSpan = bogusSrcSpan,-} hsExpName = (tuple_con_name i) }
 
-unit_tycon_name       = tc_Unit
-fun_tycon_name        = tc_Arrow
 list_tycon_name       = toName UnknownType "[]"
 tuple_tycon_name i    = tuple_con_name i
 

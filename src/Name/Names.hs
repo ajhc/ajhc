@@ -8,7 +8,7 @@
 -- rt_foo for raw names
 -- class_foo for classes
 
-module Name.Names(module Name.Names,module Name.Prim) where
+module Name.Names(module Name.Name,module Name.Names,module Name.Prim) where
 
 import Char(isDigit)
 

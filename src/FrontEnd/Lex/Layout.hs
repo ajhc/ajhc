@@ -22,7 +22,7 @@ preprocessLexemes fn xs = toplevel xs where
     toplevel ls = case skipComments ls of
         (L _ LReservedId "module":_) -> g defaultSrcLoc defaultSrcLoc 0 ls
         (L sl  _ _:_) -> TokenVLCurly "main" (srcLocColumn sl):g defaultSrcLoc defaultSrcLoc 0 ls
-        [] -> []
+        [] -> [TokenVLCurly "main" 0]
     g floc nloc n ls = f n ls where
         token (L cloc x y) = Token (L (srcLocRelative floc nloc cloc) x y)
         f n ((pragma "LINE") -> (Just lp,rs)) =  case lp of

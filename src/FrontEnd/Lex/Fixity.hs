@@ -3,12 +3,11 @@ module FrontEnd.Lex.Fixity where
 {-# LANGUAGE RecordWildCards, NamedFieldPuns #-}
 import Control.Monad
 import Control.Monad.Identity
-import Data.Maybe
 import Data.Tree
 import System.Environment
 import Text.Show
 
-data Fixity = L | R | N | Prefix | Postfix
+data Fixity = L | R | N | Prefix | Prefixy | Postfix
     deriving(Show,Eq)
 
 type Prec = (Fixity,Int)
@@ -24,7 +23,7 @@ simpleShunt getPrec e oes combine = runIdentity $ do
     let ShuntSpec { .. } = shuntSpec
     let lookupToken (Left e) = return $ Left e
         lookupToken (Right o) = return $ Right (getPrec o)
-        operator (Right t) [x,y] = return $ combine t x y
+        operator ~(Right t) ~[x,y] = return $ combine t x y
         ss = ShuntSpec { .. }
     shunt ss (Left e:concat [ [Right o, Left e] | (o,e) <- oes])
 
@@ -107,8 +106,6 @@ shunt ShuntSpec { .. } xs = f initialState xs where
         addOut s@S { ..} = case me of
             Just e -> s { output = e:output }
             Nothing -> s
-        adj L n = n - 1
-        adj _ n = n
     apop t [x,y] = case t of
         Nothing -> application x y
         Just t' -> operator t' [x,y]
@@ -119,8 +116,6 @@ shunt ShuntSpec { .. } xs = f initialState xs where
     (Prefix,x) `gt` (_,y) = x >= y
     (L,x) `gt` (_,y) = x >= y
     (_,x) `gt` (_,y) = x > y
-
-    sentinel = (R,-1)
 
 precs = procPrecs
     [prec Prefix ["~"]
@@ -147,7 +142,7 @@ main = do
             Just y -> Right y
             _ -> Left x
         operator t [x,y] = return $ parens (x <+> t <+> y)
-        operator t [x] = return $ brackets (t <+> x)
+        operator t ~[x] = return $ brackets (t <+> x)
         application = \x y -> return $ parens (x <+> y)
         lookupUnary = \_ -> return Nothing
         --trailingOps e t = return $ "<" ++ e ++ " " ++ t ++ ">"

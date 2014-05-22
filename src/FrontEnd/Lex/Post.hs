@@ -1,43 +1,61 @@
 -- post process source after initial parsing
 module FrontEnd.Lex.Post(
     checkContext,
-    checkValDef,
-    checkPattern,
+    checkDataHeader,
     checkPattern',
+    checkPattern,
+    checkSconType,
+    checkValDef,
+    qualTypeToClassHead,
     fixupHsDecls
-
 ) where
 
 import Control.Applicative
 import FrontEnd.HsSyn
 import FrontEnd.Lex.ParseMonad
 import FrontEnd.SrcLoc
-import FrontEnd.Syn.Traverse
-import FrontEnd.Warning
-import Name.Name
-import qualified Data.Set as Set
+import Name.Names
 import qualified Data.Traversable as T
 import qualified FrontEnd.Lex.Fixity as F
 
-parseError :: String -> P a
-parseError s = do
-    addWarn ParseError s
-    sl <- getSrcLoc
-    return (error $ "parseError: " ++ show (sl,s))
-
 checkContext :: HsType -> P HsContext
---checkContext (HsTyCon (toName TypeConstructor -> name)) | name == tc_Unit = return []
+checkContext (HsTyCon (toName TypeConstructor -> name)) | name == tc_Unit = return []
 checkContext (HsTyTuple []) = return []
 checkContext (HsTyTuple ts) = mapM checkAssertion ts
 checkContext t = (:[]) <$> checkAssertion t
+
+data Scon = SconApp Scon [Scon] | SconType Bool HsType | SconOp Name
+    deriving(Show)
+checkSconType :: [Either Name HsType] -> P (Name, [HsBangType])
+checkSconType xs = ans where
+    ans = do
+        s <- F.shunt sconShuntSpec xs
+        let f s = case s of
+                SconOp n -> n
+                SconType False (HsTyCon c) -> c
+            g (SconType False t) = HsUnBangedTy t
+            g (SconType True t) = HsBangedTy t
+        case s of
+            SconApp t ts -> return (f t, map g ts)
+            _ -> return (f s,[])
+
+    sconShuntSpec = F.shuntSpec { F.lookupToken, F.application, F.operator } where
+        lookupToken (Left t) | t == u_Bang = return (Right (F.Prefix,11))
+        lookupToken (Left t) = return (Right (F.L,9))
+        lookupToken (Right t) = return (Left (SconType False t))
+        application e1 e2 = return $ app e1 e2
+        operator (Left t) [SconType _ ty] | t == u_Bang = return $ SconType True ty
+        operator (Left t) as = return $ foldl app (SconOp t) as
+        app (SconApp a bs) e2 =  SconApp a (e2:bs)
+        app e1 e2 =  SconApp e1 [e2]
 
 checkAssertion :: HsType -> P HsAsst
 checkAssertion t =  f [] t where
     f ts (HsTyCon c) =  tast (c,ts)
     f ts (HsTyApp a t) = f (t:ts) a
-    f _ _ = parseError "malformed class assertion"
+    f _ _ = parseErrorK "malformed class assertion"
     tast (a,[HsTyVar n]) = return (HsAsst a [n]) -- (a,n)
-    tast _ = parseError "Invalid Class. multiparameter classes not yet supported"
+    tast _ = parseErrorK "Invalid Class. multiparameter classes not yet supported"
 
 checkValDef :: SrcLoc -> HsExp -> HsRhs -> [HsDecl] -> P HsDecl
 checkValDef srcloc lhs rhs whereBinds = withSrcLoc srcloc $ ans lhs where
@@ -108,9 +126,9 @@ checkPattern' e = checkPat e [] where
             HsExpTypeSig sl e t -> do
                 p <- checkPat e []
                 return (HsPTypeSig sl p t)
-            e -> parseError ("pattern error " ++  show e)
-    checkPat e _ = parseError ("pattern error " ++  show e)
-    patFail = parseError "pattern error"
+            e -> parseErrorK ("pattern error " ++  show e)
+    checkPat e _ = parseErrorK ("pattern error " ++  show e)
+    patFail = parseErrorK "pattern error"
     checkPatField :: HsFieldUpdate -> P HsPatField
     checkPatField (HsField n e) = do
             p <- checkPat e []
@@ -120,9 +138,11 @@ checkPattern' e = checkPat e [] where
 -- or pattern definition is done without knowledge of precedence
 patShuntSpec = F.shuntSpec { F.lookupToken, F.application, F.operator } where
     lookupToken (HsBackTick t) = return (Right (F.L,9))
+    lookupToken v@(HsVar bt) | isOpLike bt = return (Right (F.L,9))
+    lookupToken v@(HsCon bt) | isOpLike bt = return (Right (F.L,9))
     lookupToken t = return (Left t)
     application e1 e2 = return $ HsApp e1 e2
-    operator t as = return $ foldr HsApp t as
+    operator t as = return $ foldl HsApp t as
 
 fixupHsDecls :: [HsDecl] -> [HsDecl]
 fixupHsDecls ds = f ds where
@@ -145,6 +165,25 @@ fixupHsDecls ds = f ds where
     collectMatches (d:ds) = case d of
         (HsFunBind matches) -> matches ++ collectMatches ds
         _                   -> collectMatches ds
+
+checkDataHeader :: HsQualType -> P (HsContext,Name,[Name])
+checkDataHeader (HsQualType cs t) = do
+	(c,ts) <- checkSimple "data/newtype" t []
+	return (cs,c,ts)
+
+checkSimple :: String -> HsType -> [Name] -> P ((Name,[Name]))
+checkSimple kw (HsTyApp l (HsTyVar a)) xs = checkSimple kw l (a:xs)
+checkSimple _kw (HsTyCon t)   xs = return (t,xs)
+checkSimple kw _ _ = fail ("Illegal " ++ kw ++ " declaration")
+
+qualTypeToClassHead :: HsQualType -> P HsClassHead
+qualTypeToClassHead qt = do
+    let fromHsTypeApp t = f t [] where
+            f (HsTyApp a b) rs = f a (b:rs)
+            f t rs = (t,rs)
+    case fromHsTypeApp $ hsQualTypeType qt of
+        (HsTyCon className,as) -> return HsClassHead { hsClassHeadContext = hsQualTypeContext qt, hsClassHead = className, hsClassHeadArgs = as }
+        _ -> fail "Invalid Class Head"
 
 {-
 
@@ -199,15 +238,6 @@ splitTyConApp t0 = split t0 []
 -----------------------------------------------------------------------------
 -- Various Syntactic Checks
 
-qualTypeToClassHead :: HsQualType -> P HsClassHead
-qualTypeToClassHead qt = do
-    let fromHsTypeApp t = f t [] where
-            f (HsTyApp a b) rs = f a (b:rs)
-            f t rs = (t,rs)
-    case fromHsTypeApp $ hsQualTypeType qt of
-        (HsTyCon className,as) -> return HsClassHead { hsClassHeadContext = hsQualTypeContext qt, hsClassHead = className, hsClassHeadArgs = as }
-        _ -> fail "Invalid Class Head"
-
 -- Changed for multi-parameter type classes
 
 checkAssertion :: HsType -> P HsAsst
@@ -225,15 +255,6 @@ checkAssertion t =  checkAssertion' [] t
 checkPatterns :: [HsExp] -> P [HsPat]
 checkPatterns es = mapM checkPattern es
 
-checkDataHeader :: HsQualType -> P (HsContext,Name,[Name])
-checkDataHeader (HsQualType cs t) = do
-	(c,ts) <- checkSimple "data/newtype" t []
-	return (cs,c,ts)
-
-checkSimple :: String -> HsType -> [Name] -> P ((Name,[Name]))
-checkSimple kw (HsTyApp l (HsTyVar a)) xs = checkSimple kw l (a:xs)
-checkSimple _kw (HsTyCon t)   xs = return (t,xs)
-checkSimple kw _ _ = fail ("Illegal " ++ kw ++ " declaration")
 --checkSimple kw t ts = fail ("Illegal " ++ kw ++ " declaration: " ++ show (t,ts))
 
 {-

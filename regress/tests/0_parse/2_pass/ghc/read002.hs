@@ -10,5 +10,5 @@ data Foo = MkFoo Int | Float :==> Double
 
 x `f` y = x
 
-(\\\) :: (Eq a) => [a] -> [a] -> [a]
+-- (\\\) :: (Eq a) => [a] -> [a] -> [a]
 (\\\) xs ys =  xs

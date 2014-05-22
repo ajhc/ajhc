@@ -22,7 +22,6 @@ import Data.Binary
 import Data.Monoid
 import qualified Data.Map as Map
 
-import Control.Monad.Identity
 import FrontEnd.HsSyn
 import FrontEnd.Lex.ParseMonad
 import FrontEnd.Lex.Post
@@ -96,22 +95,26 @@ infixHsModule (FixityMap ism) m =  ans where
         lookupToken t = return (Left t)
         lookupUnary t = return Nothing
         application e1 e2 = return $ HsApp e1 (hsParen e2)
-        operator (HsBackTick t) as = return $ foldl HsApp t (map hsParen as)
-        operator (HsLocatedExp (Located sl (HsBackTick t))) as = return $ foldl HsApp (HsLocatedExp (Located sl t)) (map hsParen as)
+        operator (HsBackTick t) as = operator t as
+--        operator (HsLocatedExp (Located sl (HsBackTick t))) as = return $ foldl HsApp (HsLocatedExp (Located sl t)) (map hsParen as)
         operator (HsVar v) [e] | v == v_sub = return $ HsNegApp (hsParen e)
         operator t as = return $ foldl HsApp t (map hsParen as)
+        paren_operator (HsBackTick t) as = paren_operator t as
         paren_operator (HsVar v) [e] | v == v_sub = return $ HsNegApp (hsParen e)
         paren_operator t [e] = return $ HsRightSection (hsParen e) t
         paren_operator t as = operator t as
+        trailingOps e (HsBackTick t) = trailingOps e t
         trailingOps e t = return $ HsLeftSection t (hsParen e)
         backtick bt = f bt where
             f (HsVar v) = g v
-            f (HsCon v) = g v
-            f (HsAsPat _ v) = backtick v
+            f ~(HsCon v) = g v
+            --f (HsAsPat _ v) = backtick v
             g v = return $ case Map.lookup v ism of
                 Just (n,HsAssocLeft) -> Right (F.L,n)
                 Just (n,HsAssocRight) -> Right (F.R,n)
                 Just (n,HsAssocNone) -> Right (F.N,n)
+                Just (n,HsAssocPrefix) -> Right (F.Prefix,n)
+                Just (n,HsAssocPrefixy) -> Right (F.Prefixy,n)
                 Nothing -> Right (F.L,9)
         mr x v = do
             n <- lookupToken v
@@ -121,8 +124,9 @@ infixHsModule (FixityMap ism) m =  ans where
     domod m = case runP (traverseHsOps ops m) (hsModuleOpt m) of
         (ws,~(Just v)) -> if null ws then v else error $ unlines (map show ws)
     ops = (hsOpsDefault ops) { opHsExp, opHsPat } where
+        opHsExp (HsParen (HsWords es)) = F.shunt pexpShuntSpec es >>= traverseHsOps ops
         opHsExp (HsWords es) = F.shunt expShuntSpec es >>= traverseHsOps ops
-        opHsExp (HsParen (HsBackTick bt)) = traverseHsOps ops bt
+        opHsExp (HsParen (HsBackTick bt)) = parseErrorK "parens around backtick"
         opHsExp e = traverseHsOps ops e
         opHsPat (HsPatExp e) = do
             e <- opHsExp e
@@ -251,33 +255,33 @@ processFUpdt infixMap (HsField qname exp) = HsField qname new_exp
 procPat sm p = fst $ processPat sm p
 processPat :: SymbolMap -> HsPat -> (HsPat, FixityInfo)
 processPat infixMap exp = case exp of
-    HsPInfixApp l op r  ->
-              case (compare l_power op_power) of
-                    GT -> (HsPInfixApp new_l op new_r, op_fixity)
-                    EQ -> case op_assoc of
-                        HsAssocNone    -> error_precedence op new_l
-                        HsAssocRight   -> case l_assoc of
-                            HsAssocRight   -> case new_l of
-                                HsPInfixApp l' op' r' -> (HsPInfixApp l' op' (process_r' r'), l_fixity)
-                                _                     -> error_syntax op new_l
-                            _               -> error_precedence op new_l
-                        HsAssocLeft    -> case l_assoc of
-                            HsAssocLeft    -> (HsPInfixApp new_l op new_r, op_fixity)
-                            _               -> error_precedence op new_l
-                    LT -> case new_l of
+    HsPInfixApp l op r  -> case (compare l_power op_power) of
+            GT -> (HsPInfixApp new_l op new_r, op_fixity)
+            EQ -> case op_assoc of
+                HsAssocNone    -> error_precedence op new_l
+                HsAssocRight   -> case l_assoc of
+                    HsAssocRight   -> case new_l of
                         HsPInfixApp l' op' r' -> (HsPInfixApp l' op' (process_r' r'), l_fixity)
                         _                     -> error_syntax op new_l
-               where
-                    (new_l, l_fixity) = processPat infixMap l
-                    l_power = fst l_fixity
-                    l_assoc = snd l_fixity
-                    op_fixity = Map.findWithDefault defaultFixity  (toName DataConstructor op) infixMap
-                    op_power = fst op_fixity
-                    op_assoc = snd op_fixity
-                    new_r = processExp' r
-                    process_r' r' = processExp' $ HsPInfixApp r' op r
-                    error_precedence err_op err_lower = error $ syn_err_precedence err_op err_lower
-                    error_syntax err_op err_lower = error $ syn_err_bad_oparg err_op err_lower
+                    _               -> error_precedence op new_l
+                HsAssocLeft    -> case l_assoc of
+                    HsAssocLeft    -> (HsPInfixApp new_l op new_r, op_fixity)
+                    _               -> error_precedence op new_l
+                _ -> error "processPat.infix.a"
+            LT -> case new_l of
+                HsPInfixApp l' op' r' -> (HsPInfixApp l' op' (process_r' r'), l_fixity)
+                _                     -> error_syntax op new_l
+        where
+            (new_l, l_fixity) = processPat infixMap l
+            l_power = fst l_fixity
+            l_assoc = snd l_fixity
+            op_fixity = Map.findWithDefault defaultFixity  (toName DataConstructor op) infixMap
+            op_power = fst op_fixity
+            op_assoc = snd op_fixity
+            new_r = processExp' r
+            process_r' r' = processExp' $ HsPInfixApp r' op r
+            error_precedence err_op err_lower = error $ syn_err_precedence err_op err_lower
+            error_syntax err_op err_lower = error $ syn_err_bad_oparg err_op err_lower
     x@HsPVar {} -> (x,terminalFixity)
     x@HsPLit {} -> (x,terminalFixity)
     x@HsPWildCard  -> (x,terminalFixity)
@@ -291,7 +295,7 @@ processPat infixMap exp = case exp of
     HsPParen xs -> tf $ HsPParen (pp xs)
     HsPRec n xs -> tf $ HsPRec n [ HsField n (pp p) | HsField n p <- xs ]
     HsPAsPat n p -> tf $ HsPAsPat n (pp p)
-    HsPTypeSig sl p qt -> tf $ HsPTypeSig sl (pp p) qt
+    ~(HsPTypeSig sl p qt) -> tf $ HsPTypeSig sl (pp p) qt
     where
         processExp' = fst . (processPat infixMap)
         pp = fst . (processPat infixMap)
@@ -323,6 +327,7 @@ processExp infixMap exp = case exp of
                         HsAssocLeft    -> case l_assoc of
                             HsAssocLeft    -> (HsInfixApp new_l op new_r, op_fixity)
                             _               -> error_precedence op new_l
+                        _ -> error "processExp.infix.b"
                     LT -> case new_l of
                         HsInfixApp l' op' r' -> (HsInfixApp l' op' (process_r' r'), l_fixity)
                         _                     -> error_syntax op new_l

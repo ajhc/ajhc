@@ -478,18 +478,18 @@ ppHsExp (HsVar name ) = ppHsQNameParen name
 ppHsExp (HsCon name) = ppHsQNameParen name
 ppHsExp (HsTuple expList) = parenList . map ppHsExp $ expList
 ppHsExp (HsUnboxedTuple expList) = parenListzh . map ppHsExp $ expList
--- weird stuff
 ppHsExp (HsParen exp) = parens . ppHsExp $ exp
+-- TODO arguments swapped
 ppHsExp (HsLeftSection v exp)   | (HsVar name) <- dropAs v =
 	parens (ppHsExp exp <+> ppHsQNameInfix name)
 ppHsExp (HsLeftSection v exp)   | (HsCon name) <- dropAs v =
 	parens (ppHsExp exp <+> ppHsQNameInfix name)
-ppHsExp (HsLeftSection _ _) = error "illegal left section"
+--ppHsExp (HsLeftSection _ _) = error "illegal left section"
 ppHsExp (HsRightSection exp v) | (HsVar name) <- dropAs v =
 	parens (ppHsQNameInfix name <+> ppHsExp exp)
 ppHsExp (HsRightSection exp v) | (HsCon name) <- dropAs v =
 	parens (ppHsQNameInfix name <+> ppHsExp exp)
-ppHsExp (HsRightSection _ _) = error "illegal right section"
+--ppHsExp (HsRightSection _ _) = error "illegal right section"
 ppHsExp (HsRecConstr c fieldList) =
 	ppHsQName c
         <> (braceList . map ppHsFieldUpdate  $ fieldList)
