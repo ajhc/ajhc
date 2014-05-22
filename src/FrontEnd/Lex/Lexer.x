@@ -10,7 +10,7 @@ import FrontEnd.SrcLoc
 
 %wrapper "monad"
 
-$whitechar = [ \t\n\r\f\v]
+$unispace  = [\xa0]
 $whitechar = [ \t\n\r\f\v]
 $special   = [\(\)\,\;\[\]\`\{\}]
 
@@ -33,6 +33,7 @@ $hexit     = [0-9 A-F a-f]
 $idchar    = [$alpha $digit \']
 $symchar   = [$symbol \:]
 $nl        = [\n\r]
+$ws        = [$unispace $white]
 
 @reservedid =
 	as|case|class|data|default|deriving|do|else|hiding|if|
@@ -61,13 +62,13 @@ $charesc = [abfnrtv\\\"\'\&]                                                -- "
 @escape  = \\ ($charesc | @ascii | @decimal | o @octal | x @hexadecimal | \n)
 @gap     = \\ $whitechar+ \\
 @string  = $graphic # [\"\\] | " " | @escape | @gap                        -- "
-@ws      = $white+
+@ws      = $ws+
 
 haskell :-
 
 <0>  ^"#!" .*              { begin hs }
 <0>  ""                    { begin hs }
-<hs> $white+		   ;
+<hs> $ws+		   ;
 <hs> "--"\-*[^$symbol].*   ;
 <hs> "--"\-*$	           ;
 
@@ -76,19 +77,24 @@ haskell :-
 -- <hs> ^"# " / @decimal          { mkJL LPragmaStart "LINE" `andBegin` line_pragma }
 -- <line_pragma> $white*$          { mkJL LSpecial "#-}" `andBegin` 0 }
 
+"{-#" @ws "OPTIONS"             { begin discard_pragma }
+"{-#" @ws "LANGUAGE"             { begin discard_pragma }
+"{-#" @ws "GHC"                 { begin discard_pragma }
+<discard_pragma> "#-}"          { begin hs }
+<discard_pragma> .              ;
 "{-#"                           { mkL LSpecial }
 "#-}"                           { mkL LSpecial }
 
 "{-"				{ nested_comment }
 <hs> $special			{ mkL LSpecial }
 
-<hs> @reservedid			{ mkL LReservedId }
-<hs> (@conid \.)+ @varid		{ mkL LQVarId }
-<hs> (@conid \.)+ @conid		{ mkL LQConId }
+<hs> @reservedid		{ mkL LReservedId }
+<hs> (@conid \.)+ @varid	{ mkL LQVarId }
+<hs> (@conid \.)+ @conid	{ mkL LQConId }
 <hs,line_pragma> @varid		{ mkL LVarId }
 <hs,line_pragma> @conid		{ mkL LConId }
 
-<hs> @reservedop			{ mkL LReservedOp }
+<hs> @reservedop		{ mkL LReservedOp }
 <hs> (@conid \.)+ @varsym	{ mkL LVarSym }
 <hs> (@conid \.)+ @consym	{ mkL LConSym }
 <hs> @varsym			{ mkL LVarSym }
@@ -140,31 +146,6 @@ mkJL c av (p,_,_,_) _ = return (L (toSrcLoc p) c av)
 toSrcLoc (AlexPn _ l c) = SrcLoc {
     srcLocFileName = fileNameUnknown,
     srcLocLine = l, srcLocColumn = c }
-
-{-
-nested_comment :: AlexInput -> Int -> Alex Lexeme
-nested_comment _ _ = do
-  input <- alexGetInput
-  go 1 input
-  where go 0 input = do alexSetInput input; alexMonadScan
-	go n input = do
-	  case alexGetChar input of
-	    Nothing  -> err input
-	    Just (c,input) -> do
-	      case c of
-	    	'-' -> do
-		  case alexGetChar input of
-		    Nothing  -> err input
-		    Just ('}',input) -> go (n-1) input
-		    Just (_c,_input)      -> go n input
-	     	'{' -> do
-		  case alexGetChar input of
-		    Nothing  -> err input
-		    Just ('-',input) -> go (n+1) input
-		    Just (c,input)   -> go n input
-	    	c -> go n input
-        err input = do alexSetInput input; lexError "error in nested comment"
--}
 
 nested_comment :: AlexInput -> Int -> Alex Lexeme
 nested_comment _ _ = do

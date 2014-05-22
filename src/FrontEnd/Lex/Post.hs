@@ -144,8 +144,8 @@ checkPattern' e = checkPat e [] where
 -- or pattern definition is done without knowledge of precedence
 patShuntSpec = F.shuntSpec { F.lookupToken, F.application, F.operator } where
     lookupToken (HsBackTick t) = return (Right (F.L,9))
-    lookupToken v@(HsVar bt) | isOpLike bt = return (Right (F.L,9))
-    lookupToken v@(HsCon bt) | isOpLike bt = return (Right (F.L,9))
+--    lookupToken v@(HsVar bt) | isOpLike bt = return (Right (F.L,9))
+--    lookupToken v@(HsCon bt) | isOpLike bt = return (Right (F.L,9))
     lookupToken t = return (Left t)
     application e1 e2 = return $ HsApp e1 e2
     operator t as = return $ foldl HsApp t as

@@ -107,7 +107,7 @@ pat :: { HsPat }
 
 decl :: { HsDecl }
     : exp0 srcloc rhs optwhere  {% checkValDef $2 $1 $3 $4 }
-    | cl_fixvar '::' qualtype { HsTypeSig $2 $1 $3 }
+    | cl_var '::' qualtype { HsTypeSig $2 $1 $3 }
     | 'type' con ewl_atype '=' type
                       { HsTypeDecl {
                         hsDeclSrcLoc = $1,
@@ -130,9 +130,8 @@ decl :: { HsDecl }
     | 'instance' classhead optwhere { HsInstDecl $1 $2 $3 }
     | 'class' classhead optwhere { HsClassDecl $1 $2 $3 }
     | 'foreign' 'import' wl_var mstring '::' qualtype
-                    {% doForeign $2 (toName Val "import":reverse $4) $5 $7  }
-    | 'foreign' wl_var mstring '::' qualtype
-                    {% doForeign $2 (reverse $3) $4 $6  }
+                    {% doForeign $1 (toName Val "import":$3) $4 $6  }
+    | 'foreign' wl_var mstring '::' qualtype {% doForeign $1 $2 $3 $5  }
 -- FFI parts
 mstring :: { Maybe (String,Name) }
 mstring : LString var    { Just ($1,$2) }
@@ -147,41 +146,25 @@ mconstrs :: { [HsConDecl] }
     |              { [] }
 
 deriving :: { [Name] }
-      : {- empty -}               { [] }
-      | 'deriving' con            { [$2] }
-      | 'deriving' '(' ')'        { [] }
-      | 'deriving' '(' cl_con ')' { $3 }
+    : {- empty -}               { [] }
+    | 'deriving' con            { [$2] }
+    | 'deriving' '(' ')'        { [] }
+    | 'deriving' '(' cl_con ')' { $3 }
 
 constr :: { HsConDecl }
-      : srcloc mexists scontype   { HsConDecl {
-            hsConDeclSrcLoc = $1,
-            hsConDeclName = (fst $3),
-            hsConDeclConArg = (snd $3),
-            hsConDeclExists = $2 } }
-      | srcloc mexists gcon '{' ecl_fielddecl '}' { HsRecDecl {
-            hsConDeclSrcLoc = $1,
-            hsConDeclName = $3,
-            hsConDeclRecArg = $5,
-            hsConDeclExists = $2 } }
+    : srcloc mexists scontype   { HsConDecl {
+        hsConDeclSrcLoc = $1,
+        hsConDeclName = (fst $3),
+        hsConDeclConArg = (snd $3),
+        hsConDeclExists = $2 } }
+    | srcloc mexists gcon '{' ecl_fielddecl '}' { HsRecDecl {
+        hsConDeclSrcLoc = $1,
+        hsConDeclName = $3,
+        hsConDeclRecArg = $5,
+        hsConDeclExists = $2 } }
 
 fielddecl :: { ([HsName],HsBangType) }
-      : cl_var '::' type          { ($1, HsUnBangedTy $3) }
-
-      -- | srcloc mexists sbtype conop sbtype    { HsConDecl {
-      --       hsConDeclSrcLoc = $1,
-      --       hsConDeclName = $4,
-      --       hsConDeclConArg = [$3,$5],
-      --       hsConDeclExists = $2 } }
-      -- | srcloc mexists con '{' fielddecls '}' { HsRecDecl {
-      --       hsConDeclSrcLoc = $1,
-      --       hsConDeclName = $3,
-      --       hsConDeclRecArg = (reverse $5),
-      --       hsConDeclExists = $2 } }
-      -- | srcloc mexists con '{' '}' { HsRecDecl {
-      --       hsConDeclSrcLoc = $1,
-      --       hsConDeclName = $3,
-      --       hsConDeclRecArg = [],
-      --       hsConDeclExists = $2 } }
+    : cl_var '::' type  { ($1, HsUnBangedTy $3) }
 mexists : { [] }
 
 scontype :: { (HsName, [HsBangType]) }
@@ -219,52 +202,52 @@ modid :: { Module }
     : con { toModule (show $1) }
 
 optqualified :: { Bool }
-      : 'qualified'                           { True  }
-      | {- empty -}                           { False }
+    : 'qualified'   { True  }
+    | {- empty -}   { False }
 
 maybeas :: { Maybe Module }
-      : 'as' modid           { Just $2 }
-      | {- empty -}          { Nothing }
+    : 'as' modid    { Just $2 }
+    | {- empty -}   { Nothing }
 
 maybeimpspec :: { Maybe (Bool, [HsExportSpec]) }
-      : exports                               { Just (False,$1) }
-      | 'hiding' exports                      { Just (True,$2) }
-      | {- empty -}                           { Nothing }
+    : exports             { Just (False,$1) }
+    | 'hiding' exports    { Just (True,$2) }
+    | {- empty -}         { Nothing }
 
 exports :: { [HsExportSpec] }
     : '(' ecl_export ')'     { $2 }
 
 export :: { HsExportSpec }
-      :  var                          { HsEVar $1 }
-      |  con                          { HsEAbs $1 }
-      |  con '(' '..' ')'             { HsEThingAll $1 }
-      |  con '(' ecl_varcon ')'       { HsEThingWith $1 $3 }
-      |  'module' modid               { HsEModuleContents $2 }
+    :  var                          { HsEVar $1 }
+    |  con                          { HsEAbs $1 }
+    |  con '(' '..' ')'             { HsEThingAll $1 }
+    |  con '(' ecl_varcon ')'       { HsEThingWith $1 $3 }
+    |  'module' modid               { HsEModuleContents $2 }
 
 type :: { HsType }
-      : btype '->' type               { HsTyFun $1 $3 }
-      | btype                         { $1 }
+    : btype '->' type               { HsTyFun $1 $3 }
+    | btype                         { $1 }
 --      | 'forall' tbinds '.' qualtype  { HsTyForall { hsTypeVars = reverse $2, hsTypeType = $4 } }
 --      | 'exists' tbinds '.' qualtype  { HsTyExists { hsTypeVars = reverse $2, hsTypeType = $4 } }
 
 btype :: { HsType }
-      : btype atype                   { HsTyApp $1 $2 }
-      | atype                         { $1 }
+    : btype atype                   { HsTyApp $1 $2 }
+    | atype                         { $1 }
 
 atype :: { HsType }
-      : con                    { HsTyCon $1 }
-      | var                    { HsTyVar $1 }
-      | '(' ')'                { HsTyCon tc_Unit }
-      | '[' ']'                { HsTyCon tc_List }
-      | '(' cl2_type ')'       { HsTyTuple $2 }
-      | '(#' ecl_type '#)'     { HsTyUnboxedTuple $2 }
-      | '[' type ']'           { HsTyApp (HsTyCon (toName UnknownType "[]")) $2 }
-      | '(' type ')'           { $2 }
-      | '(' type '=' type ')'  { HsTyEq $2 $4 }
+    : con                    { HsTyCon $1 }
+    | var                    { HsTyVar $1 }
+    | '(' ')'                { HsTyCon tc_Unit }
+    | '[' ']'                { HsTyCon tc_List }
+    | '(' cl2_type ')'       { HsTyTuple $2 }
+    | '(#' ecl_type '#)'     { HsTyUnboxedTuple $2 }
+    | '[' type ']'           { HsTyApp (HsTyCon (toName UnknownType "[]")) $2 }
+    | '(' type ')'           { $2 }
+    | '(' type '=' type ')'  { HsTyEq $2 $4 }
 
 qualtype :: { HsQualType }
-      : type '=>' type   {% withSrcLoc $2 $ checkContext $1 >>= return . flip HsQualType $3 }
-      | type             { HsQualType [] $1 }
+    : type '=>' type   {% withSrcLoc $2 $ checkContext $1 >>= return . flip HsQualType $3 }
+    | type             { HsQualType [] $1 }
 
 exp :: { HsExp }
     : exp0 '::' qualtype { HsExpTypeSig $2 $1 $3 }
@@ -282,9 +265,9 @@ exp1 :: { HsExp }
     | aexp  { $1 }
 
 stmt :: { HsStmt }
-      : pat '<-' exp      { HsGenerator $2 $1 $3 }
-      | exp               { HsQualifier $1 }
-      | 'let' '{' decls '}'    { HsLetStmt  (fixupHsDecls $3) }
+    : pat '<-' exp      { HsGenerator $2 $1 $3 }
+    | exp               { HsQualifier $1 }
+    | 'let' '{' decls '}'    { HsLetStmt  (fixupHsDecls $3) }
 
 alt :: { HsAlt }
     : srcloc pat rhs_case optwhere { HsAlt $1 $2 $3 $4 }
@@ -298,25 +281,23 @@ aexp :: { HsExp }
     | '_'               { HsWildCard $1 }
     | var               { HsVar $1 }
     | con               { HsCon $1 }
-    | varop             { HsVar $1 }
-    | conop             { HsCon $1 }
-    | '`' var '`'       { HsBackTick (HsVar $2) }
-    | '`' con '`'       { HsBackTick (HsCon $2) }
+    | varop             { HsBackTick (HsVar $1) }
+    | conop             { HsBackTick (HsCon $1) }
     | lit               { HsLit $1 }
     -- atomic after layout processing
     | 'do' '{' stmts  '}'       { HsDo $3 }
 
 commas :: { Int }
-      : commas ','                    { $1 + 1 }
-      | ','                           { 1 }
+    : commas ','                    { $1 + 1 }
+    | ','                           { 1 }
 
 fbind :: { (Name,Maybe HsExp) }
     : uqvar '=' exp  { ($1,Just (eloc $2 $3)) }
     | uqvar { ($1,Nothing) }
 
 optwhere :: { [HsDecl] }
-      : 'where' '{' decls  '}'                { fixupHsDecls $3 }
-      | {- empty -}                           { [] }
+    : 'where' '{' decls  '}'                { fixupHsDecls $3 }
+    | {- empty -}                           { [] }
 
 list :: { HsExp }
     : ecl_exp                 { HsList $1 }
@@ -339,7 +320,7 @@ lit :: { HsLiteral }
 INT :: { Int }
     : LInteger { read $1 }
 
-#map { clist $_ } qw/exp stmt type var varcon varconop export con fielddecl fixvar/
+#map { clist $_ } qw/exp stmt type var varcon varconop export con fielddecl/
 #blist constr
 #wlist aexp
 #wlist var
@@ -365,10 +346,6 @@ rev_$a
 #oslist 'alt'
 #oslist 'stmt'
 
-fixvar :: { Name }
-    : '(' varop ')' { $2 }
-    | var   { $1 }
-
 var :: { Name }
     : uqvar { $1 }
     | LQVarId  {(toName UnknownType $1) }
@@ -388,7 +365,6 @@ uqvar :: { Name }
 gcon :: { Name }
     : '(' commas ')'   { tuple_con_name $2 }
     | con              { $1 }
-    | '(' conop  ')'   { $2 }
 
 con :: { Name }
     : LConId  { (toName UnknownType $1) }
@@ -397,14 +373,10 @@ con :: { Name }
 varcon
     : var { $1 }
     | con { $1 }
-    | '(' varop ')' { $2 }
-    | '(' conop ')' { $2 }
 
 varconop
     : varop { $1 }
     | conop { $1 }
-    | '`' var '`' { $2 }
-    | '`' con '`' { $2 }
 
 conop :: { Name }
     : LConSym  { (toName UnknownType $1) }

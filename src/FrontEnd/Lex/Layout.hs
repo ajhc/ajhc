@@ -21,13 +21,20 @@ preprocessLexemes fn xs = toplevel xs where
     defaultSrcLoc = SrcLoc { srcLocFileName = packString fn, srcLocColumn = 0, srcLocLine = 0 }
     toplevel ls = case skipComments ls of
         (L _ LReservedId "module":_) -> g defaultSrcLoc defaultSrcLoc 0 ls
+        (L _ _ "{":_) -> g defaultSrcLoc defaultSrcLoc 0 ls
         (L sl  _ _:_) -> TokenVLCurly "main" (srcLocColumn sl):g defaultSrcLoc defaultSrcLoc 0 ls
         [] -> [TokenVLCurly "main" 0]
     g floc nloc n ls = f n ls where
         token (L cloc x y) = Token (L (srcLocRelative floc nloc cloc) x y)
+        f n (L sl _ "(":L _ LVarSym z:L _ _ ")":rs) = f n (L sl LVarId z:rs)
+        f n (L sl _ "(":L _ LConSym z:L _ _ ")":rs) = f n (L sl LConId z:rs)
+        f n (L sl _ "`":L _ LVarId z:L _ _ "`":rs) = f n (L sl LVarSym z:rs)
+        f n (L sl _ "`":L _ LConId z:L _ _ "`":rs) = f n (L sl LConSym z:rs)
         f n ((pragma "LINE") -> (Just lp,rs)) =  case lp of
             [(L _ _ "default")] -> g defaultSrcLoc defaultSrcLoc n rs
-            [(L nloc LInteger num),L _ LString s] -> g SrcLoc { srcLocFileName = packString (read s), srcLocLine = read num, srcLocColumn = 0 } nloc { srcLocColumn = 0 } n rs
+            [(L nloc LInteger num),L _ LString s] -> g SrcLoc {
+                srcLocFileName = packString (read s), srcLocLine = read num, srcLocColumn = 0 }
+                    nloc { srcLocColumn = 0 } n rs
         f n ((pragma "LINE") -> (Just [(fromL -> "default")],rs)) =  g defaultSrcLoc defaultSrcLoc n rs
         f n (L _ _ "{-#":rs) = f n (d rs) where
             d (L _ _ "#-}":rs) = rs
@@ -37,6 +44,7 @@ preprocessLexemes fn xs = toplevel xs where
             TokenNL srcLocColumn:f srcLocLine rs
         f n (ls@(L _ _ s):rs@(L sl _ nv:_)) = if s `elem` layoutStarters && nv /= "{"
             then token ls:TokenVLCurly s (srcLocColumn sl):f n rs else token ls:f n rs
+        f n [ls@(L _ _ s)] | s `elem` layoutStarters = token ls:TokenVLCurly s 0:[]
         f n (r:rs) = token r:f n rs
         f _ [] = []
 

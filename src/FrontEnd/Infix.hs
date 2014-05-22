@@ -85,11 +85,11 @@ infixHsModule (FixityMap ism) m =  ans where
             F.operator,
             F.lookupUnary }
         lookupToken (HsBackTick bt) = backtick bt
-        lookupToken v@(HsVar bt) | isOpLike bt = backtick v
-        lookupToken v@(HsCon bt) | isOpLike bt = backtick v
-        lookupToken (HsParen v@(HsVar n)) | isOpLike n = return (Left v)
-        lookupToken (HsParen v@(HsCon n)) | isOpLike n = return (Left v)
-        lookupToken v@(HsParen _) = return (Left v)
+--        lookupToken v@(HsVar bt) | isOpLike bt = backtick v
+--        lookupToken v@(HsCon bt) | isOpLike bt = backtick v
+ --       lookupToken (HsParen v@(HsVar n)) | isOpLike n = return (Left v)
+ --       lookupToken (HsParen v@(HsCon n)) | isOpLike n = return (Left v)
+--        lookupToken v@(HsParen _) = return (Left v)
         lookupToken (HsAsPat x v) = mr (HsAsPat x) v
         lookupToken (HsLocatedExp (Located sl v)) = mr (HsLocatedExp . Located sl) v
         lookupToken t = return (Left t)
@@ -126,7 +126,8 @@ infixHsModule (FixityMap ism) m =  ans where
     ops = (hsOpsDefault ops) { opHsExp, opHsPat } where
         opHsExp (HsParen (HsWords es)) = F.shunt pexpShuntSpec es >>= traverseHsOps ops
         opHsExp (HsWords es) = F.shunt expShuntSpec es >>= traverseHsOps ops
-        opHsExp (HsParen (HsBackTick bt)) = parseErrorK "parens around backtick"
+        opHsExp (HsBackTick t) = parseErrorK "unexpected binary operator."
+--        opHsExp (HsParen (HsBackTick bt)) = parseErrorK "parens around backtick"
         opHsExp e = traverseHsOps ops e
         opHsPat (HsPatExp e) = do
             e <- opHsExp e
