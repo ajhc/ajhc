@@ -11,6 +11,7 @@ import Control.Monad.Error
 import FrontEnd.HsSyn
 import FrontEnd.Lex.Lexer
 import FrontEnd.Lex.ParseMonad
+import FrontEnd.Lex.Post
 import FrontEnd.SrcLoc
 import FrontEnd.Warning
 import Name.Name
@@ -77,29 +78,25 @@ module :: { HsModule }
         hsModuleExports = Just [HsEVar (toName Val "main")],
         hsModuleSrcLoc  = $1,
         hsModuleImports = $2,
-        hsModuleDecls   = $3
+        hsModuleDecls   = fixupHsDecls $3
     } }
     | 'module' modid m_exports 'where' '{' impdecls decls '}' { hsModule {
         hsModuleName    = $2,
         hsModuleExports = $3,
         hsModuleSrcLoc  = $1,
         hsModuleImports = $6,
-        hsModuleDecls   = $7
+        hsModuleDecls   = fixupHsDecls $7
         } }
 
 #maybe exports
 
 pat :: { HsPat }
-    : aexp { HsPatExp $1 }
+    : aexp {% checkPattern $1  }
 pats :: { HsPat }
     : wl_aexp { HsPatExp $ hsWords $1 }
 
 decl :: { HsDecl }
-    : pats srcloc rhs optwhere  { HsPatBind {
-        hsDeclSrcLoc = $2,
-        hsDeclPat = $1,
-        hsDeclRhs = $3,
-        hsDeclDecls = $4 } }
+    : exp srcloc rhs optwhere  {% checkValDef $2 $1 $3 $4 }
     | cl_var '::' qualtype { HsTypeSig $2 $1 $3 }
     | 'type' con ewl_atype '=' type
                       { HsTypeDecl {
@@ -172,8 +169,8 @@ atype :: { HsType }
       | '(' type '=' type ')'  { HsTyEq $2 $4 }
 
 qualtype :: { HsQualType }
- --     : context '=>' type             { HsQualType $1 $3 }
-      : type                          { HsQualType [] $1 }
+      : type '=>' type             {% withSrcLoc $2 $ checkContext $1 >>= return . flip HsQualType $3 }
+      | type                       { HsQualType [] $1 }
 
 exp :: { HsExp }
     : exp0 '::' qualtype { HsExpTypeSig $2 $1 $3 }
@@ -186,7 +183,7 @@ exp0  :: { HsExp }
 exp1 :: { HsExp }
     : 'if' exp 'then' exp 'else' exp { HsIf (espan $1 $3 $ $2) (espan $3 $5 $4) (eloc $5 $6) }
     | '\\' wl_pat '->' exp { HsLambda $1 $2 $4 }
-    | 'let' '{' decls '}' 'in' exp { HsLet $3 $6 }
+    | 'let' '{' decls '}' 'in' exp { HsLet (fixupHsDecls $3) $6 }
     | 'do' '{' stmts  '}'       { HsDo $3 }
     | 'case' exp 'of' '{' alts '}'  { espan $1 $6 $ HsCase (espan $1 $3 $2) $5 }
     | aexp  { $1 }
@@ -194,10 +191,10 @@ exp1 :: { HsExp }
 stmt :: { HsStmt }
       : pat '<-' exp      { HsGenerator $2 $1 $3 }
       | exp               { HsQualifier $1 }
-      | 'let' '{' decls '}'    { HsLetStmt  $3 }
+      | 'let' '{' decls '}'    { HsLetStmt  (fixupHsDecls $3) }
 
 alt :: { HsAlt }
-    : pats '->' exp { HsAlt $2 $1 (HsUnGuardedRhs $3) [] }
+    : pat '->' exp { HsAlt $2 $1 (HsUnGuardedRhs $3) [] }
 
 aexp :: { HsExp }
     : '(' ecl_exp ')'   { espan $1 $3 $ mtuple $2 }
@@ -218,7 +215,7 @@ fbind :: { (Name,Maybe HsExp) }
     | uqvar { ($1,Nothing) }
 
 optwhere :: { [HsDecl] }
-      : 'where' '{' decls  '}'                { $3 }
+      : 'where' '{' decls  '}'                { fixupHsDecls $3 }
       | {- empty -}                           { [] }
 
 list :: { HsExp }

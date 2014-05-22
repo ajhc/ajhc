@@ -19,12 +19,11 @@ import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 
-import Doc.DocLike(tupled)
 import DerivingDrift.Drift
+import Doc.DocLike(tupled)
 import FrontEnd.Desugar (desugarHsModule,doToExp,listCompToExp)
 import FrontEnd.HsSyn
 import FrontEnd.SrcLoc hiding(srcLoc)
-import qualified FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse
 import FrontEnd.Warning
 import Name.Name as Name
@@ -35,6 +34,7 @@ import Util.Gen
 import Util.Inst()
 import Util.SetLike
 import qualified FrontEnd.HsErrors as HsErrors
+import qualified FrontEnd.SrcLoc
 import qualified Name.VConsts as V
 
 data FieldMap = FieldMap
