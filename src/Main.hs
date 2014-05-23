@@ -1,14 +1,13 @@
 module Main(main) where
 
 import Control.Exception
-import Control.Monad.Identity
 import Data.Char
-import Prelude
 import System.Directory
 import System.FilePath as FP
 import System.IO
 import qualified Data.ByteString.Lazy as LBS
 
+import Util.Std
 import DataConstructors
 import E.Main
 import E.Program

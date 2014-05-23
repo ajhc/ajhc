@@ -13,18 +13,17 @@ module FrontEnd.Lex.Post(
 ) where
 
 import C.FFI
-import Control.Applicative
+import Util.Std
 import Data.Char
-import Data.Monoid
 import FrontEnd.HsSyn
 import FrontEnd.Lex.ParseMonad
 import FrontEnd.SrcLoc
 import Name.Names
 import Options
 import PackedString
-import qualified FlagOpts as FO
 import qualified Data.Set as Set
 import qualified Data.Traversable as T
+import qualified FlagOpts as FO
 import qualified FrontEnd.Lex.Fixity as F
 
 checkContext :: HsType -> P HsContext
@@ -71,40 +70,48 @@ checkValDef srcloc lhs rhs whereBinds = withSrcLoc srcloc $ ans lhs where
 --    ans HsWords { .. } = F.shunt patShuntSpec hsExpExps >>= ans
 --    ans (HsLocatedExp (Located sl e)) = withSrcSpan sl $ ans e
     ans lhs = do
+        bangPatterns <- flip fopts' FO.BangPatterns <$> getOptions
         --parseWarn $ show lhs
+        let isFunLhs (HsInfixApp l (HsVar op) r) es = return $ Just (op, l:r:es)
+            isFunLhs (HsLocatedExp (Located sl e)) es = withSrcSpan sl $ isFunLhs e es
+            isFunLhs (HsVar f) es = return $ Just (f, es)
+            isFunLhs (HsParen f) es@(_:_) = isFunLhs f es
+            isFunLhs (HsApp f e) es = isFunLhs f (e:es)
+            isFunLhs HsWords { .. } es =  F.shunt patShuntSpec hsExpExps >>= flip isFunLhs es
+            isFunLhs _ _ = return Nothing
+
+            -- The top level pattern parsing to determine whether it is a function
+            -- or pattern definition is done without knowledge of precedence.
+            patShuntSpec = F.shuntSpec { F.lookupToken, F.application, F.operator, F.lookupUnary } where
+                lookupToken (HsBackTick (HsVar v)) | bangPatterns && v == vu_Bang = return (Right (F.Prefix,11))
+                lookupToken (HsBackTick (HsVar v)) | v == vu_Twiddle = return (Right (F.Prefix,11))
+                lookupToken (HsBackTick (HsVar v)) | v == vu_At = return (Right (F.R,12))
+                lookupToken ((HsVar v)) | bangPatterns && v == vu_Bang = return (Right (F.Prefix,11))
+                lookupToken ((HsVar v)) | v == vu_Twiddle = return (Right (F.Prefix,11))
+                lookupToken ((HsVar v)) | v == vu_At = return (Right (F.R,12))
+                lookupToken (HsBackTick t) = return (Right (F.L,9))
+                lookupToken t = return (Left t)
+--                lookupUnary (HsBackTick t) = return Nothing
+                lookupUnary _ = fail "lookupUnary oddness"
+                application e1 e2 = return $ HsApp e1 e2
+                operator (HsBackTick t) as = operator t as
+                operator t as = return $ foldl HsApp t as
+            isFullyConst p = f p where
+                f (HsPApp _ as) = all f as
+                f (HsPList as) = all f as
+                f (HsPTuple as) = all f as
+                f (HsPParen a) = f a
+                f HsPLit {} = True
+                f _ = False
         isFunLhs lhs [] >>= \x -> case x of
             Just (f,es@(_:_)) -> do
                 es <- mapM checkPattern es
                 return (HsFunBind [HsMatch srcloc f es rhs whereBinds])
             _ -> do
                 lhs <- checkPattern lhs
+                when (isFullyConst lhs) $
+                    parseErrorK "pattern binding cannot be fully const"
                 return (HsPatBind srcloc lhs rhs whereBinds)
-    isFunLhs (HsInfixApp l (HsVar op) r) es = return $ Just (op, l:r:es)
-    isFunLhs (HsLocatedExp (Located sl e)) es = withSrcSpan sl $ isFunLhs e es
-    isFunLhs (HsVar f) es = return $ Just (f, es)
-    isFunLhs (HsParen f) es@(_:_) = isFunLhs f es
-    isFunLhs (HsApp f e) es = isFunLhs f (e:es)
-    isFunLhs HsWords { .. } es =  F.shunt patShuntSpec hsExpExps >>= flip isFunLhs es
-    isFunLhs _ _ = return Nothing
-
-    -- The top level pattern parsing to determine whether it is a function
-    -- or pattern definition is done without knowledge of precedence
-    --
-    -- TODO(jwm): vu_Bang handling should be conditional on BangPatterns being
-    -- enabled.
-    patShuntSpec = F.shuntSpec { F.lookupToken, F.application, F.operator, F.lookupUnary } where
-        lookupToken (HsBackTick (HsVar v)) | v == vu_Bang = return (Right (F.Prefix,11))
-        lookupToken (HsBackTick (HsVar v)) | v == vu_Twiddle = return (Right (F.Prefix,11))
-        lookupToken (HsBackTick (HsVar v)) | v == vu_At = return (Right (F.R,12))
-        lookupToken ((HsVar v)) | v == vu_Bang = return (Right (F.Prefix,11))
-        lookupToken ((HsVar v)) | v == vu_Twiddle = return (Right (F.Prefix,11))
-        lookupToken ((HsVar v)) | v == vu_At = return (Right (F.R,12))
-        lookupToken (HsBackTick t) = return (Right (F.L,9))
-        lookupToken t = return (Left t)
-        lookupUnary (HsBackTick t) = return Nothing
-        lookupUnary _ = fail "lookupUnary oddness"
-        application e1 e2 = return $ HsApp e1 e2
-        operator (HsBackTick t) as = return $ foldl HsApp t as
 
 checkPattern :: HsExp -> P HsPat
 checkPattern be = checkPat be [] where
@@ -113,7 +120,7 @@ checkPattern be = checkPat be [] where
         x <- checkPat x []
         checkPat f (x:args)
     checkPat (HsCon c) args = return (HsPApp c args)
-    checkPat (HsVar v) [HsPVar ap,e] = do
+    checkPat (HsVar v) [HsPVar ap,e] | v == vu_At = do
     --    parseWarn $ "cpat: " ++ show (v,e,ap)
         sl <- getSrcSpan; return $ HsPAsPat ap e
     checkPat (HsLocatedExp (Located sl e)) xs = withSrcSpan sl $ checkPat e xs
@@ -123,7 +130,10 @@ checkPattern be = checkPat be [] where
             HsVar x | bangPatterns && x == vu_Bang -> return (HsPVar $ quoteName x)
                     | x == vu_Twiddle -> return (HsPVar $ quoteName x)
                     | x == vu_At      -> return (HsPVar $ quoteName vu_At)
-                    | otherwise -> return (HsPVar x)
+                    | otherwise -> do
+                        when (isJust $ getModule x) $
+                            parseErrorK "Qualified name in binding position."
+                        return (HsPVar x)
             HsLit l  -> return (HsPLit l)
             HsError { hsExpErrorType = HsErrorUnderscore } -> return HsPWildCard
             HsInfixApp l op r  -> do

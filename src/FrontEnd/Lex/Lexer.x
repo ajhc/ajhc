@@ -128,8 +128,8 @@ haskell :-
 <hs> (@conid \.)+ @reservedid   { mkL LQReservedId }
 <hs> (@conid \.)+ @varid        { mkL LQVarId }
 <hs> (@conid \.)+ @conid	{ mkL LQConId }
-<hs> (@conid \.)+ @varsym	{ mkL LVarSym }
-<hs> (@conid \.)+ @consym	{ mkL LConSym }
+<hs> (@conid \.)+ @varsym	{ mkL LQVarSym }
+<hs> (@conid \.)+ @consym	{ mkL LQConSym }
 
 -----------
 -- literals

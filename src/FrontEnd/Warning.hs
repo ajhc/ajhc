@@ -86,6 +86,7 @@ data WarnType
     | AmbiguousName Name [Name]
     | DuplicateInstances
     | InvalidDecl
+    | InvalidExp
     | InvalidFFIType
     | LexError
     | WarnFailure
@@ -110,6 +111,7 @@ warnIsFatal w = f w where
     f AmbiguousExport {} = True
     f AmbiguousName {} = True
     f InvalidDecl {} = True
+    f InvalidExp {} = True
     f InvalidFFIType {} = True
     f DuplicateInstances {} = True
     f MissingDep {} = True

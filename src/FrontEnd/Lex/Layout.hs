@@ -68,6 +68,10 @@ preprocessLexemes opt fn xs = toplevel xs where
         f n (L sl _ "(":L _ LConSym z:L _ _ ")":rs) = f n (L sl LConId z:rs)
         f n (L sl _ "`":L _ LVarId z:L _ _ "`":rs) = f n (L sl LVarSym z:rs)
         f n (L sl _ "`":L _ LConId z:L _ _ "`":rs) = f n (L sl LConSym z:rs)
+        f n (L sl _ "(":L _ LQVarSym z:L _ _ ")":rs) = f n (L sl LQVarId z:rs)
+        f n (L sl _ "(":L _ LQConSym z:L _ _ ")":rs) = f n (L sl LQConId z:rs)
+        f n (L sl _ "`":L _ LQVarId z:L _ _ "`":rs) = f n (L sl LQVarSym z:rs)
+        f n (L sl _ "`":L _ LQConId z:L _ _ "`":rs) = f n (L sl LQConSym z:rs)
         f n ((pragma "LINE") -> (Just lp,rs)) =  case lp of
             [(L _ _ "default")] -> g defaultSrcLoc defaultSrcLoc n rs
             [(L nloc LInteger num),L _ LString s] -> g SrcLoc {

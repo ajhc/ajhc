@@ -7,3 +7,15 @@ tests:
      skip: not test
    T5084:
      skip: not error in jhc
+   tcfail107:
+        skip: not error in jhc
+   tcfail129:
+        skip: not error in jhc
+   tcfail144:
+        skip: not error in jhc
+   tcfail149:
+        skip: not error in jhc
+   tcfail150:
+        skip: not error in jhc
+   tcfail183:
+        skip: not error in jhc
