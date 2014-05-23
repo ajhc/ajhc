@@ -70,12 +70,13 @@ if($opt{m}) {
 }
 
 my @ds;
+@l = sort { $a->[0] cmp $b->[0] } @l;
 foreach (@l) {
     my $h = $_->[2];
     $h =~ s{/}{\\/}g;
     push @ds, (sprintf "%-17s -- ^ %s",$_->[0],$h);
 }
-@ds = sort @ds;
+@ds = (sort(@ds),(sprintf "%-17s -- ^ %s","Never",'Will never be set')) ;
 
 print "module $name(Flag(..),process,helpMsg,helpFlags) where\n\n";
 print "import qualified Data.Set as Set\n";
@@ -89,9 +90,10 @@ print "\ninstance Show Flag where\n";
 foreach (@l) {
     print "    show $_->[0] = \"$_->[1]\"\n";
 }
+    print "    show Never = \"never\"\n";
 print "\n";
 
-foreach (keys %h) {
+foreach (sort keys %h) {
     if ($h{$_}{hname}) {
         print "one \"$_\" = Right \$ Set.insert $h{$_}{hname}\n";
         print "one \"no-$_\" = Right \$ Set.delete $h{$_}{hname}\n";
@@ -126,4 +128,4 @@ $help =~ s/\n/\\n/g;
 print "\n{-# NOINLINE helpMsg #-}\n";
 print "helpMsg = \"$help\"\n";
 
-print "helpFlags = [" . join(", ",map { "\"$_\"" } sort keys %h) . "]\n\n";
+print "helpFlags = [" . join(", ",map { "\"$_\"" } sort keys %h) . "]\n";

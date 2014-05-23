@@ -16,6 +16,7 @@ import FrontEnd.SrcLoc
 import FrontEnd.Warning
 import Name.Name
 import Name.Names
+import qualified Data.Map as Map
 
 }
 
@@ -23,12 +24,16 @@ import Name.Names
 
 #sub token { my ($a,$b,$c) = @_; say  "    '$b' { L \$\$ $a \"$b\" }" }
 #map { token('LSpecial',$_) } qw/{ } , ; [ ] ` ( )/
-#map { token('LSpecial',$_) } qw/(# #) ∀ ∃/
-#map { token('LReservedId',$_) } qw/as case class data default deriving do else hiding if import in infix infixl infixr instance let module newtype of qualified then type where/
+#map { token('LSpecial',$_) } qw/(# #)/
+#map { token('LReservedId',$_) } qw/case class data default deriving do else if import in infix infixl infixr instance let module newtype of then type where _/
+--#map { token('LReservedId',$_) } qw/as hiding qualified/
 #map { token('LReservedId',$_) } qw/kind alias prefixx prefixy forall exists family closed foreign/
 #map { token('LReservedOp',$_) } qw/.. : :: = \\\\ | <- -> @ ~ =>/
 
- '_' { L $$ LVarId "_" }
+ '.' { L $$ LVarSym "." }
+ 'as' { L $$ LVarId "as" }
+ 'hiding' { L $$ LVarId "hiding" }
+ 'qualified' { L $$ LVarId "qualified" }
 
   LVarId   { L _ LVarId $$ }
   LQVarId  { L _ LQVarId $$ }
@@ -39,11 +44,12 @@ import Name.Names
   LConSym  { L _ LConSym $$ }
   LQConSym { L _ LQConSym $$ }
 
-  LInteger { L _ LInteger $$ }
-  LFloat   { L _ LFloat $$ }
-  LChar    { L _ LChar $$ }
-  LString  { L _ LString $$ }
-  LEOF     { L _ LEOF $$ }
+  LInteger  { L _ LInteger $$ }
+  LInteger_ { L _ LInteger_ $$ }
+  LFloat    { L _ LFloat $$ }
+  LChar     { L _ LChar $$ }
+  LString   { L _ LString $$ }
+  LString_  { L _ LString_ $$ }
 
 %monad { P } { (>>=) } { return }
 %name parse exp
@@ -105,6 +111,9 @@ module :: { HsModule }
 pat :: { HsPat }
     : aexp {% checkPattern $1  }
 
+epat :: { HsPat }
+    : exp {% checkPattern $1  }
+
 decl :: { HsDecl }
     : exp0 srcloc rhs optwhere  {% checkValDef $2 $1 $3 $4 }
     | cl_var '::' qualtype { HsTypeSig $2 $1 $3 }
@@ -120,7 +129,7 @@ decl :: { HsDecl }
         return hsDataDecl {
             hsDeclSrcLoc = $1, hsDeclContext = cs,
             hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $4,
-            hsDeclCons = $3 } }
+            hsDeclCons = fst $3, hsDeclHasKind = snd $3 } }
     | 'newtype' qualtype '=' constr deriving {% do
         (cs,c,t) <- checkDataHeader $2
         return hsNewTypeDecl {
@@ -129,21 +138,30 @@ decl :: { HsDecl }
             hsDeclCons = [$4] } }
     | 'instance' classhead optwhere { HsInstDecl $1 $2 $3 }
     | 'class' classhead optwhere { HsClassDecl $1 $2 $3 }
-    | 'foreign' 'import' wl_var mstring '::' qualtype
+    | 'foreign' 'import' ewl_var mstring '::' qualtype
                     {% doForeign $1 (toName Val "import":$3) $4 $6  }
     | 'foreign' wl_var mstring '::' qualtype {% doForeign $1 $2 $3 $5  }
 -- FFI parts
 mstring :: { Maybe (String,Name) }
-mstring : LString var    { Just ($1,$2) }
+mstring : LString var    { Just (read $1,$2) }
         | {- empty -}    { Nothing }
 
 classhead :: { HsClassHead }
     : qualtype {% qualTypeToClassHead $1 }
 
-mconstrs :: { [HsConDecl] }
-    : '=' bl_constr { $2 }
---    | '::' kind
-    |              { [] }
+mconstrs :: { ([HsConDecl],Maybe HsKind) }
+    : '=' bl_constr  { ($2,Nothing) }
+    | '::' kind      { ([],Just $2) }
+    |                { ([],Nothing) }
+
+kind :: { HsKind }
+      : bkind                          { $1 }
+      | bkind '->' kind                { HsKindFn $1 $3 }
+
+bkind :: { HsKind }
+       : '(' kind ')'     { $2 }
+       |  varop           {% toKindVarSym $1 }
+       |  con             { HsKind $1 }
 
 deriving :: { [Name] }
     : {- empty -}               { [] }
@@ -182,8 +200,8 @@ gdrh :: { HsGuardedRhs }
       : '|' exp '=' exp        { HsGuardedRhs $1 $2 $4 }
 
 rhs_case :: { HsRhs }
-    : '->' exp   { HsUnGuardedRhs $2 }
-    | wl_gdrh_case   { HsGuardedRhss $1 }
+    : '->' exp      { HsUnGuardedRhs $2 }
+    | wl_gdrh_case  { HsGuardedRhss $1 }
 
 gdrh_case :: { HsGuardedRhs }
       : '|' exp '->' exp        { HsGuardedRhs $1 $2 $4 }
@@ -227,8 +245,12 @@ export :: { HsExportSpec }
 type :: { HsType }
     : btype '->' type               { HsTyFun $1 $3 }
     | btype                         { $1 }
---      | 'forall' tbinds '.' qualtype  { HsTyForall { hsTypeVars = reverse $2, hsTypeType = $4 } }
---      | 'exists' tbinds '.' qualtype  { HsTyExists { hsTypeVars = reverse $2, hsTypeType = $4 } }
+    | 'forall' wl_tbind '.' qualtype  { HsTyForall { hsTypeVars = reverse $2, hsTypeType = $4 } }
+    | 'exists' wl_tbind '.' qualtype  { HsTyExists { hsTypeVars = reverse $2, hsTypeType = $4 } }
+
+tbind :: { HsTyVarBind }
+       : srcloc var                   { hsTyVarBind { hsTyVarBindSrcLoc = $1, hsTyVarBindName = $2 } }
+       | srcloc '(' var '::' kind ')' { hsTyVarBind { hsTyVarBindSrcLoc = $1, hsTyVarBindName = $3, hsTyVarBindKind = Just $5 } }
 
 btype :: { HsType }
     : btype atype                   { HsTyApp $1 $2 }
@@ -246,7 +268,7 @@ atype :: { HsType }
     | '(' type '=' type ')'  { HsTyEq $2 $4 }
 
 qualtype :: { HsQualType }
-    : type '=>' type   {% withSrcLoc $2 $ checkContext $1 >>= return . flip HsQualType $3 }
+    : btype '=>' type   {% withSrcLoc $2 $ checkContext $1 >>= return . flip HsQualType $3 }
     | type             { HsQualType [] $1 }
 
 exp :: { HsExp }
@@ -265,7 +287,7 @@ exp1 :: { HsExp }
     | aexp  { $1 }
 
 stmt :: { HsStmt }
-    : pat '<-' exp      { HsGenerator $2 $1 $3 }
+    : epat '<-' exp      { HsGenerator $2 $1 $3 }
     | exp               { HsQualifier $1 }
     | 'let' '{' decls '}'    { HsLetStmt  (fixupHsDecls $3) }
 
@@ -316,19 +338,18 @@ lit :: { HsLiteral }
     | LChar     { HsChar $ read $1 }
     | LString   { HsString $ read $1 }
     | LFloat    { HsFrac  $ read $1 }
+    | LString_   { HsStringPrim $ readPrim $1 }
+    | LInteger_ { HsIntPrim $ readPrim $1 }
 
 INT :: { Int }
     : LInteger { read $1 }
 
 #map { clist $_ } qw/exp stmt type var varcon varconop export con fielddecl/
 #blist constr
-#wlist aexp
-#wlist var
-#wlist gdrh
-#wlist batype
-#wlist gdrh_case
+#map { wlist $_ } qw/aexp var gdrh batype gdrh_case tbind/
 #ewlist aexp
 #ewlist atype
+#ewlist var
 #wlist pat
 
 #[def oslist   qq[
@@ -353,14 +374,15 @@ var :: { Name }
 uqvar :: { Name }
     : LVarId  { (toName UnknownType $1) }
     | 'as'                  { u_as }
-    | 'alias'               { u_alias }
-    | 'kind'                { u_kind }
-    | 'closed'              { u_closed }
     | 'family'              { u_family }
     | 'qualified'           { u_qualified }
     | 'hiding'              { u_hiding }
-    | 'forall'              { u_forall }
-    | 'exists'              { u_exists }
+
+    | 'alias'               { u_alias }
+    | 'kind'                { u_kind }
+    | 'closed'              { u_closed }
+--    | 'forall'              { u_forall }
+--    | 'exists'              { u_exists }
 
 gcon :: { Name }
     : '(' commas ')'   { tuple_con_name $2 }
@@ -386,6 +408,7 @@ conop :: { Name }
 varop :: { Name }
     : LVarSym  { (toName UnknownType $1) }
     | LQVarSym { (toName UnknownType $1) }
+    | '.'      { u_Dot }
 
 -- punctuation.
 
@@ -425,5 +448,20 @@ eloc p e =  HsLocatedExp (Located (srcSpan p) e)
 espan p1 p2 e =  HsLocatedExp (Located (SrcSpan p1 p2) e)
 
 tuple_con_name i = toName DataConstructor (toModule "Jhc.Prim.Prim","("++replicate i ','++")")
+
+readPrim :: Read a => String -> a
+readPrim s = case reads s of
+    ~[(v,"#")] -> v
+
+toKindVarSym n
+    | Just k <- Map.lookup n kmap = return k
+    | otherwise = parseErrorK $ "invalid kind: " ++ show n
+    where kmap = Map.fromList
+            [(u_Star, hsKindStar)
+            ,(u_Hash, hsKindHash)
+            ,(u_Bang, hsKindBang)
+            ,(u_StarBang, hsKindStarBang)
+            ,(u_Quest, hsKindQuest)
+            ,(u_QuestQuest, hsKindQuestQuest)]
 
 }

@@ -85,18 +85,12 @@ infixHsModule (FixityMap ism) m =  ans where
             F.operator,
             F.lookupUnary }
         lookupToken (HsBackTick bt) = backtick bt
---        lookupToken v@(HsVar bt) | isOpLike bt = backtick v
---        lookupToken v@(HsCon bt) | isOpLike bt = backtick v
- --       lookupToken (HsParen v@(HsVar n)) | isOpLike n = return (Left v)
- --       lookupToken (HsParen v@(HsCon n)) | isOpLike n = return (Left v)
---        lookupToken v@(HsParen _) = return (Left v)
         lookupToken (HsAsPat x v) = mr (HsAsPat x) v
         lookupToken (HsLocatedExp (Located sl v)) = mr (HsLocatedExp . Located sl) v
         lookupToken t = return (Left t)
         lookupUnary t = return Nothing
         application e1 e2 = return $ HsApp e1 (hsParen e2)
         operator (HsBackTick t) as = operator t as
---        operator (HsLocatedExp (Located sl (HsBackTick t))) as = return $ foldl HsApp (HsLocatedExp (Located sl t)) (map hsParen as)
         operator (HsVar v) [e] | v == v_sub = return $ HsNegApp (hsParen e)
         operator t as = return $ foldl HsApp t (map hsParen as)
         paren_operator (HsBackTick t) as = paren_operator t as

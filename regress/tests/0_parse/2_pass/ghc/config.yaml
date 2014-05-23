@@ -11,3 +11,9 @@ tests:
         skip: RecursiveDo
     read062:
         skip: TransformListComp
+    T3741:
+        skip: needs unicode
+    read060:
+        skip: FunDeps
+    read061:
+        skip: FunDeps

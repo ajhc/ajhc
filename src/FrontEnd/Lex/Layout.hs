@@ -3,21 +3,48 @@ module FrontEnd.Lex.Layout(doLayout) where
 
 import Control.Applicative
 import Control.Monad.Reader
-import Data.Char(toUpper)
+import Data.Char(toUpper,ord)
 import FrontEnd.Lex.Lexer
 import FrontEnd.SrcLoc
+import Options
 import PackedString
+import qualified Data.IntMap as IM
+import qualified Data.Map as Map
+import qualified FlagOpts as FO
 
-doLayout :: (Applicative m,Monad m) => FilePath -> [Lexeme] -> m [Lexeme]
-doLayout fn ts = layout $ preprocessLexemes fn ts
+doLayout :: (Applicative m,Monad m) => Opt -> FilePath -> [Lexeme] -> m [Lexeme]
+doLayout opt fn ts = layout $ preprocessLexemes opt fn ts
 
+-- Carry out various transformations on the lexeme stream before sending off to
+-- the parser.
+--
 -- This inserts annotations for newlines that may be used by the layout
 -- generator, virtual open braces where needed and removes pragmas we do not
--- understand that may interfere with layout. and propegates LINE pragma
--- annotations as needed
+-- understand that may interfere with layout.
+--
+-- It handles LINE pragmas propegating their values to the pending srclocs.
+--
+-- replaces (op) and `var` with their corresponding duals.
+--
+-- translate unicode symbols to their traditional counterparts
+--
+-- turn reserved ids into regular ids if the associated extension is disabled
 
-preprocessLexemes :: FilePath -> [Lexeme] -> [Token Lexeme]
-preprocessLexemes fn xs = toplevel xs where
+uniMap = IM.fromList $ [
+ f '→' LReservedOp "->",
+ f '←' LReservedOp "<-",
+ f '∷' LReservedOp "::",
+ f '‥' LReservedOp "..",
+ f '⇒' LReservedOp "=>"
+ ] where
+ f c w v = (ord c, (w,v))
+
+splitName :: String -> (Bool,String,String)
+splitName s = ('.' `elem` rmod, reverse rmod, reverse rid) where
+    (rid,'.':rmod) = span ('.' /=) (reverse s)
+
+preprocessLexemes :: Opt -> FilePath -> [Lexeme] -> [Token Lexeme]
+preprocessLexemes opt fn xs = toplevel xs where
     defaultSrcLoc = SrcLoc { srcLocFileName = packString fn, srcLocColumn = 0, srcLocLine = 0 }
     toplevel ls = case skipComments ls of
         (L _ LReservedId "module":_) -> g defaultSrcLoc defaultSrcLoc 0 ls
@@ -26,6 +53,17 @@ preprocessLexemes fn xs = toplevel xs where
         [] -> [TokenVLCurly "main" 0]
     g floc nloc n ls = f n ls where
         token (L cloc x y) = Token (L (srcLocRelative floc nloc cloc) x y)
+
+        f n (L sl LQReservedId (splitName -> (conq, con, ri)):rs) = ans where
+            ans = f n (
+                L sl (if conq then LQConId else LConId) con:
+                L (adv (length con) sl) LVarSym ".":
+                L (adv (length con + 1) sl) LReservedId ri:rs)
+            adv n sl = srcLocColumn_u (n +) sl
+
+
+        f n (L sl LSpecial s:rs) | Just flag <- Map.lookup s reservedMap, not (fopts' opt flag) = f n (L sl LVarId s:rs)
+        f n (L sl LSpecial [c]:rs) | Just (lc,v) <- IM.lookup (ord c) uniMap = f n (L sl lc v:rs)
         f n (L sl _ "(":L _ LVarSym z:L _ _ ")":rs) = f n (L sl LVarId z:rs)
         f n (L sl _ "(":L _ LConSym z:L _ _ ")":rs) = f n (L sl LConId z:rs)
         f n (L sl _ "`":L _ LVarId z:L _ _ "`":rs) = f n (L sl LVarSym z:rs)
@@ -35,7 +73,7 @@ preprocessLexemes fn xs = toplevel xs where
             [(L nloc LInteger num),L _ LString s] -> g SrcLoc {
                 srcLocFileName = packString (read s), srcLocLine = read num, srcLocColumn = 0 }
                     nloc { srcLocColumn = 0 } n rs
-        f n ((pragma "LINE") -> (Just [(fromL -> "default")],rs)) =  g defaultSrcLoc defaultSrcLoc n rs
+            _ -> f n rs
         f n (L _ _ "{-#":rs) = f n (d rs) where
             d (L _ _ "#-}":rs) = rs
             d (_:rs) = d rs
@@ -47,6 +85,17 @@ preprocessLexemes fn xs = toplevel xs where
         f n [ls@(L _ _ s)] | s `elem` layoutStarters = token ls:TokenVLCurly s 0:[]
         f n (r:rs) = token r:f n rs
         f _ [] = []
+        reservedMap = Map.fromList
+            [("foreign", FO.Ffi)
+            ,("forall", FO.Forall)
+            ,("exists", FO.Exists)
+            ,("kind", FO.UserKinds)
+            ,("family", FO.TypeFamilies)
+            ,("alias", FO.Never)
+            ,("prefixx", FO.Never)
+            ,("prefixy", FO.Never)
+            ,("closed", FO.Never)
+            ]
 
 fromL (L _ _ x) = x
 pragma s ((fromL -> "{-#"):(fromL -> n):ls) | map toUpper n == s = d [] ls  where
@@ -92,7 +141,6 @@ layout ls = runReaderT (g ls []) bogusASrcLoc where
     f [] [] = return []
     f x y = error $ "unexpected layout: " ++ show (x,y)
     rbrace (L sl _ _) = L sl LSpecial "}"
-    lbrace (L sl _ _) = L sl LSpecial "{"
     semi (L sl _ _) = L sl LSpecial ";"
 
     mcons = liftA2 (:)
@@ -118,10 +166,6 @@ data Token t =
     | TokenVLCurly String !Int
     | TokenNL !Int
     deriving(Show)
-
-showToken (Token (L _ _ s)) = s
-showToken TokenNL {} = "\n"
-showToken TokenVLCurly {} = "{"
 
 data Context
     = NoLayout String String  -- what opened it and what we expect to close it.
@@ -181,13 +225,10 @@ lbrace = Token "{"
 rbrace = Token "}"
 -}
 
-fsts = map fst
-snds = map snd
-
 layoutStarters   = ["where","let","of","do"]
 
 -- these symbols will never close a layout.
-layoutContinuers = ["|","->","=",";",","]
+-- layoutContinuers = ["|","->","=",";",","]
 
 -- valid in all contexts
 layoutBrackets = [
