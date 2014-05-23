@@ -1,3 +1,4 @@
+{-# LANGUAGE MagicHash #-}
 import Data.Monoid
 import List(sort,nub)
 import Monad
@@ -13,12 +14,12 @@ import FrontEnd.HsSyn
 import GenUtil
 import Info.Binary()
 import Info.Types
-import Name.Name
 import Name.Names
 import PackedString
 import StringTable.Atom
 import Util.HasSize
 import Util.SetLike
+import System.IO.Unsafe
 import qualified C.Generate
 import qualified Cmm.Op as Op
 import qualified Data.ByteString as BS
@@ -38,7 +39,15 @@ main = do
 qc s p = quickCheck $ label s p
 
 testAtom = do
+    let atomraw = unsafePerformIO $ addrToAtom_ "hello"# 5#
+    print atomraw
+    when (show atomraw /= "hello") $
+        fail "atomRaw"
+
     let prop_atomneq xs ys = (xs /= ys) == (a1 /= a2) where
+            a1 = toAtom xs
+            a2 = toAtom (ys :: String)
+        prop_atomcompare xs ys = (xs `compare` ys) == (a1 `atomCompare` a2) where
             a1 = toAtom xs
             a2 = toAtom (ys :: String)
         prop_atomIndex (xs :: String) = intToAtom (fromAtom a) == Just a where
@@ -56,6 +65,7 @@ testAtom = do
     qc "atom.eq" $ \xs -> (toAtom xs) == toAtom (xs::String)
     qc "atom.index" prop_atomIndex
     qc "atom.neq" prop_atomneq
+    qc "atom.compare" prop_atomcompare
     qc "atom.eq'" prop_atomneq'
     qc "atom.int" prop_atomint
     qc "atom.ii" prop_atomii

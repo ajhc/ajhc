@@ -17,9 +17,7 @@ import Name.Binary()
 import Options
 import Support.CFF
 import Support.MapBinaryInstance
-
-current_version :: Int
-current_version = 11
+import Version.Config(ho_version)
 
 readHFile :: FilePath -> IO (FilePath,HoHeader,forall a . Binary a => ChunkType -> a)
 readHFile fn = do
@@ -31,7 +29,7 @@ readHFile fn = do
             Nothing -> error $ "No chunk '" ++ show ct ++ "' found in file " ++ fn
             Just x -> decode . decompress $ LBS.fromChunks [x]
     let hoh = fc cff_jhdr
-    when (hohVersion hoh /= current_version) $ fail "invalid version in hofile"
+    when (hohVersion hoh /= ho_version) $ fail "invalid version in hofile"
     return (fn',hoh,fc)
 
 readHoFile :: FilePath -> IO (HoHeader,HoIDeps,Ho)
@@ -77,7 +75,7 @@ recordHoFile ho idep fs header = do
             if optNoWriteHo options then return () else do
             let tfn = fn ++ ".tmp"
                 cfflbs = mkCFFfile cff_magic [
-                    (cff_jhdr, compress $ encode header { hohVersion = current_version }),
+                    (cff_jhdr, compress $ encode header { hohVersion = ho_version }),
                     (cff_idep, compress $ encode idep),
                     (cff_defs, compress $ encode $ hoTcInfo ho),
                     (cff_core, compress $ encode $ hoBuild ho)]
@@ -91,7 +89,7 @@ recordHlFile
 recordHlFile l = do
     --let theho =  mapHoBodies eraseE ho
     let cfflbs = mkCFFfile cff_magic $ [
-            (cff_jhdr, compress $ encode (libHoHeader l) { hohVersion = current_version }),
+            (cff_jhdr, compress $ encode (libHoHeader l) { hohVersion = ho_version }),
             (cff_libr, compress $ encode $ libHoLib l),
             (cff_ldef, compress $ encode $ libTcMap l),
             (cff_lcor, compress $ encode $ libBuildMap l),

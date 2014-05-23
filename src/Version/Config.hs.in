@@ -8,6 +8,9 @@ datadir = "@DATADIR@"
 host    = "@host@"
 libraryInstall = "@JLIBPATH@"
 confDir = "@JETCPATH@"
+
+ho_version, version_major, version_minor, version_patch :: Int
+ho_version = @HO_VERSION@
 version_major = @VERSION_MAJOR@
 version_minor = @VERSION_MINOR@
 version_patch = @VERSION_PATCH@

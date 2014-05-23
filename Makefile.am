@@ -41,7 +41,8 @@ HSFILES=src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/
         src/DerivingDrift/StandardRules.hs src/FrontEnd/Exports.hs \
 	src/FrontEnd/Lex/Parser.hs src/FrontEnd/Lex/Parse.hs src/FrontEnd/Lex/Lexer.hs \
 	src/FrontEnd/Lex/Post.hs src/FrontEnd/Lex/Layout.hs src/FrontEnd/Lex/Fixity.hs \
-	src/FrontEnd/Lex/ParseMonad.hs src/Util/Std.hs
+	src/FrontEnd/Lex/ParseMonad.hs src/Util/Std.hs src/Name/VConsts.hs src/E/LambdaLift.hs \
+	src/E/TypeCheck.hs src/Ho/Build.hs src/Ty/Level.hs src/Name/Internals.hs
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
 GHCPROFOPTS= -prof -fprof-auto -rtsopts -auto-all -osuf prof.o -hisuf prof.hi
@@ -118,13 +119,17 @@ RAWFILES = src/data/ViaGhc.hs src/data/prelude.m4 \
 	   rts/rts/rts_support.h rts/rts/gc.h rts/rts/gc_none.c rts/rts/gc_none.h rts/rts/jhc_rts.c rts/rts/jhc_rts.h \
 	   rts/lib/lib_cbits.c rts/jhc_rts_header.h rts/lib/lib_cbits.h rts/rts/gc_jgc_internal.h
 
-DRIFTFILES = drift_processed/C/FFI.hs drift_processed/C/FromGrin2.hs drift_processed/Cmm/Op.hs drift_processed/C/Prims.hs drift_processed/DataConstructors.hs \
-   drift_processed/E/CPR.hs drift_processed/E/Demand.hs drift_processed/E/LambdaLift.hs \
-   drift_processed/E/SSimplify.hs drift_processed/E/ToHs.hs drift_processed/E/TypeCheck.hs drift_processed/E/Type.hs drift_processed/FrontEnd/Class.hs \
-   drift_processed/FrontEnd/HsSyn.hs drift_processed/FrontEnd/KindInfer.hs \
-   drift_processed/FrontEnd/Representation.hs drift_processed/FrontEnd/SrcLoc.hs drift_processed/FrontEnd/Tc/Kind.hs \
-   drift_processed/FrontEnd/Tc/Monad.hs drift_processed/Grin/SSimplify.hs drift_processed/Name/VConsts.hs drift_processed/Options.hs \
-   drift_processed/DataConstructors.hs-boot drift_processed/Ho/Type.hs  drift_processed/Ho/Build.hs
+DRIFTFILES = drift_processed/C/FFI.hs drift_processed/C/FromGrin2.hs \
+    drift_processed/C/Prims.hs drift_processed/Cmm/Op.hs \
+    drift_processed/DataConstructors.hs drift_processed/DataConstructors.hs-boot \
+    drift_processed/E/CPR.hs drift_processed/E/Demand.hs \
+    drift_processed/E/SSimplify.hs drift_processed/E/ToHs.hs \
+    drift_processed/E/Type.hs drift_processed/FrontEnd/Class.hs \
+    drift_processed/FrontEnd/HsSyn.hs drift_processed/FrontEnd/KindInfer.hs \
+    drift_processed/FrontEnd/Representation.hs drift_processed/FrontEnd/SrcLoc.hs \
+    drift_processed/FrontEnd/Tc/Kind.hs drift_processed/FrontEnd/Tc/Monad.hs \
+    drift_processed/Grin/SSimplify.hs drift_processed/Ho/Type.hs \
+    drift_processed/Options.hs
 
 drift_processed/%: src/%
 	mkdir -p `echo $@ | sed -e 's@/[^/]*$$@@'`
@@ -294,7 +299,6 @@ libs: $(JHC_LIBS) $(JHC_EXT_LIBS)
 show_elibs: lib/ext/*.cabal  lib/ext/*.yaml
 	-perl utils/build_extlibs.prl -l $^
 
-
 %: examples/%.hs jhc $(JHC_LIBS)
 	./jhc -L- -L$(srcdir) -L. --no-cache $(JHC_TEST) $< -o $@ # 2>&1 | tee $@.log
 
@@ -310,7 +314,6 @@ show_elibs: lib/ext/*.cabal  lib/ext/*.yaml
 
 %.y: %.y.pp $(srcdir)/utils/preproc.prl
 	perl $(srcdir)/utils/preproc.prl  $< > $@
-
 
 %.hs: %.pp.hs
 	perl $(srcdir)/utils/preproc.prl  $< > $@

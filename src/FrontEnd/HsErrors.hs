@@ -60,8 +60,9 @@ hsDecl cntx decl = f cntx decl where
             wDecl $ "extra complex type arguments not allowed to type family"
     f (InClass ts) HsTypeSig { .. } = do
         let HsQualType { .. } = hsDeclQualType
-        when (null $ intersect (typeVars hsQualTypeType) [ v | HsTyVar v <- ts]) $ do
-            wDecl "types of class methods must have class variables"
+--        when (null $ intersect (typeVars hsQualTypeType) [ v | HsTyVar v <- ts]) $ do
+ --           wDecl "types of class methods must have class variables"
+        return ()
 
     f TopLevel HsClassDecl { .. } = do
         let HsClassHead { .. } = hsDeclClassHead

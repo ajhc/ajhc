@@ -29,49 +29,22 @@ module Name.Name(
     quoteName,
     fromQuotedName,
     toModule,
-    toUnqualified
+    toUnqualified,
+    -- new interface
+    mkName,
+    mkNameType,
+    deconstructName
     ) where
 
 import Data.Char
-import Data.Data
 
 import C.FFI
-import Data.Binary
 import Doc.DocLike
 import Doc.PPrint
 import GenUtil
+import Name.Internals
 import StringTable.Atom
-
--------------
--- Name types
--------------
-
-data NameType
-    = TypeConstructor
-    | DataConstructor
-    | ClassName
-    | TypeVal
-    | Val
-    | SortName
-    | FieldLabel
-    | RawType
-    | UnknownType
-    | QuotedName
-    deriving(Ord,Eq,Enum,Read,Show)
-
-{-
- - TODO:
-  We cache pertinent information about a name in a single byte for easy access.
-    [qocrrss0]             [q-xrr110]
-    ss 0 term              q 0 not quoted
-       1 type                1 quoted
-       2 sort              x 0  class
-    rr 0 unqualified         1  field
-       1 qualified         c 0 not constructor
-       2 prim                1 constructor
-       3 composition       o 0 not operator
-                             1 operator
--}
+import Ty.Level
 
 isTypeNamespace TypeConstructor = True
 isTypeNamespace ClassName = True
@@ -85,9 +58,6 @@ isValNamespace _ = False
 -----------------
 -- name definiton
 -----------------
-
-newtype Name = Name Atom
-    deriving(Ord,Eq,Typeable,Binary,Data,ToAtom,FromAtom)
 
 isConstructorLike n =  isUpper x || x `elem` ":("  || xs == "->" || xs == "[]" where
     (_,_,xs@(x:_)) = nameParts n
@@ -137,8 +107,9 @@ instance ToName (Maybe Module,String) where
         (nt,a,b) -> (nt,(a,b))
 
 instance ToName Name where
-    toName nt i = toName nt (x,y) where
-        (_,x,y) = nameParts i
+    toName nt i | nt == ct = i
+                | otherwise = toName nt (x,y) where
+        (ct,x,y) = nameParts i
     fromName n = (nameType n,n)
 
 instance ToName String where
@@ -184,9 +155,10 @@ nameName :: Name -> Name
 nameName n = n
 
 nameParts :: Name -> (NameType,Maybe Module,String)
-nameParts n@(Name a) = f $ tail (fromAtom a) where
-    f (';':xs) = (nameType n,Nothing,xs)
-    f xs = (nameType n,Just $ Module (toAtom a),b) where
+nameParts n@(Name atom) = (nameType n,a,b) where
+    (a,b) = f $ tail (fromAtom atom)
+    f (';':xs) = (Nothing,xs)
+    f xs = (Just $ Module (toAtom a),b) where
         (a,_:b) = span (/= ';') xs
 
 instance Show Name where
@@ -225,14 +197,6 @@ fromQuotedName n = case nameParts n of
 -- Modules
 --------------
 
-newtype Module = Module Atom
-  deriving(Eq,Data,Typeable,ToAtom,FromAtom)
-
-instance Ord Module where
-    compare x y = show x `compare` show y
-
-instance Show Module where
-    showsPrec _ (Module n) = shows n
 
 fromModule (Module s) = fromAtom s
 
@@ -242,3 +206,32 @@ preludeModule = Module "Prelude"
 
 toModule :: String -> Module
 toModule s = Module $ toAtom s
+
+--------------
+--prefered api
+--------------
+mkName :: TyLevel -> Bool -> Maybe Module -> String -> Name
+mkName l b mm s = toName (mkNameType l b) (mm,s)
+
+-- internal
+mkNameType :: TyLevel -> Bool -> NameType
+mkNameType l b = (f l b) where
+    f l b   | l == termLevel = if b then DataConstructor else Val
+            | l == typeLevel = if b then TypeConstructor else TypeVal
+            | l == kindLevel && b = SortName
+    f l b = error ("mkName: invalid " ++ show (l,b))
+
+unRenameString :: String -> (Maybe Int,String)
+unRenameString s = case span isDigit s of
+    (ns@(_:_),'_':rs) -> (Just (read ns),rs)
+    (_,_) -> (Nothing,s)
+
+-- deconstruct name into all its possible parts
+-- does not work on quoted names.
+deconstructName :: Name -> Either UnQuotedName (Maybe Module,Maybe UnqualifiedName,UnqualifiedName,Maybe Int)
+deconstructName name = f nt where
+    (nt,mod,id) = nameParts name
+    (mi,id') = unRenameString id
+    f QuotedName = Left (Name $ toAtom id)
+    f _ = Right (mod,Nothing,toName nt id',mi)
+

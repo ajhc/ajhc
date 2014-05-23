@@ -291,7 +291,8 @@ lexigraphic_compare(atom_t x, atom_t y)
 {
     int xl = ATOM_LEN(x);
     int yl = ATOM_LEN(y);
-    return memcmp(ATOM_PTR(x),ATOM_PTR(y),xl < yl ? xl : yl) || xl - yl;
+    int ret = memcmp(ATOM_PTR(x),ATOM_PTR(y),xl < yl ? xl : yl);
+    return ret ? ret : xl - yl;
 }
 
 atom_t

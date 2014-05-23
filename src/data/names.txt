@@ -164,14 +164,18 @@ ix_range             Jhc.Inst.PrimEnum.ix_range
 
 SortName:s:
 # kinds
-Star Jhc@.*
-Hash Jhc@.#
-Bang Jhc@.!
-Tuple Jhc@.(#)
+Star *
+Hash #
+Bang !
+Tuple (#)
+
+Quest        ?
+QuestQuest   ??
+StarBang     *!
 
 # superkinds
-HashHash  Jhc@.##
-StarStar  Jhc@.**
+HashHash  ##
+StarStar  **
 
 # unqualified values
 Val:vu:
@@ -220,3 +224,5 @@ forall       forall
 hiding       hiding
 kind         kind
 qualified    qualified
+instance     instance
+import       import

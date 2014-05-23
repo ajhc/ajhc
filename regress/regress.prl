@@ -150,7 +150,7 @@ sub my_system {
 }
 
 my @libs = $opt_l ? ("-L-", "-L$jhc_dir", "-pjhc") : ("--noauto", "-i$jhc_dir/lib/jhc", "-i$jhc_dir/lib/base",
-        "-i$jhc_dir/lib/haskell98", "-i$jhc_dir/lib/jhc-prim", "-XUnboxedTuples", "-XForeignFunctionInterface", "-XUnboxedValues");
+        "-i$jhc_dir/lib/haskell98", "-i$jhc_dir/lib/haskell-extras", "-i$jhc_dir/lib/jhc-prim", "-XUnboxedTuples", "-XForeignFunctionInterface", "-XUnboxedValues");
 my @fast = $opt_n ? ("-fno-lint") : ("-fdebug", "-flint");
 
 sub to_list {

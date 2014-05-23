@@ -10,6 +10,10 @@ VERSION_PATCH=$(echo $VERSION | cut -d'.' -f3)
 
 SHORTVERSION="$VERSION_MAJOR.$VERSION_MINOR"
 
+# tracks changes in binary format, should be incremented when the format of .ho
+# or .hl files changes in an incompatible way.
+HO_VERSION=11
+
 AS_TMPDIR
 AC_CANONICAL_HOST
 AC_PROG_LN_S
@@ -123,5 +127,6 @@ AC_SUBST(VERSION)
 AC_SUBST(VERSION_MAJOR)
 AC_SUBST(VERSION_MINOR)
 AC_SUBST(VERSION_PATCH)
+AC_SUBST(HO_VERSION)
 AC_CONFIG_FILES([Makefile jhc.spec src/hs_src_config.h src/Version/Config.hs docs/building.mkd src/cbits/config.h src/data/targets.ini])
 AC_OUTPUT

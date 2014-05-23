@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -XForeignFunctionInterface -XTypeSynonymInstances -XDeriveDataTypeable  #-}
+{-# LANGUAGE MagicHash #-}
 module StringTable.Atom(
     Atom(),
     ToAtom(..),
@@ -11,6 +12,7 @@ module StringTable.Atom(
     unsafeByteIndex,
     dumpTable,
     dumpToFile,
+    addrToAtom_,
     dumpStringTableStats
     ) where
 
@@ -140,6 +142,8 @@ unsafeIntToAtom x = Atom (fromIntegral x)
 
 unsafeByteIndex :: Atom -> Int -> Word8
 unsafeByteIndex atom off = fromIntegral (unsafePerformIO $ peek (stPtr atom `advancePtr` off))
+
+foreign import ccall unsafe "stringtable_lookup" addrToAtom_ :: Addr## -> Int## -> IO Atom
 
 foreign import ccall unsafe "stringtable_lookup" stAdd :: CString -> CInt -> IO Atom
 foreign import ccall unsafe "stringtable_ptr" stPtr :: Atom -> CString

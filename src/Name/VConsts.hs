@@ -1,8 +1,6 @@
 module Name.VConsts where
 
-import Control.Applicative
 import Data.Foldable
-import Data.Monoid
 import Data.Traversable
 
 -- This is much more verbose/complicated than it needs be.
@@ -74,5 +72,4 @@ data FuncNames a = FuncNames {
     func_runMain :: a,
     func_runNoWrapper :: a,
     func_runRaw :: a
-    }
-    {-! derive: Functor, Traversable, Foldable !-}
+    } deriving(Functor, Traversable, Foldable)

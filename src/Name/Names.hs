@@ -12,6 +12,7 @@ module Name.Names(module Name.Name,module Name.Names,module Name.Prim) where
 
 import Char(isDigit)
 
+import Ty.Level
 import Name.Name
 import Name.Prim
 import Name.VConsts
@@ -45,14 +46,6 @@ instance FromTupname Name where
         (_,(m,nn)) = fromName name
     fromTupname _ = fail "not a tuple"
 
--- quasi-kinds (placeholders for existential kinds)
-s_Quest = toName SortName (Module "Jhc@","?"::String)
-s_QuestQuest = toName SortName (Module "Jhc@","??"::String)
-s_StarBang = toName SortName (Module "Jhc@","*!"::String)
-s_Any = toName SortName (Module "Jhc@","ANY"::String)
-
-u_instance = toName UnknownType (Module "Jhc@","instance"::String)
-
 sFuncNames = FuncNames {
     func_equals = v_equals,
     func_fromInteger = v_fromInteger,
@@ -64,3 +57,35 @@ sFuncNames = FuncNames {
     func_runNoWrapper = v_runNoWrapper,
     func_runRaw = v_runRaw
     }
+
+----------------
+-- Parameterized
+----------------
+
+-- Goal, get rid of hardcoded NameType, move pertinent info into cache byte
+
+instance HasTyLevel Name where
+    getTyLevel n = f (nameType n) where
+        f DataConstructor = Just termLevel
+        f Val             = Just termLevel
+        f RawType         = Just typeLevel
+        f TypeConstructor = Just typeLevel
+        f TypeVal         = Just typeLevel
+        f SortName
+            | n == s_HashHash = Just $ succ kindLevel
+            | n == s_StarStar = Just $ succ kindLevel
+            | otherwise = Just kindLevel
+        f _ = Nothing
+
+isConstructor :: Name -> Bool
+isConstructor n = f (nameType n) where
+    f TypeConstructor = True
+    f DataConstructor = True
+    f SortName = True
+    f _ = False
+
+nameTyLevel_u f n = case getTyLevel n of
+    Nothing -> n
+    Just cl | cl == cl' -> n
+            | otherwise -> toName (mkNameType cl' (isConstructor n)) n
+        where cl' = f cl
