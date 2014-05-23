@@ -232,6 +232,8 @@ traverseHsPat fn p = f p where
           hsPatFields' <- mapM (T.mapM fn) hsPatFields
           return (HsPRec hsName hsPatFields')
     f p@HsPatExp {} = return p
+    f (HsPatWords ws) = HsPatWords <$> mapM fn ws
+    f (HsPatBackTick ws) = HsPatBackTick <$> fn ws
     fnl (Located l e) = withSrcSpan l (Located l `liftM` fn e)
 
 traverseHsRhsHsExp :: (Monad m,MonadSetSrcLoc m) => (HsExp -> m HsExp) -> HsRhs -> m HsRhs
@@ -481,6 +483,8 @@ instance TraverseHsOps HsPat where
         f (HsPBangPat a1)        = HsPBangPat <$> fn a1
         f (HsPRec d1 a1)         = HsPRec d1 <$> fn a1
         f (HsPatExp e)           = HsPatExp <$> fn e
+        f (HsPatWords ws)        = HsPatWords <$> fn ws
+        f (HsPatBackTick ws)     = HsPatBackTick <$> fn ws
 
 instance TraverseHsOps HsQualType where
     traverseHsOps hops HsQualType { .. } = h <$> applyHsOps hops hsQualTypeContext <*> applyHsOps hops hsQualTypeType

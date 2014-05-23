@@ -67,10 +67,6 @@ defaultFixity = (9, HsAssocLeft)
 terminalFixity :: (Int, HsAssoc)    -- Fixity given to variables, etc. Used to terminate descent.
 terminalFixity = (10, HsAssocLeft)
 
-----------------------------------------------------------------------------
-
--- infixer(): The exported top-level function. See header for usage.
-
 infixHsModule :: FixityMap -> HsModule -> HsModule
 infixHsModule (FixityMap ism) m =  ans where
     ans = if fopts' (hsModuleOpt m) FO.NewParser
@@ -115,17 +111,47 @@ infixHsModule (FixityMap ism) m =  ans where
             case n of
                 Left v -> return $ Left $ x v
                 Right {} -> return n
+    patShuntSpec =  F.shuntSpec {
+            F.lookupToken,
+            F.application,
+            F.operator,
+            F.lookupUnary } where
+        lookupToken (HsPatBackTick bt) = backtick bt
+        lookupToken t = return (Left t)
+        lookupUnary t = return Nothing
+        application (HsPApp t es) y = return $ HsPApp t (es ++ [y])
+        application x y = parseErrorK $ "weird appliaction: " ++ show (x,y)
+        operator (HsPatBackTick t) as = operator t as
+        operator (HsPVar v) [e] | v == u_Bang = do sl <- getSrcSpan; return $ HsPBangPat (Located sl e)
+        operator (HsPVar v) [e] | v == u_Twiddle = do sl <- getSrcSpan; return $ HsPIrrPat (Located sl e)
+        operator (HsPVar v) [HsPVar ap, e] | v == u_At = do sl <- getSrcSpan; return $ HsPAsPat ap e
+        operator (HsPVar v) [e] | v == v_sub = return $ HsPNeg e
+        operator (HsPApp t xs) y = return $ HsPApp t (xs ++ y)
+        backtick bt = f bt where
+            f (HsPVar v) | v == u_Bang = return (Right (F.Prefix,11))
+            f (HsPVar v) | v == u_Twiddle = return (Right (F.Prefix,11))
+            f (HsPVar v) | v == u_At = return (Right (F.R,11))
+            f (HsPVar v) = g v
+            f (HsPApp v []) = g v
+            g v = return $ case Map.lookup v ism of
+                Just (n,HsAssocLeft) -> Right (F.L,n)
+                Just (n,HsAssocRight) -> Right (F.R,n)
+                Just (n,HsAssocNone) -> Right (F.N,n)
+                Just (n,HsAssocPrefix) -> Right (F.Prefix,n)
+                Just (n,HsAssocPrefixy) -> Right (F.Prefixy,n)
+                Nothing -> Right (F.L,9)
     domod m = case runP (traverseHsOps ops m) (hsModuleOpt m) of
         (ws,~(Just v)) -> if null ws then v else error $ unlines (map show ws)
     ops = (hsOpsDefault ops) { opHsExp, opHsPat } where
-        opHsExp (HsParen (HsWords es)) = F.shunt pexpShuntSpec es >>= traverseHsOps ops
-        opHsExp (HsWords es) = F.shunt expShuntSpec es >>= traverseHsOps ops
+        opHsExp (HsParen (HsWords es)) = F.shunt pexpShuntSpec es >>= applyHsOps ops
+        opHsExp (HsWords es) = F.shunt expShuntSpec es >>= applyHsOps ops
         opHsExp (HsBackTick t) = parseErrorK "unexpected binary operator."
 --        opHsExp (HsParen (HsBackTick bt)) = parseErrorK "parens around backtick"
         opHsExp e = traverseHsOps ops e
-        opHsPat (HsPatExp e) = do
-            e <- opHsExp e
-            checkPattern' e
+--        opHsPat (HsPatExp e) = do
+ --           e <- opHsExp e
+  --          checkPattern e
+        opHsPat (HsPatWords ws) = F.shunt patShuntSpec ws >>= applyHsOps ops
         opHsPat p = traverseHsOps ops p
 
 infixStatement :: FixityMap -> HsStmt -> HsStmt

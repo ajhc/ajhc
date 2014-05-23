@@ -176,6 +176,7 @@ StarStar  Jhc@.**
 # placeholders
 UnknownType:u:
 
+At           @
 Bang         !
 Dot          .
 DotDot       ..
@@ -185,6 +186,7 @@ Quest        ?
 QuestQuest   ??
 Star         *
 StarBang     *!
+Twiddle      ~
 alias        alias
 as           as
 closed       closed

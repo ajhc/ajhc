@@ -28,6 +28,12 @@ parseErrorK s = do
     sl <- getSrcLoc
     return (error $ "parseError: " ++ show (sl,s))
 
+parseWarn :: String -> P ()
+parseWarn s = do
+    addWarn ParseError s
+    sl <- getSrcLoc
+    return ()
+
 instance Functor P where
     fmap f (P m) = P $ \e -> fmap (fmap f) (m e)
 instance Applicative P where

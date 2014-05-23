@@ -550,7 +550,9 @@ ppHsPat	HsPWildCard = char '_'
 ppHsPat	(HsPIrrPat (Located _ pat)) = char '~' <> ppHsPat pat
 ppHsPat	(HsPBangPat (Located _ pat)) = char '!' <> ppHsPat pat
 ppHsPat	(HsPatExp e) = ppHsExp e
-ppHsPat ~(HsPTypeSig _ p qt) = parens $ ppHsPat p <+> text "::" <+> ppHsQualType qt
+ppHsPat (HsPTypeSig _ p qt) = parens $ ppHsPat p <+> text "::" <+> ppHsQualType qt
+ppHsPat (HsPatWords ws) = char '«' <> hsep (map ppHsPat ws) <> char '»'
+ppHsPat (HsPatBackTick bt) = char '`' <> ppHsPat bt <> char '`'
 
 ppHsPatField (HsField name pat) = myFsep[ppHsQName name, equals, ppHsPat pat]
 

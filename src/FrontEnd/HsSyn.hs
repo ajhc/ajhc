@@ -362,6 +362,8 @@ data HsPat
     | HsPTypeSig SrcLoc HsPat HsQualType
     -- | advanced patterns need to be parsed as expressions
     | HsPatExp HsExp
+    | HsPatBackTick HsPat
+    | HsPatWords [HsPat]
  deriving(Eq,Ord,Show)
  {-! derive: is !-}
 

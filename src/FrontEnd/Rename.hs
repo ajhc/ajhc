@@ -33,6 +33,7 @@ import Support.FreeVars
 import Util.Gen
 import Util.Inst()
 import Util.SetLike
+import qualified FlagOpts as FO
 import qualified FrontEnd.HsErrors as HsErrors
 import qualified FrontEnd.SrcLoc
 import qualified Name.VConsts as V
@@ -363,6 +364,7 @@ instance Rename HsType where
 
 renameHsType' dovar t = pp (rt t) where
     rt :: HsType -> RM HsType
+    rt (HsTyTuple []) = HsTyCon <$> implicitName tc_Unit
     rt (HsTyVar hsName) | dovar = do
         hsName' <- renameTypeName hsName
         return (HsTyVar hsName')
@@ -424,6 +426,7 @@ instance Rename HsMatch where
 
 instance Rename HsPat where
     rename (HsPVar hsName) = HsPVar `fmap` renameValName hsName
+    rename (HsPList []) = flip HsPApp [] <$> implicitName dc_EmptyList
     rename (HsPInfixApp hsPat1 hsName hsPat2) = HsPInfixApp <$> rename hsPat1 <*> renameValName hsName <*> rename hsPat2
     rename (HsPApp hsName hsPats) = HsPApp <$> renameValName hsName <*> rename hsPats
     rename (HsPRec hsName hsPatFields) = do
@@ -518,6 +521,7 @@ instance Rename HsExp where
     rename (HsEnumFromTo hsExp1 hsExp2) = rename $  desugarEnum "enumFromTo" [hsExp1, hsExp2]
     rename (HsEnumFromThen hsExp1 hsExp2) = rename $ desugarEnum "enumFromThen" [hsExp1, hsExp2]
     rename (HsEnumFromThenTo hsExp1 hsExp2 hsExp3) = rename $  desugarEnum "enumFromThenTo" [hsExp1, hsExp2, hsExp3]
+    rename (HsList []) = HsCon <$> implicitName dc_EmptyList
     rename (HsListComp hsExp hsStmts) = do
         (ss,e) <- renameHsStmts hsStmts (rename hsExp)
         listCompToExp newVar e ss
@@ -542,6 +546,13 @@ createError et s = do
 failRename s = do
     sl <- getSrcLoc
     fail (show sl ++ ": " ++ s)
+
+implicitName :: Name -> RM Name
+implicitName n = do
+    opt <- getOptions
+    if fopts' opt FO.Prelude
+        then return n
+        else renameName $ toUnqualified n
 
 buildRecConstr ::  FieldMap -> Name -> [HsFieldUpdate] -> RM HsExp
 buildRecConstr (FieldMap amp fls) n us = do

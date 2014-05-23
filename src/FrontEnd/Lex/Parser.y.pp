@@ -183,7 +183,11 @@ constr :: { HsConDecl }
 
 fielddecl :: { ([HsName],HsBangType) }
     : cl_var '::' type  { ($1, HsUnBangedTy $3) }
-mexists : { [] }
+
+mexists :: { [HsTyVarBind] }
+        : 'exists' wl_tbind '.' { $2 }
+        | 'forall' wl_tbind '.' { $2 }  -- Allowed for GHC compatability
+        |                       { [] }
 
 scontype :: { (HsName, [HsBangType]) }
     : wl_batype {% checkSconType $1  }
@@ -245,8 +249,8 @@ export :: { HsExportSpec }
 type :: { HsType }
     : btype '->' type               { HsTyFun $1 $3 }
     | btype                         { $1 }
-    | 'forall' wl_tbind '.' qualtype  { HsTyForall { hsTypeVars = reverse $2, hsTypeType = $4 } }
-    | 'exists' wl_tbind '.' qualtype  { HsTyExists { hsTypeVars = reverse $2, hsTypeType = $4 } }
+    | 'forall' wl_tbind '.' qualtype  { HsTyForall { hsTypeVars = $2, hsTypeType = $4 } }
+    | 'exists' wl_tbind '.' qualtype  { HsTyExists { hsTypeVars = $2, hsTypeType = $4 } }
 
 tbind :: { HsTyVarBind }
        : srcloc var                   { hsTyVarBind { hsTyVarBindSrcLoc = $1, hsTyVarBindName = $2 } }
@@ -259,11 +263,14 @@ btype :: { HsType }
 atype :: { HsType }
     : con                    { HsTyCon $1 }
     | var                    { HsTyVar $1 }
-    | '(' ')'                { HsTyCon tc_Unit }
-    | '[' ']'                { HsTyCon tc_List }
+--    | '(' ')'                {% HsTyCon `fmap` implicitName tc_Unit }
+    | '(' ')'                { HsTyTuple [] }
+    | '[' ']'                {% HsTyCon `fmap` implicitName tc_List }
     | '(' cl2_type ')'       { HsTyTuple $2 }
     | '(#' ecl_type '#)'     { HsTyUnboxedTuple $2 }
-    | '[' type ']'           { HsTyApp (HsTyCon (toName UnknownType "[]")) $2 }
+    | '[' type ']'           {% do
+        tc_List <- implicitName tc_List
+        return $ HsTyApp (HsTyCon tc_List) $2 }
     | '(' type ')'           { $2 }
     | '(' type '=' type ')'  { HsTyEq $2 $4 }
 
@@ -292,13 +299,17 @@ stmt :: { HsStmt }
     | 'let' '{' decls '}'    { HsLetStmt  (fixupHsDecls $3) }
 
 alt :: { HsAlt }
-    : srcloc pat rhs_case optwhere { HsAlt $1 $2 $3 $4 }
+    : srcloc epat rhs_case optwhere { HsAlt $1 $2 $3 $4 }
  --   : pat '->' exp { HsAlt $2 $1 (HsUnGuardedRhs $3) [] }
 
 aexp :: { HsExp }
-    : '(' ecl_exp ')'   { espan $1 $3 $ mtuple $2 }
+    : '(' ecl_exp ')'   {% do
+        let ee = espan $1 $3
+        case $2 of
+            [x] -> return $ ee x
+            []  -> (ee . HsCon) `fmap` implicitName dc_Unit
+            xs -> return $ ee $ HsTuple xs }
     | '(#' ecl_exp '#)' { espan $1 $3 $ HsUnboxedTuple $2 }
---    | '[' ']'           { espan $1 $2 $ HsList [] }
     | '[' list ']'      { espan $1 $3 $2 }
     | '_'               { HsWildCard $1 }
     | var               { HsVar $1 }
@@ -307,7 +318,8 @@ aexp :: { HsExp }
     | conop             { HsBackTick (HsCon $1) }
     | lit               { HsLit $1 }
     -- atomic after layout processing
-    | 'do' '{' stmts  '}'       { HsDo $3 }
+    | 'do' '{' stmts  '}'    { HsDo $3 }
+    | aexp '{' ecl_fbind '}' {% mkRecConstrOrUpdate $1 $3 }
 
 commas :: { Int }
     : commas ','                    { $1 + 1 }
@@ -337,14 +349,14 @@ lit :: { HsLiteral }
     : LInteger  { HsInt $ read $1 }
     | LChar     { HsChar $ read $1 }
     | LString   { HsString $ read $1 }
-    | LFloat    { HsFrac  $ read $1 }
+    | LFloat    { HsFrac  $ toRational (read $1 :: Double) }
     | LString_   { HsStringPrim $ readPrim $1 }
     | LInteger_ { HsIntPrim $ readPrim $1 }
 
 INT :: { Int }
     : LInteger { read $1 }
 
-#map { clist $_ } qw/exp stmt type var varcon varconop export con fielddecl/
+#map { clist $_ } qw/exp stmt type var varcon varconop export con fielddecl fbind/
 #blist constr
 #map { wlist $_ } qw/aexp var gdrh batype gdrh_case tbind/
 #ewlist aexp
@@ -409,6 +421,8 @@ varop :: { Name }
     : LVarSym  { (toName UnknownType $1) }
     | LQVarSym { (toName UnknownType $1) }
     | '.'      { u_Dot }
+    | '~'      { u_Twiddle }
+    | '@'      { u_At }
 
 -- punctuation.
 
@@ -434,6 +448,7 @@ happyError (L sl _ t:_) = do
     warn sl ParseError $ "parse error at " ++ show t
     parseNothing
 
+mtuple [] = HsCon dc_Unit
 mtuple [x] = HsParen x
 mtuple xs = HsTuple xs
 

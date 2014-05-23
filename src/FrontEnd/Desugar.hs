@@ -132,23 +132,12 @@ replaceVarNamesInPat name p = f name p where
        | otherwise = HsPWildCard
     f _ p@(HsPLit _) = p
     f name (HsPatExp e) = HsPatExp $ g e
-    f name (HsPNeg pat) = HsPNeg $ f name pat
-    f name (HsPNeg pat) = HsPNeg $ f name pat
-    f name (HsPInfixApp pat1 conName pat2) = HsPInfixApp (f name pat1) conName (f name pat2)
-    f name (HsPApp conName pats) = HsPApp conName (map (f name) pats)
-    f name (HsPTuple pats) = HsPTuple (map (f name) pats)
-    f name (HsPUnboxedTuple pats) = HsPUnboxedTuple (map (f name) pats)
-    f name (HsPList pats) = HsPList (map (f name) pats)
-    f name (HsPParen pat) = HsPParen (f name pat)
-    f name (HsPRec conName fields) = HsPRec conName [ HsField fname (f name pat)
-                                                    | HsField fname pat <- fields ]
     f name (HsPAsPat asName pat)
        | name == asName = HsPAsPat newPatVarName (f name pat)
        | otherwise = f name pat
-    f name HsPWildCard = HsPWildCard
     f name (HsPIrrPat pat) = HsPIrrPat $ fmap (f name) pat
     f name (HsPBangPat pat) = HsPBangPat $ fmap (f name) pat
-    f name (HsPTypeSig sl pat ty) = HsPTypeSig sl (f name pat) ty
+    f name p = runIdentity $ traverseHsPat (return . f name) p
 
     g (HsVar (toName Val -> name2))
        | name == name2 = HsVar newPatVarName
@@ -314,6 +303,8 @@ isLazyPat pat = not (isStrictPat pat)
 isStrictPat p = f (openPat p) where
     f HsPVar {} = False
     f HsPWildCard = False
+    f (HsPAsPat _ p) = isStrictPat p
+    f (HsPParen p) = isStrictPat p
     f (HsPIrrPat p) = False -- isStrictPat p  -- TODO irrefutable patterns
     f _ = True
 
