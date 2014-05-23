@@ -116,7 +116,7 @@ epat :: { HsPat }
 
 decl :: { HsDecl }
     : exp0 srcloc rhs optwhere  {% checkValDef $2 $1 $3 $4 }
-    | cl_var '::' qualtype { HsTypeSig $2 $1 $3 }
+    | cl_var '::' qualtype { HsTypeSig $2 (map (toName Val) $1) $3 }
     | 'type' con ewl_atype '=' type
                       { HsTypeDecl {
                         hsDeclSrcLoc = $1,
@@ -161,7 +161,7 @@ kind :: { HsKind }
 bkind :: { HsKind }
        : '(' kind ')'     { $2 }
        |  varop           {% toKindVarSym $1 }
-       |  con             { HsKind $1 }
+       |  con             { HsKind $ toName SortName $1 }
 
 deriving :: { [Name] }
     : {- empty -}               { [] }
@@ -182,7 +182,7 @@ constr :: { HsConDecl }
         hsConDeclExists = $2 } }
 
 fielddecl :: { ([HsName],HsBangType) }
-    : cl_var '::' type  { ($1, HsUnBangedTy $3) }
+    : cl_var '::' type  { (map (toName FieldLabel) $1, HsUnBangedTy $3) }
 
 mexists :: { [HsTyVarBind] }
         : 'exists' wl_tbind '.' { $2 }
@@ -253,16 +253,16 @@ type :: { HsType }
     | 'exists' wl_tbind '.' qualtype  { HsTyExists { hsTypeVars = $2, hsTypeType = $4 } }
 
 tbind :: { HsTyVarBind }
-       : srcloc var                   { hsTyVarBind { hsTyVarBindSrcLoc = $1, hsTyVarBindName = $2 } }
-       | srcloc '(' var '::' kind ')' { hsTyVarBind { hsTyVarBindSrcLoc = $1, hsTyVarBindName = $3, hsTyVarBindKind = Just $5 } }
+       : srcloc var                   { hsTyVarBind { hsTyVarBindSrcLoc = $1, hsTyVarBindName = toName TypeVal $2 } }
+       | srcloc '(' var '::' kind ')' { hsTyVarBind { hsTyVarBindSrcLoc = $1, hsTyVarBindName = toName TypeVal $3, hsTyVarBindKind = Just $5 } }
 
 btype :: { HsType }
     : btype atype                   { HsTyApp $1 $2 }
     | atype                         { $1 }
 
 atype :: { HsType }
-    : con                    { HsTyCon $1 }
-    | var                    { HsTyVar $1 }
+    : con                    { HsTyCon (toName TypeConstructor $1) }
+    | var                    { HsTyVar (toName TypeVal $1) }
 --    | '(' ')'                {% HsTyCon `fmap` implicitName tc_Unit }
     | '(' ')'                { HsTyTuple [] }
     | '[' ']'                {% HsTyCon `fmap` implicitName tc_List }
@@ -316,6 +316,9 @@ aexp :: { HsExp }
     | con               { HsCon $1 }
     | varop             { HsBackTick (HsVar $1) }
     | conop             { HsBackTick (HsCon $1) }
+    | ':'               {% do
+        cons <- implicitName dc_Cons
+        return $ HsBackTick (HsCon cons) }
     | lit               { HsLit $1 }
     -- atomic after layout processing
     | 'do' '{' stmts  '}'    { HsDo $3 }
@@ -381,18 +384,18 @@ rev_$a
 
 var :: { Name }
     : uqvar { $1 }
-    | LQVarId  {(toName UnknownType $1) }
+    | LQVarId  {(parseName Val $1) }
 
 uqvar :: { Name }
-    : LVarId  { (toName UnknownType $1) }
-    | 'as'                  { u_as }
-    | 'family'              { u_family }
-    | 'qualified'           { u_qualified }
-    | 'hiding'              { u_hiding }
+    : LVarId  { (toName Val $1) }
+    | 'as'                  { vu_as }
+    | 'family'              { vu_family }
+    | 'hiding'              { vu_hiding }
+    | 'qualified'           { vu_qualified }
 
-    | 'alias'               { u_alias }
-    | 'kind'                { u_kind }
-    | 'closed'              { u_closed }
+    | 'alias'               { vu_alias }
+    | 'kind'                { vu_kind }
+    | 'closed'              { vu_closed }
 --    | 'forall'              { u_forall }
 --    | 'exists'              { u_exists }
 
@@ -401,8 +404,8 @@ gcon :: { Name }
     | con              { $1 }
 
 con :: { Name }
-    : LConId  { (toName UnknownType $1) }
-    | LQConId { (toName UnknownType $1) }
+    : LConId  { (toName DataConstructor $1) }
+    | LQConId { (parseName DataConstructor $1) }
 
 varcon
     : var { $1 }
@@ -413,16 +416,16 @@ varconop
     | conop { $1 }
 
 conop :: { Name }
-    : LConSym  { (toName UnknownType $1) }
-    | LQConSym { (toName UnknownType $1) }
-    | ':'      { (toName UnknownType ":") }
+    : LConSym  { (toName DataConstructor $1) }
+    | LQConSym { (parseName DataConstructor $1) }
+--    | ':'      { (toName DataConstructor ":") }
 
 varop :: { Name }
-    : LVarSym  { (toName UnknownType $1) }
-    | LQVarSym { (toName UnknownType $1) }
-    | '.'      { u_Dot }
-    | '~'      { u_Twiddle }
-    | '@'      { u_At }
+    : LVarSym  { (toName Val $1) }
+    | LQVarSym { (parseName Val $1) }
+    | '.'      { vu_Dot }
+    | '~'      { vu_Twiddle }
+    | '@'      { vu_At }
 
 -- punctuation.
 
@@ -472,11 +475,11 @@ toKindVarSym n
     | Just k <- Map.lookup n kmap = return k
     | otherwise = parseErrorK $ "invalid kind: " ++ show n
     where kmap = Map.fromList
-            [(u_Star, hsKindStar)
-            ,(u_Hash, hsKindHash)
-            ,(u_Bang, hsKindBang)
-            ,(u_StarBang, hsKindStarBang)
-            ,(u_Quest, hsKindQuest)
-            ,(u_QuestQuest, hsKindQuestQuest)]
+            [(vu_Star, hsKindStar)
+            ,(vu_Hash, hsKindHash)
+            ,(vu_Bang, hsKindBang)
+            ,(vu_StarBang, hsKindStarBang)
+            ,(vu_Quest, hsKindQuest)
+            ,(vu_QuestQuest, hsKindQuestQuest)]
 
 }

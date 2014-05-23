@@ -49,11 +49,11 @@ checkSconType xs = ans where
             _ -> do s <- f s; return (s,[])
 
     sconShuntSpec = F.shuntSpec { F.lookupToken, F.application, F.operator } where
-        lookupToken (Left t) | t == u_Bang = return (Right (F.Prefix,11))
+        lookupToken (Left t) | t == vu_Bang = return (Right (F.Prefix,11))
         lookupToken (Left t) = return (Right (F.L,9))
         lookupToken (Right t) = return (Left (SconType False t))
         application e1 e2 = return $ app e1 e2
-        operator (Left t) [SconType _ ty] | t == u_Bang = return $ SconType True ty
+        operator (Left t) [SconType _ ty] | t == vu_Bang = return $ SconType True ty
         operator ~(Left t) as = return $ foldl app (SconOp t) as
         app (SconApp a bs) e2 =  SconApp a (e2:bs)
         app e1 e2 =  SconApp e1 [e2]
@@ -73,10 +73,10 @@ checkValDef srcloc lhs rhs whereBinds = withSrcLoc srcloc $ ans lhs where
     ans lhs = do
         --parseWarn $ show lhs
         isFunLhs lhs [] >>= \x -> case x of
-            Just (f,es) -> do
+            Just (f,es@(_:_)) -> do
                 es <- mapM checkPattern es
                 return (HsFunBind [HsMatch srcloc f es rhs whereBinds])
-            Nothing -> do
+            _ -> do
                 lhs <- checkPattern lhs
                 return (HsPatBind srcloc lhs rhs whereBinds)
     isFunLhs (HsInfixApp l (HsVar op) r) es = return $ Just (op, l:r:es)
@@ -90,15 +90,15 @@ checkValDef srcloc lhs rhs whereBinds = withSrcLoc srcloc $ ans lhs where
     -- The top level pattern parsing to determine whether it is a function
     -- or pattern definition is done without knowledge of precedence
     --
-    -- TODO(jwm): u_Bang handling should be conditional on BangPatterns being
+    -- TODO(jwm): vu_Bang handling should be conditional on BangPatterns being
     -- enabled.
     patShuntSpec = F.shuntSpec { F.lookupToken, F.application, F.operator, F.lookupUnary } where
-        lookupToken (HsBackTick (HsVar v)) | v == u_Bang = return (Right (F.Prefix,11))
-        lookupToken (HsBackTick (HsVar v)) | v == u_Twiddle = return (Right (F.Prefix,11))
-        lookupToken (HsBackTick (HsVar v)) | v == u_At = return (Right (F.R,12))
-        lookupToken ((HsVar v)) | v == u_Bang = return (Right (F.Prefix,11))
-        lookupToken ((HsVar v)) | v == u_Twiddle = return (Right (F.Prefix,11))
-        lookupToken ((HsVar v)) | v == u_At = return (Right (F.R,12))
+        lookupToken (HsBackTick (HsVar v)) | v == vu_Bang = return (Right (F.Prefix,11))
+        lookupToken (HsBackTick (HsVar v)) | v == vu_Twiddle = return (Right (F.Prefix,11))
+        lookupToken (HsBackTick (HsVar v)) | v == vu_At = return (Right (F.R,12))
+        lookupToken ((HsVar v)) | v == vu_Bang = return (Right (F.Prefix,11))
+        lookupToken ((HsVar v)) | v == vu_Twiddle = return (Right (F.Prefix,11))
+        lookupToken ((HsVar v)) | v == vu_At = return (Right (F.R,12))
         lookupToken (HsBackTick t) = return (Right (F.L,9))
         lookupToken t = return (Left t)
         lookupUnary (HsBackTick t) = return Nothing
@@ -120,9 +120,9 @@ checkPattern be = checkPat be [] where
     checkPat e [] = do
         bangPatterns <- flip fopts' FO.BangPatterns <$> getOptions
         case e of
-            HsVar x | bangPatterns && x == u_Bang -> return (HsPVar $ quoteName x)
-                    | x == u_Twiddle -> return (HsPVar $ quoteName x)
-                    | x == u_At      -> return (HsPVar $ quoteName u_At)
+            HsVar x | bangPatterns && x == vu_Bang -> return (HsPVar $ quoteName x)
+                    | x == vu_Twiddle -> return (HsPVar $ quoteName x)
+                    | x == vu_At      -> return (HsPVar $ quoteName vu_At)
                     | otherwise -> return (HsPVar x)
             HsLit l  -> return (HsPLit l)
             HsError { hsExpErrorType = HsErrorUnderscore } -> return HsPWildCard

@@ -40,7 +40,8 @@ HSFILES=src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/
         src/E/Main.hs src/Util/GMap.hs src/Util/ExitCodes.hs src/Support/TempDir.hs src/E/PrimDecode.hs \
         src/DerivingDrift/StandardRules.hs src/FrontEnd/Exports.hs \
 	src/FrontEnd/Lex/Parser.hs src/FrontEnd/Lex/Parse.hs src/FrontEnd/Lex/Lexer.hs \
-	src/FrontEnd/Lex/Post.hs src/FrontEnd/Lex/Layout.hs src/FrontEnd/Lex/Fixity.hs
+	src/FrontEnd/Lex/Post.hs src/FrontEnd/Lex/Layout.hs src/FrontEnd/Lex/Fixity.hs \
+	src/FrontEnd/Lex/ParseMonad.hs
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
 GHCPROFOPTS= -prof -fprof-auto -rtsopts -auto-all -osuf prof.o -hisuf prof.hi

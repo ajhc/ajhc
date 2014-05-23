@@ -173,6 +173,29 @@ Tuple Jhc@.(#)
 HashHash  Jhc@.##
 StarStar  Jhc@.**
 
+# unqualified values
+Val:vu:
+At           @
+Bang         !
+Dot          .
+Hash         #
+Minus        -
+Quest        ?
+QuestQuest   ??
+Star         *
+StarBang     *!
+Twiddle      ~
+alias        alias
+as           as
+closed       closed
+derive       derive
+exists       exists
+family       family
+forall       forall
+hiding       hiding
+kind         kind
+qualified    qualified
+
 # placeholders
 UnknownType:u:
 

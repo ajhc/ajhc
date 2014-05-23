@@ -738,14 +738,13 @@ getNamesAndASrcLocsFromHsDecl d = f d where
 -- constructors.
 
 collectDefsHsModule :: HsModule -> ([(Name,SrcLoc,[Name])],[(Name,Int)])
-collectDefsHsModule m = (\ (x,y) -> (Seq.toList x,Seq.toList y)) $ execWriter (mapM_ f (hsModuleDecls m)) where
+collectDefsHsModule m = (\(x,y) -> (Seq.toList x,Seq.toList y)) $ execWriter (mapM_ f (hsModuleDecls m)) where
     toName t n = Name.toName t (qualifyName (hsModuleName m) n)
     tellName sl n = tellF [(n,sl,[])]
     tellF xs = tell (Seq.fromList xs,Seq.empty) >> return ()
     tellS xs = tell (Seq.empty,Seq.fromList xs) >> return ()
     f (HsForeignDecl a _ n _)    = tellName a (toName Val n)
     f (HsForeignExport a e _ _)  = tellName a (ffiExportName e)
-    f (HsFunBind [])  = return ()
     f (HsFunBind (HsMatch a n _ _ _:_))  = tellName a (toName Val n)
     f (HsPatBind srcLoc p _ _)  = mapM_ (tellName srcLoc) [ (toName Val n) | n <- (getNamesFromHsPat p) ]
     f (HsActionDecl srcLoc p _) = mapM_ (tellName srcLoc) [ (toName Val n) | n <- (getNamesFromHsPat p) ]

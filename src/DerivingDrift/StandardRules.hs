@@ -2,7 +2,7 @@ module DerivingDrift.StandardRules (standardRules,driftResolvedNames) where
 
 import DerivingDrift.RuleUtils
 import Name.Prim
-import Name.Name
+import Name.Name hiding (isOpLike)
 import qualified Data.Map as Map
 
 standardRules :: Map.Map Name.Name.Name (Data -> Doc)
@@ -87,7 +87,6 @@ ordfn d = let
 		   else  text (u v_compare) <+> fsep [head,text (cmp n n')]
     in simpleInstance (q class_Ord) d <+> text "where" $$ block ifn
 
-
 ----------------------------------------------------------------------
 
 -- Show & Read
@@ -116,8 +115,11 @@ makeShow (Body{constructor=constructor,labels=labels,types=types})
 	s = fsep [comp,showChar ' ', comp]
 	s' = fsep [comp,showChar ',',comp]
 	showChar c = fsep [text (q v_showChar), text ('\'':c:"\'")]
+	showString s | isOpLike s = fsep [text (q v_showString), doubleQuotes $ char '(' <> text s <> char ')']
 	showString s = fsep [text (q v_showString), doubleQuotes $ text s]
 	comp = text (q v_compose)
+isOpLike n  = x `elem` "!#$%&*+./<=>?@\\^-~:|" where
+    (x:_) = n
 
 -- Read
 
@@ -142,10 +144,17 @@ makeRead (Body{constructor=constructor,labels=labels,types=types})
         f v = fsep [tup v ip, from,readsPrec, ip]
 	final v = [fsep[tup v rest,from,readsPrec,ip]]
 	readRecord = let
-		f lab v = [
-			fsep [tup (tshow $ show (toUnqualified lab)) ip,lex],
+		f lab v = zz ++ [
 			fsep [tup (text $ show "=") ip,lex],
-			fsep [tup v ip ,from,readsPrec,ip]]
+			fsep [tup v ip ,from,readsPrec,ip]] where
+                    --z = if isOpLike name then char '(' <> text name <> char ')' else text name
+                    zz = if isOpLike name then
+			[fsep [tup (tshow "(") ip,lex]
+			,fsep [tup (tshow name) ip,lex]
+			,fsep [tup (tshow ")") ip,lex]
+                        ] else
+			[fsep [tup (tshow name) ip,lex]]
+                    name = show (toUnqualified lab)
 		openB = fsep [tup (text $ show "{") ip,lex]
 		closeB = fsep [tup (text $ show "}") rest,lex]
 		comma = [fsep [tup (text $ show ",") ip,lex]]
@@ -166,7 +175,6 @@ makeRead (Body{constructor=constructor,labels=labels,types=types})
 	lex = fsep[from,text (q v_lex),ip]
 	readsPrec = fsep [text (q v_readsPrec),text "10"]
 	from = text "<-"
-
 
 tshow x = text (show x)
 ----------------------------------------------------------------------
