@@ -1,0 +1,135 @@
+#!/usr/bin/perl
+
+use strict;
+
+
+use BSD::Resource;
+use Getopt::Long;
+use Data::Dumper;
+use File::Temp;
+use Config;
+
+defined $Config{sig_name} || die "No sigs?";
+
+my ($i,%signo,@signame);
+
+foreach my $name (split(' ', $Config{sig_name})) {
+   $signo{$name} = $i;
+   $signame[$i] = $name;
+   $i++;
+}
+
+my ($opt_build,$opt_phase,$opt_timeout,$opt_output,$opt_chdir,
+    $opt_input,$opt_name,$opt_compare,$opt_db,$opt_status,
+    $opt_err,$opt_quiet);
+
+GetOptions(
+    't=i' => \$opt_timeout,
+    'o=s' => \$opt_output,
+    'c=s' => \$opt_compare,
+    'e'   => \$opt_err,
+    'q'   => \$opt_quiet,
+    'i=s' => \$opt_input,
+    's=s' => \$opt_status,
+    'b=s' => \$opt_build,
+    'p=s' => \$opt_phase,
+    'n=s' => \$opt_name,
+    'cd=s' => \$opt_chdir,
+    'd=s' => \$opt_db
+
+) or die <DATA>;
+
+@ARGV or die <DATA>;
+
+
+if($opt_compare &&  !$opt_output) {
+    $opt_output = mktemp('/tmp/runtest_output_XXXXXXXXXX');
+}
+
+my $why;
+my $pid = fork();
+if(!$pid) {
+    setrlimit RLIMIT_CORE, 0,0;
+    setrlimit RLIMIT_CPU, $opt_timeout, $opt_timeout + 2 if $opt_timeout;
+
+    if($opt_output) {
+        open(STDOUT,">",$opt_output) or die "$!: couldn't open output [$opt_output]";
+        if($opt_err) {
+        open(STDERR,">&STDOUT") or die "$!: couldn't dup stderr to stdout";
+    }
+    }
+    if($opt_input) {
+        open(STDIN,"<",$opt_input) or die "$!: couldn't open input [$opt_input]";
+    }
+    if($opt_chdir) {
+        chdir $opt_chdir or die "$!: $opt_chdir";
+    }
+    exec @ARGV or die "$!: Could not exec";
+} else {
+    $SIG{INT} = sub {
+        kill 9, $pid;
+        $why = 'INT';
+    };
+    if($pid != wait) { die "wrong child processs died"; }
+    my @ru = getrusage RUSAGE_CHILDREN;
+    my ($sig,$code) = ($? & 0x7f, $? >> 8);
+    if($opt_timeout && !$why && $sig && ($signame[$sig] eq 'XCPU' || $signame[$sig] eq 'KILL')) {
+        $why = 'TIMEOUT';
+    }
+    if(!$why && $sig) {
+        $why = 'SIG' . $signame[$sig];
+    }
+    $why = 'CODE ' . $code if !$why && $code;
+    $why ||= 'SUCCESS';
+    if($opt_compare && $opt_output && $why eq 'SUCCESS') {
+        $why = 'DIFF_ERROR' if system('diff','-q', $opt_compare, $opt_output);
+    }
+
+    my $command = join(' ',@ARGV);
+    if($opt_db) {
+        require DBI;
+        my $db = DBI->connect("dbi:SQLite:dbname=$opt_db");
+        $db->do('create table if not exists results (build string,name string,phase string,command string,status string,time float)');
+        $db->do('create unique index if not exists results_index on results(build,name,phase)');
+        $db->do('insert or replace into results (build,name,phase,command,status,time) values (?,?,?,?,?,?)', {}, $opt_build || undef, $opt_name || $command, $opt_phase || undef, $command,$why,$ru[0] + $ru[1]);
+    }
+
+    my $s = '';
+    $s .= sprintf("Name: %s %s %s\n",$opt_build || "", $opt_name, $opt_phase || "") if $opt_name;
+    $s .= sprintf("Output: %s\n",$opt_output) if $opt_output;
+    $s .= sprintf("Input: %s\n",$opt_input) if $opt_input;
+    $s .= sprintf("Command: %s\n", join(" ",@ARGV));
+    $s .= sprintf("Status: %s\nTime:  %f\n", $why, $ru[0] + $ru[1]);
+
+    if($opt_status) {
+        open my $fh, ">", $opt_status or die "$!: couldn't open status output [$opt_status]";
+        print $fh $s;
+    }
+    print "$s" unless $opt_quiet;
+
+    exit 3 if $why ne 'SUCCESS';
+
+}
+
+__DATA__
+
+
+runtest.prl - run a command, storing the stats in a database and optionally comparing its output against a suppled value
+
+usage
+
+  runtest.prl [options] command ...
+
+options
+
+   -t <num>        - timeout in seconds
+   -o output.txt   - file to write output of command to
+   -c expected.txt - expected output from command, it is an error if the results don't match this.
+   -e              - open STDERR on STDOUT
+   -i input.txt    - input to place on stdin
+   -d file.db      - database to store result in
+   -n name         - name used to identify test
+   -s status.txt   - write status to file in addition to stdout
+
+
+
