@@ -17,7 +17,7 @@ import FlagOpts as FO
 import FrontEnd.HsSyn
 import FrontEnd.SrcLoc
 import FrontEnd.Warning
-import Name.Name as Name
+import Name.Names as Name
 import Options
 import Util.Relation as R
 import Util.SetLike as SL
@@ -41,12 +41,12 @@ instance Ord ModInfo where
 
 modInfoModImports m =  mp  [ i | i <- hsModuleImports (modInfoHsModule m)] where
     mp xs
-        | any ((== toModule "Prelude") . hsImportDeclModule) xs = xs
+        | any ((== mod_Prelude) . hsImportDeclModule) xs = xs
         | FO.Prelude `Set.member` (optFOptsSet $ modInfoOptions m) = (prelude:xs)
         | otherwise = xs
     prelude = HsImportDecl {
         hsImportDeclSrcLoc = bogusASrcLoc,
-        hsImportDeclModule = toModule "Prelude",
+        hsImportDeclModule = mod_Prelude,
         hsImportDeclSpec = Nothing,
         hsImportDeclAs = Nothing,
         hsImportDeclQualified = False }
@@ -89,7 +89,7 @@ determineExports' owns doneMods todoMods = mdo
     ce m x = mapM f (toRelationList x) where
         f (x,[y]) = return y
         f (_,[]) = error "can't happen"
-        f (x,ys) = warn bogusASrcLoc (AmbiguousExport (modInfoName m) ys) ("module " <> fromModule (modInfoName m) <> " has ambiguous exports: " ++ show ys) >> return (head ys)
+        f (x,ys) = warn bogusASrcLoc (AmbiguousExport (modInfoName m) ys) ("module " <> show (modInfoName m) <> " has ambiguous exports: " ++ show ys) >> return (head ys)
 
     getExports :: Monad m => ModInfo -> (Module -> m (Rel Name Name)) -> m (Rel Name Name)
     getExports mi@ModInfo { modInfoHsModule = m@HsModule { hsModuleExports = Nothing } } _ = return $ defsToRel (modInfoDefs mi)

@@ -972,7 +972,7 @@ procAllSpecs dataTable rs ds = do
     return $ (nds,fromRules rules)
 
 makeSpec :: Monad m => DataTable -> (TVr,E) -> T.Rule -> m ((TVr,E),Rule)
-makeSpec dataTable (t,e) T.RuleSpec { T.ruleType = rt, T.ruleUniq = (Module m,ui), T.ruleSuper = ss } = do
+makeSpec dataTable (t,e) T.RuleSpec { T.ruleType = rt, T.ruleUniq = (m,ui), T.ruleSuper = ss } = do
     let nt = removeNewtypes dataTable $ tipe rt
     as <- specializeE (getType t) nt
     let ntvr = tvr { tvrIdent = toId newName, tvrType = getType nbody, tvrInfo = setProperties (prop_SPECIALIZATION:sspec) mempty }

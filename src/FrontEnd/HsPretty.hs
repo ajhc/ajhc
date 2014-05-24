@@ -185,7 +185,7 @@ ppHsDecls ds = vcat $ map ppHsDecl ds
 
 --------------------------  Module Header ------------------------------
 ppHsModuleHeader :: Module -> Maybe [HsExportSpec] ->  Doc
-ppHsModuleHeader (Module modName) mbExportList = mySep [
+ppHsModuleHeader modName mbExportList = mySep [
 		 text "module",
 		 text $ show modName,
 		 maybePP (parenList . map ppHsExportSpec) mbExportList,
@@ -204,7 +204,7 @@ ppHsExportSpec e = f e where
     f (HsEQualified DataConstructor e)   = text "data" <+> ppHsExportSpec e
     f (HsEQualified n e)                 = tshow n <+> ppHsExportSpec e
 
-tshow = text . show
+tshow x = text (show x)
 ppHsImportDecl (HsImportDecl pos (show -> mod) bool mbName mbSpecs) =
 	   mySep [text "import",
 		 if bool then text "qualified" else empty,

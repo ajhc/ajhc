@@ -14,7 +14,7 @@ import E.E
 import E.Show
 import E.TypeCheck
 import Name.Id
-import Name.Name
+import Name.Names
 import Options
 import System.IO
 import Util.ContextMonad
@@ -46,7 +46,7 @@ program = Program {
     progDataTable     = mempty,
     progEntry         = mempty,
     progMain          = emptyId,
-    progModule        = mainModule,
+    progModule        = mod_Main_,
     progPasses        = [],
     progUsedIds       = mempty,
     progFreeIds       = mempty,

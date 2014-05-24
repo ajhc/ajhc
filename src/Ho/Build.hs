@@ -8,12 +8,9 @@ module Ho.Build (
     buildLibrary
     ) where
 
+import Util.Std
 import Control.Concurrent
-import Control.Monad.Identity
 import Data.IORef
-import Data.List hiding(union)
-import Data.Maybe
-import Data.Monoid(Monoid(..))
 import Data.Tree
 import Data.Version(Version,parseVersion,showVersion)
 import System.FilePath as FP
@@ -27,7 +24,7 @@ import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as PPrint
 
 import DataConstructors
-import Doc.DocLike
+import Doc.DocLike hiding((<>))
 import Doc.PPrint
 import Doc.Pretty
 import E.E
@@ -46,7 +43,7 @@ import Ho.Collected()
 import Ho.Library
 import Ho.ReadSource
 import Ho.Type
-import Name.Name
+import Name.Names
 import Options
 import PackedString(PackedString,packString,unpackPS)
 import Support.TempDir
@@ -632,9 +629,9 @@ compileCompNode ifunc func ksm cn = do
                     CompSources _ -> error "sources still exist!?"
     f cn
 
-hsModuleRequires x = snub ((toModule "Jhc.Prim.Prim",bogusASrcLoc):ans) where
+hsModuleRequires x = snub ((mod_JhcPrimPrim,bogusASrcLoc):ans) where
     noPrelude = FO.Prelude `Set.notMember` optFOptsSet (hsModuleOpt x)
-    ans = (if noPrelude then id else ((preludeModule,bogusASrcLoc):)) [  (hsImportDeclModule y,hsImportDeclSrcLoc y) | y <- hsModuleImports x]
+    ans = (if noPrelude then id else ((mod_Prelude,bogusASrcLoc):)) [  (hsImportDeclModule y,hsImportDeclSrcLoc y) | y <- hsModuleImports x]
 
 searchPaths :: Opt -> String -> [(String,String)]
 searchPaths modOpt m = ans where

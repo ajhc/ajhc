@@ -27,21 +27,45 @@ print "\n";
 my %done;
 my ($nametype,$leader);
 open my $fd, "<", $input or die "$!: $input";
+my %mods;
 while(<$fd>) {
     chomp;
+    s/;.*$//;
     next unless /\S/;
-    next if /^\s*#/;
+    #next if /^\s*#/;
     ($nametype,$leader) = ($1,$2),next if /^([A-Za-z]+):([a-z]+):\s*$/;
     die "need nametype:leader declaration" unless defined $nametype && defined $leader;
-    /^([_A-Za-z0-9]+)\s+(([0-9_A-Za-z.@]+)\.)?([-0-9*!)(@~#&|><=\/\+\.\,A-Za-z%:_\[\]?]+)\s*$/ or die "unrecognized line $_";
-    my ($name,$mod,$var) = ($1,$3,$4);
+    my ($name,$mod,$var,$smod);
+    if ($nametype eq 'Module') {
+        /^([0-9_A-Za-z.@]+)\s*$/ or die "unrecognized line $_";
+        $mod = $1;
+    } else {
+        /^([_A-Za-z0-9]+|\-)\s+(([0-9_A-Za-z.@]+)\.)?([-0-9*!)(@~#&|><=\/\+\.\,A-Za-z%:_\[\]?]+)\s*$/ or die "unrecognized line $_";
+        ($name,$mod,$var) = ($1,$3,$4);
+    }
+    if (defined $mod) {
+        $smod = $mod;
+        $smod =~ s/\.//g;
+        $smod =~ s/\@/_/g;
+        $smod = "mod_$smod";
+        $mods{$mod} = $smod;
+        next unless defined $name;
+    }
     $name = $leader . "_" . $name;
     next if $done{$name};
     print "{-# NOINLINE $name #-}\n";
     if (defined $mod) {
-        my $lmod = length $mod;
-        print "$name = forgeName $nametype (Just (Module (unsafePerformIO \$ addrToAtom_ \"$mod\"# $lmod# ))) \"$var\"\n";
+        print "$name = forgeName $nametype (Just $smod) \"$var\"\n";
     } else {
         print "$name = forgeName $nametype Nothing \"$var\"\n";
     }
+}
+
+print "\n";
+
+foreach (sort keys %mods) {
+    my $lmod = length $_;
+    my $mod = $_;
+    print "{-# NOINLINE $mods{$_} #-}\n";
+    print "$mods{$_} = Module (unsafePerformIO \$ addrToAtom_ \"$mod\"# $lmod# )\n";
 }

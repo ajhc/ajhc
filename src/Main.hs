@@ -7,7 +7,6 @@ import System.FilePath as FP
 import System.IO
 import qualified Data.ByteString.Lazy as LBS
 
-import Util.Std
 import DataConstructors
 import E.Main
 import E.Program
@@ -19,12 +18,13 @@ import Grin.Show(render)
 import Ho.Build
 import Ho.Collected
 import Ho.Library
-import Name.Name
+import Name.Names
 import Options
 import StringTable.Atom
 import Support.TempDir
 import Util.Gen
 import Util.SetLike as S
+import Util.Std
 import Version.Version(versionSimple)
 import qualified FlagDump as FD
 import qualified Interactive
@@ -66,7 +66,7 @@ processFiles cs = f cs (optMainFunc options) where
     f [] Nothing  = do
         int <- Interactive.isInteractive
         when (not int) $ putErrDie "ajhc: no input files"
-        g [Left preludeModule]
+        g [Left mod_Prelude]
     f [] (Just (b,m)) = do
         m <- getModule (parseName Val m)
         g [Left m]

@@ -4,7 +4,6 @@ import Control.Exception as CE
 import Util.Std
 import Control.Monad.Reader
 import IO(stdout)
-import System.Environment
 import Text.Regex
 import qualified Data.Map as Map
 
@@ -29,7 +28,7 @@ import FrontEnd.TypeSyns
 import FrontEnd.Warning
 import GenUtil
 import Ho.Type
-import Name.Name
+import Name.Names
 import Options
 import Support.Compat
 import Util.Interact
@@ -67,7 +66,7 @@ data InteractiveState = IS {
 isInitial = IS {
     stateHo = mempty,
     stateInteract = emptyInteract,
-    stateModule = mainModule,
+    stateModule = mod_Main_,
     stateImports = [],
     stateOptions = options
     }
@@ -138,7 +137,7 @@ interact cho = mre where
     ptype k | Just r <- Map.lookup k (hoAssumps hoE) = show (pprint r:: PP.Doc)
     ptype x | nameType x == ClassName = hsep (map kindShow $ kindOfClass x (hoKinds hoE))
     ptype x = "UNKNOWN: " ++ show (nameType x,x)
-    isStart =  isInitial { stateHo = hoE, stateImports = runIdentity $ calcImports hoE False preludeModule }
+    isStart =  isInitial { stateHo = hoE, stateImports = runIdentity $ calcImports hoE False mod_Prelude }
     do_expr :: Interact -> String -> IO Interact
     do_expr act s = case parseStmt (s ++ "\n") of
         Left m -> putStrLn m >> return act

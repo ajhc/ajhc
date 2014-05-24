@@ -7,15 +7,11 @@
 
 module FrontEnd.Desugar (doToExp, listCompToExp, desugarHsModule, desugarHsStmt) where
 
---import Control.Applicative
-import Control.Monad.Identity
-import Control.Monad.State
-
 import FrontEnd.HsSyn
 import FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse
-import Name.Name
 import Name.Names
+import Util.Std
 import Util.UniqueMonad
 
 type PatSM = Uniq

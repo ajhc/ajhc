@@ -19,7 +19,7 @@ import E.Annotate
 import E.E
 import Ho.Type
 import Info.Types
-import Name.Name
+import Name.Names
 import Util.SetLike
 import qualified Data.Map as Map
 import qualified Info.Info as Info
@@ -36,7 +36,7 @@ instance Monoid CollectedHo where
     mempty = updateChoHo CollectedHo {
         choExternalNames = mempty,
         choOrphanRules = mempty,
-        choHoMap = Map.singleton primModule pho,
+        choHoMap = Map.singleton mod_Prim_ pho,
         choCombinators = mempty,
         choHo = error "choHo-a",
         choVarMap = error "choVarMap-a",

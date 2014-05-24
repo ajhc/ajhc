@@ -71,9 +71,9 @@ addTopLevels  hsmod action = do
     let cdefs = map (\ (x,y,_) -> (x,y)) $ fst $ collectDefsHsModule hsmod
         nmap = foldl f [] (fsts cdefs)
         f r hsName@(getModule -> Just _)
-            | Just _ <- V.fromTupname hsName, toModule "Jhc.Prim.Prim" == mod
+            | Just _ <- V.fromTupname hsName, mod_JhcPrimPrim == mod
                 = let nn = hsName in (nn,nn):r
-            | nameName tc_Arrow == hsName, toModule "Jhc.Prim.Prim" == mod
+            | nameName tc_Arrow == hsName, mod_JhcPrimPrim == mod
                 = let nn = hsName in (nn,nn):r
             | otherwise = let nn = toUnqualified hsName in (nn,hsName):(hsName,hsName):r
         f r z = let nn = qualifyName mod z in (z,nn):(nn,nn):r
@@ -831,8 +831,7 @@ instance DeNameable Name where
         fm (Just m) | m == mod = Nothing
                     | m `elem` removedMods = Nothing
         fm m = m
-        removedMods = map toModule [
-            "Prelude","Jhc.Basics","Jhc.Prim.IO","Jhc.Type.Word","Jhc.Type.Basic"]
+        removedMods = [ mod_Prelude,mod_JhcBasics,mod_JhcPrimIO,mod_JhcTypeWord,mod_JhcTypeBasic]
 
 instance DeNameable HsPat where
     deName mod p = f p where

@@ -1,12 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Name.Name(
-    Module(..),
+    Module(),
     Name,
     Class,
     NameType(..),
     ToName(..),
     ffiExportName,
-    fromModule,
     fromTypishHsName,
     fromValishHsName,
     getIdent,
@@ -15,15 +14,12 @@ module Name.Name(
     isTypeNamespace,
     isValNamespace,
     isOpLike,
-    mainModule,
-    preludeModule,
     mapName,
     mapName',
     nameName,
     nameParts,
     nameType,
     parseName,
-    primModule,
     qualifyName,
     setModule,
     quoteName,
@@ -45,6 +41,7 @@ import GenUtil
 import Name.Internals
 import StringTable.Atom
 import Ty.Level
+import Name.Prim
 
 isTypeNamespace TypeConstructor = True
 isTypeNamespace ClassName = True
@@ -197,13 +194,6 @@ fromQuotedName n = case nameParts n of
 -- Modules
 --------------
 
-
-fromModule (Module s) = fromAtom s
-
-mainModule = Module "Main@"
-primModule = Module "Prim@"
-preludeModule = Module "Prelude"
-
 toModule :: String -> Module
 toModule s = Module $ toAtom s
 
@@ -235,3 +225,37 @@ deconstructName name = f nt where
     f QuotedName = Left (Name $ toAtom id)
     f _ = Right (mod,Nothing,toName nt id',mi)
 
+--constructName :: Maybe Module -> Maybe UnqualifiedName -> UnqualifiedName -> Maybe Int -> Name
+--constructName mm
+
+----------------
+-- Parameterized
+----------------
+
+-- Goal, get rid of hardcoded NameType, move pertinent info into cache byte
+
+instance HasTyLevel Name where
+    getTyLevel n = f (nameType n) where
+        f DataConstructor = Just termLevel
+        f Val             = Just termLevel
+        f RawType         = Just typeLevel
+        f TypeConstructor = Just typeLevel
+        f TypeVal         = Just typeLevel
+        f SortName
+            | n == s_HashHash = Just $ succ kindLevel
+            | n == s_StarStar = Just $ succ kindLevel
+            | otherwise = Just kindLevel
+        f _ = Nothing
+
+isConstructor :: Name -> Bool
+isConstructor n = f (nameType n) where
+    f TypeConstructor = True
+    f DataConstructor = True
+    f SortName = True
+    f _ = False
+
+nameTyLevel_u f n = case getTyLevel n of
+    Nothing -> n
+    Just cl | cl == cl' -> n
+            | otherwise -> toName (mkNameType cl' (isConstructor n)) n
+        where cl' = f cl

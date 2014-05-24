@@ -7,7 +7,7 @@ import C.FFI
 import Data.Foldable(Foldable)
 import Data.Traversable(Traversable)
 import FrontEnd.SrcLoc
-import Name.Name
+import Name.Internals(Module(..))
 import Name.Names
 import Options
 import StringTable.Atom

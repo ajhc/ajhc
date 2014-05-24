@@ -12,7 +12,6 @@ module Name.Names(module Name.Name,module Name.Names,module Name.Prim) where
 
 import Char(isDigit)
 
-import Ty.Level
 import Name.Name
 import Name.Prim
 import Name.VConsts
@@ -42,7 +41,7 @@ fromUnboxedNameTuple n = case show n of
     _ -> fail $ "Not unboxed tuple: " ++ show n
 
 instance FromTupname Name where
-    fromTupname name | m == Module "Jhc.Prim.Prim" = fromTupname (nn::String) where
+    fromTupname name | m == mod_JhcPrimPrim = fromTupname (nn::String) where
         (_,(m,nn)) = fromName name
     fromTupname _ = fail "not a tuple"
 
@@ -57,35 +56,3 @@ sFuncNames = FuncNames {
     func_runNoWrapper = v_runNoWrapper,
     func_runRaw = v_runRaw
     }
-
-----------------
--- Parameterized
-----------------
-
--- Goal, get rid of hardcoded NameType, move pertinent info into cache byte
-
-instance HasTyLevel Name where
-    getTyLevel n = f (nameType n) where
-        f DataConstructor = Just termLevel
-        f Val             = Just termLevel
-        f RawType         = Just typeLevel
-        f TypeConstructor = Just typeLevel
-        f TypeVal         = Just typeLevel
-        f SortName
-            | n == s_HashHash = Just $ succ kindLevel
-            | n == s_StarStar = Just $ succ kindLevel
-            | otherwise = Just kindLevel
-        f _ = Nothing
-
-isConstructor :: Name -> Bool
-isConstructor n = f (nameType n) where
-    f TypeConstructor = True
-    f DataConstructor = True
-    f SortName = True
-    f _ = False
-
-nameTyLevel_u f n = case getTyLevel n of
-    Nothing -> n
-    Just cl | cl == cl' -> n
-            | otherwise -> toName (mkNameType cl' (isConstructor n)) n
-        where cl' = f cl

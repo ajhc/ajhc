@@ -92,8 +92,8 @@ ebl_$a
 
 module :: { HsModule }
     : '{' impdecls decls '}'  { hsModule {
-        hsModuleName    = toModule "Main",
-        hsModuleExports = Just [HsEVar (toName Val "main")],
+        hsModuleName    = mod_Main,
+        hsModuleExports = Just [HsEVar vu_main],
         hsModuleSrcLoc  = $1,
         hsModuleImports = $2,
         hsModuleDecls   = fixupHsDecls $3
@@ -139,7 +139,7 @@ decl :: { HsDecl }
     | 'instance' classhead optwhere { HsInstDecl $1 $2 $3 }
     | 'class' classhead optwhere { HsClassDecl $1 $2 $3 }
     | 'foreign' 'import' ewl_var mstring '::' qualtype
-                    {% doForeign $1 (toName Val "import":$3) $4 $6  }
+                    {% doForeign $1 (vu_import:$3) $4 $6  }
     | 'foreign' wl_var mstring '::' qualtype {% doForeign $1 $2 $3 $5  }
 -- FFI parts
 mstring :: { Maybe (String,Name) }
@@ -464,7 +464,7 @@ x `cat` y = HsWords [x,y]
 eloc p e =  HsLocatedExp (Located (srcSpan p) e)
 espan p1 p2 e =  HsLocatedExp (Located (SrcSpan p1 p2) e)
 
-tuple_con_name i = toName DataConstructor (toModule "Jhc.Prim.Prim","("++replicate i ','++")")
+tuple_con_name i = toName DataConstructor (mod_JhcPrimPrim,"("++replicate i ','++")")
 
 readPrim :: Read a => String -> a
 readPrim s = case reads s of

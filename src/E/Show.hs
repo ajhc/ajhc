@@ -104,7 +104,7 @@ showLit showBind l = do
         cons = bop (R,5) (text ":")
 	shortenName n = Map.lookup n shortName `mplus` (getModule n >>= mm) where
 	    mm m = if m `elem` shortMods then return (toUnqualified n) else Nothing
-            shortMods = map toModule [ "Jhc.Prim.IO", "Jhc.Prim.Bits", "Jhc.Type.Word", "Jhc.Type.C" ]
+            shortMods = [ mod_JhcPrimIO, mod_JhcPrimBits, mod_JhcTypeWord, mod_JhcTypeC ]
     f l
 
 app = bop (L,100) (text " ")

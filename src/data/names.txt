@@ -1,24 +1,32 @@
+; Any names the compiler might have to refer to internally go in here to get
+; definitions automatically created in an efficient and typesafe way.
+;
+; It seems long, but most are for deriving and desugaring.
+; semicolons introduce comments.
+;
+; The finished names are placed in Name.Prim
+
 TypeConstructor:tc:
 
 IOErrorType  Jhc.Type.Handle.IOErrorType
 IOMode       Jhc.Type.Handle.IOMode
 
-Bang_      Jhc.Prim.Rts.Bang_
+ACIO       Jhc.Prim.IO.ACIO
 Arrow      Jhc.Prim.Prim.->
-MutArray__ Jhc.Prim.Array.MutArray_
-List       Jhc.Prim.Prim.[]
+Bang_      Jhc.Prim.Rts.Bang_
+Bool       Jhc.Prim.Prim.Bool
+Bool_      Jhc.Prim.Bits.Bool_
 Char       Jhc.Type.Basic.Char
 IO         Jhc.Prim.IO.IO
-ST         Jhc.Prim.IO.ST
-ACIO       Jhc.Prim.IO.ACIO
-State_     Jhc.Prim.IO.State_
-RealWorld  Jhc.Prim.IO.RealWorld
-Bool       Jhc.Prim.Prim.Bool
+List       Jhc.Prim.Prim.[]
+MutArray__ Jhc.Prim.Array.MutArray_
 Ordering   Jhc.Prim.Prim.Ordering
-Bool_      Jhc.Prim.Bits.Bool_
+RealWorld  Jhc.Prim.IO.RealWorld
+ST         Jhc.Prim.IO.ST
+State_     Jhc.Prim.IO.State_
 Unit       Jhc.Prim.Prim.()
 
-# Jhc.Type
+; Jhc.Type
 Ratio      Jhc.Type.Float.Ratio
 Float      Jhc.Type.Float.Float
 Double     Jhc.Type.Float.Double
@@ -163,26 +171,26 @@ ix_inRange           Jhc.Inst.PrimEnum.ix_inRange
 ix_range             Jhc.Inst.PrimEnum.ix_range
 
 SortName:s:
-# kinds
-Star *
-Hash #
-Bang !
-Tuple (#)
+; kinds
+Star   *       ; The kind of lazy boxed types
+Hash   #       ; The kind of unboxed types
+Bang   !       ; The kind of strict boxed types
+Tuple (#)      ; The kind of unboxed tuples
 
 Quest        ?
 QuestQuest   ??
 StarBang     *!
 
-# superkinds
+; superkinds
 HashHash  ##
 StarStar  **
 
-# unqualified values
+; unqualified values
 Val:vu:
 At           @
 Bang         !
 Dot          .
-Hash         #
+Hash         #              ; kinds will be parsed as values.
 Minus        -
 Quest        ?
 QuestQuest   ??
@@ -199,15 +207,17 @@ forall       forall
 hiding       hiding
 kind         kind
 qualified    qualified
+main         main
+import       import
 
-# placeholders
+; placeholders
 UnknownType:u:
 
 At           @
 Bang         !
 Dot          .
 DotDot       ..
-Hash         #
+Hash         #                  ; comment
 Minus        -
 Quest        ?
 QuestQuest   ??
@@ -226,3 +236,14 @@ kind         kind
 qualified    qualified
 instance     instance
 import       import
+
+Module:mod:
+
+Prelude
+Main
+unknown
+Jhc.Type.C
+Jhc.Type.Ptr
+
+Main@   ; The meta-module containing the whole program
+Prim@   ; The synthesized module containing primitives
