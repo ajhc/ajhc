@@ -3,6 +3,7 @@ module FrontEnd.Lex.Post(
     checkContext,
     checkDataHeader,
     checkPattern,
+    checkPatterns,
     checkSconType,
     checkValDef,
     doForeign,
@@ -112,6 +113,35 @@ checkValDef srcloc lhs rhs whereBinds = withSrcLoc srcloc $ ans lhs where
                 when (isFullyConst lhs) $
                     parseErrorK "pattern binding cannot be fully const"
                 return (HsPatBind srcloc lhs rhs whereBinds)
+
+-- when we have a sequence of patterns we don't allow top level binary
+-- operators, but instead give a sequence of responses. This is used in lambda
+-- notation. \ x y -> .. is \ x -> \ y -> .. not \ (x y) -> ..
+checkPatterns :: HsExp -> P [HsPat]
+checkPatterns HsWords { .. } = do
+    bangPatterns <- flip fopts' FO.BangPatterns <$> getOptions
+    let patShuntSpec = F.shuntSpec { F.lookupToken, F.application, F.operator } where
+            lookupToken (HsBackTick (HsVar v)) | bangPatterns && v == vu_Bang = return (Right (F.Prefix,11))
+            lookupToken (HsBackTick (HsVar v)) | v == vu_Twiddle = return (Right (F.Prefix,11))
+            lookupToken (HsBackTick (HsVar v)) | v == vu_At = return (Right (F.R,12))
+            lookupToken HsBackTick {} = fail "sequence of pattern bindings can't have top level operators."
+            lookupToken t = do
+                p <- checkPattern t
+                return (Left [p])
+            application e1 e2 = return $ e1 ++ e2
+            operator (HsBackTick (HsVar v)) [[e]] | bangPatterns && v == vu_Bang = do
+                sl <- getSrcSpan; return $ [HsPBangPat (Located sl e)]
+            operator (HsBackTick (HsVar v)) [[e]] | v == vu_Twiddle = do
+                sl <- getSrcSpan; return $ [HsPIrrPat (Located sl e)]
+            operator (HsBackTick (HsVar v)) [[HsPVar ap],[e]] | v == vu_At = do
+                sl <- getSrcSpan; return $ [HsPAsPat ap e]
+            operator (HsBackTick (HsVar v)) [ap,[e]] | v == vu_At = do
+                parseErrorK "as pattern must bind variable"
+                return [e]
+            operator t as = fail "unexpected operator in checkPatterns"
+    F.shunt patShuntSpec hsExpExps
+
+checkPatterns e = (:[]) <$> checkPattern e
 
 checkPattern :: HsExp -> P HsPat
 checkPattern be = checkPat be [] where

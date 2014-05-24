@@ -28,6 +28,7 @@ my $opt_help;
 my $opt_man;
 my $opt_tc;
 my $opt_kb;
+my $show_all;
 my $verbose;
 
 Getopt::Long::Configure ("bundling", "auto_help");
@@ -38,11 +39,12 @@ GetOptions(
     'f=s' => \@fopts,
     'o=s' => \@opts,
     't=i' => \$opt_timeout,
+    'a'   => \$show_all,
     l => \$opt_l,
     n => \$opt_n,
     p => \$opt_p,
     v => \$verbose,
-    t => \$opt_tc,
+    's=s' => \$opt_tc,
     'noskip=s' => \$opt_kb,
     'win' => \$opt_win,
     'rts=s' =>\@opt_rts,
@@ -60,7 +62,7 @@ delete $ENV{JHC_CACHE};
 delete $ENV{JHC_LIBRARY_PATH};
 
 @opts = (@opts, (map { "-f$_" } @fopts), (map { "-m$_" } @mopts));
-@opts = (@opts, '--no-cache', '--stop', 'typecheck') if $opt_tc;
+@opts = (@opts, '--stop', $opt_tc) if $opt_tc;
 
 my @cond;
 my @ncond;
@@ -216,13 +218,15 @@ sub run_test {
     push @res, $result;
     if($must_fail) {
         if($r == 0) {
-            rlog "$name - Compilation Succeeded When It shouldn't!";
+            rlog "\n$name - Compilation Succeeded When It shouldn't!";
             $error++;
             $result->{compile_status} = 'BAD';
+            $result->{has_error}++;
             return;
         } else {
             if(statf($r) eq 'INT') {
                 $result->{compile_status} = 'INT';
+                $result->{has_error}++;
                 done();
             }
             $result->{compile_status} = 'pass';
@@ -232,13 +236,15 @@ sub run_test {
         if($r == 0) {
             $result->{compile_status} = 'pass';
         } else {
+            $result->{has_error}++;
             $error++;
         }
     }
     unless($r == 0) {
-        rlog "Compilation Failed: $name $r";
+        rlog "\nCompilation Failed: $name $r";
         my $msg = `tail $result->{compile_results}`;
         rlog $msg;
+        $result->{has_error}++;
         $error++;
         if(statf($r) eq 'INT') {done()};
         return;
@@ -255,6 +261,7 @@ sub run_test {
     $result->{run_time} = $time;
     unless($r == 0) {
         rlog "-- $name Run Failed: $r";
+        $result->{has_error}++;
         $error++;
         if(statf($r) eq 'INT') {done()};
         return;
@@ -264,6 +271,7 @@ sub run_test {
         $result->{expected_stdout} = "$fbase.expected.stdout";
         my $r = system "diff --strip-trailing-cr $result->{run_stdout} $result->{expected_stdout}";
         $result->{stdout_diff} = $r;
+        $result->{has_error}++;
         $error++ if $r ne 0;
     }
 }
@@ -332,12 +340,16 @@ sub done {
     my $fmt = "%10s %25s %5s %5s %5s %7s %7s\n";
     rlog sprintf $fmt, "Category", "Name", "Compile", "Run", "Out", "CTime", "RTime";
     rlog "-------------------------------------------------------------------------";
+    my $failing;
     foreach my $r (@res) {
+        $failing++ if $r->{has_error};
+        next unless $r->{has_error} || $show_all;
         my $name = $r->{name};
         $name =~ s/^tests\.//;
         $name =~ /^([^.]*)\.(.*)$/;
         rlog sprintf $fmt, $1, $2, statf($r->{compile_status}),statf($r->{run_status}),statf($r->{stdout_diff}), timef($r->{compile_time}), timef($r->{run_time}) ;
     }
+    rlog sprintf "Tests: %i total %i passing %i failing", scalar @res, scalar @res - $failing, $failing;
     close RLOG;
     unlink "$results_dir/last";
     system "mv -f $results_dir/latest $results_dir/last";
@@ -377,9 +389,13 @@ regress [options] [conditions]
    -n            go faster by not linting
    -p            profile JHC (requires jhcp to have been built)
 
+   -s PHASE      stop after phase
+
    --rts         extra GHC RTS flags for JHC
    --clean       start with fresh cache for test
    --win         cross compile to windows and test with wine
+
+   --noskip RES  don't skip tests that match argument.
 
 =head1 DESCRIPTION
 

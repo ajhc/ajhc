@@ -49,11 +49,11 @@ module FrontEnd.Tc.Monad(
     withMetaVars
     ) where
 
+import Util.Std
 import Control.Monad.Error
 import Control.Monad.Reader
 import Control.Monad.Writer.Strict
 import Data.IORef
-import List
 import System
 --import Text.PrettyPrint.HughesPJ(Doc)
 import qualified Data.Foldable as T
@@ -68,7 +68,6 @@ import FrontEnd.Class
 import FrontEnd.Diagnostic
 import FrontEnd.KindInfer
 import FrontEnd.Rename(DeNameable(..))
-import FrontEnd.SrcLoc(bogusASrcLoc,MonadSrcLoc(..))
 import FrontEnd.Tc.Kind
 import FrontEnd.Tc.Type
 import FrontEnd.Warning
@@ -117,7 +116,7 @@ data Output = Output {
    {-! derive: Monoid !-}
 
 newtype Tc a = Tc (ReaderT TcEnv (WriterT Output IO) a)
-    deriving(MonadFix,MonadIO,MonadReader TcEnv,MonadWriter Output,Functor)
+    deriving(MonadFix,MonadIO,MonadReader TcEnv,MonadWriter Output,Functor,Applicative)
 
 -- | information that is passed into the type checker.
 data TcInfo = TcInfo {
@@ -362,9 +361,9 @@ deconstructorInstantiate tfa@TForAll {} = do
     TForAll vs qt@(_ :=> t) <- freshSigma tfa
     let f (_ `TArrow` b) = f b
         f b = b
-        eqvs = vs List.\\ freeVars (f t)
+        eqvs = vs \\ freeVars (f t)
     tell mempty { existentialVars = eqvs }
-    (_,t) <- freshInstance Sigma (TForAll (vs List.\\ eqvs) qt)
+    (_,t) <- freshInstance Sigma (TForAll (vs \\ eqvs) qt)
     return t
 deconstructorInstantiate x = return x
 
@@ -378,7 +377,7 @@ boxySpec (TForAll as qt@(ps :=> t)) = do
         f (TAp a b) vs = liftM2 tAp (f a vs) (f b vs)
         f (TArrow a b) vs = liftM2 TArrow (f a vs) (f b vs)
         f (TForAll as (ps :=> t)) vs = do
-            t' <- f t (vs List.\\ as)
+            t' <- f t (vs \\ as)
             return (TForAll as (ps :=> t'))
         f t _ = return t
         -- f t _ = error $ "boxySpec: " ++ show t

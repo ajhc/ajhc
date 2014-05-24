@@ -106,7 +106,7 @@ makeShow (Body{constructor=constructor,labels=labels,types=types})
 	headfn = fsep [char 'd',(pattern constructor types),equals]
 	bodyStart = fsep [text (q v_showParen),parens $ fsep [text "d",text (q v_geq),text "10"]]
 	body = parens . fsep $ sepWith s (c : b)
-	recordBody = parens $ fsep [c,comp,showChar '{',comp,
+	recordBody = parens $ fsep [c,comp,showString " {",comp,
 				    fsep (sepWith s' b'),comp,showChar '}']
 	c = showString constructor
 	b = map (\x -> fsep[text (q v_showsPrec), text "10", x]) (varNames types)

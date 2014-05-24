@@ -27,9 +27,7 @@ module FrontEnd.ParseMonad(
                 pullCtxtFlag, setFlagDo
 	) where
 
-import Control.Monad
-import Data.Functor
-import Data.Monoid
+import Util.Std
 import qualified Control.Applicative as A
 import qualified Data.Set as Set
 
@@ -152,6 +150,13 @@ instance Monad P where
 		    Ok s' a -> runP (k a) i x y l s' mode
 	fail s = P $ \_r _col _line loc _stk _m -> Failed loc s
 
+instance Functor P where
+    fmap = liftM
+instance Applicative P where
+    (<*>) = ap
+    pure = return
+    (*>) = (>>)
+
 returnP :: a -> P a
 returnP = return
 thenP :: P a -> (a -> P b) -> P b
@@ -224,6 +229,13 @@ instance Monad (Lex r) where
 	Lex v >>= f = Lex $ \k -> v (\a -> runL (f a) k)
 	Lex v >> Lex w = Lex $ \k -> v (\_ -> w k)
 	fail s = Lex $ \_ -> fail s
+
+instance Functor (Lex r) where
+    fmap = liftM
+instance Applicative (Lex r) where
+    (<*>) = ap
+    pure = return
+    (*>) = (>>)
 
 instance MonadWarn (Lex r) where
     addWarning w = Lex $ \k -> addWarning w >> k ()

@@ -6,19 +6,20 @@ module FrontEnd.Warning(
     warn,
     err,
     addWarn,
+    module FrontEnd.SrcLoc,
     -- IO monad
     processIOErrors,
     printIOErrors
     ) where
 
-import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Data.IORef
 import System.IO
 import System.IO.Unsafe
+import Util.Std
 
-import FrontEnd.SrcLoc
+import FrontEnd.SrcLoc(SrcSpan(..),WithSrcLoc(..),MonadSetSrcLoc(..),SrcLoc(..),MonadSrcLoc(..),bogusASrcLoc)
 import Name.Name
 import Options
 import PackedString
@@ -31,7 +32,7 @@ data Warning = Warning {
     warnMessage :: String
     } deriving(Eq,Ord)
 
-class Monad m => MonadWarn m where
+class (Applicative m,Monad m) => MonadWarn m where
     addWarning :: Warning -> m ()
     addWarning w = fail $ show w
 

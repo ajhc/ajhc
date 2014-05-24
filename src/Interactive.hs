@@ -1,13 +1,10 @@
 module Interactive(Interactive.interact, isInteractive) where
 
 import Control.Exception as CE
-import Control.Monad.Identity
+import Util.Std
 import Control.Monad.Reader
-import Data.Monoid
 import IO(stdout)
-import List(sort,isPrefixOf)
-import Maybe
-import System
+import System.Environment
 import Text.Regex
 import qualified Data.Map as Map
 
@@ -76,7 +73,7 @@ isInitial = IS {
     }
 
 newtype In a = MkIn (ReaderT InteractiveState IO a)
-    deriving(MonadIO,Monad,Functor,MonadReader InteractiveState)
+    deriving(MonadIO,Monad,Functor,MonadReader InteractiveState, Applicative)
 
 runIn :: InteractiveState -> In a -> IO a
 runIn is (MkIn x) = runReaderT x is
@@ -244,7 +241,7 @@ calcImports ho qual mod = case Map.lookup mod (hoExports ho) of
 
 isInteractive :: IO Bool
 isInteractive = do
-    pn <- System.getProgName
+    pn <- getProgName
     return $ (optMode options == Interactive)
           || "ichj" `isPrefixOf` reverse pn
           || not (null $ optStmts options)

@@ -108,8 +108,8 @@ module :: { HsModule }
 
 #maybe exports
 
-pat :: { HsPat }
-    : aexp {% checkPattern $1  }
+pats :: { [HsPat] }
+    : exp0 {% checkPatterns $1  }
 
 epat :: { HsPat }
     : exp {% checkPattern $1  }
@@ -288,7 +288,7 @@ exp0  :: { HsExp }
 
 exp1 :: { HsExp }
     : 'if' exp 'then' exp 'else' exp { HsIf (espan $1 $3 $ $2) (espan $3 $5 $4) (eloc $5 $6) }
-    | '\\' wl_pat '->' exp { HsLambda $1 $2 $4 }
+    | '\\' pats '->' exp { HsLambda $1 $2 $4 }
     | 'let' '{' decls '}' 'in' exp { HsLet (fixupHsDecls $3) $6 }
     | 'case' exp 'of' '{' alts '}'  { espan $1 $6 $ HsCase (espan $1 $3 $2) $5 }
     | aexp  { $1 }
@@ -365,7 +365,6 @@ INT :: { Int }
 #ewlist aexp
 #ewlist atype
 #ewlist var
-#wlist pat
 
 #[def oslist   qq[
 ${a}s : rev_$a { reverse \$1 }
