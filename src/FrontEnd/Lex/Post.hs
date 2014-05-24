@@ -8,6 +8,7 @@ module FrontEnd.Lex.Post(
     checkValDef,
     doForeign,
     qualTypeToClassHead,
+    checkBangType,
     implicitName,
     mkRecConstrOrUpdate,
     fixupHsDecls
@@ -34,20 +35,36 @@ checkContext t = (:[]) <$> checkAssertion t
 
 data Scon = SconApp Scon [Scon] | SconType Bool HsType | SconOp Name
     deriving(Show)
-checkSconType :: [Either Name HsType] -> P (Name, [HsBangType])
-checkSconType xs = ans where
-    ans = do
-        s <- F.shunt sconShuntSpec xs
-        let f (SconOp n) = return n
-            f (SconType False (HsTyCon c)) = return c
-            f (SconType False _) = parseErrorK "Needs constructor as head."
-            f ~(SconType True _) = parseErrorK "Only fields may be made strict."
-        let g (SconType False t) = HsUnBangedTy t
-            g ~(SconType True t) = HsBangedTy t
-        case s of
-            SconApp t ts -> do t <- f t; return (t, reverse $ map g ts)
-            _ -> do s <- f s; return (s,[])
+checkSconType  :: [Either Name HsType] -> P (Name, [HsBangType])
+checkSconType xs = do
+    let f (SconOp n) = return n
+        f (SconType False (HsTyCon c)) = return c
+        f (SconType False _) = parseErrorK "Needs constructor as head."
+        f ~(SconType True _) = parseErrorK "Only fields may be made strict."
+    let g (SconType False t) = HsUnBangedTy t
+        g ~(SconType True t) = HsBangedTy t
+    s <- checkSconType' xs
+    case s of
+        SconApp t ts -> do t <- f t; return (t, reverse $ map g ts)
+        _ -> do s <- f s; return (s,[])
 
+checkBangType  :: [Either Name HsType] -> P HsBangType
+checkBangType xs = checkSconType' xs >>= \s -> case s of
+        SconType True ty -> return $ HsBangedTy ty
+        _ -> HsUnBangedTy <$> f s
+    where
+    f (SconType False ty) = return ty
+    f (SconType True _) = parseErrorK "(!) annotation in wrong place."
+    f SconOp {} =  parseErrorK "unexpected operator in type signature."
+    f (SconApp t ts) = do foldl HsTyApp <$> f t <*> mapM f ts
+--        parseErrorK "unexpected operator in type signature."
+ --   SconApp (SconType True _) _ -> parseErrorK "(!) annotation in wrong place."
+ --   SconApp (SconType False t) ts -> return $ HsUnBangedTy (foldr HsTyApp t ts)
+
+
+checkSconType' :: [Either Name HsType] -> P Scon
+checkSconType' xs = ans where
+    ans = F.shunt sconShuntSpec xs
     sconShuntSpec = F.shuntSpec { F.lookupToken, F.application, F.operator } where
         lookupToken (Left t) | t == vu_Bang = return (Right (F.Prefix,11))
         lookupToken (Left t) = return (Right (F.L,9))

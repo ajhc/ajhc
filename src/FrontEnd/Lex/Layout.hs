@@ -30,19 +30,6 @@ doLayout opt fn ts = layout $ preprocessLexemes opt fn ts
 --
 -- turn reserved ids into regular ids if the associated extension is disabled
 
-uniMap = IM.fromList $ [
- f '→' LReservedOp "->",
- f '←' LReservedOp "<-",
- f '∷' LReservedOp "::",
- f '‥' LReservedOp "..",
- f '⇒' LReservedOp "=>"
- ] where
- f c w v = (ord c, (w,v))
-
-splitName :: String -> (Bool,String,String)
-splitName s = ('.' `elem` rmod, reverse rmod, reverse rid) where
-    (rid,'.':rmod) = span ('.' /=) (reverse s)
-
 preprocessLexemes :: Opt -> FilePath -> [Lexeme] -> [Token Lexeme]
 preprocessLexemes opt fn xs = toplevel xs where
     defaultSrcLoc = SrcLoc { srcLocFileName = packString fn, srcLocColumn = 0, srcLocLine = 0 }
@@ -61,7 +48,6 @@ preprocessLexemes opt fn xs = toplevel xs where
                 L (adv (length con + 1) sl) LReservedId ri:rs)
             adv n sl = srcLocColumn_u (n +) sl
 
-
         f n (L sl LSpecial s:rs) | Just flag <- Map.lookup s reservedMap, not (fopts' opt flag) = f n (L sl LVarId s:rs)
         f n (L sl LSpecial [c]:rs) | Just (lc,v) <- IM.lookup (ord c) uniMap = f n (L sl lc v:rs)
         f n (L sl _ "(":L _ LVarSym z:L _ _ ")":rs) = f n (L sl LVarId z:rs)
@@ -78,10 +64,12 @@ preprocessLexemes opt fn xs = toplevel xs where
                 srcLocFileName = packString (read s), srcLocLine = read num, srcLocColumn = 0 }
                     nloc { srcLocColumn = 0 } n rs
             _ -> f n rs
+        f n (x@(fromL -> "{-#"):(fromL -> "JHC"):xs) = f n (x:xs)
+        f n (L sl _ "{-#":(fromL -> pn):xs) | Just npn <- Map.lookup pn pragmaMap = f n (L sl LPragmaStart npn:xs)
         f n (L _ _ "{-#":rs) = f n (d rs) where
             d (L _ _ "#-}":rs) = rs
             d (_:rs) = d rs
-            d [] = error "unterminated pragma"
+            d [] = []
         f n rs@(L sl@SrcLoc { .. } _ _:_) | n /= srcLocLine =
             TokenNL srcLocColumn:f srcLocLine rs
         f n (ls@(L _ _ s):rs@(L sl _ nv:_)) = if s `elem` layoutStarters && nv /= "{"
@@ -89,17 +77,35 @@ preprocessLexemes opt fn xs = toplevel xs where
         f n [ls@(L _ _ s)] | s `elem` layoutStarters = token ls:TokenVLCurly s 0:[]
         f n (r:rs) = token r:f n rs
         f _ [] = []
+
+        pragmaMap = Map.fromList $ [ (y,x) | xs@(x:_) <- pragmaKeepMap, y <- xs]
+            ++ [ (x,x) | x <- pragmaKeep ]
         reservedMap = Map.fromList
-            [("foreign", FO.Ffi)
-            ,("forall", FO.Forall)
-            ,("exists", FO.Exists)
-            ,("kind", FO.UserKinds)
-            ,("family", FO.TypeFamilies)
-            ,("alias", FO.Never)
-            ,("prefixx", FO.Never)
-            ,("prefixy", FO.Never)
-            ,("closed", FO.Never)
+            [("foreign", FO.Ffi), ("forall", FO.Forall), ("exists", FO.Exists)
+            ,("kind", FO.UserKinds), ("family", FO.TypeFamilies), ("alias", FO.Never)
+            ,("prefixx", FO.Never), ("prefixy", FO.Never), ("closed", FO.Never)
             ]
+        pragmaKeep = ["NOETA", "SUPERINLINE", "CTYPE", "INLINE"]
+        pragmaKeepMap =
+            [["NOINLINE", "NOTINLINE"]
+            ,["CATALYST", "CATALYSTS"]
+            ,["SPECIALIZE", "SPECIALISE"]
+            ,["MULTISPECIALIZE", "MULTISPECIALISE"]
+            ,["SUPERSPECIALIZE", "SUPERSPECIALISE"]
+            ,["RULE","RULES", "JHC_RULE", "JHC_RULES", "RULES_JHC"]]
+
+uniMap = IM.fromList $ [
+ f '→' LReservedOp "->",
+ f '←' LReservedOp "<-",
+ f '∷' LReservedOp "::",
+ f '‥' LReservedOp "..",
+ f '⇒' LReservedOp "=>"
+ ] where
+ f c w v = (ord c, (w,v))
+
+splitName :: String -> (Bool,String,String)
+splitName s = ('.' `elem` rmod, reverse rmod, reverse rid) where
+    (rid,'.':rmod) = span ('.' /=) (reverse s)
 
 fromL (L _ _ x) = x
 pragma s ((fromL -> "{-#"):(fromL -> n):ls) | map toUpper n == s = d [] ls  where
@@ -240,6 +246,7 @@ layoutBrackets = [
     ("if","then"),
     ("then","else"),
     ("(",")"),
+    ("(#","#)"),
     ("[","]"),
     ("{","}")
     ]

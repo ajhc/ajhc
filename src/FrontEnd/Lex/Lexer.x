@@ -77,6 +77,8 @@ $charesc = [abfnrtv\\\"\'\&]                                                -- "
 @ws      = $ws+
 @integer = @decimal | 0[oO] @octal | 0[xX] @hexadecimal
 @stringlit = \" @string* \"  -- "
+@floatlit =  @decimal \. @decimal @exponent?  | @decimal @exponent
+@charlit =  \' ($graphic # [\'\\] | " " | @escape) \'
 
 haskell :-
 
@@ -101,6 +103,7 @@ haskell :-
 "{-#" @ws "GHC"                 { begin discard_pragma }
 <discard_pragma> "#-}"          { begin hs }
 <discard_pragma> .              ;
+
 "{-#"                           { mkL LSpecial }
 "#-}"                           { mkL LSpecial }
 
@@ -135,15 +138,10 @@ haskell :-
 -- literals
 -----------
 
-<hs> @integer                   { mkL LInteger }
-
-<hs> @decimal \. @decimal @exponent?
-  | @decimal @exponent		{ mkL LFloat }
-
-<hs> \' ($graphic # [\'\\] | " " | @escape) \'
-				{ mkL LChar }
-
-<hs> \" @string* \"	{ mkL LString }   -- "
+<hs> @integer  { mkL LInteger }
+<hs> @floatlit { mkL LFloat }
+<hs> @charlit  { mkL LChar }
+<hs> @stringlit{ mkL LString }
 
 -----------
 -- unboxed
@@ -153,6 +151,8 @@ haskell :-
 <hs> "#)" / { isEnabled FO.UnboxedTuples }  { mkL LSpecial }
 <hs> @integer "#" / { isEnabled FO.UnboxedValues } { mkL LInteger_ }
 <hs> @stringlit "#" / { isEnabled FO.UnboxedValues } { mkL LString_ }
+<hs> @charlit "#" / { isEnabled FO.UnboxedValues } { mkL LChar_ }
+<hs> @floatlit "#" / { isEnabled FO.UnboxedValues } { mkL LFloat_ }
 
 {
 data Lexeme = L SrcLoc LexemeClass String
@@ -162,7 +162,9 @@ data LexemeClass
   = LInteger
   | LInteger_
   | LFloat
+  | LFloat_
   | LChar
+  | LChar_
   | LString
   | LString_
   | LSpecial

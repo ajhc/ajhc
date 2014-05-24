@@ -84,7 +84,7 @@ instance  (Integral a)  => Enum (Ratio a)  where
 
 instance  (Read a, Integral a)  => Read (Ratio a)  where
     readsPrec p  =  readParen (p > ratPrec)
-                              (\r -> [(reduce (x * signum y) (abs y),u) | (x,s)   <- readsPrec (ratPrec+1) r,
+                              (\r -> [(reduce (x * signum y) (abs y),u) | (x,s) <- readsPrec (ratPrec+1) r,
                                                 ("%",t) <- lex s,
                                                 (y,u)   <- readsPrec (ratPrec+1) t ])
 

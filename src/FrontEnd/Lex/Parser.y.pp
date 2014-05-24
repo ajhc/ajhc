@@ -14,7 +14,7 @@ import FrontEnd.Lex.ParseMonad
 import FrontEnd.Lex.Post
 import FrontEnd.SrcLoc
 import FrontEnd.Warning
-import Name.Name
+import Info.Properties
 import Name.Names
 import qualified Data.Map as Map
 
@@ -22,14 +22,16 @@ import qualified Data.Map as Map
 
 %token
 
-#sub token { my ($a,$b,$c) = @_; say  "    '$b' { L \$\$ $a \"$b\" }" }
+#def token "    '$b' { L \$\$ $a \"$b\" }\n"
 #map { token('LSpecial',$_) } qw/{ } , ; [ ] ` ( )/
-#map { token('LSpecial',$_) } qw/(# #)/
+#map { token('LSpecial',$_) } qw/(# #) #-}/
 #map { token('LReservedId',$_) } qw/case class data default deriving do else if import in infix infixl infixr instance let module newtype of then type where _/
 --#map { token('LReservedId',$_) } qw/as hiding qualified/
 #map { token('LReservedId',$_) } qw/kind alias prefixx prefixy forall exists family closed foreign/
 #map { token('LReservedOp',$_) } qw/.. : :: = \\\\ | <- -> @ ~ =>/
+#def pragma qq[    '$a' { L _ LPragmaStart \$\$@"$a" }\n]
 
+#map {pragma($_)} qw/NOINLINE CATALYST SPECIALIZE MULTISPECIALIZE SUPERSPECIALIZE RULE NOETA SUPERINLINE CTYPE INLINE SRCLOC_ANNOTATE/
  '.' { L $$ LVarSym "." }
  'as' { L $$ LVarId "as" }
  'hiding' { L $$ LVarId "hiding" }
@@ -47,7 +49,9 @@ import qualified Data.Map as Map
   LInteger  { L _ LInteger $$ }
   LInteger_ { L _ LInteger_ $$ }
   LFloat    { L _ LFloat $$ }
+  LFloat_    { L _ LFloat_ $$ }
   LChar     { L _ LChar $$ }
+  LChar_     { L _ LChar_ $$ }
   LString   { L _ LString $$ }
   LString_  { L _ LString_ $$ }
 
@@ -109,10 +113,13 @@ module :: { HsModule }
 #maybe exports
 
 pats :: { [HsPat] }
-    : exp0 {% checkPatterns $1  }
+    : srcloc exp0 {% withSrcLoc $1 (checkPatterns $2) }
 
 epat :: { HsPat }
-    : exp {% checkPattern $1  }
+    : exp {% checkPattern $1 }
+
+CTYPE :: { String } :  'CTYPE' STRING '#-}'  { $2 }
+#maybe CTYPE
 
 decl :: { HsDecl }
     : exp0 srcloc rhs optwhere  {% checkValDef $2 $1 $3 $4 }
@@ -124,23 +131,65 @@ decl :: { HsDecl }
                         hsDeclTArgs = $3,
                         hsDeclType = $5 } }
     | assoc INT cl_varconop  { HsInfixDecl (fst $1) (snd $1) $2 $3 }
-    | 'data' qualtype mconstrs deriving {% do
-        (cs,c,t) <- checkDataHeader $2
+    | 'data' m_CTYPE qualtype mconstrs deriving {% withSrcLoc $1 $ do
+        (cs,c,t) <- checkDataHeader $3
         return hsDataDecl {
             hsDeclSrcLoc = $1, hsDeclContext = cs,
-            hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $4,
-            hsDeclCons = fst $3, hsDeclHasKind = snd $3 } }
-    | 'newtype' qualtype '=' constr deriving {% do
-        (cs,c,t) <- checkDataHeader $2
+            hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $5,
+            hsDeclCons = fst $4, hsDeclHasKind = snd $4, hsDeclCTYPE = $2 } }
+    | 'newtype' m_CTYPE qualtype '=' constr deriving {% withSrcLoc $1 $ do
+        (cs,c,t) <- checkDataHeader $3
         return hsNewTypeDecl {
             hsDeclSrcLoc = $1, hsDeclContext = cs,
-            hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $5,
-            hsDeclCons = [$4] } }
+            hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $6,
+            hsDeclCons = [$5], hsDeclCTYPE = $2 } }
     | 'instance' classhead optwhere { HsInstDecl $1 $2 $3 }
     | 'class' classhead optwhere { HsClassDecl $1 $2 $3 }
     | 'foreign' 'import' ewl_var mstring '::' qualtype
                     {% doForeign $1 (vu_import:$3) $4 $6  }
     | 'foreign' wl_var mstring '::' qualtype {% doForeign $1 $2 $3 $5  }
+    | propspragma srcloc ecl_var '#-}'  { HsPragmaProps $2 $1 $3 }
+    | 'deriving' 'instance' classhead { HsDeclDeriving $1 $3 }
+    | rulecatalyst rules '#-}' {
+        HsPragmaRules $ map (\x -> x { hsRuleIsMeta = $1 }) (reverse $2) }
+    | srcloc specialize m_con var '::' type '#-}'
+                      { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = $4, hsDeclType = $6
+                                           , hsDeclUniq = error "hsDeclUniq not set"  } }
+#maybe con
+
+rulecatalyst ::  { Bool }
+    : 'RULE' { False }
+    | 'CATALYST' { True }
+specialize ::  { Bool }
+    : 'SPECIALIZE' { False }
+    | 'SUPERSPECIALIZE' { True }
+
+rule :: { HsRule } : srcloc STRING mfreevars exp '=' exp { HsRule {
+    hsRuleSrcLoc = $1,
+    hsRuleString = $2,
+    hsRuleFreeVars = $3,
+    hsRuleLeftExpr = $4,
+    hsRuleRightExpr = $6,
+    hsRuleUniq = error "hsRuleUniq not set",
+    hsRuleIsMeta = error "hsRuleIsMeta not set" } }
+
+mfreevars :: { [(HsName,Maybe HsType)] }
+      : 'forall' vbinds '.' { $2 }
+      | { [] }
+
+vbinds :: { [(HsName,Maybe HsType)] }
+      : vbinds '(' var '::' type ')' { ($3,Just $5) : $1 }
+      | vbinds var                   { ($2,Nothing) : $1 }
+      |                              { [] }
+
+propspragma :: { String }
+    : 'INLINE' { $1 }
+    | 'MULTISPECIALIZE' { $1 }
+    | 'NOINLINE' { $1 }
+    | 'SRCLOC_ANNOTATE' { $1 }
+    | 'SUPERINLINE' { $1 }
+    | 'NOETA' { $1 }
+
 -- FFI parts
 mstring :: { Maybe (String,Name) }
 mstring : LString var    { Just (read $1,$2) }
@@ -182,7 +231,9 @@ constr :: { HsConDecl }
         hsConDeclExists = $2 } }
 
 fielddecl :: { ([HsName],HsBangType) }
-    : cl_var '::' type  { (map (toName FieldLabel) $1, HsUnBangedTy $3) }
+    : cl_var '::' wl_batype  {% withSrcLoc $2 $ do
+        tty <- checkBangType $3
+        return (map (toName FieldLabel) $1, tty) }
 
 mexists :: { [HsTyVarBind] }
         : 'exists' wl_tbind '.' { $2 }
@@ -237,7 +288,8 @@ maybeimpspec :: { Maybe (Bool, [HsExportSpec]) }
     | {- empty -}         { Nothing }
 
 exports :: { [HsExportSpec] }
-    : '(' ecl_export ')'     { $2 }
+--    : '(' ')'                     { [] }
+    : '(' ocl_export ')'  { $2 }
 
 export :: { HsExportSpec }
     :  var                          { HsEVar $1 }
@@ -261,10 +313,12 @@ btype :: { HsType }
     | atype                         { $1 }
 
 atype :: { HsType }
-    : con                    { HsTyCon (toName TypeConstructor $1) }
+    : gcon                    { HsTyCon (toName TypeConstructor $1) }
     | var                    { HsTyVar (toName TypeVal $1) }
 --    | '(' ')'                {% HsTyCon `fmap` implicitName tc_Unit }
-    | '(' ')'                { HsTyTuple [] }
+    | '(' ')'                { HsTyCon tc_Unit }
+ --   | '(' commas ')'   { tuple_con_name $2 }
+    | '(' '->' ')'           { HsTyCon tc_Arrow }
     | '[' ']'                {% HsTyCon `fmap` implicitName tc_List }
     | '(' cl2_type ')'       { HsTyTuple $2 }
     | '(#' ecl_type '#)'     { HsTyUnboxedTuple $2 }
@@ -313,16 +367,15 @@ aexp :: { HsExp }
     | '[' list ']'      { espan $1 $3 $2 }
     | '_'               { HsWildCard $1 }
     | var               { HsVar $1 }
-    | con               { HsCon $1 }
+    | gcon               { HsCon $1 }
     | varop             { HsBackTick (HsVar $1) }
     | conop             { HsBackTick (HsCon $1) }
-    | ':'               {% do
-        cons <- implicitName dc_Cons
-        return $ HsBackTick (HsCon cons) }
     | lit               { HsLit $1 }
     -- atomic after layout processing
     | 'do' '{' stmts  '}'    { HsDo $3 }
     | aexp '{' ecl_fbind '}' {% mkRecConstrOrUpdate $1 $3 }
+
+m_comma :: { () } : ',' { () } |  { () }
 
 commas :: { Int }
     : commas ','                    { $1 + 1 }
@@ -353,11 +406,14 @@ lit :: { HsLiteral }
     | LChar     { HsChar $ read $1 }
     | LString   { HsString $ read $1 }
     | LFloat    { HsFrac  $ toRational (read $1 :: Double) }
-    | LString_   { HsStringPrim $ readPrim $1 }
-    | LInteger_ { HsIntPrim $ readPrim $1 }
 
-INT :: { Int }
-    : LInteger { read $1 }
+    | LChar_     { HsCharPrim $ readPrim $1 }
+    | LFloat_    { HsFrac  $ toRational (readPrim $1 :: Double) }
+    | LInteger_  { HsIntPrim $ readPrim $1 }
+    | LString_   { HsStringPrim $ readPrim $1 }
+
+STRING :: { String } : LString { read $1 }
+INT :: { Int } : LInteger { read $1 }
 
 #map { clist $_ } qw/exp stmt type var varcon varconop export con fielddecl fbind/
 #blist constr
@@ -375,11 +431,22 @@ rev_$a
     | {- empty -}   { [] }
 ]
 #]
+#[def oclist   qq[
+ocl_${a} : ocrev_$a { reverse \$1 }
+ocrev_$a
+    : ocrev_$a ',' $a { \$3 : \$1 }
+    | ocrev_$a ','    { \$1 }
+    | $a            { [\$1] }
+    | {- empty -}   { [] }
+]
+#]
 
+#oclist 'export'
 #oslist 'decl'
 #oslist 'impdecl'
 #oslist 'alt'
 #oslist 'stmt'
+#oslist 'rule'
 
 var :: { Name }
     : uqvar { $1 }
@@ -417,7 +484,7 @@ varconop
 conop :: { Name }
     : LConSym  { (toName DataConstructor $1) }
     | LQConSym { (parseName DataConstructor $1) }
---    | ':'      { (toName DataConstructor ":") }
+    | ':'     {% do implicitName dc_Cons }
 
 varop :: { Name }
     : LVarSym  { (toName Val $1) }
@@ -463,6 +530,7 @@ x `cat` y = HsWords [x,y]
 
 eloc p e =  HsLocatedExp (Located (srcSpan p) e)
 espan p1 p2 e =  HsLocatedExp (Located (SrcSpan p1 p2) e)
+withSpan p1 p2 e =  withSrcSpan (SrcSpan p1 p2) e
 
 tuple_con_name i = toName DataConstructor (mod_JhcPrimPrim,"("++replicate i ','++")")
 
