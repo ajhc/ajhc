@@ -72,6 +72,7 @@ infixHsModule (FixityMap ism) m =  ans where
     ans = if fopts' (hsModuleOpt m) FO.NewParser
         then domod m
         else hsModuleDecls_u (map (processDecl ism)) m
+    bangPatterns = fopts' (hsModuleOpt m) FO.BangPatterns
     (expShuntSpec,pexpShuntSpec) = (expShuntSpec,pexpShuntSpec) where
         pexpShuntSpec = expShuntSpec {
             F.operator = paren_operator, F.trailingOps }
@@ -122,17 +123,18 @@ infixHsModule (FixityMap ism) m =  ans where
         application (HsPApp t es) y = return $ HsPApp t (es ++ [y])
         application x y = parseErrorK $ "weird appliaction: " ++ show (x,y)
         operator (HsPatBackTick t) as = operator t as
-        operator (HsPVar v) [e] | v == vu_Bang = do sl <- getSrcSpan; return $ HsPBangPat (Located sl e)
+        operator (HsPVar v) [e] | v == vu_Bang  && bangPatterns = do sl <- getSrcSpan; return $ HsPBangPat (Located sl e)
         operator (HsPVar v) [e] | v == vu_Twiddle = do sl <- getSrcSpan; return $ HsPIrrPat (Located sl e)
         operator (HsPVar v) [HsPVar ap, e] | v == vu_At = do sl <- getSrcSpan; return $ HsPAsPat ap e
         operator (HsPVar v) [e] | v == v_sub = return $ HsPNeg e
         operator (HsPApp t xs) y = return $ HsPApp t (xs ++ y)
         backtick bt = f bt where
-            f (HsPVar v) | v == vu_Bang = return (Right (F.Prefix,11))
+            f (HsPVar v) | v == vu_Bang && bangPatterns = return (Right (F.Prefix,11))
             f (HsPVar v) | v == vu_Twiddle = return (Right (F.Prefix,11))
-            f (HsPVar v) | v == vu_At = return (Right (F.R,11))
+            f (HsPVar v) | v == vu_At = return (Right (F.R,12))
             f (HsPVar v) = g v
             f (HsPApp v []) = g v
+            f z = parseErrorK $ "infix.f: " ++ show z
             g v = return $ case Map.lookup v ism of
                 Just (n,HsAssocLeft) -> Right (F.L,n)
                 Just (n,HsAssocRight) -> Right (F.R,n)

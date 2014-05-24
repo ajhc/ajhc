@@ -364,7 +364,7 @@ instance Rename HsType where
 
 renameHsType' dovar t = pp (rt t) where
     rt :: HsType -> RM HsType
-    rt (HsTyTuple []) = HsTyCon <$> implicitName tc_Unit
+    rt (HsTyTuple []) = return $ HsTyCon tc_Unit
     rt (HsTyVar hsName) | dovar = do
         hsName' <- renameTypeName hsName
         return (HsTyVar hsName')
@@ -426,7 +426,7 @@ instance Rename HsMatch where
 
 instance Rename HsPat where
     rename (HsPVar hsName) = HsPVar `fmap` renameValName hsName
-    rename (HsPList []) = flip HsPApp [] <$> implicitName dc_EmptyList
+    rename (HsPList []) = return $ HsPApp dc_EmptyList []
     rename (HsPInfixApp hsPat1 hsName hsPat2) = HsPInfixApp <$> rename hsPat1 <*> renameValName hsName <*> rename hsPat2
     rename (HsPApp hsName hsPats) = HsPApp <$> renameValName hsName <*> rename hsPats
     rename (HsPRec hsName hsPatFields) = do
@@ -521,7 +521,7 @@ instance Rename HsExp where
     rename (HsEnumFromTo hsExp1 hsExp2) = rename $  desugarEnum "enumFromTo" [hsExp1, hsExp2]
     rename (HsEnumFromThen hsExp1 hsExp2) = rename $ desugarEnum "enumFromThen" [hsExp1, hsExp2]
     rename (HsEnumFromThenTo hsExp1 hsExp2 hsExp3) = rename $  desugarEnum "enumFromThenTo" [hsExp1, hsExp2, hsExp3]
-    rename (HsList []) = HsCon <$> implicitName dc_EmptyList
+    rename (HsList []) = return $ HsCon dc_EmptyList
     rename (HsListComp hsExp hsStmts) = do
         (ss,e) <- renameHsStmts hsStmts (rename hsExp)
         listCompToExp newVar e ss
@@ -547,8 +547,8 @@ failRename s = do
     sl <- getSrcLoc
     fail (show sl ++ ": " ++ s)
 
-implicitName :: Name -> RM Name
-implicitName n = do
+_implicitName :: Name -> RM Name
+_implicitName n = do
     opt <- getOptions
     if fopts' opt FO.Prelude
         then return n
@@ -728,6 +728,7 @@ instance UpdateTable HsType where
 getNamesAndASrcLocsFromHsDecl :: HsDecl -> [(Name, SrcLoc)]
 getNamesAndASrcLocsFromHsDecl d = f d where
     f (HsPatBind srcLoc (HsPVar hsName) _ _) = [(fromValishHsName hsName, srcLoc)]
+--    f (HsPatBind sloc p _ _) = [ (fromValishHsName n, sloc) | n <- (getNamesFromHsPat p) ]
     f (HsPatBind sloc _ _ _) = error $ "non simple pattern binding found (sloc): " ++ show sloc
     f (HsFunBind (HsMatch { .. }:_)) = [(fromValishHsName hsMatchName,hsMatchSrcLoc)]
     f (HsForeignDecl { .. }) = [(fromValishHsName hsDeclName, hsDeclSrcLoc)]

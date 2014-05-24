@@ -53,7 +53,8 @@ $ws        = [$unispace $white]
 @specialid = as|hiding|qualified
 
 @reservedop =
-	".." | ":" | "::" | "=" | \\ | "|" | "<-" | "->" | "@" | "~" | "=>"
+	".." | "::" | "=" | \\ | "|" | "<-" | "->" | "=>"
+     --   ".." | ":" | "::" | "=" | \\ | "|" | "<-" | "->" | "@" | "~" | "=>"
 
 @varid  = $small $idchar* $trailing*
 @conid  = $large $idchar* $trailing*

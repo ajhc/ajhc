@@ -28,7 +28,8 @@ import qualified Data.Map as Map
 #map { token('LReservedId',$_) } qw/case class data default deriving do else if import in infix infixl infixr instance let module newtype of then type where _/
 --#map { token('LReservedId',$_) } qw/as hiding qualified/
 #map { token('LReservedId',$_) } qw/kind alias prefixx prefixy forall exists family closed foreign/
-#map { token('LReservedOp',$_) } qw/.. : :: = \\\\ | <- -> @ ~ =>/
+-- #map { token('LReservedOp',$_) } qw/.. : :: = \\\\ | <- -> @ ~ =>/
+#map { token('LReservedOp',$_) } qw/.. :: = \\\\ | <- -> =>/
 #def pragma qq[    '$a' { L _ LPragmaStart \$\$@"$a" }\n]
 
 #map {pragma($_)} qw/NOINLINE CATALYST SPECIALIZE MULTISPECIALIZE SUPERSPECIALIZE RULE NOETA SUPERINLINE CTYPE INLINE SRCLOC_ANNOTATE/
@@ -36,6 +37,9 @@ import qualified Data.Map as Map
  'as' { L $$ LVarId "as" }
  'hiding' { L $$ LVarId "hiding" }
  'qualified' { L $$ LVarId "qualified" }
+
+ cons_id  { L $$ LVarId ":" }
+ cons_sym { L $$ LVarSym ":" }
 
   LVarId   { L _ LVarId $$ }
   LQVarId  { L _ LQVarId $$ }
@@ -150,6 +154,7 @@ decl :: { HsDecl }
     | 'foreign' wl_var mstring '::' qualtype {% doForeign $1 $2 $3 $5  }
     | propspragma srcloc ecl_var '#-}'  { HsPragmaProps $2 $1 $3 }
     | 'deriving' 'instance' classhead { HsDeclDeriving $1 $3 }
+    | 'default' type { HsDefaultDecl $1 $2 }
     | rulecatalyst rules '#-}' {
         HsPragmaRules $ map (\x -> x { hsRuleIsMeta = $1 }) (reverse $2) }
     | srcloc specialize m_con var '::' type '#-}'
@@ -313,18 +318,16 @@ btype :: { HsType }
     | atype                         { $1 }
 
 atype :: { HsType }
-    : gcon                    { HsTyCon (toName TypeConstructor $1) }
+    : gcon                   { HsTyCon (toName TypeConstructor $1) }
     | var                    { HsTyVar (toName TypeVal $1) }
---    | '(' ')'                {% HsTyCon `fmap` implicitName tc_Unit }
-    | '(' ')'                { HsTyCon tc_Unit }
+    | '(' ')'                { HsTyCon $ quoteName tc_Unit }
  --   | '(' commas ')'   { tuple_con_name $2 }
-    | '(' '->' ')'           { HsTyCon tc_Arrow }
-    | '[' ']'                {% HsTyCon `fmap` implicitName tc_List }
+    | '(' '->' ')'           { HsTyCon $ quoteName tc_Arrow }
+    | '[' ']'                { HsTyCon $ quoteName tc_List }
     | '(' cl2_type ')'       { HsTyTuple $2 }
     | '(#' ecl_type '#)'     { HsTyUnboxedTuple $2 }
     | '[' type ']'           {% do
-        tc_List <- implicitName tc_List
-        return $ HsTyApp (HsTyCon tc_List) $2 }
+        return $ HsTyApp (HsTyCon $ quoteName tc_List) $2 }
     | '(' type ')'           { $2 }
     | '(' type '=' type ')'  { HsTyEq $2 $4 }
 
@@ -361,13 +364,13 @@ aexp :: { HsExp }
         let ee = espan $1 $3
         case $2 of
             [x] -> return $ ee x
-            []  -> (ee . HsCon) `fmap` implicitName dc_Unit
+            []  -> return (HsCon $ quoteName dc_Unit)
             xs -> return $ ee $ HsTuple xs }
     | '(#' ecl_exp '#)' { espan $1 $3 $ HsUnboxedTuple $2 }
     | '[' list ']'      { espan $1 $3 $2 }
     | '_'               { HsWildCard $1 }
     | var               { HsVar $1 }
-    | gcon               { HsCon $1 }
+    | gcon              { HsCon $1 }
     | varop             { HsBackTick (HsVar $1) }
     | conop             { HsBackTick (HsCon $1) }
     | lit               { HsLit $1 }
@@ -472,6 +475,7 @@ gcon :: { Name }
 con :: { Name }
     : LConId  { (toName DataConstructor $1) }
     | LQConId { (parseName DataConstructor $1) }
+    | cons_id { quoteName dc_Cons }
 
 varcon
     : var { $1 }
@@ -484,14 +488,15 @@ varconop
 conop :: { Name }
     : LConSym  { (toName DataConstructor $1) }
     | LQConSym { (parseName DataConstructor $1) }
-    | ':'     {% do implicitName dc_Cons }
+--    | ':'     {% do implicitName dc_Cons }
+    | cons_sym { quoteName dc_Cons }
 
 varop :: { Name }
     : LVarSym  { (toName Val $1) }
     | LQVarSym { (parseName Val $1) }
     | '.'      { vu_Dot }
-    | '~'      { vu_Twiddle }
-    | '@'      { vu_At }
+--    | '~'      { vu_Twiddle }
+--    | '@'      { vu_At }
 
 -- punctuation.
 
@@ -516,14 +521,6 @@ happyError [] = do
 happyError (L sl _ t:_) = do
     warn sl ParseError $ "parse error at " ++ show t
     parseNothing
-
-mtuple [] = HsCon dc_Unit
-mtuple [x] = HsParen x
-mtuple xs = HsTuple xs
-
-hsWords [] = error "hsWords []"
-hsWords [x] = x
-hsWords xs = HsWords xs
 
 x `cat` HsWords ws = HsWords (x:ws)
 x `cat` y = HsWords [x,y]

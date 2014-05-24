@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fno-prelude #-}
+{-# OPTIONS_JHC -fno-prelude -funboxed-values #-}
 module Prelude.CType (
     isAscii, isLatin1, isControl, isPrint, isSpace, isUpper, isLower,
     isAlpha, isDigit, isOctDigit, isHexDigit, isAlphaNum,

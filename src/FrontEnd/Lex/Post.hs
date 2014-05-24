@@ -61,7 +61,6 @@ checkBangType xs = checkSconType' xs >>= \s -> case s of
  --   SconApp (SconType True _) _ -> parseErrorK "(!) annotation in wrong place."
  --   SconApp (SconType False t) ts -> return $ HsUnBangedTy (foldr HsTyApp t ts)
 
-
 checkSconType' :: [Either Name HsType] -> P Scon
 checkSconType' xs = ans where
     ans = F.shunt sconShuntSpec xs
@@ -90,30 +89,35 @@ checkValDef srcloc lhs rhs whereBinds = withSrcLoc srcloc $ ans lhs where
     ans lhs = do
         bangPatterns <- flip fopts' FO.BangPatterns <$> getOptions
         --parseWarn $ show lhs
-        let isFunLhs (HsInfixApp l (HsVar op) r) es = return $ Just (op, l:r:es)
+        let isFunLhs HsInfixApp {} es = parseErrorK "Unexpected Infix application"
             isFunLhs (HsLocatedExp (Located sl e)) es = withSrcSpan sl $ isFunLhs e es
-            isFunLhs (HsVar f) es = return $ Just (f, es)
-            isFunLhs (HsParen f) es@(_:_) = isFunLhs f es
+            isFunLhs (HsVar f) [] = return $ Right (HsVar f)
+            isFunLhs (HsVar f) es = return $ Left (f, es)
+            --isFunLhs (HsParen f) es@(_:_) = isFunLhs f es
             isFunLhs (HsApp f e) es = isFunLhs f (e:es)
             isFunLhs HsWords { .. } es =  F.shunt patShuntSpec hsExpExps >>= flip isFunLhs es
-            isFunLhs _ _ = return Nothing
+            isFunLhs p@HsAsPat {} [] = return $ Right p
+            isFunLhs p@HsBangPat {} [] = return $ Right p
+            isFunLhs p@HsIrrPat {} [] = return $ Right p
+            isFunLhs _ _ = return $ Right lhs
 
             -- The top level pattern parsing to determine whether it is a function
             -- or pattern definition is done without knowledge of precedence.
-            patShuntSpec = F.shuntSpec { F.lookupToken, F.application, F.operator, F.lookupUnary } where
+            patShuntSpec = F.shuntSpec { F.lookupToken, F.application, F.operator } where
                 lookupToken (HsBackTick (HsVar v)) | bangPatterns && v == vu_Bang = return (Right (F.Prefix,11))
                 lookupToken (HsBackTick (HsVar v)) | v == vu_Twiddle = return (Right (F.Prefix,11))
                 lookupToken (HsBackTick (HsVar v)) | v == vu_At = return (Right (F.R,12))
-                lookupToken ((HsVar v)) | bangPatterns && v == vu_Bang = return (Right (F.Prefix,11))
-                lookupToken ((HsVar v)) | v == vu_Twiddle = return (Right (F.Prefix,11))
-                lookupToken ((HsVar v)) | v == vu_At = return (Right (F.R,12))
                 lookupToken (HsBackTick t) = return (Right (F.L,9))
                 lookupToken t = return (Left t)
---                lookupUnary (HsBackTick t) = return Nothing
-                lookupUnary _ = fail "lookupUnary oddness"
+
                 application e1 e2 = return $ HsApp e1 e2
-                operator (HsBackTick t) as = operator t as
-                operator t as = return $ foldl HsApp t as
+
+                operator ~(HsBackTick t) as = operator' t as
+                operator' (HsVar v) [e] | v == vu_Bang && bangPatterns = do sl <- getSrcSpan; return $ HsBangPat (Located sl e)
+                operator' (HsVar v) [e] | v == vu_Twiddle = do sl <- getSrcSpan; return $ HsIrrPat (Located sl e)
+                operator' (HsVar v) [HsVar ap, e] | v == vu_At = do sl <- getSrcSpan; return $ HsAsPat ap e
+                operator' (HsVar v) [HsWildCard {}, e] | v == vu_At = do sl <- getSrcSpan; return e
+                operator' t as = return $ foldl HsApp t as
             isFullyConst p = f p where
                 f (HsPApp _ as) = all f as
                 f (HsPList as) = all f as
@@ -122,11 +126,11 @@ checkValDef srcloc lhs rhs whereBinds = withSrcLoc srcloc $ ans lhs where
                 f HsPLit {} = True
                 f _ = False
         isFunLhs lhs [] >>= \x -> case x of
-            Just (f,es@(_:_)) -> do
+            Left (f,es@(_:_)) -> do
                 es <- mapM checkPattern es
                 return (HsFunBind [HsMatch srcloc f es rhs whereBinds])
-            _ -> do
-                lhs <- checkPattern lhs
+            Right e -> do
+                lhs <- checkPattern e
                 when (isFullyConst lhs) $
                     parseErrorK "pattern binding cannot be fully const"
                 return (HsPatBind srcloc lhs rhs whereBinds)

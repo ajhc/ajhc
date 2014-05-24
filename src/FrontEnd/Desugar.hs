@@ -64,22 +64,31 @@ desugarDecl (HsFunBind matches) = do
     newMatches <- mapM desugarMatch matches
     return [HsFunBind newMatches]
 
--- variable pattern bindings remain unchanged
-desugarDecl pb@(HsPatBind sloc (HsPVar n) rhs wheres) = do
-    newRhs <- desugarRhs rhs
-    newWheres <- mapM desugarDecl wheres
-    return [HsPatBind sloc (HsPVar n) newRhs (concat newWheres)]
+--desugarDecl pb@(HsPatBind sloc p rhs wheres) = do
+--    newRhs <- desugarRhs rhs
+--    newWheres <- mapM desugarDecl wheres
+--    return [HsPatBind sloc p newRhs (concat newWheres)]
 
-desugarDecl pb@(HsPatBind sloc pat rhs wheres) = do
-    rhs <- desugarRhs rhs
+--variable pattern bindings remain unchanged
+--desugarDecl (HsPatBind sloc (HsPVar n) rhs wheres) = do
+desugarDecl HsPatBind { hsDeclPat = hsDeclPat@HsPVar {}, .. } = do
+    hsDeclRhs <- desugarRhs hsDeclRhs
+    hsDeclDecls <- concat <$> mapM desugarDecl hsDeclDecls
+    return [HsPatBind { .. }]
+
+--desugarDecl (HsPatBind sloc pat rhs wheres) = do
+desugarDecl HsPatBind { .. } = do
+    hsDeclRhs <- desugarRhs hsDeclRhs
+    hsDeclDecls <- concat <$> mapM desugarDecl hsDeclDecls
+
     unique <- newUniq
     let newRhsName = toName Val ("patrhs@" ++ show unique)
-    newWheres <- mapM desugarDecl wheres
-    let newTopDeclForRhs
-               = HsPatBind sloc (HsPVar newRhsName) rhs (concat newWheres)
-    let newBinds = genBindsForPat pat sloc newRhsName
-    newBinds <- mapM desugarDecl newBinds
-    return (newTopDeclForRhs : concat newBinds)
+
+    let newBinds = genBindsForPat hsDeclPat hsDeclSrcLoc newRhsName
+    newBinds <- concat <$> mapM desugarDecl newBinds
+
+    let newTopDeclForRhs = HsPatBind { hsDeclPat = HsPVar newRhsName, .. }
+    return (newTopDeclForRhs : newBinds)
 
 desugarDecl (HsClassDecl sloc qualtype decls) = do
     newDecls <- mapM desugarDecl decls
@@ -112,7 +121,7 @@ genBindsForPat pat sloc rhsName
 -- are bound in a pattern
 
 getPatSelFuns :: SrcLoc -> HsPat -> [(HsName, (HsExp))]
-getPatSelFuns sloc pat = [(varName, HsParen (HsLambda sloc [HsPVar newPatVarName] (kase (replaceVarNamesInPat varName pat)))) | varName <- getNamesFromHsPat pat] where
+getPatSelFuns sloc pat = [(varName, HsParen (HsLambda sloc [HsPVar newPatVarName] (kase (replaceVarNamesInPat varName pat)))) | varName <- getNamesFromHsPat pat, nameType varName == Val] where
     kase p =  HsCase (HsVar newPatVarName) [a1, a2 ] where
        a1 =  HsAlt sloc p (HsUnGuardedRhs (HsVar newPatVarName)) []
        a2 =  HsAlt sloc HsPWildCard (HsUnGuardedRhs (HsError { hsExpSrcLoc = sloc, hsExpErrorType = HsErrorPatternFailure, hsExpString = show sloc ++ " failed pattern match" })) []
@@ -244,7 +253,7 @@ listCompToExp newName exp ss = hsParen `liftM` f ss where
     --f ((HsGenerator srcLoc pat e):[HsQualifier q]) | isHsPVar pat = hsParen $ HsApp (HsApp (HsVar f_filter)  (hsParen $ HsLambda srcLoc [pat] q) ) e
     f ((HsGenerator srcLoc pat e):HsQualifier q:ss) | isLazyPat pat, Just exp' <- g ss = do
         npvar <- newName
-        return $ hsApp (HsVar v_foldr)  [HsLambda srcLoc [pat,HsPVar npvar] $ 
+        return $ hsApp (HsVar v_foldr)  [HsLambda srcLoc [pat,HsPVar npvar] $
             hsIf q (hsApp (HsCon dc_Cons) [exp',HsVar npvar]) (HsVar npvar), HsList [],e]
     f ((HsGenerator srcLoc pat e):ss) | isLazyPat pat = do
         ss' <- f ss

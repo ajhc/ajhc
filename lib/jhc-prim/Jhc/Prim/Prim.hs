@@ -2,6 +2,7 @@
 -- It will not bring any code into the system, but brings several
 -- names and type definitions into scope that the compiler expects
 -- to exist.
+
 module Jhc.Prim.Prim where
 
 import Jhc.Prim.Bits
