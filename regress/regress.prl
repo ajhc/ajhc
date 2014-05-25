@@ -340,7 +340,7 @@ sub done {
     my $fmt = "%10s %25s %5s %5s %5s %7s %7s\n";
     rlog sprintf $fmt, "Category", "Name", "Compile", "Run", "Out", "CTime", "RTime";
     rlog "-------------------------------------------------------------------------";
-    my $failing;
+    my $failing = 0;
     foreach my $r (@res) {
         $failing++ if $r->{has_error};
         next unless $r->{has_error} || $show_all;

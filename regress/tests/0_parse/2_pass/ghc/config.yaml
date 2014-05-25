@@ -1,8 +1,4 @@
 tests:
-    read028:
-        skip: known_bug
-    read030:
-        skip: known_bug
     read050:
         skip: KindSignatures
     read054:
