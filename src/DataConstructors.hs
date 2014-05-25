@@ -110,7 +110,7 @@ tipe' ~(TExists xs (_ :=> t)) = do
         --return $ tVr v (kind $ tyvarKind tv)
         return $ (kind $ tyvarKind tv)
     t' <- tipe' t
-    return $ ELit litCons { litName = unboxedNameTuple TypeConstructor (length xs' + 1), litArgs = (t':xs'), litType = eHash }
+    return $ ELit litCons { litName = name_UnboxedTupleConstructor typeLevel (length xs' + 1), litArgs = (t':xs'), litType = eHash }
 
 kind (KBase KUTuple) = eHash
 kind (KBase KHash) = eHash
@@ -239,8 +239,8 @@ tunboxedtuple n = (typeCons,dataCons) where
         conInhabits  = s_Hash,
         conChildren  = DataNormal [dc]
         }
-    dc = unboxedNameTuple DataConstructor n
-    tc = unboxedNameTuple TypeConstructor n
+    dc = name_UnboxedTupleConstructor termLevel n
+    tc = name_UnboxedTupleConstructor typeLevel n
     tipe = foldr ELam ftipe typeVars
     typeVars = take n [ tvr { tvrType = eStar, tvrIdent = v } | v <- anonymousIds ]
     vars =  [ tvr { tvrType = EVar t, tvrIdent = v } | v <- map anonymous [ n + 8, n + 9 ..] | t <- typeVars ]
@@ -818,7 +818,7 @@ showDataTable (DataTable mp) = vcat xs where
 {-# NOINLINE samplePrimitiveDataTable #-}
 samplePrimitiveDataTable :: DataTable
 samplePrimitiveDataTable = DataTable $ Map.fromList [ (x,c) | x <- xs, c <- getConstructor x mempty] where
-    nt v = map (flip unboxedNameTuple (v::Int)) [DataConstructor, TypeConstructor]
+    nt v = map (flip name_UnboxedTupleConstructor (v::Int)) [termLevel, typeLevel]
     xs = nt 0 ++ nt 3 ++ [nameConjured modAbsurd eStar,nameConjured modBox hs, nameConjured modAbsurd hs', nameConjured modBox hs',rt_bits16,rt_bits_ptr_]
     hs = EPi (tVr emptyId eHash) eStar
     hs' = tFunc eStar (tFunc (tFunc eStar eHash) eStar)

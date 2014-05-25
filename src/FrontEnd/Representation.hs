@@ -139,7 +139,9 @@ data Tycon = Tycon { tyconName :: Name, tyconKind :: Kind }
     {-! derive: Binary !-}
 
 instance ToTuple Tycon where
-    toTuple n = Tycon (nameTuple TypeConstructor n) (foldr Kfun kindStar $ replicate n kindStar)
+    --toTuple n = Tycon (nameTuple TypeConstructor n) (foldr Kfun kindStar $ replicate n kindStar)
+    toTuple n = Tycon (name_TupleConstructor typeLevel n) (foldr Kfun kindStar $ replicate n kindStar)
+
 instance ToTuple Type where
     toTuple n = TCon $ toTuple n
 
@@ -311,8 +313,9 @@ instance CanType Type where
     getType (TMetaVar mv) = getType mv
     getType ta@TAssoc {} = getType (tassocToAp ta)
 
-tTTuple ts | length ts < 2 = error "tTTuple"
+tTTuple [] = tUnit
+tTTuple [_]  = error "tTTuple"
 tTTuple ts = foldl TAp (toTuple (length ts)) ts
 
-tTTuple' ts = foldl TAp (TCon $ Tycon (unboxedNameTuple TypeConstructor  n) (foldr Kfun kindUTuple $ replicate n kindStar)) ts where
+tTTuple' ts = foldl TAp (TCon $ Tycon (name_UnboxedTupleConstructor typeLevel n) (foldr Kfun kindUTuple $ replicate n kindStar)) ts where
     n = length ts

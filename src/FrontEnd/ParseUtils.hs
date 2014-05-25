@@ -58,6 +58,7 @@ splitTyConApp t0 = split t0 []
 	split :: HsType -> [HsType] -> P (Name,[HsType])
 	split (HsTyApp t u) ts = split t (u:ts)
 	split (HsTyCon t) ts = return (t,ts)
+        split (HsTyTuple []) [] = return (quoteName tc_Unit,[])
 	split _ _ = fail "Illegal data/newtype declaration"
 --	split a b = fail $ "Illegal data/newtype declaration: " ++ show (a,b)
 
@@ -74,7 +75,7 @@ qualTypeToClassHead qt = do
         _ -> fail "Invalid Class Head"
 
 checkContext :: HsType -> P HsContext
-checkContext (HsTyCon (toName TypeConstructor -> name)) | name == tc_Unit = return []
+checkContext (HsTyCon (toName TypeConstructor -> name)) | name == quoteName tc_Unit = return []
 checkContext (HsTyTuple ts) =
 	mapM checkAssertion ts
 checkContext t = do
@@ -106,6 +107,7 @@ checkDataHeader (HsQualType cs t) = do
 checkSimple :: String -> HsType -> [Name] -> P ((Name,[Name]))
 checkSimple kw (HsTyApp l (HsTyVar a)) xs = checkSimple kw l (a:xs)
 checkSimple _kw (HsTyCon t)   xs = return (t,xs)
+checkSimple _kw (HsTyTuple [])   [] = return (quoteName tc_Unit,[])
 checkSimple kw _ _ = fail ("Illegal " ++ kw ++ " declaration")
 --checkSimple kw t ts = fail ("Illegal " ++ kw ++ " declaration: " ++ show (t,ts))
 

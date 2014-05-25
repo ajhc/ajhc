@@ -38,6 +38,54 @@ import qualified FrontEnd.HsErrors as HsErrors
 import qualified FrontEnd.SrcLoc
 import qualified Name.VConsts as V
 
+{-
+
+Special renaming rules.
+
+When it maps to a 'Prelude.*' name, it means it will map to whatever version
+the Prelude in scope exports.
+
+For other 'Jhc.*.* names, it refers to the _exact_ version defined in jhc-prim.
+
+module JPP = Jhc.Prim.Prim
+
+name         prelude           -fno-prelude
+
+names introduced by desugaring:
+do:>>=           Prelude.>>=            (>>=)
+do:>>            Prelude.>>             (>>)
+do:fail          Prelude.fail           fail
+4:fromInteger    Prelude.fromInteger    fromInteger
+4:fromInt        Prelude.fromInt        fromInt
+4.4:fromRational Prelude.fromRational   fromRational
+pattern:(==)     Prelude.==             (==)
+unary:-          Prelude.negate         negate
+n+k:>=           Prelude.>=             >=
+n+k:-            Prelude.-              (-)
+[..]             Prelude.enumFrom..     (enumFrom..)
+(x,y,..)         JPP.(,*) x y           JPP.(,*) x y
+
+terms:
+[]           JPP.[]       JPP.[]
+()           JPP.()       JPP.()
+(,*)         JPP.(,*)     JPP.(,*)
+[x,y,..]     x JPP.: ..   x JPP.: ..
+(:)          JPP.:        JPP.:
+
+types:
+[]           JPP.[]    JPP.[]
+()           JPP.()    JPP.()
+(,*)         JPP.(,*)  JPP.(,*)
+(->)         JPP.->    JPP.->
+if:Bool      JPP.Bool  JPP.Bool
+[..]         JPP.[]    JPP.[]
+
+other:
+(#.. #)      always special.
+list comprehensions always turn into JPP versions
+
+-}
+
 data FieldMap = FieldMap
     !(Map.Map Name Int)          -- a map of data constructors to their arities
     !(Map.Map Name [(Name,Int)]) -- a map of field labels to ...
@@ -364,7 +412,7 @@ instance Rename HsType where
 
 renameHsType' dovar t = pp (rt t) where
     rt :: HsType -> RM HsType
-    rt (HsTyTuple []) = return $ HsTyCon tc_Unit
+    rt (HsTyTuple []) = return $ HsTyTuple []
     rt (HsTyVar hsName) | dovar = do
         hsName' <- renameTypeName hsName
         return (HsTyVar hsName')
@@ -426,7 +474,7 @@ instance Rename HsMatch where
 
 instance Rename HsPat where
     rename (HsPVar hsName) = HsPVar `fmap` renameValName hsName
-    rename (HsPList []) = return $ HsPApp dc_EmptyList []
+--    rename (HsPList []) = return $ HsPList []
     rename (HsPInfixApp hsPat1 hsName hsPat2) = HsPInfixApp <$> rename hsPat1 <*> renameValName hsName <*> rename hsPat2
     rename (HsPApp hsName hsPats) = HsPApp <$> renameValName hsName <*> rename hsPats
     rename (HsPRec hsName hsPatFields) = do
@@ -521,7 +569,7 @@ instance Rename HsExp where
     rename (HsEnumFromTo hsExp1 hsExp2) = rename $  desugarEnum "enumFromTo" [hsExp1, hsExp2]
     rename (HsEnumFromThen hsExp1 hsExp2) = rename $ desugarEnum "enumFromThen" [hsExp1, hsExp2]
     rename (HsEnumFromThenTo hsExp1 hsExp2 hsExp3) = rename $  desugarEnum "enumFromThenTo" [hsExp1, hsExp2, hsExp3]
-    rename (HsList []) = return $ HsCon dc_EmptyList
+   -- rename (HsList []) = return $ HsCon dc_EmptyList
     rename (HsListComp hsExp hsStmts) = do
         (ss,e) <- renameHsStmts hsStmts (rename hsExp)
         listCompToExp newVar e ss

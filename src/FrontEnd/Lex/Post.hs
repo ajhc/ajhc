@@ -39,6 +39,7 @@ checkSconType  :: [Either Name HsType] -> P (Name, [HsBangType])
 checkSconType xs = do
     let f (SconOp n) = return n
         f (SconType False (HsTyCon c)) = return c
+        f (SconType False (HsTyTuple [])) = return $ quoteName tc_Unit
         f (SconType False _) = parseErrorK "Needs constructor as head."
         f ~(SconType True _) = parseErrorK "Only fields may be made strict."
     let g (SconType False t) = HsUnBangedTy t
@@ -359,17 +360,6 @@ mkRecConstrOrUpdate e fs = f e fs where
     fs' = map g fs
 
 {-
-
-splitTyConApp :: HsType -> P (Name,[HsType])
-splitTyConApp t0 = split t0 []
- where
-	split :: HsType -> [HsType] -> P (Name,[HsType])
-	split (HsTyApp t u) ts = split t (u:ts)
-	split (HsTyCon t) ts = return (t,ts)
-	split _ _ = fail "Illegal data/newtype declaration"
---	split a b = fail $ "Illegal data/newtype declaration: " ++ show (a,b)
-
---checkSimple kw t ts = fail ("Illegal " ++ kw ++ " declaration: " ++ show (t,ts))
 
 {-
 checkInstHeader :: HsQualType -> P (HsContext,Name,[HsType])

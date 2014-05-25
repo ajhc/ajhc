@@ -255,12 +255,33 @@ lookupName n = do
     env <- askCurrentEnv
     case Map.lookup n env of
         Just x -> freshSigma x
-        Nothing | Just 0 <- fromUnboxedNameTuple n  -> do
-            return (tTTuple' [])
-        Nothing | Just num <- fromUnboxedNameTuple n -> do
-            nvs <- mapM newVar  (replicate num kindArg)
-            let nvs' = map TVar nvs
-            return (TForAll nvs $ [] :=> foldr TArrow  (tTTuple' nvs') nvs')
+--        Nothing | Just 0 <- fromTupname n  -> do
+--            return (tTTuple [])
+        -- Nothing | Just 0 <- fromUnboxedNameTuple n  -> do
+        --     return (tTTuple' [])
+        -- Nothing | Just num <- fromUnboxedNameTuple n -> do
+        --     nvs <- mapM newVar  (replicate num kindArg)
+        --     let nvs' = map TVar nvs
+        --     return (TForAll nvs $ [] :=> foldr TArrow  (tTTuple' nvs') nvs')
+        Nothing | Just (isBoxed,lv,num) <- fromName_Tuple n, lv == termLevel -> f (isBoxed,num) where
+            f (isBoxed,0) = return $ if isBoxed then tTTuple [] else tTTuple' []
+            f (isBoxed,num) = do
+                nvs <- mapM newVar  (replicate num kindArg)
+                let nvs' = map TVar nvs
+                    ttuple = if isBoxed then tTTuple else tTTuple'
+                return (TForAll nvs $ [] :=> foldr TArrow  (ttuple nvs') nvs')
+        -- Nothing | Just (lv,num) <- fromName_UnboxedTupleConstructor n, lv == termLevel -> f num where
+        --     f 0 = return $ tTTuple' []
+        --     f num = do
+        --         nvs <- mapM newVar  (replicate num kindArg)
+        --         let nvs' = map TVar nvs
+        --         return (TForAll nvs $ [] :=> foldr TArrow  (tTTuple' nvs') nvs')
+        -- Nothing | Just (lv,num) <- fromName_TupleConstructor n, lv == termLevel -> f num where
+        --     f 0 = return $ tTTuple []
+        --     f num = do
+        --         nvs <- mapM newVar  (replicate num kindArg)
+        --         let nvs' = map TVar nvs
+        --         return (TForAll nvs $ [] :=> foldr TArrow  (tTTuple nvs') nvs')
         Nothing -> fail $ "Could not find var in tcEnv:" ++ show (nameType n,n)
 
 newMetaVar :: MetaVarType -> Kind -> Tc Type

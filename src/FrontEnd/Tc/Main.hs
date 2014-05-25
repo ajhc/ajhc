@@ -119,7 +119,7 @@ doCoerce ct e = do
 wrapInAsPat :: HsExp -> Tc (HsExp,Name)
 wrapInAsPat e = do
     n <- newHsVar "As"
-    return (HsAsPat (nameName n) e, n)
+    return (HsAsPat n e, n)
 
 wrapInAsPatEnv :: HsExp -> Type -> Tc HsExp
 wrapInAsPatEnv e typ = do
@@ -288,11 +288,19 @@ tiExpr (HsIf e e1 e2) typ = do
 
 tiExpr tuple@(HsTuple exps@(_:_)) typ = deNameContext Nothing "in the tuple" tuple $ do
     --(_,exps') <- tcApps (HsCon (toTuple (length exps))) exps typ
-    (_,exps') <- tcApps (HsCon (nameTuple TypeConstructor (length exps))) exps typ
+    (_,exps') <- tcApps (HsCon (name_TupleConstructor typeLevel (length exps))) exps typ
     return (HsTuple exps')
 
+tiExpr t@(HsTuple []) typ = do -- deNameContext Nothing "in the tuple" tuple $ do
+    tUnit `subsumes` typ
+    return t
+--    return (HsTuple [])
+    --(_,exps') <- tcApps (HsCon (toTuple (length exps))) exps typ
+    --(_,exps') <- tcApps (HsCon (nameTuple TypeConstructor (length exps))) exps typ
+    --return (HsTuple exps')
+
 tiExpr tuple@(HsUnboxedTuple exps) typ = deNameContext Nothing "in the unboxed tuple" tuple $ do
-    (_,exps') <- tcApps (HsCon (nameName $ unboxedNameTuple DataConstructor (length exps))) exps typ
+    (_,exps') <- tcApps (HsCon (name_UnboxedTupleConstructor termLevel (length exps))) exps typ
     return (HsUnboxedTuple exps')
 
 -- special case for the empty list
@@ -451,7 +459,7 @@ tiPat (HsPBangPat (Located l p@HsPAsPat {})) typ = do
     return (HsPBangPat (Located l p),ns)
 tiPat (HsPBangPat (Located l p)) typ = do
     v <- newHsVar "Bang"
-    tiPat (HsPBangPat (Located l (HsPAsPat (nameName v) p))) typ
+    tiPat (HsPBangPat (Located l (HsPAsPat v p))) typ
 tiPat (HsPParen p) typ = tiPat p typ
 
 -- TODO check that constructors are saturated
@@ -503,7 +511,7 @@ tiPat HsPWildCard typ = do
     n <- newHsVar "Wild"
     typ' <- unBox typ
     addToCollectedEnv (Map.singleton n typ')
-    return (HsPVar (nameName n), Map.singleton n typ')
+    return (HsPVar n, Map.singleton n typ')
 
 tiPat (HsPAsPat i pat) typ = do
     (pat',env) <- tcPat pat typ
@@ -512,8 +520,8 @@ tiPat (HsPAsPat i pat) typ = do
 
 tiPat (HsPInfixApp pLeft conName pRight) typ =  tiPat (HsPApp conName [pLeft,pRight]) typ
 
-tiPat (HsPUnboxedTuple ps) typ = tiPat (HsPApp (nameName $ unboxedNameTuple DataConstructor (length ps)) ps) typ
-tiPat tuple@(HsPTuple pats) typ = tiPat (HsPApp (nameTuple DataConstructor (length pats)) pats) typ
+tiPat (HsPUnboxedTuple ps) typ = tiPat (HsPApp (name_UnboxedTupleConstructor termLevel (length ps)) ps) typ
+tiPat tuple@(HsPTuple pats) typ = tiPat (HsPApp (name_TupleConstructor termLevel (length pats)) pats) typ
 tiPat (HsPTypeSig _ pat qt)  typ = do
     kt <- getKindEnv
     s <- hsQualTypeToSigma kt qt
@@ -524,8 +532,8 @@ tiPat (HsPTypeSig _ pat qt)  typ = do
 tiPat p _ = error $ "tiPat: " ++ show p
 
 delistPats ps = pl ps where
-    pl [] = HsPApp (nameName $ dc_EmptyList) []
-    pl (p:xs) = HsPApp (nameName $ dc_Cons) [p, pl xs]
+    pl [] = HsPApp (dc_EmptyList) []
+    pl (p:xs) = HsPApp (dc_Cons) [p, pl xs]
 
 tcBindGroup :: BindGroup -> Tc ([HsDecl], TypeEnv)
 tcBindGroup (es, is) = do
@@ -859,7 +867,7 @@ tiLit _ = error "Main.tiLit: bad."
 getFunDeclsBg :: TypeEnv -> [HsDecl] -> [BindGroup]
 getFunDeclsBg sigEnv decls = makeProgram sigEnv equationGroups where
    equationGroups :: [[HsDecl]]
-   equationGroups = getBindGroups bindDecls (nameName . getDeclName) getDeclDeps
+   equationGroups = getBindGroups bindDecls getDeclName getDeclDeps
    bindDecls = collectBindDecls decls
 
 getBindGroups :: Ord name =>
@@ -881,8 +889,8 @@ makeProgram sigEnv groups = map (makeBindGroup sigEnv ) groups
 makeBindGroup :: TypeEnv -> [HsDecl] -> BindGroup
 makeBindGroup sigEnv decls = (exps, f impls) where
     (exps, impls) = makeBindGroup' sigEnv decls
-    enames = map (nameName . getDeclName . snd) exps
-    f xs = map g $ stronglyConnComp [ (x, nameName $ getDeclName x,[ d | d <- getDeclDeps x, d `notElem` enames]) |  x <- xs]
+    enames = map (getDeclName . snd) exps
+    f xs = map g $ stronglyConnComp [ (x, getDeclName x,[ d | d <- getDeclDeps x, d `notElem` enames]) |  x <- xs]
     g (AcyclicSCC x) = Left x
     g (CyclicSCC xs) = Right xs
 

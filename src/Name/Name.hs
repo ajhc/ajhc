@@ -29,6 +29,10 @@ module Name.Name(
     -- new interface
     mkName,
     mkNameType,
+    nameTyLevel_u,
+    typeLevel,
+    kindLevel,
+    termLevel,
     deconstructName
     ) where
 
@@ -218,12 +222,13 @@ unRenameString s = case span isDigit s of
 
 -- deconstruct name into all its possible parts
 -- does not work on quoted names.
-deconstructName :: Name -> Either UnQuotedName (Maybe Module,Maybe UnqualifiedName,UnqualifiedName,Maybe Int)
+deconstructName :: Name -> (Bool,Maybe Module,Maybe UnqualifiedName,UnqualifiedName,Maybe Int)
+deconstructName name | Just name <- fromQuotedName name = case deconstructName name of
+    (_,a,b,c,d) -> (True,a,b,c,d)
 deconstructName name = f nt where
     (nt,mod,id) = nameParts name
     (mi,id') = unRenameString id
-    f QuotedName = Left (Name $ toAtom id)
-    f _ = Right (mod,Nothing,toName nt id',mi)
+    f _ = (False,mod,Nothing,toName nt id',mi)
 
 --constructName :: Maybe Module -> Maybe UnqualifiedName -> UnqualifiedName -> Maybe Int -> Name
 --constructName mm
@@ -254,6 +259,7 @@ isConstructor n = f (nameType n) where
     f SortName = True
     f _ = False
 
+nameTyLevel_u f (fromQuotedName -> Just qn) = quoteName $ nameTyLevel_u f qn
 nameTyLevel_u f n = case getTyLevel n of
     Nothing -> n
     Just cl | cl == cl' -> n

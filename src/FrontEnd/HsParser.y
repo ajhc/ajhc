@@ -157,7 +157,7 @@ module :: { HsModule }
 modulep  :: { HsModule }
       : 'module' modid maybeexports 'where' body      { HsModule { hsModuleName = $2, hsModuleExports = $3, hsModuleImports = (fst $5), hsModuleDecls = (snd $5)
                                                                  , hsModuleSrcLoc = error "hsModuleSrcLoc not set", hsModuleOptions = error "hsModuleOptions not set" } }
-      | body                                          { HsModule { hsModuleName = main_mod, hsModuleExports = Just [HsEVar (toName Val "main")], hsModuleImports = (fst $1), hsModuleDecls = (snd $1)
+      | body                                          { HsModule { hsModuleName = mod_Main, hsModuleExports = Just [HsEVar vu_main], hsModuleImports = (fst $1), hsModuleDecls = (snd $1)
                                                                  , hsModuleSrcLoc = error "hsModuleSrcLoc not set", hsModuleOptions = error "hsModuleOptions not set" } }
 
 body :: { ([HsImportDecl],[HsDecl]) }
@@ -343,7 +343,7 @@ topdecl :: { HsDecl }
       | pinfixexp srcloc '<-' exp      {% checkPattern $1 `thenP` \p ->
                                          returnP (HsActionDecl $2 p $4) }
       | 'foreign' srcloc 'import' varids mstring '::' ctype
-                      {% doForeign $2 (toName Val "import":reverse $4) $5 $7  }
+                      {% doForeign $2 (vu_import:reverse $4) $5 $7  }
       | 'foreign' srcloc varids mstring '::' ctype
                       {% doForeign $2 (reverse $3) $4 $6  }
       | 'foreign' srcloc varids mstring '::' ctype '=' exp
@@ -477,6 +477,7 @@ btype :: { HsType }
 atype :: { HsType }
       : gtycon                        { HsTyCon $1 }
       | tyvar                         { HsTyVar $1 }
+      | '(' ')'                       { HsTyTuple [] }
       | '(' types ')'                 { HsTyTuple (reverse $2) }
       | '(#' '#)'                     { HsTyUnboxedTuple [] }
       | '(#' type '#)'                { HsTyUnboxedTuple [$2] }
@@ -491,10 +492,9 @@ ktype :: { HsType }
 
 gtycon :: { HsName }
       : qcon                          { $1 }
-      | '(' ')'                       { tc_Unit }
-      | '(' '->' ')'                  { tc_Arrow }
-      | '[' ']'                       { list_tycon_name }
-      | '(' commas ')'                { tuple_tycon_name $2 }
+      | '(' '->' ')'                  { quoteName $ tc_Arrow }
+      | '[' ']'                       { quoteName $ tc_List }
+      | '(' commas ')'                { quoteName $ tuple_tycon_name $2 }
 
 -- (Slightly edited) Comment from GHC's hsparser.y:
 -- "context => type" vs  "type" is a problem, because you can't distinguish between
@@ -1085,22 +1085,17 @@ tyvar :: { HsName }
 parse       :: P HsModule
 parseHsStmt :: P HsStmt
 
-happyError = parseError "Parse error"
---hsSymbol x = HsIdent x
+happyError = parseError "parse error"
+
 readInteger x = fromIntegral x
 readRational x = x
 
-main_mod	      = toModule "Main"
+tuple_con_name i      = name_TupleConstructor termLevel (i + 1)
+tuple_tycon_name i    = name_TupleConstructor typeLevel (i + 1)
 
-tuple_con_name i      = toName DataConstructor (toModule "Jhc.Prim.Prim","("++replicate i ','++")")
+unit_con	      = HsTuple []
+tuple_con i	      = HsCon { hsExpName = quoteName (tuple_con_name i) }
 
-unit_con	      = HsCon { {-hsExpSrcSpan = bogusSrcSpan,-} hsExpName = dc_Unit }
-tuple_con i	      = HsCon { {-hsExpSrcSpan = bogusSrcSpan,-} hsExpName = (tuple_con_name i) }
+list_tycon	      = HsTyCon $ quoteName tc_List
 
-list_tycon_name       = toName UnknownType "[]"
-tuple_tycon_name i    = tuple_con_name i
-
-list_tycon	      = HsTyCon list_tycon_name
-
-toUnqualName n = toName UnknownType (Nothing :: Maybe Module,n)
 }

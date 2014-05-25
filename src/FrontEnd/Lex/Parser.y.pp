@@ -318,8 +318,8 @@ btype :: { HsType }
     | atype                         { $1 }
 
 atype :: { HsType }
-    : gcon                   { HsTyCon (toName TypeConstructor $1) }
-    | var                    { HsTyVar (toName TypeVal $1) }
+    : gcon                   { HsTyCon (nameTyLevel_u (const typeLevel) $1) }
+    | var                    { HsTyVar (nameTyLevel_u (const typeLevel) $1) }
     | '(' ')'                { HsTyCon $ quoteName tc_Unit }
  --   | '(' commas ')'   { tuple_con_name $2 }
     | '(' '->' ')'           { HsTyCon $ quoteName tc_Arrow }
@@ -529,7 +529,7 @@ eloc p e =  HsLocatedExp (Located (srcSpan p) e)
 espan p1 p2 e =  HsLocatedExp (Located (SrcSpan p1 p2) e)
 withSpan p1 p2 e =  withSrcSpan (SrcSpan p1 p2) e
 
-tuple_con_name i = toName DataConstructor (mod_JhcPrimPrim,"("++replicate i ','++")")
+tuple_con_name i = quoteName $ name_TupleConstructor termLevel (i + 1)
 
 readPrim :: Read a => String -> a
 readPrim s = case reads s of
