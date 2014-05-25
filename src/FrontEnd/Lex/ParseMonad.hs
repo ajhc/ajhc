@@ -28,6 +28,12 @@ parseErrorK s = do
     sl <- getSrcLoc
     return (error $ "parseError: " ++ show (sl,s))
 
+parseInfoK :: String -> P a
+parseInfoK s = do
+    addWarn ParseInfo s
+    sl <- getSrcLoc
+    return (error $ "parseError: " ++ show (sl,s))
+
 parseWarn :: String -> P ()
 parseWarn s = do
     addWarn ParseError s

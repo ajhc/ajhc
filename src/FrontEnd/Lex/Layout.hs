@@ -1,5 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
-module FrontEnd.Lex.Layout(doLayout) where
+module FrontEnd.Lex.Layout(doLayout,preprocessLexemes) where
 
 import Control.Applicative
 import Control.Monad.Reader
@@ -143,7 +143,7 @@ layout ls = runReaderT (g ls []) bogusASrcLoc where
         ls -> (t:) `fmap` g rs ls
     f (t@(Token (L _ _ ",")):rs) (Layout "let" _:NoLayout "|" e:ls) = rbrace' `mcons` g (t:rs) (NoLayout "|" e:ls)
     f ((Token t@(L _ _ "where")):rs) ls = case ls of
-        Layout l n : rest | l `elem` ["do","of"]
+        Layout l n : rest | l `elem` ["do"]
             -> mcons3 rbrace' (return t) (g rs rest) -- 'where' closes 'do' and 'case' on equal indentation.
         _otherwise -> (t:) `fmap` g rs ls
     f (Token t:rs) ls = return t `mcons` f rs ls

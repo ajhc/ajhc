@@ -96,6 +96,7 @@ data WarnType
     | MultiplyDefined Name [SrcLoc]
     | OccursCheck
     | ParseError
+    | ParseInfo
     | PrimitiveBadType
     | PrimitiveUnknown Atom
     | TypeSynonymPartialAp

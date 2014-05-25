@@ -59,7 +59,9 @@ sFuncNames = FuncNames {
     func_runRaw = v_runRaw
     }
 
+--------------
 -- tuple names
+--------------
 
 name_TupleConstructor :: TyLevel -> Int -> Name
 name_TupleConstructor l 1 = error $ "name_TupleConstructor called for unary tuple at " ++ show l

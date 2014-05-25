@@ -3,6 +3,7 @@ module DerivingDrift.Drift(driftDerive,driftResolvedNames) where
 import Data.Char
 import qualified Data.Map as Map
 
+import FrontEnd.Warning
 import DerivingDrift.DataP
 import DerivingDrift.StandardRules
 import FrontEnd.Class
@@ -10,16 +11,24 @@ import FrontEnd.HsParser
 import FrontEnd.HsSyn
 import FrontEnd.ParseMonad
 import Name.Name
+import Options
 import Text.PrettyPrint.HughesPJ(render)
+import qualified FlagOpts as FO
+import qualified FrontEnd.Lex.Parse as NP
 
-driftDerive :: HsModule -> [HsDecl]
-driftDerive hsModule = if null ss then [] else hsModuleDecls hsMod
-  where
-    --hsMod = case parse (unlines ss) (SrcLoc (show $ hsModuleName hsModule) 1 1) 0 [] of
-    hsMod = case snd $ runParser parse ss  of
-        ParseOk e -> e
-        ParseFailed sl err -> error $ "internal parse error(driftDerive): " ++ show sl ++ err  ++ "\n" ++ ss
-    ss = unlines [ n | Just n <- map driftDerive' $ hsModuleDecls hsModule, any (not . isSpace) n ]
+driftDerive :: MonadWarn m => HsModule -> m [HsDecl]
+driftDerive hsModule@HsModule { hsModuleOpt, hsModuleName } = do
+    let ss = unlines [ n | Just n <- map driftDerive' $ hsModuleDecls hsModule, any (not . isSpace) n ]
+    if null ss then return [] else do
+        case fopts' hsModuleOpt FO.NewParser of
+            False -> case snd $ runParser parse ss of
+                ParseOk e -> return $ hsModuleDecls e
+                ParseFailed sl err -> fail $ "internal parse error(driftDerive): " ++ show sl ++ err  ++ "\n" ++ ss
+            True -> do
+                res <- NP.parseM hsModuleOpt ("derived:" ++ show hsModuleName) ss
+                case res of
+                    Just hs -> return $ hsModuleDecls hs
+                    Nothing -> return $ []
 
 driftDerive' :: Monad m => HsDecl -> m String
 driftDerive' HsDataDecl { hsDeclName = name, hsDeclArgs = args, hsDeclCons = condecls, hsDeclDerives = derives } = do

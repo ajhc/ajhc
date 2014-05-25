@@ -30,6 +30,7 @@ import Jhc.Show
 import Jhc.Type.C
 import System.C.Stdio
 import Jhc.Prim.Wrapper
+import Jhc.Class.Num
 
 -- IO operations exported by the prelude
 

@@ -209,6 +209,7 @@ kind         kind
 qualified    qualified
 main         main
 import       import
+sub          -
 
 ; placeholders
 UnknownType:u:

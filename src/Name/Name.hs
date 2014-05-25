@@ -30,9 +30,11 @@ module Name.Name(
     mkName,
     mkNameType,
     nameTyLevel_u,
+    nameTyLevel_s,
     typeLevel,
     kindLevel,
     termLevel,
+    originalUnqualifiedName,
     deconstructName
     ) where
 
@@ -230,6 +232,10 @@ deconstructName name = f nt where
     (mi,id') = unRenameString id
     f _ = (False,mod,Nothing,toName nt id',mi)
 
+originalUnqualifiedName :: Name -> Name
+originalUnqualifiedName n = case deconstructName n of
+    (_,_,_,n,_) -> n
+
 --constructName :: Maybe Module -> Maybe UnqualifiedName -> UnqualifiedName -> Maybe Int -> Name
 --constructName mm
 
@@ -258,6 +264,8 @@ isConstructor n = f (nameType n) where
     f DataConstructor = True
     f SortName = True
     f _ = False
+
+nameTyLevel_s tl n = nameTyLevel_u (const tl) n
 
 nameTyLevel_u f (fromQuotedName -> Just qn) = quoteName $ nameTyLevel_u f qn
 nameTyLevel_u f n = case getTyLevel n of

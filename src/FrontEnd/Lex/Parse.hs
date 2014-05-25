@@ -1,4 +1,4 @@
-module FrontEnd.Lex.Parse(parse,parseStmt) where
+module FrontEnd.Lex.Parse(parseM,parse,parseStmt) where
 
 import Util.Std
 
@@ -11,6 +11,18 @@ import Options
 import PackedString
 import qualified FlagDump as FD
 import qualified FrontEnd.Lex.Parser as P
+
+parseM :: MonadWarn m => Opt -> FilePath -> String -> m (Maybe HsModule)
+parseM opt fp s = case scanner opt s of
+    Left s -> fail s
+    Right s -> do
+        s <- doLayout opt fp s
+        case runP (withSrcLoc bogusASrcLoc { srcLocFileName = packString fp } $ P.parseModule s) opt of
+            (ws, ~(Just p)) -> do
+                mapM_ addWarning ws
+                if null ws 
+                    then return $ Just p { hsModuleOpt = opt }
+                    else return Nothing
 
 parse :: Opt -> FilePath -> String -> IO HsModule
 parse opt fp s = case scanner opt s of

@@ -43,6 +43,7 @@ checkSconType xs = do
         f (SconType False _) = parseErrorK "Needs constructor as head."
         f ~(SconType True _) = parseErrorK "Only fields may be made strict."
     let g (SconType False t) = HsUnBangedTy t
+--        f (SconApp (SconOp x) [ta,tb]) | x == tc_Arrow = do HsTyFun <$> f tb <*> f ta
         g ~(SconType True t) = HsBangedTy t
     s <- checkSconType' xs
     case s of
@@ -55,6 +56,7 @@ checkBangType xs = checkSconType' xs >>= \s -> case s of
         _ -> HsUnBangedTy <$> f s
     where
     f (SconType False ty) = return ty
+    f (SconApp (SconOp x) [ta,tb]) | x == tc_Arrow = do HsTyFun <$> f tb <*> f ta
     f (SconType True _) = parseErrorK "(!) annotation in wrong place."
     f SconOp {} =  parseErrorK "unexpected operator in type signature."
     f (SconApp t ts) = do foldl HsTyApp <$> f t <*> mapM f ts
@@ -64,14 +66,20 @@ checkBangType xs = checkSconType' xs >>= \s -> case s of
 
 checkSconType' :: [Either Name HsType] -> P Scon
 checkSconType' xs = ans where
-    ans = F.shunt sconShuntSpec xs
+    ans = do
+        --parseErrorK (show xs)
+        x <- F.shunt sconShuntSpec xs
+        --parseErrorK (show x)
+        return x
     sconShuntSpec = F.shuntSpec { F.lookupToken, F.application, F.operator } where
         lookupToken (Left t) | t == vu_Bang = return (Right (F.Prefix,11))
+        lookupToken (Left t) | t == tc_Arrow = return (Right (F.R,0))
         lookupToken (Left t) = return (Right (F.L,9))
         lookupToken (Right t) = return (Left (SconType False t))
         application e1 e2 = return $ app e1 e2
+--        operator (Left t) [SconType False ta,SconType False tb] | t == tc_Arrow = return $ SconType False (HsTyFun ta tb)
         operator (Left t) [SconType _ ty] | t == vu_Bang = return $ SconType True ty
-        operator ~(Left t) as = return $ foldl app (SconOp t) as
+        operator ~(Left t) as = return $ foldl app (SconOp $ nameTyLevel_s typeLevel t) as
         app (SconApp a bs) e2 =  SconApp a (e2:bs)
         app e1 e2 =  SconApp e1 [e2]
 
@@ -269,9 +277,11 @@ checkDataHeader (HsQualType cs t) = do
 	return (cs,c,ts)
 
 checkSimple :: String -> HsType -> [Name] -> P ((Name,[Name]))
-checkSimple kw (HsTyApp l (HsTyVar a)) xs = checkSimple kw l (a:xs)
-checkSimple _kw (HsTyCon t)   xs = return (t,xs)
-checkSimple kw _ _ = fail ("Illegal " ++ kw ++ " declaration")
+checkSimple kw t xs = f t xs where
+    f (HsTyApp l (HsTyVar a)) xs = checkSimple kw l (a:xs)
+    f (HsTyCon t)   xs = return (t,xs)
+    f (HsTyTuple []) [] = return (tc_Unit,[])
+    f _ _ = fail ("Illegal " ++ kw ++ " declaration")
 
 qualTypeToClassHead :: HsQualType -> P HsClassHead
 qualTypeToClassHead qt = do

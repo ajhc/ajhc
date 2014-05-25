@@ -170,7 +170,8 @@ renameModule opt fls ns m = runRename go opt (hsModuleName m) fls (ns ++ driftRe
   where go mod = do
           let renDesugared = renameDecls . desugarHsModule
           rmod <- renDesugared mod
-          inst <- hsModuleDecls `fmap` renDesugared mod{hsModuleDecls = driftDerive rmod}
+          dd <- driftDerive rmod
+          inst <- hsModuleDecls `fmap` renDesugared mod{hsModuleDecls = dd}
           return (hsModuleDecls_u (++ inst) rmod,inst)
 
 {-# NOINLINE renameStatement #-}
@@ -795,8 +796,9 @@ collectDefsHsModule m = (\(x,y) -> (Seq.toList x,Seq.toList y)) $ execWriter (ma
     f (HsForeignDecl a _ n _)    = tellName a (toName Val n)
     f (HsForeignExport a e _ _)  = tellName a (ffiExportName e)
     f (HsFunBind (HsMatch a n _ _ _:_))  = tellName a (toName Val n)
-    f (HsPatBind srcLoc p _ _)  = mapM_ (tellName srcLoc) [ (toName Val n) | n <- (getNamesFromHsPat p) ]
-    f (HsActionDecl srcLoc p _) = mapM_ (tellName srcLoc) [ (toName Val n) | n <- (getNamesFromHsPat p) ]
+    f (HsPatBind srcLoc (HsPVar n) _ _)  = tellName srcLoc (toName Val n)
+    f (HsPatBind srcLoc p _ _)  = mapM_ (tellName srcLoc) [ (toName Val n) | n <- (getNamesFromHsPat p), n /= vu_sub ]
+    f (HsActionDecl srcLoc p _) = mapM_ (tellName srcLoc) [ (toName Val n) | n <- (getNamesFromHsPat p), n /= vu_sub ]
     f (HsTypeDecl sl n _ _) = tellName sl (toName TypeConstructor n)
     f HsDataDecl { hsDeclDeclType = DeclTypeKind, hsDeclSrcLoc =sl, hsDeclName = n, hsDeclCons = cs } = do
         tellF $ (toName SortName n,sl,snub [ x |(x,_,_) <- cs']): cs' ; zup cs where

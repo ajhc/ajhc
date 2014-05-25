@@ -127,11 +127,11 @@ CTYPE :: { String } :  'CTYPE' STRING '#-}'  { $2 }
 
 decl :: { HsDecl }
     : exp0 srcloc rhs optwhere  {% checkValDef $2 $1 $3 $4 }
-    | cl_var '::' qualtype { HsTypeSig $2 (map (toName Val) $1) $3 }
+    | cl_var '::' qualtype { HsTypeSig $2 $1 $3 }
     | 'type' con ewl_atype '=' type
                       { HsTypeDecl {
                         hsDeclSrcLoc = $1,
-                        hsDeclName = $2,
+                        hsDeclName = nameTyLevel_u (const typeLevel) $2,
                         hsDeclTArgs = $3,
                         hsDeclType = $5 } }
     | assoc INT cl_varconop  { HsInfixDecl (fst $1) (snd $1) $2 $3 }
@@ -215,7 +215,7 @@ kind :: { HsKind }
 bkind :: { HsKind }
        : '(' kind ')'     { $2 }
        |  varop           {% toKindVarSym $1 }
-       |  con             { HsKind $ toName SortName $1 }
+       |  con             { HsKind $ nameTyLevel_s kindLevel $1 }
 
 deriving :: { [Name] }
     : {- empty -}               { [] }
@@ -250,7 +250,9 @@ scontype :: { (HsName, [HsBangType]) }
 
 batype :: { Either Name HsType }
     : varconop    { Left $1 }
+    | '->'        { Left tc_Arrow }
     | atype       { Right $1 }
+    | quantifiedtype { Right $1 }
 
 rhs :: { HsRhs }
     : '=' exp   { HsUnGuardedRhs $2 }
@@ -277,7 +279,8 @@ impdecl :: { HsImportDecl }
     : 'import' optqualified modid maybeas maybeimpspec { HsImportDecl $1 $3 $2 $4 $5 }
 
 modid :: { Module }
-    : con { toModule (show $1) }
+    : LQConId { toModule $1 }
+    | LConId { toModule $1 }
 
 optqualified :: { Bool }
     : 'qualified'   { True  }
@@ -303,26 +306,28 @@ export :: { HsExportSpec }
     |  con '(' ecl_varcon ')'       { HsEThingWith $1 $3 }
     |  'module' modid               { HsEModuleContents $2 }
 
+quantifiedtype :: { HsType }
+    : 'forall' wl_tbind '.' qualtype  { HsTyForall { hsTypeVars = $2, hsTypeType = $4 } }
+    | 'exists' wl_tbind '.' qualtype  { HsTyExists { hsTypeVars = $2, hsTypeType = $4 } }
+
 type :: { HsType }
     : btype '->' type               { HsTyFun $1 $3 }
     | btype                         { $1 }
-    | 'forall' wl_tbind '.' qualtype  { HsTyForall { hsTypeVars = $2, hsTypeType = $4 } }
-    | 'exists' wl_tbind '.' qualtype  { HsTyExists { hsTypeVars = $2, hsTypeType = $4 } }
+    | quantifiedtype                { $1 }
 
 tbind :: { HsTyVarBind }
-       : srcloc var                   { hsTyVarBind { hsTyVarBindSrcLoc = $1, hsTyVarBindName = toName TypeVal $2 } }
-       | srcloc '(' var '::' kind ')' { hsTyVarBind { hsTyVarBindSrcLoc = $1, hsTyVarBindName = toName TypeVal $3, hsTyVarBindKind = Just $5 } }
+       : srcloc var                   { hsTyVarBind { hsTyVarBindSrcLoc = $1, hsTyVarBindName = nameTyLevel_s typeLevel $2 } }
+       | srcloc '(' var '::' kind ')' { hsTyVarBind { hsTyVarBindSrcLoc = $1, hsTyVarBindName = nameTyLevel_s typeLevel $3, hsTyVarBindKind = Just $5 } }
 
 btype :: { HsType }
     : btype atype                   { HsTyApp $1 $2 }
     | atype                         { $1 }
 
 atype :: { HsType }
-    : gcon                   { HsTyCon (nameTyLevel_u (const typeLevel) $1) }
-    | var                    { HsTyVar (nameTyLevel_u (const typeLevel) $1) }
-    | '(' ')'                { HsTyCon $ quoteName tc_Unit }
- --   | '(' commas ')'   { tuple_con_name $2 }
+    : gcon                   { HsTyCon (nameTyLevel_s typeLevel $1) }
+    | var                    { HsTyVar (nameTyLevel_s typeLevel $1) }
     | '(' '->' ')'           { HsTyCon $ quoteName tc_Arrow }
+    | '(' ')'                { HsTyTuple [] }
     | '[' ']'                { HsTyCon $ quoteName tc_List }
     | '(' cl2_type ')'       { HsTyTuple $2 }
     | '(#' ecl_type '#)'     { HsTyUnboxedTuple $2 }
@@ -363,7 +368,7 @@ aexp :: { HsExp }
     : '(' ecl_exp ')'   {% do
         let ee = espan $1 $3
         case $2 of
-            [x] -> return $ ee x
+            [x] -> return $ ee (HsParen x)
             []  -> return (HsCon $ quoteName dc_Unit)
             xs -> return $ ee $ HsTuple xs }
     | '(#' ecl_exp '#)' { espan $1 $3 $ HsUnboxedTuple $2 }

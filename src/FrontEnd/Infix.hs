@@ -24,7 +24,6 @@ import qualified Data.Map as Map
 
 import FrontEnd.HsSyn
 import FrontEnd.Lex.ParseMonad
-import FrontEnd.Lex.Post
 import FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse
 import Name.Name
@@ -126,8 +125,15 @@ infixHsModule (FixityMap ism) m =  ans where
         operator (HsPVar v) [e] | v == vu_Bang  && bangPatterns = do sl <- getSrcSpan; return $ HsPBangPat (Located sl e)
         operator (HsPVar v) [e] | v == vu_Twiddle = do sl <- getSrcSpan; return $ HsPIrrPat (Located sl e)
         operator (HsPVar v) [HsPVar ap, e] | v == vu_At = do sl <- getSrcSpan; return $ HsPAsPat ap e
-        operator (HsPVar v) [e] | v == v_sub = return $ HsPNeg e
+        operator (HsPVar v) [e] | originalUnqualifiedName v == vu_sub = return $ HsPNeg e
         operator (HsPApp t xs) y = return $ HsPApp t (xs ++ y)
+        operator x@(HsPVar v) y = do
+            parseErrorK $ "weird operator: " ++ show (v,originalUnqualifiedName v,x,y)
+            return HsPWildCard
+        operator x y = do
+            parseErrorK $ "weird operator: " ++ show (x,y)
+            return HsPWildCard
+
         backtick bt = f bt where
             f (HsPVar v) | v == vu_Bang && bangPatterns = return (Right (F.Prefix,11))
             f (HsPVar v) | v == vu_Twiddle = return (Right (F.Prefix,11))
@@ -148,11 +154,7 @@ infixHsModule (FixityMap ism) m =  ans where
         opHsExp (HsParen (HsWords es)) = F.shunt pexpShuntSpec es >>= applyHsOps ops
         opHsExp (HsWords es) = F.shunt expShuntSpec es >>= applyHsOps ops
         opHsExp (HsBackTick t) = parseErrorK "unexpected binary operator."
---        opHsExp (HsParen (HsBackTick bt)) = parseErrorK "parens around backtick"
         opHsExp e = traverseHsOps ops e
---        opHsPat (HsPatExp e) = do
- --           e <- opHsExp e
-  --          checkPattern e
         opHsPat (HsPatWords ws) = F.shunt patShuntSpec ws >>= applyHsOps ops
         opHsPat p = traverseHsOps ops p
 
