@@ -7,13 +7,10 @@ module FrontEnd.Rename(
     renameStatement
     ) where
 
-import Control.Applicative
-import Control.Monad.Identity
 import Control.Monad.RWS
 import Control.Monad.Writer
 import Data.Char
-import Data.Maybe
-import List hiding(union)
+import Util.Std hiding(union)
 import qualified Data.Foldable as Seq
 import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
@@ -21,7 +18,7 @@ import qualified Data.Set as Set
 
 import DerivingDrift.Drift
 import Doc.DocLike(tupled)
-import FrontEnd.Desugar (desugarHsModule,doToExp,listCompToExp)
+import FrontEnd.Desugar (desugarHsModule)
 import FrontEnd.HsSyn
 import FrontEnd.SrcLoc hiding(srcLoc)
 import FrontEnd.Syn.Traverse
@@ -33,7 +30,6 @@ import Support.FreeVars
 import Util.Gen
 import Util.Inst()
 import Util.SetLike
-import qualified FlagOpts as FO
 import qualified FrontEnd.HsErrors as HsErrors
 import qualified FrontEnd.SrcLoc
 import qualified Name.VConsts as V
@@ -917,3 +913,113 @@ instance DeNameable HsExp where
         f (HsCase hsExp hsAlts) =
             HsCase (dn hsExp) (dn hsAlts)
         f p = runIdentity $ traverseHsExp (return . dn) p
+
+doToExp :: Monad m
+    => m HsName    -- ^ name generator
+    -> HsName      -- ^ bind (>>=) to use
+    -> HsName      -- ^ bind_ (>>) to use
+    -> HsName      -- ^ fail to use
+    -> [HsStmt]
+    -> m HsExp
+doToExp newName f_bind f_bind_ f_fail ss = hsParen `liftM` f ss where
+    f [] = fail "doToExp: empty statements in do notation"
+    f [HsQualifier e] = return e
+    f [gen@(HsGenerator srcLoc _pat _e)] = fail $ "doToExp: last expression n do notation is a generator (srcLoc):" ++ show srcLoc
+    f [letst@(HsLetStmt _decls)] = fail $ "doToExp: last expression n do notation is a let statement"
+    f (HsQualifier e:ss) = do
+        ss <- f ss
+        return $ HsInfixApp (hsParen e) (HsVar f_bind_) (hsParen ss)
+    f ((HsGenerator _srcLoc pat e):ss) | isSimplePat pat = do
+        ss <- f ss
+        return $ HsInfixApp (hsParen e) (HsVar f_bind) (HsLambda _srcLoc [pat] ss)
+    f ((HsGenerator srcLoc pat e):ss) = do
+        npvar <- newName
+        ss <- f ss
+        let kase = HsCase (HsVar npvar) [a1, a2 ]
+            a1 =  HsAlt srcLoc pat (HsUnGuardedRhs ss) []
+            a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs (HsApp (HsVar f_fail) (HsLit $ HsString $ show srcLoc ++ " failed pattern match in do"))) []
+        return $ HsInfixApp (hsParen e) (HsVar f_bind) (HsLambda srcLoc [HsPVar npvar] kase)  where
+    f (HsLetStmt decls:ss) = do
+        ss <- f ss
+        return $ HsLet decls ss
+
+hsApp e es = hsParen $ foldl HsApp (hsParen e) (map hsParen es)
+hsIf e a b = hsParen $ HsIf e a b
+
+listCompToExp :: Monad m => m HsName -> HsExp -> [HsStmt] -> m HsExp
+listCompToExp newName exp ss = hsParen `liftM` f ss where
+    f [] = return $ HsList [exp]
+    f (gen:HsQualifier q1:HsQualifier q2:ss)  = f (gen:HsQualifier (hsApp (HsVar v_and) [q1,q2]):ss)
+    f ((HsLetStmt ds):ss) = do ss' <- f ss; return $ hsParen (HsLet ds ss')
+    f (HsQualifier e:ss) = do ss' <- f ss; return $ hsParen (HsIf e ss' (HsList []))
+    f ((HsGenerator srcLoc pat e):ss) | isLazyPat pat, Just exp' <- g ss = do
+        return $ hsParen $ HsVar v_map `app` HsLambda srcLoc [pat] exp' `app` e
+    --f ((HsGenerator srcLoc pat e):[HsQualifier q]) | isHsPVar pat = hsParen $ HsApp (HsApp (HsVar f_filter)  (hsParen $ HsLambda srcLoc [pat] q) ) e
+    f ((HsGenerator srcLoc pat e):HsQualifier q:ss) | isLazyPat pat, Just exp' <- g ss = do
+        npvar <- newName
+        return $ hsApp (HsVar v_foldr)  [HsLambda srcLoc [pat,HsPVar npvar] $
+            hsIf q (hsApp (HsCon dc_Cons) [exp',HsVar npvar]) (HsVar npvar), HsList [],e]
+    f ((HsGenerator srcLoc pat e):ss) | isLazyPat pat = do
+        ss' <- f ss
+        return $ hsParen $ HsVar v_concatMap `app`  HsLambda srcLoc [pat] ss' `app` e
+    f ((HsGenerator srcLoc pat e):HsQualifier q:ss) | isFailablePat pat || Nothing == g ss = do
+        npvar <- newName
+        ss' <- f ss
+        let kase = HsCase (HsVar npvar) [a1, a2 ]
+            a1 =  HsAlt srcLoc pat (HsGuardedRhss [HsGuardedRhs srcLoc q ss']) []
+            a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs $ HsList []) []
+        return $ hsParen $ HsVar v_concatMap `app`  HsLambda srcLoc [HsPVar npvar] kase `app`  e
+    f ((HsGenerator srcLoc pat e):ss) | isFailablePat pat || Nothing == g ss = do
+        npvar <- newName
+        ss' <- f ss
+        let kase = HsCase (HsVar npvar) [a1, a2 ]
+            a1 =  HsAlt srcLoc pat (HsUnGuardedRhs ss') []
+            a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs $ HsList []) []
+        return $ hsParen $ HsVar v_concatMap `app` HsLambda srcLoc [HsPVar npvar] kase `app` e
+    f ((HsGenerator srcLoc pat e):ss) = do
+        npvar <- newName
+        let Just exp' = g ss
+            kase = HsCase (HsVar npvar) [a1 ]
+            a1 =  HsAlt srcLoc pat (HsUnGuardedRhs exp') []
+        return $ hsParen $ HsVar v_map `app` HsLambda srcLoc [HsPVar npvar] kase `app` e
+    g [] = return exp
+    g (HsLetStmt ds:ss) = do
+        e <- g ss
+        return (hsParen (HsLet ds e))
+    g _ = Nothing
+    app x y = HsApp x (hsParen y)
+
+-- patterns are
+-- failable - strict and may fail to match
+-- refutable or strict - may bottom out
+-- irrefutable or lazy - match no matter what
+-- simple, a wildcard or variable
+-- failable is a subset of refutable
+
+isFailablePat p | isStrictPat p = f (openPat p) where
+    f (HsPTuple ps) = any isFailablePat ps
+    f (HsPUnboxedTuple ps) = any isFailablePat ps
+    f (HsPBangPat (Located _ p)) = isFailablePat p
+    f _ = True
+isFailablePat _ = False
+
+isSimplePat p = f (openPat p) where
+    f HsPVar {} = True
+    f HsPWildCard = True
+    f _ = False
+
+isLazyPat pat = not (isStrictPat pat)
+isStrictPat p = f (openPat p) where
+    f HsPVar {} = False
+    f HsPWildCard = False
+    f (HsPAsPat _ p) = isStrictPat p
+    f (HsPParen p) = isStrictPat p
+    f (HsPIrrPat p) = False -- isStrictPat p  -- TODO irrefutable patterns
+    f _ = True
+
+openPat (HsPParen p) = openPat p
+openPat (HsPNeg p) = openPat p
+openPat (HsPAsPat _ p) = openPat p
+openPat (HsPTypeSig _ p _) = openPat p
+openPat (HsPInfixApp a n b) = HsPApp n [a,b]
+openPat p = p

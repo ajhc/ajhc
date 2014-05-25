@@ -329,10 +329,6 @@ tiExpr expr@(HsList exps@(_:_)) typ = deNameContext Nothing "in the list " expr 
 
 tiExpr (HsParen e) typ = tcExpr e typ
 
---tiExpr (HsDo stmts) typ = withContext (simpleMsg "in a do expression") $ do
---        newExp <- doToExp stmts
---        tcExpr newExp typ
-
 tiExpr expr@(HsLet decls e) typ = deNameContext Nothing "in the let binding" expr $ do
     sigEnv <- getSigEnv
     let bgs = getFunDeclsBg sigEnv decls

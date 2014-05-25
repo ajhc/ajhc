@@ -46,5 +46,5 @@ raw just evaluate main to WHNF and nothing else.
 new-parser use new parser based on different layout rule.
 
 !Default settings
-@default inline-pragmas rules wrapper defaulting type-analysis monomorphism-restriction global-optimize full-int prelude
+@default inline-pragmas rules wrapper defaulting type-analysis monomorphism-restriction global-optimize full-int prelude new-parser
 @glasgow-exts forall ffi unboxed-tuples
