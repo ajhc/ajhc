@@ -71,7 +71,6 @@ infixHsModule (FixityMap ism) m =  ans where
     ans = if fopts' (hsModuleOpt m) FO.NewParser
         then domod m
         else hsModuleDecls_u (map (processDecl ism)) m
-    bangPatterns = fopts' (hsModuleOpt m) FO.BangPatterns
     (expShuntSpec,pexpShuntSpec) = (expShuntSpec,pexpShuntSpec) where
         pexpShuntSpec = expShuntSpec {
             F.operator = paren_operator, F.trailingOps }
@@ -120,24 +119,27 @@ infixHsModule (FixityMap ism) m =  ans where
         lookupToken t = return (Left t)
         lookupUnary t = return Nothing
         application (HsPApp t es) y = return $ HsPApp t (es ++ [y])
-        application x y = parseErrorK $ "weird appliaction: " ++ show (x,y)
-        operator (HsPatBackTick t) as = operator t as
-        operator (HsPVar v) [e] | v == vu_Bang  && bangPatterns = do sl <- getSrcSpan; return $ HsPBangPat (Located sl e)
-        operator (HsPVar v) [e] | v == vu_Twiddle = do sl <- getSrcSpan; return $ HsPIrrPat (Located sl e)
-        operator (HsPVar v) [HsPVar ap, e] | v == vu_At = do sl <- getSrcSpan; return $ HsPAsPat ap e
-        operator (HsPVar v) [e] | originalUnqualifiedName v == vu_sub = return $ HsPNeg e
-        operator (HsPApp t xs) y = return $ HsPApp t (xs ++ y)
-        operator x@(HsPVar v) y = do
-            parseErrorK $ "weird operator: " ++ show (v,originalUnqualifiedName v,x,y)
+        application x y = do
+            parseErrorK $ "weird application: " ++ show (x,y)
             return HsPWildCard
-        operator x y = do
-            parseErrorK $ "weird operator: " ++ show (x,y)
-            return HsPWildCard
+        operator ~(HsPatBackTick t) as = f t as where
+            f (HsPVar v) [e] | v == u_Bang = do sl <- getSrcSpan; return $ HsPBangPat (Located sl e)
+            f (HsPVar v) [e] | v == u_Twiddle = do sl <- getSrcSpan; return $ HsPIrrPat (Located sl e)
+            f (HsPVar v) [HsPVar ap, e] | v == u_At = do sl <- getSrcSpan; return $ HsPAsPat ap e
+            f (HsPVar v) [HsPWildCard, e] | v == u_At = do return e
+            f (HsPVar v) [e] | originalUnqualifiedName v == vu_sub = return $ HsPNeg e
+            f (HsPApp t xs) y = return $ HsPApp t (xs ++ y)
+            f x@(HsPVar v) y = do
+                parseErrorK $ "weird operator: " ++ show (v,originalUnqualifiedName v,x,y)
+                return HsPWildCard
+            f x y = do
+                parseErrorK $ "weird operator: " ++ show (x,y)
+                return HsPWildCard
 
         backtick bt = f bt where
-            f (HsPVar v) | v == vu_Bang && bangPatterns = return (Right (F.Prefix,11))
-            f (HsPVar v) | v == vu_Twiddle = return (Right (F.Prefix,11))
-            f (HsPVar v) | v == vu_At = return (Right (F.R,12))
+            f (HsPVar v) | v == u_Bang = return (Right (F.Prefix,11))
+            f (HsPVar v) | v == u_Twiddle = return (Right (F.Prefix,11))
+            f (HsPVar v) | v == u_At = return (Right (F.R,12))
             f (HsPVar v) = g v
             f (HsPApp v []) = g v
             f z = parseErrorK $ "infix.f: " ++ show z

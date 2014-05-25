@@ -1,4 +1,4 @@
-{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE UnboxedTuples, ForeignFunctionInterface #-}
 module Jhc.Prim.IO where
 
 data State_ :: * -> #

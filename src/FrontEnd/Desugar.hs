@@ -11,6 +11,7 @@ import FrontEnd.HsSyn
 import FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse
 import Name.Names
+import Ty.Level
 import Util.Std
 import Util.UniqueMonad
 
@@ -22,7 +23,7 @@ instance MonadSetSrcLoc PatSM where
 
 -- a new (unique) name introduced in pattern selector functions
 newPatVarName :: HsName
-newPatVarName = nameName $ toName Val ("patvar@0"::String)
+newPatVarName = toName Val ("pv@"::String)
 
 {-
  this function replaces all constructor-pattern bindings in a module with
@@ -82,7 +83,7 @@ desugarDecl HsPatBind { .. } = do
     hsDeclDecls <- concat <$> mapM desugarDecl hsDeclDecls
 
     unique <- newUniq
-    let newRhsName = toName Val ("patrhs@" ++ show unique)
+    let newRhsName = toName Val ("rhs@" ++ show unique)
 
     let newBinds = genBindsForPat hsDeclPat hsDeclSrcLoc newRhsName
     newBinds <- concat <$> mapM desugarDecl newBinds
@@ -112,16 +113,16 @@ desugarMatch (HsMatch sloc funName pats rhs wheres) = do
 -- generate the pattern bindings for each variable in a pattern
 
 genBindsForPat :: HsPat -> SrcLoc -> HsName -> [HsDecl]
-genBindsForPat pat sloc rhsName
-   = [HsPatBind sloc (HsPVar patName) (HsUnGuardedRhs (HsApp selector (HsVar rhsName))) [] |  (patName, selector) <- selFuns]
-   where
-   selFuns = getPatSelFuns sloc pat
+genBindsForPat pat sloc rhs = ans where
+    ans = [HsPatBind sloc (HsPVar pn) (HsUnGuardedRhs (HsApp selector (HsVar rhs))) [] | (pn, selector) <- selFuns]
+    selFuns = getPatSelFuns sloc pat
 
 -- generate selector functions for each of the variables that
 -- are bound in a pattern
 
 getPatSelFuns :: SrcLoc -> HsPat -> [(HsName, (HsExp))]
-getPatSelFuns sloc pat = [(varName, HsParen (HsLambda sloc [HsPVar newPatVarName] (kase (replaceVarNamesInPat varName pat)))) | varName <- getNamesFromHsPat pat, nameType varName == Val] where
+getPatSelFuns sloc pat = ans where
+    ans = [(v, HsParen (HsLambda sloc [HsPVar newPatVarName] (kase (replaceVarNamesInPat v pat)))) | v <- getNamesFromHsPat pat, nameType v == Val]
     kase p =  HsCase (HsVar newPatVarName) [a1, a2 ] where
        a1 =  HsAlt sloc p (HsUnGuardedRhs (HsVar newPatVarName)) []
        a2 =  HsAlt sloc HsPWildCard (HsUnGuardedRhs (HsError { hsExpSrcLoc = sloc, hsExpErrorType = HsErrorPatternFailure, hsExpString = show sloc ++ " failed pattern match" })) []
@@ -131,23 +132,16 @@ getPatSelFuns sloc pat = [(varName, HsParen (HsLambda sloc [HsPVar newPatVarName
 -- and every other name with underscore
 
 replaceVarNamesInPat :: HsName -> HsPat -> HsPat
-replaceVarNamesInPat name p = f name p where
-    f name1 (HsPVar (toName Val -> name2))
-       | name1 == name2 = HsPVar $ newPatVarName
-       | otherwise = HsPWildCard
-    f _ p@(HsPLit _) = p
-    f name (HsPatExp e) = HsPatExp $ g e
-    f name (HsPAsPat asName pat)
-       | name == asName = HsPAsPat newPatVarName (f name pat)
-       | otherwise = f name pat
-    f name (HsPIrrPat pat) = HsPIrrPat $ fmap (f name) pat
-    f name (HsPBangPat pat) = HsPBangPat $ fmap (f name) pat
-    f name p = runIdentity $ traverseHsPat (return . f name) p
-
-    g (HsVar (toName Val -> name2))
-       | name == name2 = HsVar newPatVarName
-       | otherwise = (HsWildCard bogusASrcLoc)
-    g e = runIdentity $ traverseHsExp (return . g) e
+replaceVarNamesInPat name p = f p where
+    f (HsPVar name2)
+       | name == name2 = HsPVar newPatVarName
+       | getTyLevel name2 == Just termLevel = HsPWildCard
+    f (HsPAsPat asName pat)
+       | name == asName = HsPAsPat newPatVarName (f pat)
+       | getTyLevel asName == Just termLevel = f pat
+    f (HsPIrrPat pat) = HsPIrrPat $ fmap f pat
+    f (HsPBangPat pat) = HsPBangPat $ fmap f pat
+    f p = runIdentity $ traverseHsPat (return . f) p
 
 --    f name p = error $ "replaceVarNamesInPat: " ++ show (name,p)
 
@@ -176,7 +170,7 @@ desugarExp (HsLambda sloc pats e) = z where
     f (HsPAsPat n p) = return (n,[(n,p)])
     f p = do
         unique <- newUniq
-        let n = nameName $ toName Val ("lambind@" ++ show unique)
+        let n = toName Val ("lambind@" ++ show unique)
         return (n,[(n,p)])
 desugarExp (HsLet decls e) = do
         newDecls <- mapM desugarDecl decls

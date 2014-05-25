@@ -249,7 +249,7 @@ renameHsDecl d = f d where
         hsRhs'    <- rename hsRhs
         return (HsPatBind srcLoc hsPat' hsRhs' {-where-} hsDecls')
     f (HsForeignExport a b n t) = do
-        n <- renameValName n
+        n <- renameName n
         updateWith t $ do
             t <- rename t
             return (HsForeignExport a b n t)
@@ -474,7 +474,7 @@ instance Rename HsMatch where
         return (HsMatch srcLoc hsName' hsPats' hsRhs' {-where-} hsDecls')
 
 instance Rename HsPat where
-    rename (HsPVar hsName) = HsPVar `fmap` renameValName hsName
+    rename (HsPVar hsName) = HsPVar `fmap` renameName hsName
 --    rename (HsPList []) = return $ HsPList []
     rename (HsPInfixApp hsPat1 hsName hsPat2) = HsPInfixApp <$> rename hsPat1 <*> renameValName hsName <*> rename hsPat2
     rename (HsPApp hsName hsPats) = HsPApp <$> renameValName hsName <*> rename hsPats
@@ -554,7 +554,7 @@ instance Rename HsExp where
     rename (HsCase hsExp hsAlts) = do HsCase <$> rename hsExp <*> rename hsAlts
     rename (HsDo hsStmts) = do
         (ss,()) <- renameHsStmts hsStmts (return ())
-        doToExp newVar (nameName v_bind) (nameName v_bind_) (nameName v_fail) ss
+        doToExp newVar (v_bind) (v_bind_) (v_fail) ss
     rename (HsRecConstr hsName hsFieldUpdates) = do
         hsName' <- renameValName hsName
         hsFieldUpdates' <- rename hsFieldUpdates
@@ -566,10 +566,10 @@ instance Rename HsExp where
         fls <- asks envFieldLabels
         buildRecUpdate fls hsExp' hsFieldUpdates' -- HsRecConstr hsName' hsFieldUpdates')
         --return (HsRecUpdate hsExp' hsFieldUpdates')
-    rename (HsEnumFrom hsExp) = rename $ desugarEnum "enumFrom" [hsExp]
-    rename (HsEnumFromTo hsExp1 hsExp2) = rename $  desugarEnum "enumFromTo" [hsExp1, hsExp2]
-    rename (HsEnumFromThen hsExp1 hsExp2) = rename $ desugarEnum "enumFromThen" [hsExp1, hsExp2]
-    rename (HsEnumFromThenTo hsExp1 hsExp2 hsExp3) = rename $  desugarEnum "enumFromThenTo" [hsExp1, hsExp2, hsExp3]
+    rename (HsEnumFrom hsExp) = rename $ desugarEnum vu_enumFrom [hsExp]
+    rename (HsEnumFromTo hsExp1 hsExp2) = rename $  desugarEnum vu_enumFromTo [hsExp1, hsExp2]
+    rename (HsEnumFromThen hsExp1 hsExp2) = rename $ desugarEnum vu_enumFromThen [hsExp1, hsExp2]
+    rename (HsEnumFromThenTo hsExp1 hsExp2 hsExp3) = rename $  desugarEnum vu_enumFromThenTo [hsExp1, hsExp2, hsExp3]
    -- rename (HsList []) = return $ HsCon dc_EmptyList
     rename (HsListComp hsExp hsStmts) = do
         (ss,e) <- renameHsStmts hsStmts (rename hsExp)
@@ -585,8 +585,7 @@ instance Rename HsExp where
             e <- createError HsErrorUnderscore ("_")
             return e
     rename p = traverseHsExp rename p
-
-desugarEnum s as = foldl HsApp (HsVar (toName Val s)) as
+desugarEnum s as = foldl HsApp (HsVar s) as
 
 createError et s = do
     sl <- getSrcLoc
@@ -595,13 +594,6 @@ createError et s = do
 failRename s = do
     sl <- getSrcLoc
     fail (show sl ++ ": " ++ s)
-
-_implicitName :: Name -> RM Name
-_implicitName n = do
-    opt <- getOptions
-    if fopts' opt FO.Prelude
-        then return n
-        else renameName $ toUnqualified n
 
 buildRecConstr ::  FieldMap -> Name -> [HsFieldUpdate] -> RM HsExp
 buildRecConstr (FieldMap amp fls) n us = do
@@ -702,6 +694,7 @@ renameName hsName
     | hsName `elem` [tc_Arrow,dc_Unit,tc_Unit] = return hsName
     | (nt,Just m,i) <- nameParts hsName, '@':_ <- show m = return $ toName nt (m, i)
     | Just _ <- V.fromTupname hsName = return hsName
+    | nameType hsName == UnknownType = return hsName
 renameName hsName = do
     subTable <- asks envNameMap
     case mlookup hsName subTable of
@@ -743,7 +736,8 @@ unRenameString s = (dropUnderscore . dropDigits) s where
     dropDigits = dropWhile isDigit
 
 updateWithN nt x action = getUpdatesN nt x >>= flip withSubTable action
-getUpdatesN nt x = unions `fmap` mapM clobberName (map (toName nt) $ getNames x)
+getUpdatesN nt x = unions `fmap` mapM clobberName [ n | n <- getNames x, nameType n == nt]
+--getUpdatesN nt x = unions `fmap` mapM clobberName (map (toName nt) $ getNames x)
 
 updateWith x action = getUpdates x >>= flip withSubTable action
 getUpdates x = unions `fmap` mapM clobberName (getNames x)
@@ -776,11 +770,11 @@ instance UpdateTable HsType where
 
 getNamesAndASrcLocsFromHsDecl :: HsDecl -> [(Name, SrcLoc)]
 getNamesAndASrcLocsFromHsDecl d = f d where
-    f (HsPatBind srcLoc (HsPVar hsName) _ _) = [(fromValishHsName hsName, srcLoc)]
+    f (HsPatBind srcLoc (HsPVar hsName) _ _) = [(hsName, srcLoc)]
 --    f (HsPatBind sloc p _ _) = [ (fromValishHsName n, sloc) | n <- (getNamesFromHsPat p) ]
     f (HsPatBind sloc _ _ _) = error $ "non simple pattern binding found (sloc): " ++ show sloc
-    f (HsFunBind (HsMatch { .. }:_)) = [(fromValishHsName hsMatchName,hsMatchSrcLoc)]
-    f (HsForeignDecl { .. }) = [(fromValishHsName hsDeclName, hsDeclSrcLoc)]
+    f (HsFunBind (HsMatch { .. }:_)) = [(hsMatchName,hsMatchSrcLoc)]
+    f (HsForeignDecl { .. }) = [(hsDeclName, hsDeclSrcLoc)]
     f _ = []
 
 -- | Collect all names defined in a module as well as their declaration points
@@ -797,8 +791,8 @@ collectDefsHsModule m = (\(x,y) -> (Seq.toList x,Seq.toList y)) $ execWriter (ma
     f (HsForeignExport a e _ _)  = tellName a (ffiExportName e)
     f (HsFunBind (HsMatch a n _ _ _:_))  = tellName a (toName Val n)
     f (HsPatBind srcLoc (HsPVar n) _ _)  = tellName srcLoc (toName Val n)
-    f (HsPatBind srcLoc p _ _)  = mapM_ (tellName srcLoc) [ (toName Val n) | n <- (getNamesFromHsPat p), n /= vu_sub ]
-    f (HsActionDecl srcLoc p _) = mapM_ (tellName srcLoc) [ (toName Val n) | n <- (getNamesFromHsPat p), n /= vu_sub ]
+    f (HsPatBind srcLoc p _ _)  = mapM_ (tellName srcLoc) [ toName Val n | n <- (getNamesFromHsPat p), n /= vu_sub, nameType n == Val ]
+    f (HsActionDecl srcLoc p _) = mapM_ (tellName srcLoc) [ toName Val n | n <- (getNamesFromHsPat p), n /= vu_sub, nameType n == Val ]
     f (HsTypeDecl sl n _ _) = tellName sl (toName TypeConstructor n)
     f HsDataDecl { hsDeclDeclType = DeclTypeKind, hsDeclSrcLoc =sl, hsDeclName = n, hsDeclCons = cs } = do
         tellF $ (toName SortName n,sl,snub [ x |(x,_,_) <- cs']): cs' ; zup cs where
@@ -843,10 +837,19 @@ getNamesAndASrcLocsFromHsStmt (HsLetStmt hsDecls) = concat $ map getNamesAndASrc
 -- RM Monad
 -----------
 
-newtype RM a = RM (RWS Env (Map.Map Name Name,[Warning]) ScopeState a)
-    deriving(Monad,Functor,MonadReader Env, MonadWriter (Map.Map Name Name,[Warning]), MonadState ScopeState)
+newtype RM a = RM { unRM :: RWS Env (Map.Map Name Name,[Warning]) ScopeState a }
+    deriving(Functor,MonadReader Env, MonadWriter (Map.Map Name Name,[Warning]), MonadState ScopeState)
 
-unRM (RM x) = x
+instance Monad RM where
+    RM x >> RM y = RM $ x >> y
+    RM x >>= y = RM $ do
+        r <- x
+        unRM $ y r
+    return x = RM $ return x
+    fail s = do
+        sl <- getSrcLoc
+        addWarn ParseError s
+        RM $ fail $ show sl ++ ":" ++ s
 
 instance Applicative RM where
     pure = return
@@ -914,30 +917,3 @@ instance DeNameable HsExp where
         f (HsCase hsExp hsAlts) =
             HsCase (dn hsExp) (dn hsAlts)
         f p = runIdentity $ traverseHsExp (return . dn) p
---        f (HsDo hsStmts) = do
---        (ss,()) <- renameHsStmts hsStmts (return ())
---        doToExp newVar (nameName v_bind) (nameName v_bind_) (nameName v_fail) ss
---    rename (HsRecConstr hsName hsFieldUpdates) = do
---        hsName' <- renameValName hsName
---        hsFieldUpdates' <- rename hsFieldUpdates
---        fls <- asks envFieldLabels
---        buildRecConstr fls hsName' (hsFieldUpdates'::[HsFieldUpdate])
---    rename (HsRecUpdate hsExp hsFieldUpdates) = do
---        hsExp' <- rename hsExp
---        hsFieldUpdates' <- rename hsFieldUpdates
---        fls <- asks envFieldLabels
---        buildRecUpdate fls hsExp' hsFieldUpdates' -- HsRecConstr hsName' hsFieldUpdates')
-        --return (HsRecUpdate hsExp' hsFieldUpdates')
---    rename (HsListComp hsExp hsStmts) = do
---        (ss,e) <- renameHsStmts hsStmts (rename hsExp)
---        listCompToExp newVar e ss
---    rename (HsExpTypeSig srcLoc hsExp hsQualType) = do
---        hsExp' <- rename hsExp
---        updateWith hsQualType $ do
---            hsQualType' <- rename hsQualType
---            return (HsExpTypeSig srcLoc hsExp' hsQualType')
---    rename (HsAsPat hsName hsExp) = HsAsPat <$> renameValName hsName <*> rename hsExp
---    rename (HsWildCard sl) = do
---        withSrcLoc sl $ do
---            e <- createError HsErrorUnderscore ("_")
---            return e

@@ -276,17 +276,17 @@ traverseHsDeclHsExp fn d = f d where
 --        return prules {  hsDeclFreeVars = fvs', hsDeclLeftExpr = e1', hsDeclRightExpr = e2' }
     f otherHsDecl = return otherHsDecl
 
-getNamesFromHsPat :: HsPat -> [HsName]
+getNamesFromHsPat :: HsPat -> [Name]
 getNamesFromHsPat p = execWriter (getNamesFromPat p) where
-    getNamesFromPat (HsPVar hsName) = tell [toName Val hsName]
+    getNamesFromPat (HsPVar hsName) = tell [hsName]
     getNamesFromPat (HsPAsPat hsName hsPat) = do
-        tell [toName Val hsName]
+        tell [hsName]
         getNamesFromPat hsPat
     getNamesFromPat (HsPatExp e) = f e where
         f (HsVar v) = do
-            tell [toName Val v]
+            tell [v]
         f (HsAsPat v e) = do
-            tell [toName Val v]
+            tell [v]
             f e
         f e = traverseHsExp_ f e
 

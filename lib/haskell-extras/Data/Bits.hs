@@ -1,19 +1,16 @@
 {-# OPTIONS_JHC -fm4 -fno-prelude -fffi  #-}
 module Data.Bits where
 
-
 import Jhc.Num
 import Jhc.Order
 import Jhc.Basics
 
 m4_include(Data/Bits.m4)
 
-
 infixl 8 `shift`, `rotate`, `shiftL`, `shiftR`, `rotateL`, `rotateR`
 infixl 7 .&.
 infixl 6 `xor`
 infixl 5 .|.
-
 
 {-|
 The 'Bits' class defines bitwise operations over integral types.
@@ -140,8 +137,6 @@ class Num a => Bits a where
 	question. -}
     rotateR           :: a -> Int -> a
     x `rotateR` i = x `rotate` (-i)
-
-
 
 BITSINST(Int,a)
 BITSINST(Int8,a)

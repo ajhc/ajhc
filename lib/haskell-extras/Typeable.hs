@@ -12,4 +12,3 @@ instance Typeable Bool where
 
 instance Typeable a => Typeable [a] where
     typeOf x = "[" ++ typeOf (head x) ++ "]"
-

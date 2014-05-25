@@ -322,7 +322,7 @@ ppHsDecl (HsPragmaProps _ w ns) = text "{-# " <> text w <+> mySep (punctuate com
 ppHsDecl _ = error "ppHsDecl: unknown construct"
 
 ppMatch (HsMatch pos f ps rhs whereDecls)
-   =   myFsep (ppHsQNameParen f : map ppHsPat ps ++ [ppHsRhs rhs])
+   =   myFsep (ppHsQNameParen f : map parenPrec ps ++ [ppHsRhs rhs])
    $$$ ppWhere whereDecls
 
 ppWhere [] = empty
@@ -446,8 +446,10 @@ ppHsLit (HsLitLit s)     = text "''" <> text s <> text "''"
 ppHsExp :: HsExp -> Doc
 ppHsExp (HsLit l) = ppHsLit l
 -- lambda stuff
-ppHsExp (HsInfixApp a op b) = myFsep[ppHsExp a, ppInfix op, ppHsExp b]
+ppHsExp (HsInfixApp a op b) = myFsep[mpifx a, ppInfix op, mpifx b]
 	where
+        mpifx x@HsInfixApp {} = ppHsExp $ HsParen x
+        mpifx x = ppHsExp x
 	ppInfix (HsAsPat as (HsVar n)) | dump FD.Aspats = ppHsName as <> char '@' <> ppHsQNameInfix n
 	ppInfix (HsAsPat _ (HsVar n)) = ppHsQNameInfix n
 	ppInfix (HsAsPat as (HsCon n)) | dump FD.Aspats = ppHsName as <> char '@' <> ppHsQNameInfix n
@@ -532,9 +534,9 @@ ppHsExp e = text $ show e
 ppHsPat :: HsPat -> Doc
 ppHsPat (HsPVar name) = ppHsNameParen name
 ppHsPat (HsPLit lit) = ppHsLit lit
-ppHsPat (HsPNeg p) = myFsep [char '-', ppHsPat p]
+ppHsPat (HsPNeg p) = myFsep [char '-', parenPrec p]
 ppHsPat (HsPInfixApp a op b) = myFsep[ppHsPat a, ppHsQNameInfix op, ppHsPat b]
-ppHsPat (HsPApp n ps) = myFsep (ppHsQName n : map ppHsPat ps)
+ppHsPat (HsPApp n ps) = myFsep (ppHsQName n : map parenPrec ps)
 ppHsPat (HsPTuple ps) = parenList . map ppHsPat $ ps
 ppHsPat (HsPUnboxedTuple ps) = parenListzh . map ppHsPat $ ps
 ppHsPat (HsPList ps) = bracketList . punctuate comma . map ppHsPat $ ps
@@ -544,15 +546,28 @@ ppHsPat (HsPRec c fields)
     <> (braceList . map ppHsPatField $ fields)
 -- special case that would otherwise be buggy
 ppHsPat (HsPAsPat name (HsPIrrPat (Located _ pat))) =
-	myFsep[ppHsName name <> char '@', char '~' <> ppHsPat pat]
-ppHsPat	(HsPAsPat name pat) = hcat[ppHsName name,char '@',ppHsPat pat]
+	myFsep[ppHsName name <> char '@', char '~' <> parenPrec pat]
+ppHsPat	(HsPAsPat name pat) = hcat[ppHsName name,char '@',parenPrec pat]
 ppHsPat	HsPWildCard = char '_'
-ppHsPat	(HsPIrrPat (Located _ pat)) = char '~' <> ppHsPat pat
-ppHsPat	(HsPBangPat (Located _ pat)) = char '!' <> ppHsPat pat
+ppHsPat	(HsPIrrPat (Located _ pat)) = char '~' <> parenPrec pat
+ppHsPat	(HsPBangPat (Located _ pat)) = char '!' <> parenPrec pat
 ppHsPat	(HsPatExp e) = ppHsExp e
 ppHsPat (HsPTypeSig _ p qt) = parens $ ppHsPat p <+> text "::" <+> ppHsQualType qt
-ppHsPat (HsPatWords ws) = char '«' <> hsep (map ppHsPat ws) <> char '»'
+ppHsPat (HsPatWords ws) = char '«' <> hsep (map parenPrec ws) <> char '»'
 ppHsPat (HsPatBackTick bt) = char '`' <> ppHsPat bt <> char '`'
+
+parenPrec p = if f p then char '‹' <> ppHsPat p <> char '›' else ppHsPat p where
+    f HsPParen {}        = False
+    f HsPUnboxedTuple {} = False
+    f HsPList {}         = False
+    f HsPatWords {}      = False
+    f HsPatBackTick {}   = False
+    f HsPWildCard {}     = False
+    f HsPVar {}          = False
+    f HsPLit {}          = False
+    f (HsPApp _ [])      = False
+    f HsPTuple {}        = False
+    f _                  = True
 
 ppHsPatField (HsField name pat) = myFsep[ppHsQName name, equals, ppHsPat pat]
 

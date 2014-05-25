@@ -128,7 +128,7 @@ layout ls = runReaderT (g ls []) bogusASrcLoc where
         | n < n' = (rbrace r:) <$> g (TokenNL n:rs) ls
     f (TokenNL _:rs) ls = g rs ls
     f (TokenVLCurly h n:rs) (Layout h' n':ls)
-        | n > n' = mcons lbrace' (g rs (Layout h n:Layout h' n':ls))
+        | n >= n' = mcons lbrace' (g rs (Layout h n:Layout h' n':ls))
         | otherwise = mcons3 lbrace' rbrace' (g rs (Layout h' n':ls))
     f (TokenVLCurly h n:rs) ls = mcons lbrace' (g rs (Layout h n:ls))
     f ((Token t@(L _ _ s)):rs) (dropLayouts -> (n,Just (b,e),ls)) | s == e = do

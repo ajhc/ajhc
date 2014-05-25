@@ -16,6 +16,5 @@ compilerVersion = Version (splitup "__JHC_VERSION__") []
 os = unsafePerformIO $ peekCAString =<< peek options_os
 arch = unsafePerformIO $ peekCAString =<< peek options_arch
 
-
 foreign import ccall "&jhc_options_os"   options_os   :: Ptr CString
 foreign import ccall "&jhc_options_arch" options_arch :: Ptr CString

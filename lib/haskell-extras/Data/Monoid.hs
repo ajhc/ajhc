@@ -36,7 +36,6 @@ module Data.Monoid (
         Last(..)
   ) where
 
-
 {-
 -- just for testing
 -- CI import Data.Maybe

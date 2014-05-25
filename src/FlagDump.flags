@@ -10,8 +10,9 @@ the '-d' flag. The following is a list of possible parameters you can pass to
 ini all ini configuration options
 tokens raw token stream before parsing
 preprocessed code after preprocessing/deliting
-renamed code after uniqueness renaming
 parsed  parsed code
+renamed code after uniqueness renaming
+decls       processed declarations before typechecking
 derived show generated derived instances
 imports show in scope names for each module
 exports show which names are exported from each module
@@ -31,7 +32,6 @@ all-types   show unified type table, after everything has been typechecked
 sigenv      initial signature environment
 srcsigs     processed signatures from source code
 program     impl expls, the whole shebang.
-decls       processed declarations
 boxy-steps  show step by step what the type inferencer is doing
 aspats      show as patterns
 

@@ -211,6 +211,11 @@ main         main
 import       import
 sub          -
 
+enumFrom       enumFrom
+enumFromThen   enumFromThen
+enumFromThenTo enumFromThenTo
+enumFromTo     enumFromTo
+
 ; placeholders
 UnknownType:u:
 

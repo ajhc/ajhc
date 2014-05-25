@@ -32,7 +32,6 @@ ctype s = withCString s c_wctype
 isCType :: Char -> CType -> Bool
 isCType ch ct = unsafePerformIO (c_iswctype ch ct) /= 0
 
-
 t_alnum, t_alpha, t_blank, t_cntrl,
  t_digit, t_graph, t_lower, t_print,
  t_punct, t_space, t_upper, t_xdigit, t_none :: CType
@@ -57,7 +56,5 @@ t_none = CType 0
  t_punct, t_space, t_upper, t_xdigit
  #-}
 
-
 foreign import ccall "wctype.h iswctype" c_iswctype :: Char -> CType -> IO Int
 foreign import ccall "wctype.h wctype" c_wctype :: CString -> IO CType
-

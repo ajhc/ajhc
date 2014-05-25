@@ -92,41 +92,25 @@ checkAssertion t =  f [] t where
     tast x = parseErrorK $ "Invalid Class. multiparameter classes not yet supported:" ++ show x
 
 checkValDef :: SrcLoc -> HsExp -> HsRhs -> [HsDecl] -> P HsDecl
-checkValDef srcloc lhs rhs whereBinds = withSrcLoc srcloc $ ans lhs where
---    ans HsWords { .. } = F.shunt patShuntSpec hsExpExps >>= ans
---    ans (HsLocatedExp (Located sl e)) = withSrcSpan sl $ ans e
-    ans lhs = do
+checkValDef srcloc lhs rhs whereBinds = withSrcLoc srcloc $ do
         bangPatterns <- flip fopts' FO.BangPatterns <$> getOptions
         --parseWarn $ show lhs
-        let isFunLhs HsInfixApp {} es = parseErrorK "Unexpected Infix application"
-            isFunLhs (HsLocatedExp (Located sl e)) es = withSrcSpan sl $ isFunLhs e es
-            isFunLhs (HsVar f) [] = return $ Right (HsVar f)
-            isFunLhs (HsVar f) es = return $ Left (f, es)
-            --isFunLhs (HsParen f) es@(_:_) = isFunLhs f es
-            isFunLhs (HsApp f e) es = isFunLhs f (e:es)
-            isFunLhs HsWords { .. } es =  F.shunt patShuntSpec hsExpExps >>= flip isFunLhs es
-            isFunLhs p@HsAsPat {} [] = return $ Right p
-            isFunLhs p@HsBangPat {} [] = return $ Right p
-            isFunLhs p@HsIrrPat {} [] = return $ Right p
-            isFunLhs _ _ = return $ Right lhs
 
             -- The top level pattern parsing to determine whether it is a function
             -- or pattern definition is done without knowledge of precedence.
-            patShuntSpec = F.shuntSpec { F.lookupToken, F.application, F.operator } where
+        let patShuntSpec = F.shuntSpec { F.lookupToken, F.application, F.operator } where
                 lookupToken (HsBackTick (HsVar v)) | bangPatterns && v == vu_Bang = return (Right (F.Prefix,11))
                 lookupToken (HsBackTick (HsVar v)) | v == vu_Twiddle = return (Right (F.Prefix,11))
                 lookupToken (HsBackTick (HsVar v)) | v == vu_At = return (Right (F.R,12))
                 lookupToken (HsBackTick t) = return (Right (F.L,9))
                 lookupToken t = return (Left t)
-
                 application e1 e2 = return $ HsApp e1 e2
-
-                operator ~(HsBackTick t) as = operator' t as
-                operator' (HsVar v) [e] | v == vu_Bang && bangPatterns = do sl <- getSrcSpan; return $ HsBangPat (Located sl e)
-                operator' (HsVar v) [e] | v == vu_Twiddle = do sl <- getSrcSpan; return $ HsIrrPat (Located sl e)
-                operator' (HsVar v) [HsVar ap, e] | v == vu_At = do sl <- getSrcSpan; return $ HsAsPat ap e
-                operator' (HsVar v) [HsWildCard {}, e] | v == vu_At = do sl <- getSrcSpan; return e
-                operator' t as = return $ foldl HsApp t as
+                operator ~(HsBackTick t) as = f t as where
+                    f (HsVar v) [e] | v == vu_Bang && bangPatterns = do sl <- getSrcSpan; return $ HsBangPat (Located sl e)
+                    f (HsVar v) [e] | v == vu_Twiddle = do sl <- getSrcSpan; return $ HsIrrPat (Located sl e)
+                    f (HsVar v) [HsVar ap, e] | v == vu_At = do sl <- getSrcSpan; return $ HsAsPat ap e
+                    f (HsVar v) [HsWildCard {}, e] | v == vu_At = do sl <- getSrcSpan; return e
+                    f t as = return $ foldl HsApp t as
             isFullyConst p = f p where
                 f (HsPApp _ as) = all f as
                 f (HsPList as) = all f as
@@ -134,7 +118,38 @@ checkValDef srcloc lhs rhs whereBinds = withSrcLoc srcloc $ ans lhs where
                 f (HsPParen a) = f a
                 f HsPLit {} = True
                 f _ = False
-        isFunLhs lhs [] >>= \x -> case x of
+        let f HsInfixApp {} = parseErrorK "Unexpected Infix application"
+            f HsApp {}  = parseErrorK "Unexpected application"
+            f HsBackTick {} = parseErrorK "Did not expect operator binding"
+            f (HsLocatedExp (Located sl e)) = withSrcSpan sl $ f e
+            f HsWords { .. } = F.shunt patShuntSpec hsExpExps >>= g []
+            f _ = return Nothing
+            g es (HsApp f e) = g (e:es) f
+            g es@(_:_) (HsVar v) = return $ Just (v,es)
+            g _ _ = return Nothing
+        f lhs >>= \x -> case x of
+            Just (f,es) -> do
+                es <- mapM checkPattern es
+                return (HsFunBind [HsMatch srcloc f es rhs whereBinds])
+            Nothing -> do
+                lhs <- tryP $ checkPattern lhs
+                when (isFullyConst lhs) $
+                    parseErrorK "pattern binding cannot be fully const"
+                return (HsPatBind srcloc lhs rhs whereBinds)
+            {-
+        let isFunLhs HsInfixApp {} es = parseErrorK "Unexpected Infix application"
+            isFunLhs HsApp {} es = parseErrorK "Unexpected application"
+            isFunLhs (HsLocatedExp (Located sl e)) es = withSrcSpan sl $ isFunLhs e es
+            --isFunLhs (HsVar f) [] = return $ Right (HsVar f)
+            isFunLhs (HsVar f) es = return $ Left (f, es)
+            --isFunLhs (HsParen f) es@(_:_) = isFunLhs f es
+            --isFunLhs (HsApp f e) es = isFunLhs f (e:es)
+            isFunLhs HsWords { .. } es =  F.shunt patShuntSpec hsExpExps >>= flip isFunLhs es
+            isFunLhs p@HsAsPat {} [] = return $ Right p
+            isFunLhs p@HsBangPat {} [] = return $ Right p
+            isFunLhs p@HsIrrPat {} [] = return $ Right p
+            isFunLhs _ _ = return $ Right lhs
+        isFunLhs lhs[] >>= \x -> case x of
             Left (f,es@(_:_)) -> do
                 es <- mapM checkPattern es
                 return (HsFunBind [HsMatch srcloc f es rhs whereBinds])
@@ -143,6 +158,7 @@ checkValDef srcloc lhs rhs whereBinds = withSrcLoc srcloc $ ans lhs where
                 when (isFullyConst lhs) $
                     parseErrorK "pattern binding cannot be fully const"
                 return (HsPatBind srcloc lhs rhs whereBinds)
+            -}
 
 -- when we have a sequence of patterns we don't allow top level binary
 -- operators, but instead give a sequence of responses. This is used in lambda
@@ -170,84 +186,50 @@ checkPatterns HsWords { .. } = do
                 return [e]
             operator t as = fail "unexpected operator in checkPatterns"
     F.shunt patShuntSpec hsExpExps
-
 checkPatterns e = (:[]) <$> checkPattern e
 
 checkPattern :: HsExp -> P HsPat
-checkPattern be = checkPat be [] where
-    checkPat :: HsExp -> [HsPat] -> P HsPat
-    checkPat (HsApp f x) args = do
-        x <- checkPat x []
-        checkPat f (x:args)
-    checkPat (HsCon c) args = return (HsPApp c args)
-    checkPat (HsVar v) [HsPVar ap,e] | v == vu_At = do
-    --    parseWarn $ "cpat: " ++ show (v,e,ap)
-        sl <- getSrcSpan; return $ HsPAsPat ap e
-    checkPat (HsLocatedExp (Located sl e)) xs = withSrcSpan sl $ checkPat e xs
-    checkPat e [] = do
-        bangPatterns <- flip fopts' FO.BangPatterns <$> getOptions
-        case e of
-            HsVar x | bangPatterns && x == vu_Bang -> return (HsPVar $ quoteName x)
-                    | x == vu_Twiddle -> return (HsPVar $ quoteName x)
-                    | x == vu_At      -> return (HsPVar $ quoteName vu_At)
-                    | otherwise -> do
-                        when (isJust $ getModule x) $
-                            parseErrorK "Qualified name in binding position."
-                        return (HsPVar x)
-            HsLit l  -> return (HsPLit l)
-            HsError { hsExpErrorType = HsErrorUnderscore } -> return HsPWildCard
-            HsInfixApp l op r  -> do
-                l <- checkPat l []
-                r <- checkPat r []
-                case op of
-                    HsCon c -> return (HsPInfixApp l c r)
-                    _ -> patFail
-            HsTuple es -> do
-                ps <- mapM (\e -> checkPat e []) es
-                return (HsPTuple ps)
-            HsUnboxedTuple es  -> do
-                ps <- mapM (\e -> checkPat e []) es
-                return (HsPUnboxedTuple ps)
-            HsList es	   -> do
-                ps <- mapM (\e -> checkPat e []) es
-                return (HsPList ps)
-            HsParen e	   -> do
-                p <- checkPat e []
-                return (HsPParen p)
-            HsAsPat n e	   -> do
-                p <- checkPat e []
-                return (HsPAsPat n p)
-            HsWildCard {} -> return HsPWildCard
-            HsIrrPat e         -> do
-                p <- T.mapM checkPattern e
-                return (HsPIrrPat p)
-            HsBangPat e         -> do
-                p <- T.mapM checkPattern e
-                return (HsPBangPat p)
-            HsWords es -> HsPatWords <$> mapM checkPattern es
-            HsRecConstr c fs   -> do
-                fs <- mapM checkPatField fs
-                return (HsPRec c fs)
-            HsNegApp (HsLit l) -> return (HsPNeg (HsPLit l))
-            HsExpTypeSig sl e t -> do
-                p <- checkPat e []
-                return (HsPTypeSig sl p t)
-            HsBackTick t -> HsPatBackTick <$> checkPattern t
-            HsLambda {} -> parseErrorK "Lambda not allowed in pattern."
-            HsLet {} -> parseErrorK "let not allowed in pattern."
-            HsDo {} -> parseErrorK "do not allowed in pattern."
-            HsIf {} -> parseErrorK "if not allowed in pattern."
-            HsCase {} -> parseErrorK "case not allowed in pattern."
-            --e -> parseErrorK ("pattern error " ++  show e)
-    checkPat e ts = do
-        parseErrorK (unlines ["invalid pattern"])
-        return (HsPApp (toName UnknownType "craziness") (reverse ts))
-
-    patFail = parseErrorK "pattern error"
-    checkPatField :: HsFieldUpdate -> P HsPatField
-    checkPatField (HsField n e) = do
-            p <- checkPat e []
-            return (HsField n p)
+checkPattern be = do
+    bangPatterns <- flip fopts' FO.BangPatterns <$> getOptions
+    let checkPatField :: HsFieldUpdate -> P HsPatField
+        checkPatField (HsField n e) = HsField n <$> checkPattern e
+    case be of
+        HsInfixApp {} -> parseErrorK "unexpected infix application"
+        HsLocatedExp (Located sl e) -> withSrcSpan sl $ checkPattern e
+        HsApp e1 e2 -> f e1 [e2] where
+            f (HsApp e1 e2) es = f e1 (e2:es)
+            f (HsCon c) es = HsPApp c <$> mapM checkPattern es
+            f _ _ = parseErrorK "invalid application in pattern."
+        (HsBackTick (HsVar x))
+            | bangPatterns && x == vu_Bang -> return (HsPatBackTick $ HsPVar u_Bang)
+            | x == vu_Twiddle -> return (HsPatBackTick $ HsPVar u_Twiddle)
+            | x == vu_At      -> return (HsPatBackTick $ HsPVar u_At)
+        HsVar x -> do
+            when (isJust $ getModule x) $
+                parseErrorK "Qualified name in binding position."
+            return (HsPVar x)
+        HsCon c -> return (HsPApp c [])
+        HsBackTick t -> HsPatBackTick <$> checkPattern t
+        HsLit l  -> return (HsPLit l)
+        HsError { hsExpErrorType = HsErrorUnderscore } -> return HsPWildCard
+        HsTuple es -> HsPTuple <$> mapM checkPattern es
+        HsUnboxedTuple es -> HsPUnboxedTuple <$> mapM checkPattern es
+        HsList es  -> HsPList <$> mapM checkPattern es
+        HsParen e -> HsPParen <$> checkPattern e
+        HsAsPat n e -> HsPAsPat n <$> checkPattern e
+        HsWildCard {} -> return HsPWildCard
+        HsIrrPat e  -> HsPIrrPat <$> T.traverse checkPattern e
+        HsBangPat e -> HsPBangPat <$> T.traverse checkPattern e
+        HsWords es -> HsPatWords <$> mapM checkPattern es
+        HsRecConstr c fs -> HsPRec c <$> mapM checkPatField fs
+        HsNegApp e -> HsPNeg <$> checkPattern e
+        HsExpTypeSig sl e t -> HsPTypeSig sl <$> checkPattern e <*> return t
+        HsLambda {} -> parseErrorK "Lambda not allowed in pattern."
+        HsLet {} -> parseErrorK "let not allowed in pattern."
+        HsDo {} -> parseErrorK "do not allowed in pattern."
+        HsIf {} -> parseErrorK "if not allowed in pattern."
+        HsCase {} -> parseErrorK "case not allowed in pattern."
+        e -> parseErrorK ("pattern error " ++  show e)
 
 fixupHsDecls :: [HsDecl] -> [HsDecl]
 fixupHsDecls ds = f ds where
@@ -323,12 +305,12 @@ doForeign srcLoc names ms qt = ans where
 
 -- FFI parsing
 
-parseExport :: Monad m => String -> Name -> m String
-parseExport cn hn =
-    case words cn of
-      [x] | isCName x -> return x
-      []              -> return (show hn)
-      _               -> fail ("Invalid cname in export declaration: "++show cn)
+-- parseExport :: Monad m => String -> Name -> m String
+-- parseExport cn hn =
+--     case words cn of
+--       [x] | isCName x -> return x
+--       []              -> return (show hn)
+--       _               -> fail ("Invalid cname in export declaration: "++show cn)
 
 parseImport :: Monad m => CallConv -> Maybe String -> Name -> m FfiType
 parseImport _ Nothing hn = return $ Import (show hn) mempty

@@ -48,8 +48,6 @@ instance Ix Month where
         | y < x = 0
         | otherwise = fromEnum y - fromEnum x
 
-
-
 data Day   =  Sunday | Monday  | Tuesday  | Wednesday | Thursday
            |  Friday | Saturday
            deriving (Eq, Ord, Enum, Bounded, Read, Show)
@@ -80,7 +78,6 @@ data TimeDiff = TimeDiff {
     tdYear, tdMonth, tdDay, tdHour, tdMin, tdSec :: !Int,
     tdPicosec      :: !Integer
     } deriving (Eq, Ord)
-
 
 -- Functions on times
 getClockTime         :: IO ClockTime
@@ -158,7 +155,6 @@ diffClockTimes (TOD sa) (TOD sb) =
 noTimeDiff :: TimeDiff
 noTimeDiff = TimeDiff 0 0 0 0 0 0 0
 
-
 formatCalendarTime :: TimeLocale -> String -> CalendarTime -> String
 formatCalendarTime l fmt ct@(CalendarTime year mon day hour min sec sdec
                                            wday yday tzname _ _) =
@@ -225,6 +221,4 @@ show2' x = if x < 10 then [ ' ', intToDigit x] else show2 x
 
 show3 x = intToDigit (x `quot` 100) : show2 (x `rem` 100)
 
-
 foreign import unsafe ccall "time.h time" c_time :: Ptr CTime -> IO CTime
-

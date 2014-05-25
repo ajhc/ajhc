@@ -165,10 +165,12 @@ nameParts n@(Name atom) = (nameType n,a,b) where
         (a,_:b) = span (/= ';') xs
 
 instance Show Name where
-    showsPrec _ n = case nameParts n of
-        (QuotedName,Nothing,b) -> showChar '`' . showString b
-        (_,Just a,b) -> shows a . showChar '.' . showString b
-        (_,Nothing,b) -> showString b
+    showsPrec _ n = f n where
+        f (fromQuotedName -> Just n) = showChar '`' . f n
+        f (nameType -> UnknownType)  = showChar '¿' . (g $ nameParts n)
+        f n = g $ nameParts n
+        g (_,Just a,b) = shows a . showChar '.' . showString b
+        g (_,Nothing,b) = showString b
 
 instance DocLike d => PPrint d Name  where
     pprint n = text (show n)

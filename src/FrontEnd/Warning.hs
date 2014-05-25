@@ -2,6 +2,7 @@ module FrontEnd.Warning(
     Warning(..),
     MonadWarn(..),
     WarnType(..),
+    warnIsFatal,
     processErrors,
     warn,
     err,

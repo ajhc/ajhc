@@ -1,7 +1,6 @@
 {-# OPTIONS_JHC -fffi #-}
 module Data.Dynamic(Dynamic,toDyn,fromDyn,fromDynamic,dynApply,dynApp) where
 
-
 import Data.Typeable
 
 data Obj
@@ -61,6 +60,5 @@ dynApp f x = case dynApply f x of
              Nothing -> error ("Type error in dynamic application.\n" ++
                                "Can't apply function " ++ show f ++
                                " to argument " ++ show x)
-
 
 foreign import primitive "unsafeCoerce" unsafeCoerce :: a -> b

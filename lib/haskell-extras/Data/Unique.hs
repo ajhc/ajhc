@@ -13,7 +13,6 @@ import Foreign.Ptr
 -- compared for equality and ordering and hashed into 'Int'.
 newtype Unique = Unique Int deriving (Eq,Ord)
 
-
 -- | Creates a new object of type 'Unique'.  The value returned will
 -- not compare equal to any other value of type 'Unique' returned by
 -- previous calls to 'newUnique'.  There is no limit on the number of
@@ -30,9 +29,7 @@ newUnique = do
 hashUnique :: Unique -> Int
 hashUnique (Unique u) = u
 
-
 instance Show Unique where
     showsPrec p (Unique n) = showsPrec p n
 
 foreign import ccall "&jhc_data_unique" c_data_unique :: Ptr Int
-
