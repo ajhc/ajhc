@@ -14,7 +14,7 @@ module Util.Std(
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Identity
-import Data.List
+import Data.List hiding(null)
 import Data.Maybe
 import Data.Monoid(Monoid(..),(<>))
 import System.Environment(getArgs,getProgName)

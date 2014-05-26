@@ -76,7 +76,7 @@ module GenUtil(
     -- *** Scrambling
     rot13,
     -- ** Random
-    intercalate,
+    --intercalate,
     powerSet,
     randomPermute,
     randomPermuteIO,
@@ -122,7 +122,7 @@ module GenUtil(
 import CPUTime
 import Char(isAlphaNum, isSpace, toLower, ord, chr)
 import Control.Exception
-import List
+import Data.List
 import Monad
 import Prelude hiding (catch)
 import Random(StdGen, newStdGen, Random(randomR))
@@ -336,12 +336,12 @@ snds :: [(a,b)] -> [b]
 snds = map snd
 
 {-# INLINE repeatM #-}
-{-# SPECIALIZE repeatM :: IO a -> IO [a] #-}
+{- SPECIALIZE repeatM :: IO a -> IO [a] #-}
 repeatM :: Monad m => m a -> m [a]
 repeatM x = sequence $ repeat x
 
 {-# INLINE repeatM_ #-}
-{-# SPECIALIZE repeatM_ :: IO a -> IO () #-}
+{- SPECIALIZE repeatM_ :: IO a -> IO () #-}
 repeatM_ :: Monad m => m a -> m ()
 repeatM_ x = sequence_ $ repeat x
 
@@ -349,12 +349,12 @@ repeatM_ x = sequence_ $ repeat x
 {-# RULES "replicateM_/0" replicateM_ 0 = const (return ()) #-}
 
 {-# INLINE replicateM #-}
-{-# SPECIALIZE replicateM :: Int -> IO a -> IO [a] #-}
+{- SPECIALIZE replicateM :: Int -> IO a -> IO [a] #-}
 replicateM :: Monad m => Int -> m a -> m [a]
 replicateM n x = sequence $ replicate n x
 
 {-# INLINE replicateM_ #-}
-{-# SPECIALIZE replicateM_ :: Int -> IO a -> IO () #-}
+{- SPECIALIZE replicateM_ :: Int -> IO a -> IO () #-}
 replicateM_ :: Monad m => Int -> m a -> m ()
 replicateM_ n x = sequence_ $ replicate n x
 
@@ -574,8 +574,8 @@ isConjoint xs ys = or [x == y | x <- xs, y <- ys]
 isDisjoint xs ys = not (isConjoint xs ys)
 
 -- | 'concat' composed with 'List.intersperse'. Can be used similarly to join in perl.
-intercalate :: [a] -> [[a]] -> [a]
-intercalate x xss = concat (intersperse x xss)
+--intercalate :: [a] -> [[a]] -> [a]
+--intercalate x xss = concat (intersperse x xss)
 
 -- | place spaces before each line in string.
 indentLines :: Int -> String -> String
@@ -596,11 +596,11 @@ buildTableLL ps = map f ps where
     f (x,y) = x ++ replicate (bs - length x) ' ' ++ replicate 4 ' ' ++ y
     bs = maximum (map (length . fst) ps)
 
-{-# INLINE foldl' #-}
+-- {- INLINE foldl' #-}
 -- | strict version of 'foldl'
-foldl' :: (a -> b -> a) -> a -> [b] -> a
-foldl' _ a []     = a
-foldl' f a (x:xs) = (foldl' f $! f a x) xs
+--foldl' :: (a -> b -> a) -> a -> [b] -> a
+--foldl' _ a []     = a
+--foldl' f a (x:xs) = (foldl' f $! f a x) xs
 
 -- | count elements of list that have a given property
 count :: (a -> Bool) -> [a] -> Int
@@ -647,7 +647,7 @@ readHex cs = mapM readHexChar cs >>= \cs' -> return (rh $ reverse cs') where
     rh (c:cs) =  c + 16 * (rh cs)
     rh [] =  0
 
-{-# SPECIALIZE overlaps :: (Int,Int) -> (Int,Int) -> Bool #-}
+{- SPECIALIZE overlaps :: (Int,Int) -> (Int,Int) -> Bool #-}
 
 -- | determine if two closed intervals overlap at all.
 

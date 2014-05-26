@@ -33,18 +33,16 @@ module Stats(
     readStat
     ) where
 
-import Control.Monad.Identity
+import Util.Std
 import Control.Monad.Reader
 import Control.Monad.Writer.Strict
 import Data.IORef
 import Data.Tree
-import List(sort,groupBy)
 import Prelude hiding(null)
 import System.IO.Unsafe
 import qualified Data.Map as Map
 import qualified Prelude(null)
 
-import GenUtil
 import StringTable.Atom
 import qualified Doc.Chars as C
 import qualified Util.IntBag as IB

@@ -252,5 +252,3 @@ eHash = ESort EHash
 
 tVr x y = tvr { tvrIdent = x, tvrType = y }
 tvr = TVr { tvrIdent = emptyId, tvrType = Unknown, tvrInfo = Info.empty }
-
---  Imported from other files :-

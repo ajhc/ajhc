@@ -7,7 +7,10 @@ import Test.QuickCheck
 import qualified Data.Set as Set
 import qualified List
 
+import Text.Printf
 import Data.Binary
+import Data.Binary.Put
+import Data.Binary.Get
 import E.Arbitrary
 import E.E
 import FrontEnd.HsSyn
@@ -17,9 +20,10 @@ import Info.Types
 import Name.Names
 import PackedString
 import StringTable.Atom
+import Support.MapBinaryInstance
+import System.IO.Unsafe
 import Util.HasSize
 import Util.SetLike
-import System.IO.Unsafe
 import qualified C.Generate
 import qualified Cmm.Op as Op
 import qualified Data.ByteString as BS
@@ -35,6 +39,7 @@ main = do
     testName
     testInfo
     testBinary
+    testBinaryLEB
 
 qc s p = quickCheck $ label s p
 
@@ -177,6 +182,24 @@ testBinary = do
     print $ x `asTypeOf` nf
     z <- Info.lookup nfo
     if (z /= t) then fail "Info Test Failed" else return ()
+
+testBinaryLEB = do
+    putStrLn "Testing Binary LEB"
+    let num = 23948
+    let bin = runPut $ putLEB128 num
+    print bin
+    let res = runGet getLEB128 bin
+    printf "0x%x 0x%x\n" num res
+
+    testleb 0x39
+    testleb 0x73
+    testleb 0x83
+
+testleb num = do
+    let bin = runPut $ putLEB128 num
+    let res = runGet getLEB128 bin
+    print bin
+    printf "0x%x 0x%x\n" num res
 
 deriving instance Bounded NameType
 deriving instance Enum Op.ValOp

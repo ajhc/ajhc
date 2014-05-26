@@ -27,6 +27,7 @@ module Name.Name(
     toModule,
     toUnqualified,
     -- new interface
+    unMkName,
     mkName,
     mkComplexName,
     emptyNameParts,
@@ -42,6 +43,7 @@ module Name.Name(
     ) where
 
 import Data.Char
+import Util.Std
 
 import C.FFI
 import Doc.DocLike
@@ -237,6 +239,13 @@ mkComplexName NameParts { .. } = qn $ toName (mkNameType nameLevel nameConstruct
     ident = maybe id (\c s -> show c ++ "_" ++ s) nameUniquifier nameIdent
     qn = if nameQuoted then quoteName else id
 
+unMkName :: Name -> NameParts
+unMkName name = NameParts { .. } where
+    (nameQuoted,nameModule,_,uqn,nameUniquifier) = deconstructName name
+    (_,_,nameIdent) = nameParts uqn
+    nameConstructor = isConstructor name
+    nameLevel = tyLevelOf name
+
 -- internal
 mkNameType :: TyLevel -> Bool -> NameType
 mkNameType l b = (f l b) where
@@ -291,6 +300,7 @@ isConstructor n = f (nameType n) where
     f TypeConstructor = True
     f DataConstructor = True
     f SortName = True
+    f QuotedName = isConstructor $ fromJust (fromQuotedName n)
     f _ = False
 
 nameTyLevel_s tl n = nameTyLevel_u (const tl) n

@@ -4,23 +4,25 @@ import Data.Monoid
 import Maybe
 
 import Data.Binary
+import GenUtil(replicateM)
 import Name.Id
-import Name.Name
+import Name.Internals
+import Support.MapBinaryInstance
 
 instance Binary IdSet where
     put ids = do
-        put [ id | id <- idSetToList ids, isNothing (fromId id)]
-        put [ n | id <- idSetToList ids, n <- fromId id]
+        putList [ id | id <- idSetToList ids, isNothing (fromId id)]
+        putList [ n | id <- idSetToList ids, n <- fromId id]
     get = do
-        (idl:: [Id])   <- get
-        (ndl:: [Name]) <- get
+        (idl:: [Id])   <- getList
+        (ndl:: [Name]) <- getList
         return (idSetFromDistinctAscList idl `mappend` idSetFromList (map toId ndl))
 
 instance Binary a => Binary (IdMap a) where
     put ids = do
-        put [ x | x@(id,_) <- idMapToList ids, isNothing (fromId id)]
-        put [ (n,v) | (id,v) <- idMapToList ids, n <- fromId id]
+        putList [ x | x@(id,_) <- idMapToList ids, isNothing (fromId id)]
+        putList [ (n,v) | (id,v) <- idMapToList ids, n <- fromId id]
     get = do
-        idl <- get
-        ndl <- get
+        idl <- getList
+        ndl <- getList
         return (idMapFromDistinctAscList idl `mappend` idMapFromList [ (toId n,v) | (n,v) <- ndl ])

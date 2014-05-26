@@ -4,6 +4,7 @@ import Data.Binary
 import E.Type
 import FrontEnd.HsSyn()
 import Name.Binary()
+import Support.MapBinaryInstance
 import {-# SOURCE #-} Info.Binary(putInfo,getInfo)
 
 instance Binary TVr where
@@ -38,18 +39,18 @@ instance Data.Binary.Binary RuleType where
 instance Data.Binary.Binary Rule where
     put (Rule aa ab ac ad ae af ag ah) = do
 	    Data.Binary.put aa
-	    Data.Binary.put ab
-	    Data.Binary.put ac
-	    Data.Binary.put ad
+	    putList ab
+	    putList ac
+	    putLEB128 $ fromIntegral ad
 	    Data.Binary.put ae
 	    Data.Binary.put af
 	    Data.Binary.put ag
 	    Data.Binary.put ah
     get = do
     aa <- get
-    ab <- get
-    ac <- get
-    ad <- get
+    ab <- getList
+    ac <- getList
+    ad <- fromIntegral `fmap` getLEB128
     ae <- get
     af <- get
     ag <- get
@@ -59,10 +60,10 @@ instance Data.Binary.Binary Rule where
 instance Data.Binary.Binary ARules where
     put (ARules aa ab) = do
 	    Data.Binary.put aa
-	    Data.Binary.put ab
+	    putList ab
     get = do
     aa <- get
-    ab <- get
+    ab <- getList
     return (ARules aa ab)
 
 instance (Data.Binary.Binary e,
@@ -74,7 +75,7 @@ instance (Data.Binary.Binary e,
     put (LitCons ac ad ae af) = do
 	    Data.Binary.putWord8 1
 	    Data.Binary.put ac
-	    Data.Binary.put ad
+	    putList ad
 	    Data.Binary.put ae
 	    Data.Binary.put af
     get = do
@@ -86,7 +87,7 @@ instance (Data.Binary.Binary e,
 		    return (LitInt aa ab)
 	      1 -> do
 		    ac <- Data.Binary.get
-		    ad <- Data.Binary.get
+		    ad <- getList
 		    ae <- Data.Binary.get
 		    af <- Data.Binary.get
 		    return (LitCons ac ad ae af)
@@ -154,7 +155,7 @@ instance Data.Binary.Binary E where
 	    Data.Binary.put ai
     put (ELetRec aj ak) = do
 	    Data.Binary.putWord8 7
-	    Data.Binary.put aj
+	    putList aj
 	    Data.Binary.put ak
     put (EPrim al am an) = do
 	    Data.Binary.putWord8 8
@@ -170,7 +171,7 @@ instance Data.Binary.Binary E where
 	    Data.Binary.put aq
 	    Data.Binary.put ar
 	    Data.Binary.put as
-	    Data.Binary.put at
+	    putList at
 	    Data.Binary.put au
 	    Data.Binary.put av
     get = do
@@ -200,7 +201,7 @@ instance Data.Binary.Binary E where
 		    ai <- Data.Binary.get
 		    return (ELit ai)
 	      7 -> do
-		    aj <- Data.Binary.get
+		    aj <- getList
 		    ak <- Data.Binary.get
 		    return (ELetRec aj ak)
 	      8 -> do
@@ -216,7 +217,7 @@ instance Data.Binary.Binary E where
 		    aq <- Data.Binary.get
 		    ar <- Data.Binary.get
 		    as <- Data.Binary.get
-		    at <- Data.Binary.get
+		    at <- getList
 		    au <- Data.Binary.get
 		    av <- Data.Binary.get
 		    return (ECase aq ar as at au av)
