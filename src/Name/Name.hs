@@ -28,7 +28,10 @@ module Name.Name(
     toUnqualified,
     -- new interface
     mkName,
+    mkComplexName,
+    emptyNameParts,
     mkNameType,
+    NameParts(..),
     nameTyLevel_u,
     nameTyLevel_s,
     typeLevel,
@@ -210,6 +213,29 @@ toModule s = Module $ toAtom s
 --------------
 mkName :: TyLevel -> Bool -> Maybe Module -> String -> Name
 mkName l b mm s = toName (mkNameType l b) (mm,s)
+
+data NameParts = NameParts {
+    nameLevel :: TyLevel,
+    nameQuoted :: Bool,
+    nameConstructor :: Bool,
+    nameModule :: Maybe Module,
+    nameUniquifier :: Maybe Int,
+    nameIdent      :: String
+    }
+
+emptyNameParts = NameParts {
+    nameLevel = termLevel,
+    nameQuoted = False,
+    nameConstructor = False,
+    nameModule = Nothing,
+    nameUniquifier = Nothing,
+    nameIdent = "(empty)"
+    }
+
+mkComplexName :: NameParts -> Name
+mkComplexName NameParts { .. } = qn $ toName (mkNameType nameLevel nameConstructor) (nameModule,ident) where
+    ident = maybe id (\c s -> show c ++ "_" ++ s) nameUniquifier nameIdent
+    qn = if nameQuoted then quoteName else id
 
 -- internal
 mkNameType :: TyLevel -> Bool -> NameType

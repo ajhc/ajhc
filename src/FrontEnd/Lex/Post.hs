@@ -47,8 +47,8 @@ checkSconType xs = do
         g ~(SconType True t) = HsBangedTy t
     s <- checkSconType' xs
     case s of
-        SconApp t ts -> do t <- f t; return (t, reverse $ map g ts)
-        _ -> do s <- f s; return (s,[])
+        SconApp t ts -> do t <- f t; return (nameTyLevel_s termLevel t, reverse $ map g ts)
+        _ -> do s <- f s; return (nameTyLevel_s termLevel s,[])
 
 checkBangType  :: [Either Name HsType] -> P HsBangType
 checkBangType xs = checkSconType' xs >>= \s -> case s of

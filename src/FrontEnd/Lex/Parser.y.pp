@@ -219,9 +219,9 @@ bkind :: { HsKind }
 
 deriving :: { [Name] }
     : {- empty -}               { [] }
-    | 'deriving' con            { [$2] }
+    | 'deriving' con            { [toName ClassName $2] }
     | 'deriving' '(' ')'        { [] }
-    | 'deriving' '(' cl_con ')' { $3 }
+    | 'deriving' '(' cl_con ')' { map (toName ClassName) $3 }
 
 constr :: { HsConDecl }
     : srcloc mexists scontype   { HsConDecl {

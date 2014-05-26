@@ -150,7 +150,7 @@ haskell :-
 
 <hs> "(#" / { isEnabled FO.UnboxedTuples }  { mkL LSpecial }
 <hs> "#)" / { isEnabled FO.UnboxedTuples }  { mkL LSpecial }
-<hs> @integer "#" / { isEnabled FO.UnboxedValues } { mkL LInteger_ }
+<hs> '-'? @integer "#" / { isEnabled FO.UnboxedValues } { mkL LInteger_ }
 <hs> @stringlit "#" / { isEnabled FO.UnboxedValues } { mkL LString_ }
 <hs> @charlit "#" / { isEnabled FO.UnboxedValues } { mkL LChar_ }
 <hs> @floatlit "#" / { isEnabled FO.UnboxedValues } { mkL LFloat_ }

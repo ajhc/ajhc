@@ -88,7 +88,7 @@ data FieldMap = FieldMap
 
 instance Monoid FieldMap where
     mempty = FieldMap mempty mempty
-    mappend (FieldMap a b) (FieldMap c d) =
+    FieldMap a b `mappend` FieldMap c d =
         FieldMap (a `mappend` c) (b `mappend` d)
 
 type SubTable = Map.Map Name Name
@@ -115,10 +115,8 @@ addTopLevels  hsmod action = do
     let cdefs = map (\ (x,y,_) -> (x,y)) $ fst $ collectDefsHsModule hsmod
         nmap = foldl f [] (fsts cdefs)
         f r hsName@(getModule -> Just _)
-            | Just _ <- V.fromTupname hsName, mod_JhcPrimPrim == mod
-                = let nn = hsName in (nn,nn):r
-            | nameName tc_Arrow == hsName, mod_JhcPrimPrim == mod
-                = let nn = hsName in (nn,nn):r
+            | Just _ <- V.fromTupname hsName, mod_JhcPrimPrim == mod = (hsName,hsName):r
+            | tc_Arrow == hsName, mod_JhcPrimPrim == mod = (hsName,hsName):r
             | otherwise = let nn = toUnqualified hsName in (nn,hsName):(hsName,hsName):r
         f r z = let nn = qualifyName mod z in (z,nn):(nn,nn):r
         z ns = mapM mult (filter (\x -> length x > 1) $
@@ -278,9 +276,9 @@ renameHsDecl d = f d where
         hsDeclName <- renameTypeName hsDeclName
         updateWith (map fromTypishHsName hsDeclArgs) $ do
             hsDeclContext <- rename hsDeclContext
-            hsDeclArgs <- mapM renameTypeName hsDeclArgs
+            hsDeclArgs <- mapM renameName hsDeclArgs
             hsDeclCons <- rename hsDeclCons
-            hsDeclDerives <- mapM (renameName . toName ClassName) hsDeclDerives
+            hsDeclDerives <- mapM renameName hsDeclDerives
             return HsDataDecl { .. }
     f (HsTypeDecl srcLoc name hsNames t) = do
         hsName' <- renameTypeName name
@@ -324,7 +322,7 @@ renameHsDecl d = f d where
         rs' <- rename rs
         return $ HsPragmaRules rs'
     f prules@HsPragmaSpecialize { hsDeclSrcLoc = srcLoc, hsDeclName = n, hsDeclType = t } = do
-        n <- if n == nameName u_instance then return n else renameValName n
+        n <- if n == u_instance then return n else renameValName n
         let ns = snub (getNames t)
         updateWith t $ do
             ns' <- mapM renameTypeName ns
@@ -490,7 +488,7 @@ buildRecPat (FieldMap amp fls) n us = case mlookup (toName DataConstructor n) am
     Just t -> do
         let f (HsField x p) = case  mlookup (toName FieldLabel x) fls of
                 Nothing -> failRename $ "Field Label does not exist: " ++ show x
-                Just cs -> case lookup n [ (nameName x,(y)) | (x,y) <- cs ] of
+                Just cs -> case lookup n [ (x,(y)) | (x,y) <- cs ] of
                     Nothing -> failRename $ "Field Label does not belong to constructor: " ++ show (x,n)
                     Just i -> return (i,HsPParen p)
         fm <- mapM f us
@@ -519,14 +517,18 @@ instance Rename HsGuardedRhs where
         hsExp2' <- rename hsExp2
         return (HsGuardedRhs srcLoc hsExp1' hsExp2')
 
-f_fromRational = HsVar $ nameName (toUnqualified v_fromRational)
+f_fromRational = HsVar (toUnqualified v_fromRational)
 
 newVar = do
     unique <- newUniq
     mod <- getCurrentModule
-    --let hsName'' = (Qual mod (HsIdent $ show unique {- ++ fromName hsName' -} ++ "_var@"))
-    let hsName'' = toName Val (mod,show unique ++ "_var@")
-    return hsName''
+    return $ mkComplexName emptyNameParts {
+            nameModule = Just mod,
+            nameLevel = termLevel,
+            nameConstructor = False,
+            nameUniquifier = Just unique,
+            nameIdent = "var@"
+        }
 
 instance Rename HsExp where
     rename (HsVar hsName) = HsVar <$> renameValName hsName
@@ -599,7 +601,7 @@ buildRecConstr (FieldMap amp fls) n us = do
         Just t -> do
             let f (HsField x e) = case  mlookup (toName FieldLabel x) fls of
                     Nothing -> failRename $ "Field Label does not exist: " ++ show x
-                    Just cs -> case lookup n [ (nameName x,(y)) | (x,y) <- cs ] of
+                    Just cs -> case lookup n [ (x,(y)) | (x,y) <- cs ] of
                         Nothing -> failRename $ "Field Label does not belong to constructor: " ++ show (x,n)
                         Just i -> return (i,hsParen e)
             fm <- mapM f us
@@ -621,9 +623,8 @@ buildRecUpdate (FieldMap amp fls) n us = do
                 Just t -> do
                     vars <- replicateM t newVar
                     let vars' = (map HsVar vars)
-                    let c' = nameName c
-                    let x = foldl HsApp (HsCon c') [ maybe v id (lookup i zs) | v <- vars' | i <- [ 0 .. t - 1] ]
-                    return $ HsAlt sl (HsPApp c' (map HsPVar vars))  (HsUnGuardedRhs x) []
+                    let x = foldl HsApp (HsCon c) [ maybe v id (lookup i zs) | v <- vars' | i <- [ 0 .. t - 1] ]
+                    return $ HsAlt sl (HsPApp c (map HsPVar vars))  (HsUnGuardedRhs x) []
         as <- mapM g fm'
         pe <- createError HsErrorRecordUpdate "Record Update Error"
         return $ HsCase n (as ++ [HsAlt sl HsPWildCard (HsUnGuardedRhs pe) []])
@@ -668,20 +669,18 @@ instance Rename HsStmt where
 
 instance Rename HsFieldUpdate where
     rename (HsField hsName hsExp) = do
---        gt <- gets globalSubTable              -- field names are global and not shadowed
- --       hsName' <- renameName hsName gt      -- TODO field names should have own namespace
-        hsName' <- renameName (toName FieldLabel hsName)      -- TODO field names should have own namespace
+        hsName' <- renameName (toName FieldLabel hsName)
         hsExp' <- rename hsExp
         return (HsField hsName' hsExp')
 
 renameValName :: Name -> RM Name
-renameValName hsName = renameName (fromValishHsName hsName)
+renameValName hsName = renameName hsName -- (fromValishHsName hsName)
 
 renameTypeName :: Name -> RM Name
-renameTypeName hsName = renameName (fromTypishHsName hsName)
+renameTypeName hsName = renameName (hsName)
 
 renameKindName :: Name -> RM Name
-renameKindName hsName = renameName (toName SortName hsName)
+renameKindName hsName = renameName (hsName)
 
 renameName :: Name -> RM Name
 -- a few hard coded cases
@@ -834,7 +833,7 @@ getNamesAndASrcLocsFromHsStmt (HsLetStmt hsDecls) = concat $ map getNamesAndASrc
 -----------
 
 newtype RM a = RM { unRM :: RWS Env (Map.Map Name Name,[Warning]) ScopeState a }
-    deriving(Functor,MonadReader Env, MonadWriter (Map.Map Name Name,[Warning]), MonadState ScopeState)
+    deriving(Applicative, Functor,MonadReader Env, MonadWriter (Map.Map Name Name,[Warning]), MonadState ScopeState)
 
 instance Monad RM where
     RM x >> RM y = RM $ x >> y
@@ -846,10 +845,6 @@ instance Monad RM where
         sl <- getSrcLoc
         addWarn ParseError s
         RM $ fail $ show sl ++ ":" ++ s
-
-instance Applicative RM where
-    pure = return
-    (<*>) = ap
 
 instance MonadWarn RM where
     addWarning w = tell (mempty,[w])
