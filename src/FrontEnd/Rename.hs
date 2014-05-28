@@ -248,7 +248,7 @@ renameHsDecl d = f d where
             t <- rename t
             return (HsForeignExport a b n t)
     f (HsForeignDecl a b n t) = do
-        n <- renameValName n
+        n <- renameName n
         updateWith t $ do
         t <- rename t
         return (HsForeignDecl a b n t)
@@ -256,12 +256,12 @@ renameHsDecl d = f d where
         hsMatches' <- rename hsMatches
         return (HsFunBind hsMatches')
     f (HsTypeSig srcLoc hsNames hsQualType) = do
-        hsNames' <- mapM renameValName hsNames
+        hsNames' <- mapM renameName hsNames
         updateWith hsQualType $ do
             hsQualType' <- rename hsQualType
             return (HsTypeSig srcLoc hsNames' hsQualType')
     f HsDataDecl { .. } | hsDeclDeclType == DeclTypeKind = do
-        hsDeclName <- renameKindName hsDeclName
+        hsDeclName <- renameName hsDeclName
         unless (null hsDeclArgs) $
             addWarn InvalidDecl "kind declarations can't have arguments."
         when (any isHsRecDecl hsDeclCons) $
@@ -273,7 +273,7 @@ renameHsDecl d = f d where
             addWarn InvalidDecl "kind declarations can't have context"
         return HsDataDecl { .. }
     f HsDataDecl { .. } = do
-        hsDeclName <- renameTypeName hsDeclName
+        hsDeclName <- renameName hsDeclName
         updateWith (map fromTypishHsName hsDeclArgs) $ do
             hsDeclContext <- rename hsDeclContext
             hsDeclArgs <- mapM renameName hsDeclArgs
@@ -281,13 +281,13 @@ renameHsDecl d = f d where
             hsDeclDerives <- mapM renameName hsDeclDerives
             return HsDataDecl { .. }
     f (HsTypeDecl srcLoc name hsNames t) = do
-        hsName' <- renameTypeName name
+        hsName' <- renameName name
         updateWith (Set.toList $ freeVars hsNames :: [Name]) $ do
             hsNames' <- rename hsNames
             t' <- rename t
             return (HsTypeDecl srcLoc  hsName' hsNames' t')
     f HsTypeFamilyDecl { .. } = do
-        hsDeclCName <- renameTypeName hsDeclName
+        hsDeclCName <- renameName hsDeclName
         updateWith (Set.toList $ freeVars hsDeclTArgs :: [Name]) $ do
             hsDeclTArgs <- rename hsDeclTArgs
             return HsTypeFamilyDecl { .. }
@@ -296,7 +296,7 @@ renameHsDecl d = f d where
         hsDecls' <- rename hsDecls
         return (HsClassDecl srcLoc classHead' hsDecls')
     f (HsClassAliasDecl srcLoc name args hsContext hsClasses hsDecls) = do
-        name' <- renameTypeName name
+        name' <- renameName name
         updateWith args $ do
         args' <- mapM rename args
         hsContext' <- rename hsContext
@@ -309,23 +309,23 @@ renameHsDecl d = f d where
         hsDecls' <- mapM (qualifyInstMethod (getTypeClassModule classHead')) hsDecls
         return (HsInstDecl srcLoc classHead' hsDecls')
     f (HsInfixDecl srcLoc assoc int hsNames) = do
-        hsNames' <- mapM renameValName hsNames
+        hsNames' <- mapM renameName hsNames
         return $ HsInfixDecl srcLoc assoc int hsNames'
     f (HsActionDecl srcLoc pat e) = do
         pat <- rename pat
         e <- rename e
         return (HsActionDecl srcLoc pat e)
     f (HsPragmaProps srcLoc prop hsNames) = do
-        hsNames' <- mapM renameValName hsNames
+        hsNames' <- mapM renameName hsNames
         return (HsPragmaProps  srcLoc prop hsNames')
     f (HsPragmaRules rs) = do
         rs' <- rename rs
         return $ HsPragmaRules rs'
     f prules@HsPragmaSpecialize { hsDeclSrcLoc = srcLoc, hsDeclName = n, hsDeclType = t } = do
-        n <- if n == u_instance then return n else renameValName n
+        n <- if n == u_instance then return n else renameName n
         let ns = snub (getNames t)
         updateWith t $ do
-            ns' <- mapM renameTypeName ns
+            ns' <- mapM renameName ns
             t <- rename t
             m <- getCurrentModule
             i <- newUniq
@@ -345,7 +345,7 @@ instance Rename HsRule where
         withSrcLoc srcLoc $ do
         updateWith (map fromValishHsName $ fsts fvs) $ do
         subTable'' <- getUpdates (catMaybes $ snds fvs)
-        fvs' <- sequence [ liftM2 (,) (renameValName x) (withSubTable subTable'' $ rename y)| (x,y) <- fvs]
+        fvs' <- sequence [ liftM2 (,) (renameName x) (withSubTable subTable'' $ rename y)| (x,y) <- fvs]
         e1' <- rename e1
         e2' <- rename e2
         m <- getCurrentModule
@@ -359,7 +359,7 @@ instance Rename HsQualType where
 instance Rename HsAsst where
     rename (HsAsst hsName1 hsName2s) = do
         hsName1' <- renameName (toName ClassName hsName1)
-        hsName2s' <- mapM renameTypeName hsName2s
+        hsName2s' <- mapM renameName hsName2s
         return (HsAsst hsName1' hsName2s')
     rename (HsAsstEq t1 t2) = HsAsstEq <$> rename t1 <*> rename t2
 
@@ -367,14 +367,14 @@ instance Rename HsConDecl where
     --rename cd@(HsConDecl { hsConDeclSrcLoc = srcLoc, hsConDeclName = hsName, hsConDeclConArg = hsBangTypes }) = do
     rename cd@(HsConDecl {  hsConDeclName = hsName, hsConDeclConArg = hsBangTypes, .. }) = do
         withSrcLoc hsConDeclSrcLoc $ do
-        hsName' <- renameValName hsName
+        hsName' <- renameName hsName
         updateWith  (map (toName TypeVal . hsTyVarBindName) hsConDeclExists) $ do
         hsConDeclExists <- rename hsConDeclExists
         hsBangTypes' <- rename hsBangTypes
         return cd { hsConDeclName = hsName', hsConDeclConArg = hsBangTypes', hsConDeclExists }
     rename cd@HsRecDecl { hsConDeclSrcLoc = srcLoc, hsConDeclName = hsName, hsConDeclRecArg = stuff} = do
         withSrcLoc srcLoc $ do
-        hsName' <- renameValName hsName
+        hsName' <- renameName hsName
         updateWith (map (toName TypeVal . hsTyVarBindName) (hsConDeclExists cd)) $ do
         es <- rename (hsConDeclExists cd)
         stuff' <- sequence [ do ns' <- mapM renameName (map (toName FieldLabel) ns); t' <- rename t; return (ns',t')  |  (ns,t) <- stuff]
@@ -382,14 +382,14 @@ instance Rename HsConDecl where
 
 renameKindHsCon HsConDecl { .. } = do
     withSrcLoc hsConDeclSrcLoc $ do
-    hsConDeclName <- renameTypeName hsConDeclName
+    hsConDeclName <- renameName hsConDeclName
     unless (null hsConDeclExists) $
         addWarn InvalidDecl "kind declarations cannot have existential types"
     let bt e@HsBangedTy {} = do
             addWarn InvalidDecl "strictness annotations not relevant to kind declarations"
             return e
         bt (HsUnBangedTy e) = HsUnBangedTy `liftM` f e
-        f (HsTyCon n) = HsTyCon `liftM` renameKindName n
+        f (HsTyCon n) = HsTyCon `liftM` renameName n
         f e = addWarn InvalidDecl "invalid argument in kind declaration" >> return e
     hsConDeclConArg <- mapM bt hsConDeclConArg
     return HsConDecl { .. }
@@ -409,11 +409,11 @@ renameHsType' dovar t = pp (rt t) where
     rt :: HsType -> RM HsType
     rt (HsTyTuple []) = return $ HsTyTuple []
     rt (HsTyVar hsName) | dovar = do
-        hsName' <- renameTypeName hsName
+        hsName' <- renameName hsName
         return (HsTyVar hsName')
     rt v@HsTyVar {} = return v
     rt (HsTyCon hsName) = do
-        hsName' <- renameTypeName hsName
+        hsName' <- renameName hsName
         return (HsTyCon hsName')
     rt (HsTyForall ts v) = do
         updateWith (map (toName TypeVal) $ map hsTyVarBindName ts)  $ do
@@ -450,7 +450,7 @@ instance Rename a => Rename (Maybe a) where
 
 instance Rename HsTyVarBind where
     rename tvb@HsTyVarBind { hsTyVarBindName = n } = do
-        n' <- renameTypeName n
+        n' <- renameName n
         return tvb { hsTyVarBindName = n' }
 
 -- note that for renameHsMatch, the 'wheres' dominate the 'pats'
@@ -458,7 +458,7 @@ instance Rename HsTyVarBind where
 instance Rename HsMatch where
     rename (HsMatch srcLoc hsName hsPats hsRhs {-where-} hsDecls) = do
         withSrcLoc srcLoc $ do
-        hsName' <- renameValName hsName
+        hsName' <- renameName hsName
         updateWithN Val hsPats  $ do
         hsPats' <- rename hsPats
         updateWithN Val hsDecls $ do
@@ -469,15 +469,14 @@ instance Rename HsMatch where
 
 instance Rename HsPat where
     rename (HsPVar hsName) = HsPVar `fmap` renameName hsName
---    rename (HsPList []) = return $ HsPList []
-    rename (HsPInfixApp hsPat1 hsName hsPat2) = HsPInfixApp <$> rename hsPat1 <*> renameValName hsName <*> rename hsPat2
-    rename (HsPApp hsName hsPats) = HsPApp <$> renameValName hsName <*> rename hsPats
+    rename (HsPInfixApp hsPat1 hsName hsPat2) = HsPInfixApp <$> rename hsPat1 <*> renameName hsName <*> rename hsPat2
+    rename (HsPApp hsName hsPats) = HsPApp <$> renameName hsName <*> rename hsPats
     rename (HsPRec hsName hsPatFields) = do
-        hsName' <- renameValName hsName
+        hsName' <- renameName hsName
         hsPatFields' <- rename hsPatFields
         fls <- asks envFieldLabels
         buildRecPat fls hsName' hsPatFields'
-    rename (HsPAsPat hsName hsPat) = HsPAsPat <$> renameValName hsName <*> rename hsPat
+    rename (HsPAsPat hsName hsPat) = HsPAsPat <$> renameName hsName <*> rename hsPat
     rename (HsPTypeSig sl hsPat qt)  = HsPTypeSig sl <$> rename hsPat <*> rename qt
     rename (HsPatExp e) = HsPatExp <$> rename e
     rename p = traverseHsPat rename p
@@ -531,8 +530,8 @@ newVar = do
         }
 
 instance Rename HsExp where
-    rename (HsVar hsName) = HsVar <$> renameValName hsName
-    rename (HsCon hsName) = HsCon <$> renameValName hsName
+    rename (HsVar hsName) = HsVar <$> renameName hsName
+    rename (HsCon hsName) = HsCon <$> renameName hsName
     rename i@(HsLit HsInt {}) = do return i
     rename i@(HsLit HsFrac {}) = do
         z <- rename f_fromRational
@@ -554,7 +553,7 @@ instance Rename HsExp where
         (ss,()) <- renameHsStmts hsStmts (return ())
         doToExp newVar (v_bind) (v_bind_) (v_fail) ss
     rename (HsRecConstr hsName hsFieldUpdates) = do
-        hsName' <- renameValName hsName
+        hsName' <- renameName hsName
         hsFieldUpdates' <- rename hsFieldUpdates
         fls <- asks envFieldLabels
         buildRecConstr fls hsName' (hsFieldUpdates'::[HsFieldUpdate])
@@ -577,7 +576,7 @@ instance Rename HsExp where
         updateWith hsQualType $ do
             hsQualType' <- rename hsQualType
             return (HsExpTypeSig srcLoc hsExp' hsQualType')
-    rename (HsAsPat hsName hsExp) = HsAsPat <$> renameValName hsName <*> rename hsExp
+    rename (HsAsPat hsName hsExp) = HsAsPat <$> renameName hsName <*> rename hsExp
     rename (HsWildCard sl) = do
         withSrcLoc sl $ do
             e <- createError HsErrorUnderscore ("_")
@@ -672,15 +671,6 @@ instance Rename HsFieldUpdate where
         hsName' <- renameName (toName FieldLabel hsName)
         hsExp' <- rename hsExp
         return (HsField hsName' hsExp')
-
-renameValName :: Name -> RM Name
-renameValName hsName = renameName hsName -- (fromValishHsName hsName)
-
-renameTypeName :: Name -> RM Name
-renameTypeName hsName = renameName (hsName)
-
-renameKindName :: Name -> RM Name
-renameKindName hsName = renameName (hsName)
 
 renameName :: Name -> RM Name
 -- a few hard coded cases
@@ -872,26 +862,17 @@ instance (Functor f,DeNameable a) => DeNameable (f a) where
     deName m fx = fmap (deName m) fx
 
 instance DeNameable Name where
-    deName mod name = mapName' fm unRenameString name where
-        fm (Just m) | m == mod = Nothing
-                    | m `elem` removedMods = Nothing
-        fm m = m
+    deName mod name = mkComplexName np { nameUniquifier = Nothing, nameModule = fm nameModule } where
+        np@NameParts { .. } = unMkName name
+        fm x = do r <- x; guard (r `notElem` mod:removedMods); return r
         removedMods = [ mod_Prelude,mod_JhcBasics,mod_JhcPrimIO,mod_JhcTypeWord,mod_JhcTypeBasic]
 
 instance DeNameable HsPat where
     deName mod p = f p where
         f (HsPVar v) = HsPVar (deName mod v)
-        f (HsPNeg p) = HsPNeg (f p)
-        f (HsPIrrPat p) = HsPIrrPat (deName mod p)
-        f (HsPBangPat p) = HsPBangPat (deName mod p)
-        f (HsPParen p) = HsPParen (f p)
         f (HsPApp cn pats) = HsPApp (deName mod cn) (deName mod pats)
-        f (HsPList pats) = HsPList (deName mod pats)
         f (HsPAsPat n p) = HsPAsPat (deName mod n) (deName mod p)
-        f p = p
-
---instance DeNameable n => DeNameable Located l n where
---    deName mod p
+        f p = runIdentity $ traverseHsPat (return . f) p
 
 instance DeNameable HsAlt where
     deName mod (HsAlt sl p rhs ds) = HsAlt sl (dn p) (dn rhs) ds where
@@ -949,7 +930,6 @@ listCompToExp newName exp ss = hsParen `liftM` f ss where
     f (HsQualifier e:ss) = do ss' <- f ss; return $ hsParen (HsIf e ss' (HsList []))
     f ((HsGenerator srcLoc pat e):ss) | isLazyPat pat, Just exp' <- g ss = do
         return $ hsParen $ HsVar v_map `app` HsLambda srcLoc [pat] exp' `app` e
-    --f ((HsGenerator srcLoc pat e):[HsQualifier q]) | isHsPVar pat = hsParen $ HsApp (HsApp (HsVar f_filter)  (hsParen $ HsLambda srcLoc [pat] q) ) e
     f ((HsGenerator srcLoc pat e):HsQualifier q:ss) | isLazyPat pat, Just exp' <- g ss = do
         npvar <- newName
         return $ hsApp (HsVar v_foldr)  [HsLambda srcLoc [pat,HsPVar npvar] $
