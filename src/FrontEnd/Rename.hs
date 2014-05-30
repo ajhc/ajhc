@@ -12,6 +12,7 @@ import Control.Monad.Writer
 import Data.Char
 import Util.Std hiding(union)
 import qualified Data.Foldable as Seq
+import qualified Data.List
 import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
@@ -103,11 +104,14 @@ data Context
 
 data Env = Env {
     envModule      :: Module,
-    envNameMap     :: Map.Map Name (Either String Name),
+    envNameMap     :: Map.Map Name NameEntry,
     envOptions     :: Opt,
     envFieldLabels :: FieldMap,
-    envSrcLoc      :: SrcLoc
+    envSrcLoc      :: SrcLoc,
+    envInPattern   :: Bool
     }
+
+envInPattern_s p e = e { envInPattern = p }
 
 addTopLevels :: HsModule -> RM a -> RM a
 addTopLevels  hsmod action = do
@@ -124,10 +128,18 @@ addTopLevels  hsmod action = do
         mult xs@(~((n,sl):_)) = warn sl (MultiplyDefined n (snds xs))
             (show n ++ " is defined multiple times: " ++ show xs)
     z cdefs
-    let amb k x y | x == y = x
-        amb k (Right n1) (Right n2) = Left (ambig k [n1,n2])
-        amb _ _ l  = l
-    local (\e -> e { envNameMap = Map.unionWithKey amb (Map.map Right $ Map.fromList nmap) (envNameMap e) }) action
+    let amb k x y = if x < y then f x y else f y x where
+            f x y | x == y = y
+            f (NameJust n1) (NameJust n2) | getModule n1 == Just mod = NameBound n1 [n2]
+            f (NameJust n1) (NameJust n2) | getModule n2 == Just mod = NameBound n2 [n1]
+            f (NameJust n1) (NameBound x xs) | n1  `elem` (x:xs)  = NameBound x xs
+            f (NameBound x xs) (NameBound y ys) | x == y = NameBound x (xs `Data.List.union` ys)
+                                                    | otherwise = NameAmbig ((x:xs) `Data.List.union` (y:ys))
+            f (names -> xs) (names -> ys) = NameAmbig (Data.List.union xs ys)
+        names (NameJust n1) = [n1]
+        names (NameBound x xs) = x:xs
+        names (NameAmbig xs) = xs
+    local (\e -> e { envNameMap = Map.unionWithKey amb (Map.map NameJust $ Map.fromList nmap) (envNameMap e) }) action
 
 createSelectors sloc ds = mapM g ns where
     ds' :: [(Name,[(Name,HsBangType)])]
@@ -143,17 +155,25 @@ createSelectors sloc ds = mapM g ns where
 
 ambig x ys = "Ambiguous Name: " ++ show x ++ "\nCould refer to: " ++ tupled (map show ys)
 
+data NameEntry
+    = NameJust Name
+    | NameBound Name [Name]
+    | NameAmbig [Name]
+    deriving(Eq,Ord)
+
 runRename :: MonadWarn m => (a -> RM b) -> Opt -> Module -> FieldMap -> [(Name,[Name])] -> a -> m (b,Map.Map Name Name)
 runRename doit opt mod fls ns m = mapM_ addWarning errors >> return (renamedMod,reverseMap) where
-    nameMap = fromList $ map f ns where
-        f (x,[y]) = (x,Right y)
-        f (x,ys)  = (x,Left $ ambig x ys)
+    nameMap = fmap f (Map.fromList ns) where
+        f [y] = NameJust y
+        f ys | ([ln],rs) <- partition (\c -> getModule c == Just mod) ys = NameBound ln rs
+        f ys  = NameAmbig ys
     startState = ScopeState 1
     startEnv = Env {
         envModule      = mod,
         envNameMap     = nameMap,
         envOptions     = opt,
         envFieldLabels = fls,
+        envInPattern   = False,
         envSrcLoc      = mempty
     }
     (renamedMod, _, (reverseMap,errors)) = runRWS (unRM $ doit m) startEnv startState
@@ -173,7 +193,7 @@ renameStatement :: MonadWarn m => FieldMap -> [(Name,[Name])] ->  Module -> HsSt
 renameStatement fls ns modName stmt = fst `liftM` runRename rename options modName fls ns stmt
 
 withSubTable :: SubTable -> RM a -> RM a
-withSubTable st action = local (\e -> e { envNameMap = Map.map Right st `union` envNameMap e }) action
+withSubTable st action = local (\e -> e { envNameMap = Map.map NameJust st `union` envNameMap e }) action
 
 renameDecls :: HsModule -> RM HsModule
 renameDecls mod = do
@@ -237,18 +257,18 @@ instance Rename HsDecl where
 
 renameHsDecl d = f d where
     f (HsPatBind srcLoc hsPat hsRhs {-where-} hsDecls) = do
-        hsPat'    <- rename hsPat
+        hsPat'    <- local (envInPattern_s True) $ rename hsPat
         updateWithN Val hsDecls $ do
         hsDecls'  <- rename hsDecls
         hsRhs'    <- rename hsRhs
         return (HsPatBind srcLoc hsPat' hsRhs' {-where-} hsDecls')
     f (HsForeignExport a b n t) = do
-        n <- renameName n
+        n <- local (envInPattern_s True) $ renameName n
         updateWith t $ do
             t <- rename t
             return (HsForeignExport a b n t)
     f (HsForeignDecl a b n t) = do
-        n <- renameName n
+        n <- local (envInPattern_s True) $ renameName n
         updateWith t $ do
         t <- rename t
         return (HsForeignDecl a b n t)
@@ -256,7 +276,7 @@ renameHsDecl d = f d where
         hsMatches' <- rename hsMatches
         return (HsFunBind hsMatches')
     f (HsTypeSig srcLoc hsNames hsQualType) = do
-        hsNames' <- mapM renameName hsNames
+        hsNames' <- local (envInPattern_s True) $ mapM renameName hsNames
         updateWith hsQualType $ do
             hsQualType' <- rename hsQualType
             return (HsTypeSig srcLoc hsNames' hsQualType')
@@ -458,9 +478,9 @@ instance Rename HsTyVarBind where
 instance Rename HsMatch where
     rename (HsMatch srcLoc hsName hsPats hsRhs {-where-} hsDecls) = do
         withSrcLoc srcLoc $ do
-        hsName' <- renameName hsName
+        hsName' <- local (envInPattern_s True) $ renameName hsName
         updateWithN Val hsPats  $ do
-        hsPats' <- rename hsPats
+        hsPats' <- local (envInPattern_s True) $ rename hsPats
         updateWithN Val hsDecls $ do
         hsDecls' <- rename (expandTypeSigs hsDecls)
         mapM_ HsErrors.hsDeclLocal hsDecls'
@@ -677,21 +697,27 @@ renameName :: Name -> RM Name
 renameName hsName
     | Just n <- fromQuotedName hsName = return n
     | hsName `elem` [tc_Arrow,dc_Unit,tc_Unit] = return hsName
-    | (nt,Just m,i) <- nameParts hsName, '@':_ <- show m = return $ toName nt (m, i)
+--    | (nt,Just m,i) <- nameParts hsName, '@':_ <- show m = return $ toName nt (m, i)
     | Just _ <- V.fromTupname hsName = return hsName
     | nameType hsName == UnknownType = return hsName
 renameName hsName = do
     subTable <- asks envNameMap
+    inPattern <- asks envInPattern
     case mlookup hsName subTable of
-        Just (Right name) -> do
+        Just (NameJust name) -> do
             tell (Map.singleton name hsName,mempty)
             return name
-        Just (Left err) -> do
-            addWarn (UndefinedName hsName) err
+        Just (NameBound x _) | inPattern -> do
+            tell (Map.singleton x hsName,mempty)
+            return x
+        Just (NameAmbig xs) -> do
+            addWarn (AmbiguousName hsName xs) (ambig hsName xs)
+            return hsName
+        Just (NameBound x xs) -> do
+            addWarn (AmbiguousName hsName (x:xs)) (ambig hsName $ x:xs)
             return hsName
         Nothing -> do
-            let err = "Unknown name: " ++ show hsName
-            addWarn (UndefinedName hsName) err
+            addWarn (UndefinedName hsName) $ "Unknown name: " ++ show hsName
             return hsName
 
 clobberedName :: Name -> RM Name
