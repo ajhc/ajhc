@@ -611,7 +611,7 @@ failRename s = do
 buildRecConstr ::  FieldMap -> Name -> [HsFieldUpdate] -> RM HsExp
 buildRecConstr (FieldMap amp fls) n us = do
     undef <- createError HsErrorUninitializedField "Uninitialized Field"
-    case mlookup (toName DataConstructor n) amp of
+    case mlookup n amp of
         Nothing -> failRename $ "Unknown Constructor: " ++ show n
         Just t -> do
             let f (HsField x e) = case  mlookup (toName FieldLabel x) fls of

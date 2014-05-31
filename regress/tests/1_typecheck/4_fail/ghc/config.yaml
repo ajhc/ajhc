@@ -19,3 +19,7 @@ tests:
         skip: not error in jhc
    tcfail183:
         skip: not error in jhc
+   tcfail032:
+     skip: jhc extension allows this
+   tcfail071:
+     skip: jhc extension allows this

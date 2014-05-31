@@ -6,11 +6,11 @@ module FrontEnd.HsErrors(
     hsDeclLocal
     ) where
 
-import Control.Applicative(Applicative)
-import Control.Monad
+import Util.Std
+
 import Control.Monad.Writer
-import Data.List
 import FrontEnd.Class
+import FrontEnd.Utils(maybeGetDeclName)
 import FrontEnd.HsSyn
 import FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse
@@ -38,11 +38,14 @@ typeVars t = execWriter $ f t where
     f t = traverseHsType_ f t
 
 hsDecl :: (MonadSetSrcLoc m,MonadSrcLoc m, MonadWarn m) => Context -> HsDecl -> m ()
-hsDecl cntx decl = f cntx decl where
+hsDecl cntx decl = withSrcLoc (srcLoc decl) $ f cntx decl where
     f _ d@HsTypeFamilyDecl { } = do
         warn (srcLoc d) UnsupportedFeature "Type families currently not supported"
     f l d@HsTypeDecl { } | l /= TopLevel= do
         warn (srcLoc d) UnsupportedFeature "Type families currently not supported"
+    f TopLevel HsForeignDecl {} = return ()
+    f TopLevel HsActionDecl {} = do
+        wDecl "top level actions not supported"
     f TopLevel HsDataDecl { .. } = do
         let ds = map (toName ClassName) hsDeclDerives
         checkDeriving False ds
@@ -52,12 +55,13 @@ hsDecl cntx decl = f cntx decl where
         return ()
     f TopLevel HsTypeDecl { hsDeclTArgs = as } = do
         when (any (not . isHsTyVar) as) $ do
-            wDecl $ "complex type arguments not allowed for type synonym"
+            wDecl "complex type arguments not allowed for type synonym"
     f (InInstance ts) decl@HsTypeDecl { hsDeclTArgs = as }
         | length as < length ts || or (zipWith (/=) as ts) =
             wDecl "arguments to associated type must match instance head"
         | any (not . isHsTyVar) (drop (length ts) as) =
-            wDecl $ "extra complex type arguments not allowed to type family"
+            wDecl "extra complex type arguments not allowed to type family"
+    f InInstance {} HsTypeSig {} = wDecl "type signatures not allowed in instance declaration"
     f (InClass ts) HsTypeSig { .. } = do
         let HsQualType { .. } = hsDeclQualType
 --        when (null $ intersect (typeVars hsQualTypeType) [ v | HsTyVar v <- ts]) $ do
@@ -73,6 +77,8 @@ hsDecl cntx decl = f cntx decl where
     f TopLevel HsInstDecl { .. } = do
         let HsClassHead { .. } = hsDeclClassHead
         mapM_ (f (InInstance hsClassHeadArgs)) hsDeclDecls
+        when (hasDuplicates . catMaybes $ map maybeGetDeclName hsDeclDecls) $ do
+            wDecl "multiple definitions for the same method"
         let vs = concatMap typeVars hsClassHeadArgs
         when (hasDuplicates vs) $ do
             wDecl "type variables cannot be duplicated in instance head"
@@ -80,6 +86,8 @@ hsDecl cntx decl = f cntx decl where
     f context HsClassDecl {} = wDecl $ "class declaration not allowed " ++ show context
     f context HsInstDecl {} = wDecl $ "instance declaration not allowed " ++ show context
     f context HsDataDecl {} = wDecl $ "data declaration not allowed " ++ show context
+    f context HsForeignDecl {} = wDecl $ "foreign declaration not allowed " ++ show context
+    f context HsActionDecl {} = wDecl $ "action declaration not allowed " ++ show context
     f _ d = applyHsOps ops d >> return ()
     wDecl = addWarn InvalidDecl
     wExp = addWarn InvalidExp
