@@ -140,7 +140,7 @@ tiModules htc ms = do
 
     -- kind inference for all type constructors type variables and classes in the module
     let classAndDataDecls = filter (or' [isHsDataDecl, isHsClassDecl, isHsClassAliasDecl]) ds
-    kindInfo <- kiDecls importKindEnv ds -- classAndDataDecls
+    kindInfo <- kiDecls importKindEnv ds
 
     when (dump FD.Kind) $
          do {putStrLn " \n ---- kind information ---- \n";
@@ -172,8 +172,11 @@ tiModules htc ms = do
                     }
     smallClassHierarchy <- checkForDuplicateInstaces importClassHierarchy smallClassHierarchy
 
+
     let cHierarchyWithInstances = scatterAliasInstances $
             smallClassHierarchy `mappend` importClassHierarchy
+
+    checkForCircularDeps cHierarchyWithInstances
 
     when (dump FD.ClassSummary) $ do
         putStrLn "  ---- class summary ---- "

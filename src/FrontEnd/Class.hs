@@ -1,30 +1,31 @@
 {-# LANGUAGE NoMonoLocalBinds, NamedFieldPuns #-}
 module FrontEnd.Class(
-    printClassHierarchy,
-    instanceToTopDecls,
     ClassHierarchy(),
-    augmentClassHierarchy,
-    chToClassHead,
     ClassRecord(..),
     ClassType(..),
-    instanceName,
-    defaultInstanceName,
+    Inst(..),
+    InstanceEnv(..),
+    addInstanceToHierarchy,
+    asksClassRecord,
+    augmentClassHierarchy,
+    chToClassHead,
+    checkForCircularDeps,
     checkForDuplicateInstaces,
-    printClassSummary,
+    classRecords,
+    defaultInstanceName,
+    derivableClasses,
+    emptyInstance,
+    enumDerivableClasses,
     findClassInsts,
     findClassRecord,
-    asksClassRecord,
-    classRecords,
-    addInstanceToHierarchy,
+    instanceName,
+    instanceToTopDecls,
     makeClassHierarchy,
-    scatterAliasInstances,
-    derivableClasses,
-    enumDerivableClasses,
-    noNewtypeDerivable,
     makeInstanceEnv,
-    emptyInstance,
-    InstanceEnv(..),
-    Inst(..)
+    noNewtypeDerivable,
+    printClassHierarchy,
+    printClassSummary,
+    scatterAliasInstances
     ) where
 
 import Control.Monad.Identity
@@ -35,6 +36,7 @@ import Data.Maybe
 import Debug.Trace
 import Text.PrettyPrint.HughesPJ(render,Doc())
 import Text.Printf
+import Util.Graph
 import qualified Data.List
 import qualified Data.Map as Map
 import qualified Text.PrettyPrint.HughesPJ as PPrint
@@ -49,7 +51,6 @@ import FrontEnd.Tc.Kind
 import FrontEnd.Tc.Type
 import FrontEnd.Utils
 import FrontEnd.Warning
-import Name.Name
 import Name.Names
 import Options (verbose)
 import Support.FreeVars
@@ -114,7 +115,10 @@ getTypeHead th = case fromTAp th of
     (TCon c,_) -> tyconName c
     _ -> error $ "getTypeHead: " ++ show th
 
-data ClassHierarchy = CH (Map.Map Class ClassRecord) (Map.Map Class [Inst])
+data ClassHierarchy = CH {
+        chRecordMap :: Map.Map Class ClassRecord,
+        chInstMap :: Map.Map Class [Inst]
+    }
 
 instance Binary ClassHierarchy where
     get = do
@@ -405,26 +409,32 @@ fromHsTyVar _ = fail "fromHsTyVar"
 
 -- We give all instance declarations the benefit of the doubt here, assuming
 -- they are correct. It is up to the typechecking pass to find any errors.
-makeClassHierarchy :: MonadWarn m => ClassHierarchy -> KindEnv -> [HsDecl] -> m ClassHierarchy
+makeClassHierarchy :: MonadWarn m
+    => ClassHierarchy -> KindEnv -> [HsDecl] -> m ClassHierarchy
 makeClassHierarchy (CH ch _is) kt ds = mconcat `liftM` mapM f ds where
-    f (HsClassDecl sl chead decls) = do
-            let qualifiedMethodAssumps = concatMap (aHsTypeSigToAssumps kt . qualifyMethod newClassContext) (filter isHsTypeSig decls)
-                newClassContext = [HsAsst className args]
-                className = hsClassHead chead
-                args = [ a | ~(Just a) <- map fromHsTyVar (hsClassHeadArgs chead) ]
-            return $ classHierarchyFromRecords [ClassRecord {
-                classArgs,
-                classAssocs,
-                classAlias = Nothing,
-                className = toName ClassName className,
-                classSrcLoc = sl,
-                classSupers = [ toName ClassName x | ~(HsAsst x _) <- cntxt],
-                classAssumps = qualifiedMethodAssumps }]
+    f HsClassDecl { .. } = do
+        let qualifiedMethodAssumps = concatMap (aHsTypeSigToAssumps kt . qualifyMethod newClassContext) (filter isHsTypeSig hsDeclDecls)
+            newClassContext = [HsAsst hsClassHead args]
+            args = [ a | ~(Just a) <- map fromHsTyVar hsClassHeadArgs ]
+        return $ classHierarchyFromRecords [ClassRecord {
+            classArgs,
+            classAssocs,
+            classAlias = Nothing,
+            className = toName ClassName hsClassHead,
+            classSrcLoc = hsDeclSrcLoc,
+            classSupers = [ toName ClassName x | ~(HsAsst x _) <- hsClassHeadContext],
+            classAssumps = qualifiedMethodAssumps }]
         where
-        cntxt = hsClassHeadContext chead
-        classAssocs = createClassAssocs kt decls
-        (_,(_,classArgs')) = chToClassHead kt chead
+        --cntxt = hsClassHeadContext chead
+        HsClassHead { .. } = hsDeclClassHead
+        classAssocs = createClassAssocs kt hsDeclDecls
+        (_,(_,classArgs')) = chToClassHead kt hsDeclClassHead
         classArgs = [ v | ~(TVar v) <- classArgs' ]
+    f decl@(HsInstDecl {}) = hsInstDeclToInst kt decl >>= \insts -> do
+        return $ foldl (flip addInstanceToHierarchy) mempty insts
+    f decl@(HsDeclDeriving {}) = hsInstDeclToInst kt decl >>= \insts -> do
+        return $ foldl (flip addInstanceToHierarchy) mempty insts
+    f _ = return mempty
 --    f decl@(HsClassAliasDecl {}) = trace ("makeClassHierarchy: "++show decl) $ do
 --        tell [ClassAliasRecord { className = toName ClassName (hsDeclName decl),
 --                                 classArgs = [v | ~(TVar v) <- map (runIdentity . hsTypeToType kt) (hsDeclTypeArgs decl)],
@@ -435,11 +445,16 @@ makeClassHierarchy (CH ch _is) kt ds = mconcat `liftM` mapM f ds where
 --                                 classMethodMap = Map.empty
 --                               }]
 
-    f decl@(HsInstDecl {}) = hsInstDeclToInst kt decl >>= \insts -> do
-        return $ foldl (flip addInstanceToHierarchy) mempty insts
-    f decl@(HsDeclDeriving {}) = hsInstDeclToInst kt decl >>= \insts -> do
-        return $ foldl (flip addInstanceToHierarchy) mempty insts
-    f _ = return mempty
+checkForCircularDeps :: MonadWarn m
+    => ClassHierarchy -> m (Graph ClassRecord)
+checkForCircularDeps CH { .. } = do
+    let g = newGraph (Map.elems chRecordMap) className classSupers
+        s ClassRecord { .. } = show classSrcLoc ++ ": class " ++ show classSupers ++ " => " ++ show className
+        f (Right (c:cs)) = do
+            warn (classSrcLoc c) InvalidDecl $ "Superclasses form cycle:" ++ unlines (map s (c:cs))
+        f _ = return ()
+    mapM_ f (scc g)
+    return g
 
 checkForDuplicateInstaces :: MonadWarn m
     => ClassHierarchy    -- ^ imported class hierarchy

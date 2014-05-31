@@ -38,9 +38,7 @@ import List(sort,sortBy,group,delete)
 import qualified Data.Graph as G
 import qualified Data.Map as Map
 
-
 data Graph n = Graph G.Graph (Table n)
-
 
 instance Show n => Show (Graph n) where
     showsPrec n g = showsPrec n (Util.Graph.scc g)
@@ -98,7 +96,6 @@ findLoopBreakers func ex (Graph g ln) = ans where
         f _ [] xs lb = (map ((ln!) . head) (group $ sort lb),reverse $ map (ln!) xs)
     dec (Node v ts) vs = v:foldr dec vs ts
 
-
 reachable :: Graph n -> [Vertex] -> [n]
 reachable (Graph g ln) vs = map (ln!) $ snub $  concatMap (G.reachable g) vs
 
@@ -128,7 +125,6 @@ components (Graph g ln) = map decode forest where
     decode n = dec n []
     dec (Node v ts) vs = ln!v:foldr dec vs ts
 
-
 topSort :: Graph n -> [n]
 topSort (Graph g ln) = map (ln!) $ G.topSort g
 
@@ -155,8 +151,6 @@ transitiveClosureAM arr = do
                 dik <- readArray arr (i,k)
                 dkj <- readArray arr (k,j)
                 writeArray arr (i,j) (dij || (dik && dkj))
-
-
 
 transitiveReductionAM :: AdjacencyMatrix s -> ST s ()
 transitiveReductionAM arr = do
@@ -197,7 +191,6 @@ transitiveReduction (Graph g ns) = let g' = runST (tc g) in (Graph g' ns) where
         transitiveReductionAM a
         fromAdjacencyMatrix a
 
-
 instance Functor Graph where
     fmap f (Graph g n) = Graph g (fmap f n)
 
@@ -224,5 +217,3 @@ mapGraph f (Graph gr nr) = runST $ do
     mnr <- mapArray fromRight mnr
     mnr <- unsafeFreeze mnr
     return (Graph gr mnr)
-
-

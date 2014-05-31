@@ -520,8 +520,7 @@ buildRecPat (FieldMap amp fls) n us = case mlookup (toName DataConstructor n) am
 
 instance Rename HsPatField where
     rename (HsField hsName hsPat) = do
-        --gt <- gets globalSubTable      -- field names are not shadowed by local definitions.
-        hsName' <- renameName (toName FieldLabel hsName) --renameName hsName gt
+        hsName' <- renameName (toName FieldLabel hsName)
         hsPat' <- rename hsPat
         return (HsField hsName' hsPat')
 
@@ -530,11 +529,8 @@ instance Rename HsRhs where
     rename (HsGuardedRhss rs) = HsGuardedRhss <$> rename rs
 
 instance Rename HsGuardedRhs where
-    rename (HsGuardedRhs srcLoc hsExp1 hsExp2) = do
-        withSrcLoc srcLoc $ do
-        hsExp1' <- rename hsExp1
-        hsExp2' <- rename hsExp2
-        return (HsGuardedRhs srcLoc hsExp1' hsExp2')
+    rename (HsGuardedRhs srcLoc e1 e2) = withSrcLoc srcLoc $
+        HsGuardedRhs srcLoc <$> rename e1 <*> rename e2
 
 f_fromRational = HsVar (toUnqualified v_fromRational)
 
