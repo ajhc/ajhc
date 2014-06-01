@@ -284,8 +284,9 @@ options.mkd: drift_processed/Options.hs | jhc
 	./jhc --help | sed -e 's/^/    /'  >> $@
 
 fix-whitespace:
-	find src -not \( -name .svn -prune -o -name .git -prune \) -type f -name \*.hs -print0 | xargs -0 sed -i  -E 's/[ 	]*$$//'
-	find lib -not \( -name .svn -prune -o -name .git -prune \) -type f -name \*.hs -print0 | xargs -0 sed -i  -E 's/[ 	]*$$//'
+	find src -not \( -name .svn -prune -o -name .git -prune \) -type f \( -name \*.hs -o -name \*.\[ch\] \)  -print0 | xargs -0 sed -i  -E 's/[ 	]*$$//'
+	find rts -not \( -name .svn -prune -o -name .git -prune \) -type f \( -name \*.hs -o -name \*.\[ch\] \)  -print0 | xargs -0 sed -i  -E 's/[ 	]*$$//'
+	find lib -not \( -name .svn -prune -o -name .git -prune \) -type f \( -name \*.hs -o -name \*.\[ch\] \)  -print0 | xargs -0 sed -i  -E 's/[ 	]*$$//'
 
 jhc.1 :
 	$(MAKE) man

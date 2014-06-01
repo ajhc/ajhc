@@ -449,6 +449,7 @@ compile' cenv (tvr,as,e) = ans where
 
         case ap of
             PrimTypeInfo {} -> return $ Prim ap xs' ty'
+            CConst {} -> return $ Prim ap xs' ty'
             Func {} -> return $ Prim ap xs' ty'
             IFunc {} -> return $ Prim ap xs' ty'
             --Func True fn as "void" -> return $ Prim ap xs' ty'

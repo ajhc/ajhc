@@ -53,7 +53,13 @@
 #define JHC_isBigEndian (__BYTE_ORDER == __BIG_ENDIAN)
 #endif
 
-#define JHC_isPosix (!JHC_isWindows && !defined(__ARM_EABI__))
+#ifdef __ARM_EABI__
+#define JHC_isRawHardware 1
+#else
+#define JHC_isRawHardware 0
+#endif
+
+#define JHC_isPosix (!JHC_isWindows && !JHC_isRawHardware)
 
 // the program will provide the following
 void _amain(void);
