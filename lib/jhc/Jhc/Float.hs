@@ -11,12 +11,13 @@ module Jhc.Float(
     ) where
 
 import Jhc.Basics
+import Jhc.Class.Num
+import Jhc.Class.Real
 import Jhc.Enum
 import Jhc.Inst.Num
 import Jhc.Order
 import Jhc.Type.Float
-import Jhc.Class.Num
-import Jhc.Class.Real
+import Prelude.Text
 
 infixr 8  **
 

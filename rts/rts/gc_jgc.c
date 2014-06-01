@@ -103,7 +103,7 @@ gc_mark_deeper(struct stack *stack, unsigned *number_redirects)
                         if(1 && (P_LAZY == GET_PTYPE(e->ptrs[i]))) {
                                 VALGRIND_MAKE_MEM_DEFINED(FROM_SPTR(e->ptrs[i]), sizeof(uintptr_t));
                                 if(!IS_LAZY(GETHEAD(FROM_SPTR(e->ptrs[i])))) {
-                                        *number_redirects++;
+                                        number_redirects[0]++;
                                         debugf(" *");
                                         e->ptrs[i] = (sptr_t)GETHEAD(FROM_SPTR(e->ptrs[i]));
                                 }
@@ -675,7 +675,7 @@ gc_malloc_foreignptr(unsigned alignment, unsigned size, bool finalizer) {
         assert (!finalizer);
         unsigned spacing = 1 + finalizer;
         wptr_t *res = gc_array_alloc_atomic(saved_gc, spacing + TO_BLOCKS(size),
-                                             finalizer ? SLAB_FLAG_FINALIZER : SLAB_FLAG_NONE);
+                                            finalizer ? SLAB_FLAG_FINALIZER : SLAB_FLAG_NONE);
         res[0] = (wptr_t)(res + spacing);
         if (finalizer)
                 res[1] = NULL;

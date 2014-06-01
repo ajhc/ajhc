@@ -1,10 +1,10 @@
-module Jhc.Class.Real where
+module Jhc.Class.Real(Real(..),Integral(..),Fractional(..),Rational) where
 
 import Jhc.Basics
 import Jhc.Class.Num
 import Jhc.Class.Ord
 import Jhc.Enum
-import Jhc.Float
+import Jhc.Inst.Num
 import Jhc.Type.Float
 
 infixl 7  /, `quot`, `rem`, `div`, `mod`
@@ -14,7 +14,11 @@ type  Rational = Ratio Integer
 class  (Num a, Ord a) => Real a  where
     toRational       ::  a -> Rational
     toDouble         ::  a -> Double
-    toDouble x = rationalToDouble (toRational x)
+    toDouble x = rationalToDouble (toRational x) where
+        rationalToDouble (x:%y) = fid x `divideDouble` fid y
+
+foreign import primitive "FDiv" divideDouble ::  Double -> Double -> Double
+foreign import primitive "I2F"  fid :: Integer -> Double
 
 class  (Real a, Enum a) => Integral a  where
     quot, rem        :: a -> a -> a

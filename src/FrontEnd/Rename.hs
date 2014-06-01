@@ -33,6 +33,7 @@ import Support.FreeVars
 import Util.Gen
 import Util.Inst()
 import Util.SetLike
+import qualified FlagOpts as FO
 import qualified FrontEnd.HsErrors as HsErrors
 import qualified FrontEnd.SrcLoc
 import qualified Name.VConsts as V
@@ -530,11 +531,18 @@ newVar = do
             nameIdent = "var@"
         }
 
+noDesugar s = do
+    sugar <- flagOpt FO.Sugar
+    unless sugar $ eWarn s
+    
 instance Rename HsExp where
     rename (HsVar hsName) = HsVar <$> renameName hsName
     rename (HsCon hsName) = HsCon <$> renameName hsName
-    rename i@(HsLit HsInt {}) = do return i
+    rename i@(HsLit HsInt {}) = do 
+        noDesugar "int desugaring disabled by -fno-sugar"
+        return i
     rename i@(HsLit HsFrac {}) = do
+        noDesugar "fractional desugaring disabled by -fno-sugar"
         z <- rename f_fromRational
         return $ HsParen (HsApp z i)
     rename (HsLambda srcLoc hsPats hsExp) = do
@@ -550,9 +558,13 @@ instance Rename HsExp where
         hsExp' <- rename hsExp
         return (HsLet hsDecls' hsExp')
     rename (HsCase hsExp hsAlts) = do HsCase <$> rename hsExp <*> rename hsAlts
-    rename (HsDo hsStmts) = do
+    rename orig@(HsDo hsStmts) = do
         (ss,()) <- renameHsStmts hsStmts (return ())
-        doToExp newVar (v_bind) (v_bind_) (v_fail) ss
+        sugar <- flagOpt FO.Sugar
+        if sugar
+        then doToExp newVar (v_bind) (v_bind_) (v_fail) ss
+        else do eWarn "do desugaring disabled by -fno-sugar"
+                return $ HsDo ss
     rename (HsRecConstr hsName hsFieldUpdates) = do
         hsName' <- renameName hsName
         hsFieldUpdates' <- rename hsFieldUpdates
@@ -564,14 +576,18 @@ instance Rename HsExp where
         fls <- asks envFieldLabels
         buildRecUpdate fls hsExp' hsFieldUpdates' -- HsRecConstr hsName' hsFieldUpdates')
         --return (HsRecUpdate hsExp' hsFieldUpdates')
-    rename (HsEnumFrom hsExp) = rename $ desugarEnum vu_enumFrom [hsExp]
-    rename (HsEnumFromTo hsExp1 hsExp2) = rename $  desugarEnum vu_enumFromTo [hsExp1, hsExp2]
-    rename (HsEnumFromThen hsExp1 hsExp2) = rename $ desugarEnum vu_enumFromThen [hsExp1, hsExp2]
-    rename (HsEnumFromThenTo hsExp1 hsExp2 hsExp3) = rename $  desugarEnum vu_enumFromThenTo [hsExp1, hsExp2, hsExp3]
+    rename (HsEnumFrom hsExp) = desugarEnum vu_enumFrom [hsExp]
+    rename (HsEnumFromTo hsExp1 hsExp2) = desugarEnum vu_enumFromTo [hsExp1, hsExp2]
+    rename (HsEnumFromThen hsExp1 hsExp2) = desugarEnum vu_enumFromThen [hsExp1, hsExp2]
+    rename (HsEnumFromThenTo hsExp1 hsExp2 hsExp3) = desugarEnum vu_enumFromThenTo [hsExp1, hsExp2, hsExp3]
    -- rename (HsList []) = return $ HsCon dc_EmptyList
-    rename (HsListComp hsExp hsStmts) = do
+    rename orig@(HsListComp hsExp hsStmts) = do
         (ss,e) <- renameHsStmts hsStmts (rename hsExp)
-        listCompToExp newVar e ss
+        sugar <- flagOpt FO.Sugar
+        if sugar
+        then listCompToExp newVar e ss
+        else do eWarn "list comprehension desugaring disabled by -fno-sugar"
+                return $ HsListComp e ss
     rename (HsExpTypeSig srcLoc hsExp hsQualType) = do
         hsExp' <- rename hsExp
         updateWith hsQualType $ do
@@ -583,7 +599,13 @@ instance Rename HsExp where
             e <- createError HsErrorUnderscore ("_")
             return e
     rename p = traverseHsExp rename p
-desugarEnum s as = foldl HsApp (HsVar s) as
+
+desugarEnum s as = do
+        sugar <- flagOpt FO.Sugar
+        if sugar
+        then rename $ foldl HsApp (HsVar s) as
+        else do eWarn "enum desugaring disabled by -fno-sugar"
+                return $ foldl HsApp (HsVar s) as
 
 createError et s = do
     sl <- getSrcLoc
@@ -593,13 +615,14 @@ failRename s = do
     sl <- getSrcLoc
     fail (show sl ++ ": " ++ s)
 
+eWarn = addWarn InvalidExp
+
 getRecInfo :: FieldMap -> Maybe Name -> [HsField a] -> RM [(Name,(Int,[(Int,(FieldName,a))]))]
 getRecInfo (FieldMap amp fls) constructorName fields = do
     when (hasDuplicates fieldLabels) $ do
         failRename "Duplicate field labels in pattern"
     when hasDotDot $ do
         failRename "Wildcard pattern not yet supported"
-
     let f (HsField n _) | n == u_DotDot = return []
         f (HsField fieldName e) = case mlookup fieldName fls of
             Nothing -> failRename $ "Field Label does not exist: " ++ show fieldName

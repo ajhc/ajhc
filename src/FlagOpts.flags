@@ -13,6 +13,7 @@ ffi support foreign function declarations
 cpp pass haskell source through c preprocessor
 m4 pass haskell source through m4 preprocessor
 prelude implicitly import Prelude
+sugar  disable all desugarings, only unboxed literals allowed.
 type-families type/data family support
 user-kinds user defined kinds
 forall forall keyword for rank-n types and explicit quantification
@@ -46,5 +47,5 @@ raw just evaluate main to WHNF and nothing else.
 new-parser use new parser based on different layout rule.
 
 !Default settings
-@default inline-pragmas rules wrapper defaulting type-analysis monomorphism-restriction global-optimize full-int prelude new-parser
+@default inline-pragmas rules wrapper defaulting type-analysis monomorphism-restriction global-optimize full-int prelude new-parser sugar
 @glasgow-exts forall ffi unboxed-tuples

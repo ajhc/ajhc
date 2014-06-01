@@ -4,9 +4,11 @@ module Jhc.Inst.Num() where
 m4_include(Jhc/Num.m4)
 
 import Jhc.Num
-import Jhc.Float
+--import Jhc.Float
+import Jhc.Type.Float
 import Jhc.Inst.Enum
-import Prelude.Text
+import Jhc.Inst.Order
+import Jhc.Inst.Show
 import Jhc.Type.C
 import Jhc.Type.Basic
 import Jhc.Class.Ord

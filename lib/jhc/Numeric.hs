@@ -157,12 +157,9 @@ showFloat      =  showGFloat Nothing
 data FFFormat = FFExponent | FFFixed | FFGeneric
 
 formatRealFloat :: (RealFloat a) => FFFormat -> Maybe Int -> a -> String
-formatRealFloat fmt decs x
-  = s
-  where
+formatRealFloat fmt decs x = s where
     base = 10
-    s = if isNaN x then
-            "NaN"
+    s = if isNaN x then "NaN"
         else if isInfinite x then
             if x < 0 then "-Infinity" else "Infinity"
         else if x < 0 || isNegativeZero x then
@@ -170,11 +167,7 @@ formatRealFloat fmt decs x
         else
             doFmt fmt (floatToDigits (toInteger base) x)
 
-    doFmt fmt (is, e)
-      = let
-           ds = map intToDigit is
-        in
-        case fmt of
+    doFmt fmt (is, e) = let ds = map intToDigit is in case fmt of
           FFGeneric ->
               doFmt (if e < 0 || e > 7 then FFExponent else FFFixed)
                     (is, e)

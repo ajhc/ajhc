@@ -1,7 +1,7 @@
 Name: jhc-prim
 Version: 1.0
 Extensions: [ ForeignFunctionInterface, NoImplicitPrelude, UnboxedTuples, UnboxedValues ]
-Options: --noauto
+Options: [--noauto, -fno-sugar]
 Hs-Source-Dir: .
 Exposed-Modules:
         - Jhc.Prim.Array
