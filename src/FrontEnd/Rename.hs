@@ -149,7 +149,7 @@ createSelectors sloc ds = mapM g ns where
     ns = sortGroupUnderF fst $ concatMap f ds' -- [  | (c,nts) <- ds' ]
     f (c,nts) = [ (n,(c,i,length nts)) | (n,_) <- nts | i <- [0..]]
     g (n,cs) = do
-        var <- clobberedName (toName Val "_sel")
+        var <- clobberedName (mkName termLevel False Nothing "_sel")
         let f (_,(c,i,l)) = HsMatch sloc n [pat c i l] (HsUnGuardedRhs (HsVar var)) []
             pat c i l = HsPApp c [ if p == i then HsPVar var else HsPWildCard | p <- [0 .. l - 1]]
             els = HsMatch sloc n [HsPWildCard] (HsUnGuardedRhs HsError { hsExpSrcLoc = sloc, hsExpString = show n, hsExpErrorType = HsErrorFieldSelect } ) []
@@ -806,7 +806,7 @@ unRenameString s = (dropUnderscore . dropDigits) s where
     dropDigits = dropWhile isDigit
 
 updateWithN nt x action = getUpdatesN nt x >>= flip withSubTable action
-getUpdatesN nt x = unions `fmap` mapM clobberName [ n | n <- getNames x, nameType n == nt]
+getUpdatesN nt x = unions `fmap` mapM clobberName [ n | n <- getNames x, nameType n == nt, n /= vu_sub]
 --getUpdatesN nt x = unions `fmap` mapM clobberName (map (toName nt) $ getNames x)
 
 updateWith x action = getUpdates x >>= flip withSubTable action

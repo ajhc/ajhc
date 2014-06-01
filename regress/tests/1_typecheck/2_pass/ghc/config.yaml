@@ -83,8 +83,6 @@ tests:
      skip:  known_bug
    tc092:
      skip: known_bug
-   tc095:
-     skip: known_bug
    tc148:
      skip:  known_bug
    tc175:
@@ -93,6 +91,3 @@ tests:
      skip:  known_bug
    tc120:
      skip:  known_feature
-
-
-
