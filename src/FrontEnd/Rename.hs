@@ -12,11 +12,13 @@ import Control.Monad.Writer
 import Data.Char
 import Util.Std hiding(union)
 import qualified Data.Foldable as Seq
+import qualified Data.Traversable as T
 import qualified Data.List
 import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 
+import Data.Word
 import DerivingDrift.Drift
 import Doc.DocLike(tupled)
 import FrontEnd.Desugar (desugarHsModule)
@@ -84,8 +86,8 @@ list comprehensions always turn into JPP versions
 -}
 
 data FieldMap = FieldMap
-    !(Map.Map Name Int)          -- a map of data constructors to their arities
-    !(Map.Map Name [(Name,Int)]) -- a map of field labels to ...
+    !(Map.Map Name Word8)          -- a map of data constructors to their arities
+    !(Map.Map Name [(Name,Word8)]) -- a map of field labels to constructors and positions
 
 instance Monoid FieldMap where
     mempty = FieldMap mempty mempty
@@ -501,23 +503,6 @@ instance Rename HsPat where
     rename (HsPatExp e) = HsPatExp <$> rename e
     rename p = traverseHsPat rename p
 
-buildRecPat :: FieldMap -> Name -> [HsPatField] -> RM HsPat
-buildRecPat (FieldMap amp fls) n us = case mlookup (toName DataConstructor n) amp of
-    Nothing -> failRename $ "Unknown Constructor: " ++ show n
-    Just t -> do
-        let f (HsField x p) = case  mlookup (toName FieldLabel x) fls of
-                Nothing -> failRename $ "Field Label does not exist: " ++ show x
-                Just cs -> case lookup n [ (x,(y)) | (x,y) <- cs ] of
-                    Nothing -> failRename $ "Field Label does not belong to constructor: " ++ show (x,n)
-                    Just i -> return (i,HsPParen p)
-        fm <- mapM f us
-        let g i | Just e <- lookup i fm = return e
-                | otherwise = do
-                    v <- newVar
-                    return $ HsPVar v
-        rs <- mapM g [0 .. t - 1 ]
-        return $ HsPApp n rs
-
 instance Rename HsPatField where
     rename (HsField hsName hsPat) = do
         hsName' <- renameName (toName FieldLabel hsName)
@@ -608,6 +593,83 @@ failRename s = do
     sl <- getSrcLoc
     fail (show sl ++ ": " ++ s)
 
+getRecInfo :: FieldMap -> Maybe Name -> [HsField a] -> RM [(Name,(Int,[(Int,(FieldName,a))]))]
+getRecInfo (FieldMap amp fls) constructorName fields = do
+    when (hasDuplicates fieldLabels) $ do
+        failRename "Duplicate field labels in pattern"
+    when hasDotDot $ do
+        failRename "Wildcard pattern not yet supported"
+
+    let f (HsField n _) | n == u_DotDot = return []
+        f (HsField fieldName e) = case mlookup fieldName fls of
+            Nothing -> failRename $ "Field Label does not exist: " ++ show fieldName
+            Just cs -> return [ (x,(fromIntegral y,(fieldName,e))) | (x,y) <- cs, maybe True (x ==) constructorName]
+    fm <- concat <$> mapM f fields
+    let fm' = sortGroupUnderFG fst snd fm -- $ maybe fm (\t -> (t,[]):fm) constructorName
+        fm'' =  maybe fm' (\t -> if t `elem` fsts fm' then fm' else (t,[]):fm') constructorName
+    T.forM fm'' $ \ (t,v) -> case Map.lookup t amp of
+        Nothing -> failRename $ "Unknown Constructor: " ++ show t
+        Just arity -> return (t,(fromIntegral arity,v))
+    where
+    (dotDotList,fieldLabels) = partition (u_DotDot ==) [ n | HsField n _ <- fields ]
+    hasDotDot = not $ null dotDotList
+
+buildRecPat :: FieldMap -> Name -> [HsPatField] -> RM HsPat
+buildRecPat fm n us = do
+    [(_,(arity,fs))] <- getRecInfo fm (Just n) us
+    let g i | Just (_,e) <- lookup i fs = return $ HsPParen e
+            | otherwise = do
+                v <- newVar
+                return $ HsPVar v
+    rs <- mapM g [0 .. arity - 1 ]
+    return $ HsPApp n rs
+
+buildRecConstr ::  FieldMap -> Name -> [HsFieldUpdate] -> RM HsExp
+buildRecConstr fm n us = do
+    undef <- createError HsErrorUninitializedField "Uninitialized Field"
+    [(_,(arity,fs))] <- getRecInfo fm (Just n) us
+    let rs = map g [0 .. arity - 1 ]
+        g i | Just (_,e) <- lookup i fs = hsParen e
+            | otherwise = undef
+    return $ foldl HsApp (HsCon n) rs
+
+buildRecUpdate ::  FieldMap -> HsExp -> [HsFieldUpdate] -> RM HsExp
+buildRecUpdate fm n us = do
+    rs <- getRecInfo fm Nothing us
+    sl <- getSrcLoc
+    let g (c,(arity,zs)) = do
+            vars <- replicateM arity newVar
+            let x = foldl HsApp (HsCon c) [ maybe (HsVar v) snd (lookup i zs) | v <- vars | i <- [ 0 .. arity - 1] ]
+            return $ HsAlt sl (HsPApp c (map HsPVar vars))  (HsUnGuardedRhs x) []
+    as <- mapM g rs
+    pe <- createError HsErrorRecordUpdate "Record Update Error"
+    return $ HsCase n (as ++ [HsAlt sl HsPWildCard (HsUnGuardedRhs pe) []])
+
+{-
+buildRecPat :: FieldMap -> Name -> [HsPatField] -> RM HsPat
+buildRecPat (FieldMap amp fls) n us = case mlookup n amp of
+    Nothing -> failRename $ "Unknown Constructor: " ++ show n
+    Just t -> do
+        let (dotDotList,fieldLabels) = partition (u_DotDot ==) [ n | HsField n _ <- us ]
+            hasDotDot = not $ null dotDotList
+        when (hasDuplicates fieldLabels) $ do
+            failRename "Duplicate field labels in pattern"
+        when hasDotDot $ do
+            failRename "Wildcard pattern not supported"
+        let f (HsField n _) | n == u_DotDot = return []
+            f (HsField x p) = case mlookup x fls of
+                Nothing -> failRename $ "Field Label does not exist: " ++ show x
+                Just cs -> case lookup n cs of
+                    Nothing -> failRename $ "Field Label does not belong to constructor: " ++ show (x,n)
+                    Just i -> return [(i,HsPParen p)]
+        fm <- concat <$> mapM f us
+        let g i | Just e <- lookup i fm = return e
+                | otherwise = do
+                    v <- newVar
+                    return $ HsPVar v
+        rs <- mapM g [0 .. t - 1 ]
+        return $ HsPApp n rs
+
 buildRecConstr ::  FieldMap -> Name -> [HsFieldUpdate] -> RM HsExp
 buildRecConstr (FieldMap amp fls) n us = do
     undef <- createError HsErrorUninitializedField "Uninitialized Field"
@@ -636,13 +698,14 @@ buildRecUpdate (FieldMap amp fls) n us = do
         let g (c,zs) = case mlookup c amp of
                 Nothing -> failRename $ "Unknown Constructor: " ++ show n
                 Just t -> do
-                    vars <- replicateM t newVar
+                    vars <- replicateM (fromIntegral t) newVar
                     let vars' = (map HsVar vars)
                     let x = foldl HsApp (HsCon c) [ maybe v id (lookup i zs) | v <- vars' | i <- [ 0 .. t - 1] ]
                     return $ HsAlt sl (HsPApp c (map HsPVar vars))  (HsUnGuardedRhs x) []
         as <- mapM g fm'
         pe <- createError HsErrorRecordUpdate "Record Update Error"
         return $ HsCase n (as ++ [HsAlt sl HsPWildCard (HsUnGuardedRhs pe) []])
+-}
 
 instance Rename HsAlt where
     rename (HsAlt srcLoc hsPat hsGuardedAlts {-where-} hsDecls) = withSrcLoc srcLoc $ do
@@ -1020,3 +1083,5 @@ openPat (HsPAsPat _ p) = openPat p
 openPat (HsPTypeSig _ p _) = openPat p
 openPat (HsPInfixApp a n b) = HsPApp n [a,b]
 openPat p = p
+
+hasDuplicates xs = any ((> 1) . length) $ group (sort xs)

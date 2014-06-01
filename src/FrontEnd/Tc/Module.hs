@@ -64,7 +64,7 @@ buildFieldMap ms = FieldMap ans' ans where
             nameType x == DataConstructor ]
         ans = Map.fromList $ sortGroupUnderFG fst snd $ concat
             [ [ (y,(x,i)) |  y <- ys | i <- [0..] ]  | (x,ys) <-  allDefs ]
-        ans' = Map.fromList $ concatMap modInfoConsArity ms
+        ans' = Map.fromList $ [ (x,fromIntegral y) | (x,y) <- concatMap modInfoConsArity ms]
 
 processModule :: FieldMap -> ModInfo -> IO (ModInfo,[Warning])
 processModule defs m = do
@@ -171,7 +171,6 @@ tiModules htc ms = do
                     instHead = [] :=> IsIn c (TCon (Tycon t kindStar))
                     }
     smallClassHierarchy <- checkForDuplicateInstaces importClassHierarchy smallClassHierarchy
-
 
     let cHierarchyWithInstances = scatterAliasInstances $
             smallClassHierarchy `mappend` importClassHierarchy

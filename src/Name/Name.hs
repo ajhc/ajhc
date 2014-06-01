@@ -25,7 +25,10 @@ module Name.Name(
     quoteName,
     fromQuotedName,
     toModule,
+    FieldName,
+    ClassName,
     toUnqualified,
+    removeUniquifier,
     -- new interface
     unMkName,
     mkName,
@@ -311,3 +314,5 @@ nameTyLevel_u f n = case getTyLevel n of
     Just cl | cl == cl' -> n
             | otherwise -> toName (mkNameType cl' (isConstructor n)) n
         where cl' = f cl
+
+removeUniquifier name = mkComplexName (unMkName name) { nameUniquifier = Nothing }

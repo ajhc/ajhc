@@ -6,16 +6,15 @@ module FrontEnd.HsErrors(
     hsDeclLocal
     ) where
 
-import Util.Std
-
 import Control.Monad.Writer
 import FrontEnd.Class
-import FrontEnd.Utils(maybeGetDeclName)
 import FrontEnd.HsSyn
 import FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse
+import FrontEnd.Utils(maybeGetDeclName)
 import FrontEnd.Warning
 import Name.Name
+import Util.Std
 
 hsType :: (Applicative m,MonadSrcLoc m, MonadWarn m) => HsType -> m ()
 hsType x = traverseHsType (\x -> hsType x >> return x) x >> return ()
@@ -64,10 +63,8 @@ hsDecl cntx decl = withSrcLoc (srcLoc decl) $ f cntx decl where
     f InInstance {} HsTypeSig {} = wDecl "type signatures not allowed in instance declaration"
     f (InClass ts) HsTypeSig { .. } = do
         let HsQualType { .. } = hsDeclQualType
---        when (null $ intersect (typeVars hsQualTypeType) [ v | HsTyVar v <- ts]) $ do
- --           wDecl "types of class methods must have class variables"
-        return ()
-
+        when (null $ intersect (map removeUniquifier $ typeVars hsQualTypeType) [ removeUniquifier v | HsTyVar v <- ts]) $ do
+            wDecl "types of class methods must have class variables"
     f TopLevel HsClassDecl { .. } = do
         let HsClassHead { .. } = hsDeclClassHead
         mapM_ (f (InClass hsClassHeadArgs)) hsDeclDecls

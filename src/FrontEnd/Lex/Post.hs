@@ -318,5 +318,6 @@ mkRecConstrOrUpdate e fs = f e fs where
     f e         fs@(_:_) = return (HsRecUpdate e fs')
     f _         _        = fail "Empty record update"
     g (x,Just y) = HsField x y
-    g (x,Nothing) = HsField x (HsVar x)
+    g (x,Nothing) | x == u_DotDot = HsField u_DotDot (HsVar u_DotDot)
+    g (x,Nothing) = HsField x (HsVar $ toName Val x)
     fs' = map g fs

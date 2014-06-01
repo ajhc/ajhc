@@ -390,8 +390,9 @@ commas :: { Int }
     | ','                           { 1 }
 
 fbind :: { (Name,Maybe HsExp) }
-    : uqvar '=' exp  { ($1,Just (eloc $2 $3)) }
-    | uqvar { ($1,Nothing) }
+    : uqvar '=' exp  { (toName FieldLabel $1,Just (eloc $2 $3)) }
+    | uqvar { (toName FieldLabel $1,Nothing) }
+    | '..'  { (u_DotDot,Nothing) }
 
 optwhere :: { [HsDecl] }
     : 'where' '{' decls  '}'                { fixupHsDecls $3 }
