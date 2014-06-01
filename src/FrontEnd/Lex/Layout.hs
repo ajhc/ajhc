@@ -141,6 +141,7 @@ layout ls = runReaderT (g ls []) bogusASrcLoc where
         Just e <- lookup c conditionalBrackets >>= lookup s = (t:) `fmap` g rs (NoLayout s e:ls)
     f ((Token t@(L _ _ "in")):rs) ls = case ls of
         Layout "let" n:ls -> mcons3 rbrace' (return t) (g rs ls)
+        Layout {}:ls ->  (rbrace t:) <$> g (Token t:rs) ls
         ls -> (t:) `fmap` g rs ls
     f (t@(Token (L _ _ ",")):rs) (Layout "let" _:NoLayout "|" e:ls) = rbrace' `mcons` g (t:rs) (NoLayout "|" e:ls)
     f ((Token t@(L _ _ "where")):rs) ls = case ls of
