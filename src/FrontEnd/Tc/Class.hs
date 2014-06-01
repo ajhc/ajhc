@@ -151,9 +151,12 @@ splitReduce fs gs ps = do
     (ds, rs) <- splitPreds h fs ps
     --liftIO $ putStrLn $ pprint (ds,rs)
     let (rs',sub) = genDefaults h (fs `Set.union` gs) rs
-    --liftIO $ putStrLn $ pprint (rs')
+    --liftIO $ putStrLn $ pprint (rs',sub)
+    let leftovers = freeMetaVarsPreds rs' Set.\\ (Set.union fs gs)
+    when (not $ Set.null leftovers) $ do
+        fail $ "Ambiguous types exist:" <+> pprint rs'
     flip mapM_ sub $ \ (x,y) ->  do
-        let msg = "defaulting: " <+> pprint x <+> "=>" <+> prettyPrintType y
+        let msg = "defaulting:" <+> pprint x <+> "=>" <+> prettyPrintType y
         wdump FD.BoxySteps $ liftIO $ putStrLn msg
         --addWarn "type-defaults" msg
     sequence_ [ varBind x y | (x,y) <- nub sub]

@@ -564,8 +564,11 @@ tiNonRecImpl decl = withContext (locSimple (srcLoc decl) ("in the implicitly typ
     (mvs,ds,rs) <- splitReduce fs vss ps'
     addPreds ds
     mr <- flagOpt FO.MonomorphismRestriction
+    when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "*** tinonrecimpls quantify " ++ show (gs,rs,mv')
     sc' <- if restricted mr [decl] then do
         let gs' = gs Set.\\ Set.fromList (freeVars rs)
+        ch <- getClassHierarchy
+--        liftIO $ print $ genDefaults ch fs rs
         addPreds rs
         quantify (Set.toList gs') [] mv'
      else quantify (Set.toList gs) rs mv'
@@ -799,10 +802,7 @@ tiExpl (sc, decl) = withContext (locSimple (srcLoc decl) ("in the explicitly typ
     return ret
 
 restricted :: Bool -> [HsDecl] -> Bool
-restricted monomorphismRestriction bs = any isHsActionDecl bs || (monomorphismRestriction && any isSimpleDecl bs) where
-   isSimpleDecl :: (HsDecl) -> Bool
-   isSimpleDecl (HsPatBind _sloc _pat _rhs _wheres) = True
-   isSimpleDecl _ = False
+restricted monomorphismRestriction bs = any isHsActionDecl bs || (monomorphismRestriction && any isHsPatBind bs)
 
 --getBindGroupName (expl,impls) =  map getDeclName (snds expl ++ concat (rights impls) ++ lefts impls)
 
@@ -815,7 +815,9 @@ tiProgram bgs es = ans where
         ps <- flattenType ps
 --        ch <- getClassHierarchy
     --    ([],rs) <- splitPreds ch Set.empty ps
+--        liftIO $ print ps
         (_,[],rs) <- splitReduce Set.empty Set.empty ps
+ --       liftIO $ print rs
         topDefaults rs
         return r
     f pr (bg:bgs) rs  = do

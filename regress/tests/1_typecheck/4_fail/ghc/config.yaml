@@ -19,6 +19,8 @@ tests:
         skip: not error in jhc
    tcfail183:
         skip: not error in jhc
+   tcfail197:
+        skip: not error in jhc
    tcfail032:
      skip: jhc extension allows this
    tcfail071:
@@ -27,3 +29,6 @@ tests:
      skip: jhc extension allows this
    tcfail204:
      skip: ghc specific
+
+   tcfail198:
+        skip: scoped variables
