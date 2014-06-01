@@ -161,6 +161,9 @@ decl :: { HsDecl }
     | srcloc specialize m_con var '::' type '#-}'
                       { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = $4, hsDeclType = $6
                                            , hsDeclUniq = error "hsDeclUniq not set"  } }
+    | srcloc specialize 'instance'  type '#-}'
+                      { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = nameName u_instance , hsDeclType = $4
+                                           , hsDeclUniq = error "hsDeclUniq not set"  } }
 #maybe con
 
 rulecatalyst ::  { Bool }

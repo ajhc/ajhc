@@ -20,7 +20,7 @@ parseM opt fp s = case scanner opt s of
         case runP (withSrcLoc bogusASrcLoc { srcLocFileName = packString fp } $ P.parseModule s) opt of
             (ws, ~(Just p)) -> do
                 mapM_ addWarning ws
-                if null ws 
+                if null ws
                     then return $ Just p { hsModuleOpt = opt }
                     else return Nothing
 

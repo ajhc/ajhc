@@ -113,6 +113,10 @@ pragma s ((fromL -> "{-#"):(fromL -> n):ls) | map toUpper n == s = d [] ls  wher
     d cs (L _ _ "#-}":rs) = (Just $ reverse cs,rs)
     d cs (r:rs) = d (r:cs) rs
     d cs [] = (Just (reverse cs),[])
+pragma "LINE" ((L bsl LPragmaStart "#LINE"):ls) = d [] ls  where
+    d cs (r@(L sl _ _):rs) | srcLocLine sl /= srcLocLine bsl = (Just $ reverse cs,r:rs)
+    d cs (r:rs) = d (r:cs) rs
+    d cs [] = (Just (reverse cs),[])
 pragma _ ls = (Nothing,ls)
 
 layout :: (Applicative m,Monad m) => [Token Lexeme] -> m [Lexeme]
@@ -124,6 +128,7 @@ layout ls = runReaderT (g ls []) bogusASrcLoc where
 --    f (TokenNL n:Token s:rs) (Layout h n':ls)
 --        | s `elem` layoutContinuers = layout (Token s:rs) (Layout h (min n' n):ls)
     f (TokenNL n:rs@(Token r:_)) ctx@(Layout _ n':ls)
+        | n == n', fromL r == "where" = (rbrace r:) <$> g (TokenNL n:rs) ls
         | n == n' = (semi r:) <$> g rs ctx
         | n > n' = f rs ctx
         | n < n' = (rbrace r:) <$> g (TokenNL n:rs) ls
@@ -163,6 +168,10 @@ layout ls = runReaderT (g ls []) bogusASrcLoc where
 
 skipComments :: [Lexeme] -> [Lexeme]
 skipComments ls = f ls where
+    f (L bsl _ "#LINE":rs) = f (d rs) where
+        d (r@(L sl _ _):rs) | srcLocLine sl /= srcLocLine bsl = r:rs
+        d (_:rs) = d rs
+        d [] = []
     f (L _ _ "{-#":rs) = f (d rs) where
         d (L _ _ "#-}":rs) = rs
         d (_:rs) = d rs

@@ -534,11 +534,11 @@ newVar = do
 noDesugar s = do
     sugar <- flagOpt FO.Sugar
     unless sugar $ eWarn s
-    
+
 instance Rename HsExp where
     rename (HsVar hsName) = HsVar <$> renameName hsName
     rename (HsCon hsName) = HsCon <$> renameName hsName
-    rename i@(HsLit HsInt {}) = do 
+    rename i@(HsLit HsInt {}) = do
         noDesugar "int desugaring disabled by -fno-sugar"
         return i
     rename i@(HsLit HsFrac {}) = do

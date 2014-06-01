@@ -16,6 +16,7 @@ import qualified FlagOpts as FO
 
 $unispace  = [\xa0]
 $whitechar = [ \t\n\r\f\v]
+$spaces    = [ \t\xa0]
 $special   = [\(\)\,\;\[\]\`\{\}]
 $unispecial = [→←∷‥⇒∀∃]
 $trailing  = [₀₁₂₃₄₅₆₇₈₉⁰¹²³⁴⁵⁶⁷⁸⁹₍₎⁽⁾₊₋]
@@ -92,12 +93,15 @@ haskell :-
 <hs> $ws+		   ;
 <hs> "--"\-*[^$symbol].*   ;
 <hs> "--"\-*$	           ;
-<hs> ^"#line " .*          ;
 
 -- Handle CPP style line pragmas
--- <hs> ^"#line " @ws                { mkJL LPragmaStart "LINE" `andBegin` line_pragma }
+--<hs> ^"#line "                  { mkJL LPragmaStart "LINE" `andBegin` line_pragma }
+<hs> ^"#line "                  { mkJL LPragmaStart "#LINE" }
 -- <hs> ^"# " / @decimal          { mkJL LPragmaStart "LINE" `andBegin` line_pragma }
--- <line_pragma> $white*$          { mkJL LSpecial "#-}" `andBegin` 0 }
+--<line_pragma> "\n"          { mkJL LSpecial "#-}" `andBegin` hs }
+--<line_pragma> $spaces+       ;
+--<line_pragma> @integer  { mkL LInteger }
+--<line_pragma> @stringlit{ mkL LString }
 
 "{-#" @ws "OPTIONS"             { begin discard_pragma }
 "{-#" @ws "LANGUAGE"            { begin discard_pragma }
