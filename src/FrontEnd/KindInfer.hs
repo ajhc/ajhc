@@ -95,7 +95,16 @@ data KiEnv  = KiEnv {
     }
 
 newtype Ki a = Ki (ReaderT KiEnv IO a)
-    deriving(Monad, Applicative, MonadReader KiEnv,MonadIO,Functor,MonadWarn)
+    deriving(Applicative, MonadReader KiEnv,MonadIO,Functor,MonadWarn)
+
+instance Monad Ki where
+    return a = Ki $ return a
+    Ki comp >>= fun = Ki $ do x <- comp; case fun x of Ki m -> m
+    Ki a >> Ki b = Ki $ a >> b
+    fail s = do
+        addWarn WarnFailure s
+        st <- getSrcLoc
+        liftIO $ fail $ show st ++ ":" ++ s
 
 instance MonadSrcLoc Ki where
     getSrcLoc = asks kiSrcLoc
@@ -180,9 +189,9 @@ zonkConstraint nk mv = do
 
 constrain KindAny k = return ()
 constrain KindStar        (KBase Star) = return ()
-constrain KindQuest       k@KBase {}  = kindCombine kindFunRet k >> return ()
-constrain KindQuestQuest  (KBase KQuest) = fail "cannot constrain ? to be ??"
-constrain KindQuestQuest  k@KBase {}  = kindCombine kindArg k >> return ()
+constrain KindQuest       k@KBase {} | Just _ <- kindCombine kindFunRet k = return ()
+constrain KindQuestQuest  (KBase KQuest) = addWarn WarnFailure $ "cannot constrain ? to be ??"
+constrain KindQuestQuest  k@KBase {} | Just _ <- kindCombine kindArg k = return ()
 constrain KindSimple (KBase Star) = return ()
 constrain KindSimple (a `Kfun` b) = do
     a <- findKind a
@@ -190,7 +199,7 @@ constrain KindSimple (a `Kfun` b) = do
     constrain KindSimple a
     constrain KindSimple b
 constrain con (KVar v) = zonkConstraint con v
-constrain con k = fail $ "constraining kind: " ++ show (con,k)
+constrain con k = addWarn WarnFailure $ "kind error constraining " ++ show k ++ " to " ++ show con
 
 flattenKind :: Kind -> Ki Kind
 flattenKind k = f' k where
