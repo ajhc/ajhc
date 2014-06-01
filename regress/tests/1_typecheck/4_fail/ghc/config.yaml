@@ -25,3 +25,5 @@ tests:
      skip: jhc extension allows this
    tcfail139:
      skip: jhc extension allows this
+   tcfail204:
+     skip: ghc specific

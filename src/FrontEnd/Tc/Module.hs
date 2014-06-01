@@ -15,10 +15,12 @@ import FrontEnd.DataConsAssump     (dataConsEnv)
 import FrontEnd.DeclsDepends       (getDeclDeps, debugDeclBindGroups)
 import FrontEnd.DependAnalysis     (getBindGroups)
 import FrontEnd.Exports
+import FrontEnd.HsErrors
 import FrontEnd.HsSyn
 import FrontEnd.Infix
 import FrontEnd.KindInfer
 import FrontEnd.Rename
+import FrontEnd.SrcLoc
 import FrontEnd.Tc.Main
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
@@ -136,6 +138,7 @@ tiModules htc ms = do
     wdump FD.Decls $ do
         putStrLn "  ---- processed decls ---- "
         putStrLn $ HsPretty.render (HsPretty.ppHsDecls ds)
+    runSLM $ preTypecheckChecks ds
     processIOErrors "synonym expansion and fixity processing"
 
     -- kind inference for all type constructors type variables and classes in the module

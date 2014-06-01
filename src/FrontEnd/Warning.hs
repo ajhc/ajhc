@@ -20,7 +20,7 @@ import System.IO
 import System.IO.Unsafe
 import Util.Std
 
-import FrontEnd.SrcLoc(SrcSpan(..),WithSrcLoc(..),MonadSetSrcLoc(..),SrcLoc(..),MonadSrcLoc(..),bogusASrcLoc)
+import FrontEnd.SrcLoc(SrcSpan(..),WithSrcLoc(..),MonadSetSrcLoc(..),SrcLoc(..),MonadSrcLoc(..),bogusASrcLoc,SLM(..))
 import Name.Name
 import Options
 import PackedString
@@ -166,6 +166,8 @@ _warnings = [
 ioWarnings :: IORef [Warning]
 ioWarnings = unsafePerformIO $ newIORef []
 
+instance MonadWarn m => MonadWarn (SLM m) where
+    addWarning w = SLM $ addWarning w
 instance MonadWarn IO where
     addWarning w = modifyIORef ioWarnings (w:)
 instance MonadWarn (Writer [Warning]) where

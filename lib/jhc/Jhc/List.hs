@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fno-prelude #-}
+{-# OPTIONS_JHC -fno-prelude -fforall #-}
 module Jhc.List where
 
 import Jhc.Basics

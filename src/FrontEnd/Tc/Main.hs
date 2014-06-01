@@ -288,7 +288,7 @@ tiExpr (HsIf e e1 e2) typ = do
 
 tiExpr tuple@(HsTuple exps@(_:_)) typ = deNameContext Nothing "in the tuple" tuple $ do
     --(_,exps') <- tcApps (HsCon (toTuple (length exps))) exps typ
-    (_,exps') <- tcApps (HsCon (name_TupleConstructor typeLevel (length exps))) exps typ
+    (_,exps') <- tcApps (HsCon (name_TupleConstructor termLevel (length exps))) exps typ
     return (HsTuple exps')
 
 tiExpr t@(HsTuple []) typ = do -- deNameContext Nothing "in the tuple" tuple $ do

@@ -3,6 +3,7 @@
 module FrontEnd.HsErrors(
     hsType,
     hsDeclTopLevel,
+    preTypecheckChecks,
     hsDeclLocal
     ) where
 
@@ -85,15 +86,18 @@ hsDecl cntx decl = withSrcLoc (srcLoc decl) $ f cntx decl where
     f context HsDataDecl {} = wDecl $ "data declaration not allowed " ++ show context
     f context HsForeignDecl {} = wDecl $ "foreign declaration not allowed " ++ show context
     f context HsActionDecl {} = wDecl $ "action declaration not allowed " ++ show context
-    f _ d = applyHsOps ops d >> return ()
+    f _ d = return ()
     wDecl = addWarn InvalidDecl
-    wExp = addWarn InvalidExp
+
+preTypecheckChecks :: (MonadWarn m,MonadSrcLoc m,MonadSetSrcLoc m,Applicative m,TraverseHsOps a) => a -> m a
+preTypecheckChecks x = traverseHsOps ops x where
     ops = (hsOpsDefault ops) { opHsExp, opHsPat } where
             opHsExp e = traverseHsOps ops e
             opHsPat p@(HsPIrrPat (Located sl HsPUnboxedTuple {})) = withSrcSpan sl $ do
                 wExp "unboxed tuples may not be irrefutably matched"
                 traverseHsOps ops p
             opHsPat p = traverseHsOps ops p
+    wExp = addWarn InvalidExp
 
 --    f context@(InClass ts) decl@HsTypeDecl { hsDeclTArgs = as }
 

@@ -1,10 +1,8 @@
 module FrontEnd.SrcLoc where
 
-import Control.Applicative
-import Control.Monad.Identity
+import Util.Std
+import Control.Monad.Reader
 import Control.Monad.Writer
-import Data.Foldable
-import Data.Traversable
 import Data.Binary
 import Data.Generics
 
@@ -142,5 +140,16 @@ instance Show SrcSpan where
             f s = show (srcLocLine s) ++ ":" ++ show (srcLocColumn s)
             slf = unpackPS . srcLocFileName
 
+newtype SLM m a = SLM (ReaderT SrcSpan m a)
+    deriving(Monad,MonadReader SrcSpan,Applicative,Functor)
+
+runSLM :: SLM m a -> m a
+runSLM (SLM t) = runReaderT t bogusSrcSpan
+
+instance (Applicative m,Monad m) => MonadSetSrcLoc (SLM m) where
+    withSrcSpan' ss (SLM a) = SLM $ local (const ss) a
+
+instance Monad m => MonadSrcLoc (SLM m) where
+    getSrcSpan = SLM ask
 instance MonadSetSrcLoc IO where
     withSrcLoc' sl a = a

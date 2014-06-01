@@ -35,6 +35,7 @@ import qualified Data.Map as Map
 #map {pragma($_)} qw/NOINLINE CATALYST SPECIALIZE MULTISPECIALIZE SUPERSPECIALIZE RULE NOETA SUPERINLINE CTYPE INLINE SRCLOC_ANNOTATE/
  '.' { L $$ LVarSym "." }
  'as' { L $$ LVarId "as" }
+ FORALL { L $$ LVarId "forall" }   -- used inside of rules when -fno-forall is in effect
  'hiding' { L $$ LVarId "hiding" }
  'qualified' { L $$ LVarId "qualified" }
 
@@ -180,6 +181,7 @@ rule :: { HsRule } : srcloc STRING mfreevars exp '=' exp { HsRule {
 
 mfreevars :: { [(HsName,Maybe HsType)] }
       : 'forall' vbinds '.' { $2 }
+      | FORALL vbinds '.' { $2 }
       | { [] }
 
 vbinds :: { [(HsName,Maybe HsType)] }

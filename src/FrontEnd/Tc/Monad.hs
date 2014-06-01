@@ -49,13 +49,12 @@ module FrontEnd.Tc.Monad(
     withMetaVars
     ) where
 
-import Util.Std
 import Control.Monad.Error
 import Control.Monad.Reader
 import Control.Monad.Writer.Strict
 import Data.IORef
 import System
---import Text.PrettyPrint.HughesPJ(Doc)
+import Util.Std
 import qualified Data.Foldable as T
 import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
@@ -86,23 +85,23 @@ type TypeEnv = Map.Map Name Sigma
 
 -- read only environment, set up before type checking.
 data TcEnv = TcEnv {
-    tcInfo              :: TcInfo,
-    tcDiagnostics       :: [Diagnostic],   -- list of information that might help diagnosis
-    tcVarnum            :: {-# UNPACK #-} !(IORef Int),
-    tcCollectedEnv      :: {-# UNPACK #-} !(IORef (Map.Map Name Sigma)),
-    tcCollectedCoerce   :: {-# UNPACK #-} !(IORef (Map.Map Name CoerceTerm)),
-    tcConcreteEnv       :: Map.Map Name Sigma,
-    tcMutableEnv        :: Map.Map Name Sigma,
-    tcCurrentScope      :: Set.Set MetaVar,
-    tcRecursiveCalls    :: Set.Set Name,
-    tcInstanceEnv       :: InstanceEnv,
-    tcOptions           :: Opt  -- module specific options
+    tcInfo            :: TcInfo,
+    tcDiagnostics     :: [Diagnostic],   -- list of information that might help diagnosis
+    tcVarnum          :: {-# UNPACK #-} !(IORef Int),
+    tcCollectedEnv    :: {-# UNPACK #-} !(IORef (Map.Map Name Sigma)),
+    tcCollectedCoerce :: {-# UNPACK #-} !(IORef (Map.Map Name CoerceTerm)),
+    tcConcreteEnv     :: Map.Map Name Sigma,
+    tcMutableEnv      :: Map.Map Name Sigma,
+    tcCurrentScope    :: Set.Set MetaVar,
+    tcRecursiveCalls  :: Set.Set Name,
+    tcInstanceEnv     :: InstanceEnv,
+    tcOptions         :: Opt  -- module specific options
     }
 
-tcConcreteEnv_u    f r@TcEnv{tcConcreteEnv  = x} = r{tcConcreteEnv = f x}
-tcDiagnostics_u    f r@TcEnv{tcDiagnostics  = x} = r{tcDiagnostics = f x}
-tcMutableEnv_u     f r@TcEnv{tcMutableEnv  = x}  = r{tcMutableEnv = f x}
-tcRecursiveCalls_u f r@TcEnv{tcRecursiveCalls  = x} = r{tcRecursiveCalls = f x}
+tcConcreteEnv_u    f r@TcEnv{tcConcreteEnv    = x} = r{tcConcreteEnv    = f x}
+tcDiagnostics_u    f r@TcEnv{tcDiagnostics    = x} = r{tcDiagnostics    = f x}
+tcMutableEnv_u     f r@TcEnv{tcMutableEnv     = x} = r{tcMutableEnv     = f x}
+tcRecursiveCalls_u f r@TcEnv{tcRecursiveCalls = x} = r{tcRecursiveCalls = f x}
 
 data Output = Output {
     collectedPreds   :: !Preds,
@@ -266,7 +265,7 @@ lookupName n = do
         Nothing | Just (isBoxed,lv,num) <- fromName_Tuple n, lv == termLevel -> f (isBoxed,num) where
             f (isBoxed,0) = return $ if isBoxed then tTTuple [] else tTTuple' []
             f (isBoxed,num) = do
-                nvs <- mapM newVar  (replicate num kindArg)
+                nvs <- mapM newVar (replicate num (if isBoxed then kindStar else kindArg))
                 let nvs' = map TVar nvs
                     ttuple = if isBoxed then tTTuple else tTTuple'
                 return (TForAll nvs $ [] :=> foldr TArrow  (ttuple nvs') nvs')

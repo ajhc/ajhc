@@ -301,7 +301,9 @@ sub do_it {
     }
     foreach my $t (sort keys %{$y->{tests}}) {
         next if $done{$t}++;
+        #print Dumper($cwd,$y,$name,$t);
         my $y = combine_yaml($y, $yc->{tests}{$t});
+        next unless $y->{progname};
         run_test($cwd,$y,$name,$t,undef);
     }
     closedir $dh;

@@ -204,8 +204,9 @@ getConstructor n _ | isJust me = return (emptyConstructor {
         (_,ss) = fromPi e
         me@(~(Just e)) = fromConjured modBox n `mplus` fromConjured modAbsurd n
 getConstructor n _ | RawType <- nameType n = return $ primitiveConstructor n
-getConstructor n _ | Just v <- fromUnboxedNameTuple n, DataConstructor <- nameType n = return $ snd $ tunboxedtuple v
-getConstructor n _ | Just v <- fromUnboxedNameTuple n, TypeConstructor <- nameType n = return $ fst $ tunboxedtuple v
+getConstructor n _ | Just (level,arity) <- fromName_UnboxedTupleConstructor n = return $ if level == termLevel then snd $ tunboxedtuple arity else fst $ tunboxedtuple arity
+--getConstructor n _ | Just v <- fromUnboxedNameTuple n, DataConstructor <- nameType n = return $ snd $ tunboxedtuple v
+--getConstructor n _ | Just v <- fromUnboxedNameTuple n, TypeConstructor <- nameType n = return $ fst $ tunboxedtuple v
 getConstructor n (DataTable map) = case Map.lookup n map of
     Just x -> return x
     Nothing -> fail $ "getConstructor: " ++ show (nameType n,n)
