@@ -14,6 +14,7 @@ import FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse
 import FrontEnd.Utils(maybeGetDeclName)
 import FrontEnd.Warning
+import GenUtil(hasRepeatUnder)
 import Name.Name
 import Util.Std
 
@@ -49,6 +50,9 @@ hsDecl cntx decl = withSrcLoc (srcLoc decl) $ f cntx decl where
     f TopLevel HsDataDecl { .. } = do
         let ds = map (toName ClassName) hsDeclDerives
         checkDeriving False ds
+        when (hasRepeatUnder hsConDeclName hsDeclCons) $ do
+            wDecl "repeated constructor name is not allowed"
+
 --        let isEnum = all (\x ->  null (hsConDeclArgs x)) cs
 --        when (not isEnum && class_Enum `elem` ds) $ warn sl "derive-enum" "Cannot derive enum from non enumeration type"
 --        when (not isEnum && length cs /= 1 && class_Bounded `elem` ds) $ warn sl "derive-bounded" "Cannot derive bounded from non enumeration or unary type"

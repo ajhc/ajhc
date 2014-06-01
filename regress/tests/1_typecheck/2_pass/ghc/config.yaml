@@ -83,8 +83,6 @@ tests:
      skip:  known_bug
    tc178:
      skip:  known_bug
-   T3219:
-     skip: known_bug
    tc092:
      skip: known_bug
    tc095:

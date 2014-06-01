@@ -228,12 +228,12 @@ deriving :: { [Name] }
 constr :: { HsConDecl }
     : srcloc mexists scontype   { HsConDecl {
         hsConDeclSrcLoc = $1,
-        hsConDeclName = (fst $3),
+        hsConDeclName = nameTyLevel_s termLevel (fst $3),
         hsConDeclConArg = (snd $3),
         hsConDeclExists = $2 } }
     | srcloc mexists gcon '{' ecl_fielddecl '}' { HsRecDecl {
         hsConDeclSrcLoc = $1,
-        hsConDeclName = $3,
+        hsConDeclName = nameTyLevel_s termLevel $3,
         hsConDeclRecArg = $5,
         hsConDeclExists = $2 } }
 

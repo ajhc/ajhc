@@ -869,7 +869,7 @@ collectDefsHsModule m = (\(x,y) -> (Seq.toList x,Seq.toList y)) $ execWriter (ma
             cs' = concatMap (namesHsConDeclSort' toName) cs
     f HsDataDecl { hsDeclSrcLoc =sl, hsDeclName = n, hsDeclCons = cs } = do
         tellF $ (toName TypeConstructor n,sl,snub [ x |(x,_,_) <- cs']): cs' ; zup cs where
-            cs' = concatMap (namesHsConDecl' toName) cs
+            cs' = nubBy (\ (x,_,_) (y,_,_) -> nameType x == FieldLabel && x == y) $ concatMap (namesHsConDecl' toName) cs
     f cd@(HsClassDecl sl ch ds) = tellF $ (toName ClassName $ hsClassHead ch,sl,snub $ fsts cs):[ (n,a,[]) | (n,a) <- cs]  where
         cs = (mconcatMap (namesHsDeclTS' toName) ds)
     f cad@(HsClassAliasDecl { hsDeclSrcLoc = sl, hsDeclName = n, hsDeclDecls = ds })
