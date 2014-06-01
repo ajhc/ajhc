@@ -42,12 +42,17 @@ checkSconType xs = do
         f (SconType False (HsTyTuple [])) = return $ quoteName tc_Unit
         f (SconType False _) = parseErrorK "Needs constructor as head."
         f ~(SconType True _) = parseErrorK "Only fields may be made strict."
-    let g (SconType False t) = HsUnBangedTy t
 --        f (SconApp (SconOp x) [ta,tb]) | x == tc_Arrow = do HsTyFun <$> f tb <*> f ta
-        g ~(SconType True t) = HsBangedTy t
+    let g (SconType True t) = return $ HsBangedTy t
+        g s = HsUnBangedTy <$> h s
+        h (SconType False t) = return t
+        h (SconApp (SconOp x) [ta,tb]) | x == tc_Arrow = do HsTyFun <$> h tb <*> h ta
+        h (SconApp t ts) = do foldl HsTyApp <$> h t <*> mapM h (reverse ts)
+        h (SconType True _) = parseErrorK "(!) annotation in wrong place."
+        h SconOp {} =  parseErrorK "unexpected operator in type signature."
     s <- checkSconType' xs
     case s of
-        SconApp t ts -> do t <- f t; return (nameTyLevel_s termLevel t, reverse $ map g ts)
+        SconApp t ts -> do t <- f t; ts <- mapM g ts; return (nameTyLevel_s termLevel t, reverse ts)
         _ -> do s <- f s; return (nameTyLevel_s termLevel s,[])
 
 checkBangType  :: [Either Name HsType] -> P HsBangType
