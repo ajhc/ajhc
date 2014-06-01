@@ -1,11 +1,11 @@
+#include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <locale.h>
 
 #include "HsFFI.h"
-#include "rts/rts_support.h"
-#include "rts/profile.h"
 #include "rts/gc.h"
+#include "rts/profile.h"
+#include "rts/rts_support.h"
 
 jmp_buf jhc_uncaught;
 int jhc_argc;

@@ -271,7 +271,7 @@ sub run_test {
         $result->{expected_stdout} = "$fbase.expected.stdout";
         my $r = system "diff --strip-trailing-cr $result->{run_stdout} $result->{expected_stdout}";
         $result->{stdout_diff} = $r;
-        $result->{has_error}++;
+        $result->{has_error}++ if $r ne 0;
         $error++ if $r ne 0;
     }
 }

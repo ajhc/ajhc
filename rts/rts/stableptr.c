@@ -1,5 +1,5 @@
-#include "sys/queue.h"
 #include "jhc_rts_header.h"
+#include "sys/queue.h"
 
 struct StablePtr_list root_StablePtrs = LIST_HEAD_INITIALIZER();
 
