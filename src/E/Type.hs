@@ -10,7 +10,6 @@ import Cmm.Number
 import Doc.DocLike hiding((<$>))
 import Info.Types
 import Name.Id
-import Name.Name
 import Name.Names
 import StringTable.Atom
 import Util.Gen

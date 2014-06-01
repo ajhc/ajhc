@@ -44,7 +44,7 @@ m4_undefine({{FI}})
 
 instance Floating $1 where
     pi = c_pi$1
-    sqrt ($1 x) = $1 (sqrt$2 x)
+    sqrt = c_sqrt$1
     exp ($1 x) = $1 (exp$2 x)
     log ($1 x) = $1 (log$2 x)
     sin ($1 x) = $1 (sin$2 x)
@@ -85,6 +85,7 @@ instance RealFrac $1 where
     ceilingf x = c_ceil$1 x
     floorf x = c_floor$1 x
 
+foreign import ccall "-lm math.h sqrt$3" c_sqrt$1 :: $1 -> $1
 foreign import ccall "-lm math.h asinh$3" c_asinh$1 :: $1 -> $1
 foreign import ccall "-lm math.h acosh$3" c_acosh$1 :: $1 -> $1
 foreign import ccall "-lm math.h atanh$3" c_atanh$1 :: $1 -> $1

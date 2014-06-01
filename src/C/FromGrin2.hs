@@ -763,6 +763,8 @@ primBinOp n ta tb r a b
     | Just t <- lookup n floatOps = return $ operator t a b
     | otherwise = return $ err ("primBinOp: " ++ show ((n,ta,tb,r),a,b))
 
+_mathRequires = Requires (Set.fromList [(CCall,"math.h"),(CCall,"-lm")])
+
 primUnOp Op.Neg ta r a = do
     a <- castSigned ta a
     return $ uoperator "-" a
