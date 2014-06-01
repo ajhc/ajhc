@@ -79,8 +79,6 @@ tests:
      skip:  OverlappingInstances
 
 #bugs
-   tc174:
-     skip:  known_bug
    tc178:
      skip:  known_bug
    tc092:

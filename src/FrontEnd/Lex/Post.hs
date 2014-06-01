@@ -241,7 +241,7 @@ qualTypeToClassHead qt = do
             f (HsTyApp a b) rs = f a (b:rs)
             f t rs = (t,rs)
     case fromHsTypeApp $ hsQualTypeType qt of
-        (HsTyCon className,as) -> return HsClassHead { hsClassHeadContext = hsQualTypeContext qt, hsClassHead = className, hsClassHeadArgs = as }
+        (HsTyCon className,as) -> return HsClassHead { hsClassHeadContext = hsQualTypeContext qt, hsClassHead = toName ClassName className, hsClassHeadArgs = as }
         _ -> fail "Invalid Class Head"
 
 doForeign :: Monad m => SrcLoc -> [Name] -> Maybe (String,Name) -> HsQualType -> m HsDecl

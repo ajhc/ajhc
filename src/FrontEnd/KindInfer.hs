@@ -503,7 +503,8 @@ kiDataKind tyconName condecls = do
 kiHsQualType :: KindEnv -> HsQualType -> KindEnv
 kiHsQualType inputEnv qualType@(HsQualType ps t) = newState where
     newState = unsafePerformIO $ runKI inputEnv $ withContext ("kiHsQualType: " ++ show qualType) $ do
-        kiType kindStar t
+        kv <- newKindVar KindAny
+        kiType (KVar kv) t
         mapM_ kiPred ps
         getEnv >>= postProcess
 

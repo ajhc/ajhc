@@ -853,7 +853,9 @@ getNamesAndASrcLocsFromHsDecl d = f d where
 
 collectDefsHsModule :: HsModule -> ([(Name,SrcLoc,[Name])],[(Name,Int)])
 collectDefsHsModule m = (\(x,y) -> (Seq.toList x,Seq.toList y)) $ execWriter (mapM_ f (hsModuleDecls m)) where
-    toName t n = Name.toName t (qualifyName (hsModuleName m) n)
+--    toName t n | nameType n == UnknownType = n
+    toName t n  = Name.toName t (qualifyName (hsModuleName m) n)
+             --  | otherwise = error $ show (t,n,nameType n)
     tellName sl n = tellF [(n,sl,[])]
     tellF xs = tell (Seq.fromList xs,Seq.empty) >> return ()
     tellS xs = tell (Seq.empty,Seq.fromList xs) >> return ()
@@ -869,7 +871,7 @@ collectDefsHsModule m = (\(x,y) -> (Seq.toList x,Seq.toList y)) $ execWriter (ma
             cs' = concatMap (namesHsConDeclSort' toName) cs
     f HsDataDecl { hsDeclSrcLoc =sl, hsDeclName = n, hsDeclCons = cs } = do
         tellF $ (toName TypeConstructor n,sl,snub [ x |(x,_,_) <- cs']): cs' ; zup cs where
-            cs' = nubBy (\ (x,_,_) (y,_,_) -> nameType x == FieldLabel && x == y) $ concatMap (namesHsConDecl' toName) cs
+            cs' = nubBy (\ (x,_,_) (y,_,_) -> x == y) $ concatMap (namesHsConDecl' toName) cs
     f cd@(HsClassDecl sl ch ds) = tellF $ (toName ClassName $ hsClassHead ch,sl,snub $ fsts cs):[ (n,a,[]) | (n,a) <- cs]  where
         cs = (mconcatMap (namesHsDeclTS' toName) ds)
     f cad@(HsClassAliasDecl { hsDeclSrcLoc = sl, hsDeclName = n, hsDeclDecls = ds })
