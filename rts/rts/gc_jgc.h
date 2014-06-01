@@ -9,8 +9,8 @@
 struct sptr;
 struct s_arena;
 struct s_cache;
-typedef void* *gc_t;
-typedef void* heap_t;  // a pointer into the GCed heap.
+typedef void **gc_t;
+typedef void *heap_t;  // a pointer into the GCed heap.
 
 #if defined(_JHC_JGC_BLOCK_SHIFT) && defined(_JHC_JGC_MEGABLOCK_SHIFT)
 #if (_JHC_JGC_BLOCK_SHIFT) >= (_JHC_JGC_MEGABLOCK_SHIFT)
@@ -37,18 +37,18 @@ struct s_cache *new_cache(struct s_arena *arena, unsigned short size,
 struct s_arena *new_arena(void);
 struct s_cache *find_cache(struct s_cache **rsc, struct s_arena *arena,
                            unsigned short size, unsigned short num_ptrs);
-void gc_add_root(gc_t gc, void * root);
+void gc_add_root(gc_t gc, void *root);
 void A_STD gc_perform_gc(gc_t gc);
-uint32_t get_heap_flags(void* sp);
+uint32_t get_heap_flags(void *sp);
 
 heap_t s_alloc(gc_t gc, struct s_cache *sc) A_STD;
-heap_t (gc_alloc)(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs) A_STD;
+heap_t (gc_alloc)(gc_t gc, struct s_cache **sc, unsigned count, unsigned nptrs) A_STD;
 heap_t gc_array_alloc(gc_t gc, unsigned count) A_STD;
 heap_t gc_array_alloc_atomic(gc_t gc, unsigned count, unsigned slab_flags) A_STD;
 /* foreignptr, saved_gc must be set properly. */
 heap_t gc_malloc_foreignptr(unsigned alignment, unsigned size, bool finalizer) A_STD;
 heap_t gc_new_foreignptr(HsPtr ptr) A_STD;
-bool gc_add_foreignptr_finalizer(struct sptr* fp, HsFunPtr finalizer) A_STD;
+bool gc_add_foreignptr_finalizer(struct sptr *fp, HsFunPtr finalizer) A_STD;
 
 #define gc_frame0(gc,n,...) void *ptrs[n] = { __VA_ARGS__ }; \
         for(int i = 0; i < n; i++) gc[i] = (sptr_t)ptrs[i]; \
@@ -58,8 +58,8 @@ bool gc_add_foreignptr_finalizer(struct sptr* fp, HsFunPtr finalizer) A_STD;
                                     gc_t sgc = gc;  gc_t gc = sgc + 2;
 
 struct StablePtr {
-    LIST_ENTRY(StablePtr) link;
-    struct sptr* contents;
+        LIST_ENTRY(StablePtr) link;
+        struct sptr *contents;
 };
 
 extern LIST_HEAD(StablePtr_list, StablePtr) root_StablePtrs;

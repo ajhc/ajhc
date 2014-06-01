@@ -107,7 +107,7 @@ redirection to a whnf value.
 #include "jhc_rts_header.h"
 
 #if _JHC_GC == _JHC_GC_JGC
-typedef wptr_t (*eval_fn)(gc_t gc,node_t *node) A_STD;
+typedef wptr_t (*eval_fn)(gc_t gc, node_t *node) A_STD;
 #else
 typedef wptr_t (*eval_fn)(node_t *node) A_STD;
 #endif
@@ -117,7 +117,7 @@ static inline wptr_t A_STD A_UNUSED  A_HOT
 follow(sptr_t s)
 {
         assert(jhc_valid_lazy(s));
-        if(IS_LAZY(s)) {
+        if (IS_LAZY(s)) {
                 sptr_t h = (sptr_t)(GETHEAD(FROM_SPTR(s)));
                 assert(!IS_LAZY(h));
                 return (wptr_t)h;
@@ -127,18 +127,18 @@ follow(sptr_t s)
 
 wptr_t A_STD A_UNUSED  A_HOT
 #if _JHC_GC == _JHC_GC_JGC
-eval(gc_t gc,sptr_t s)
+eval(gc_t gc, sptr_t s)
 #else
 eval(sptr_t s)
 #endif
 {
         assert(jhc_valid_lazy(s));
-        if(IS_LAZY(s)) {
+        if (IS_LAZY(s)) {
                 assert(GET_PTYPE(s) == P_LAZY);
                 void *ds = FROM_SPTR(s);
                 sptr_t h = (sptr_t)(GETHEAD(ds));
                 assert((fptr_t)h != BLACK_HOLE);
-                if(IS_LAZY(h)) {
+                if (IS_LAZY(h)) {
                         eval_fn fn = (eval_fn)FROM_SPTR(h);
                         assert(GET_PTYPE(h) == P_FUNC);
 #if _JHC_DEBUG
@@ -146,7 +146,7 @@ eval(sptr_t s)
 #endif
                         fn = (eval_fn)SET_THUMB_BIT(fn);
 #if _JHC_GC == _JHC_GC_JGC
-                        wptr_t r = (*fn)(gc,NODEP(ds));
+                        wptr_t r = (*fn)(gc, NODEP(ds));
 #else
                         wptr_t r = (*fn)(NODEP(ds));
 #endif
@@ -165,7 +165,7 @@ eval(sptr_t s)
 int
 main(int argc, char *argv[])
 {
-        hs_init(&argc,&argv);
+        hs_init(&argc, &argv);
         if (jhc_setjmp(&jhc_uncaught))
                 jhc_error("Uncaught Exception");
         else

@@ -10,9 +10,9 @@ struct fptr;
 
 // we use dummy structs here so the compiler will catch any attempt
 // to use one type in anothers place
-typedef struct sptr * sptr_t;
-typedef struct sptr * wptr_t;
-typedef struct fptr * fptr_t;
+typedef struct sptr *sptr_t;
+typedef struct sptr *wptr_t;
+typedef struct fptr *fptr_t;
 typedef uintptr_t     what_t;
 
 typedef struct node {
@@ -69,7 +69,7 @@ typedef struct dnode {
 
 wptr_t A_STD
 #if _JHC_GC == _JHC_GC_JGC
-eval(gc_t gc,sptr_t s);
+eval(gc_t gc, sptr_t s);
 #else
 eval(sptr_t s);
 #endif
@@ -83,7 +83,10 @@ void   A_STD update(void *, wptr_t);
 #else
 #define promote(x) PROMOTE(x)
 #define demote(x) DEMOTE(x)
-inline static void update(void *t, wptr_t n) { GETHEAD(t) = (fptr_t)n; }
+inline static void update(void *t, wptr_t n)
+{
+        GETHEAD(t) = (fptr_t)n;
+}
 #endif
 
 #if _JHC_DEBUG && _JHC_GC == _JHC_GC_JGC

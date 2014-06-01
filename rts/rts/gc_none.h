@@ -18,12 +18,12 @@
 #elif _JHC_GC == _JHC_GC_NONE
 
 #if _JHC_DEBUG
-void * A_MALLOC jhc_malloc_debug(size_t n,int line,int atomic);
+void *A_MALLOC jhc_malloc_debug(size_t n, int line, int atomic);
 #define jhc_malloc(n) jhc_malloc_debug(n,__LINE__,0)
 #define jhc_malloc_atomic(n) jhc_malloc_debug(n,__LINE__,1)
 #else
-void * A_MALLOC jhc_malloc(size_t n);
-void * A_MALLOC jhc_malloc_atomic(size_t n);
+void *A_MALLOC jhc_malloc(size_t n);
+void *A_MALLOC jhc_malloc_atomic(size_t n);
 #endif
 
 #endif

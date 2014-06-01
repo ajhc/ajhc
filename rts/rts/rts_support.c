@@ -32,22 +32,25 @@ hs_set_argv(int argc, char *argv[])
 }
 
 void A_NORETURN A_UNUSED A_COLD
-jhc_exit(int n) {
+jhc_exit(int n)
+{
         fflush(stdout);
         jhc_print_profile();
         exit(n);
 }
 
 void  A_NORETURN A_UNUSED  A_COLD
-jhc_error(char *s) {
+jhc_error(char *s)
+{
         fflush(stdout);
-        fputs(s,stderr);
-        fputs("\n",stderr);
+        fputs(s, stderr);
+        fputs("\n", stderr);
         jhc_exit(1);
 }
 
 void  A_NORETURN A_UNUSED  A_COLD
-jhc_case_fell_off(int n) {
+jhc_case_fell_off(int n)
+{
         fflush(stdout);
         fprintf(stderr, "\n%s:%i: case fell off\n", __FILE__, n);
         abort();
@@ -59,30 +62,29 @@ static int hs_init_count;
 void
 hs_init(int *argc, char **argv[])
 {
-
-        if(!hs_init_count++) {
+        if (!hs_init_count++) {
                 jhc_alloc_init();
                 jhc_hs_init();
-                hs_set_argv(*argc,*argv);
+                hs_set_argv(*argc, *argv);
 #if JHC_isPosix
                 struct utsname jhc_utsname;
-                if(!uname(&jhc_utsname)) {
+                if (!uname(&jhc_utsname)) {
                         jhc_options_arch = jhc_utsname.machine;
                         jhc_options_os   = jhc_utsname.sysname;
                 }
 #endif
-                setlocale(LC_ALL,"");
+                setlocale(LC_ALL, "");
         }
 }
 
 void
 hs_exit(void)
 {
-        if(!hs_init_count) {
+        if (!hs_init_count) {
                 fprintf(stderr, "hs_exit() called before hs_init()\n");
                 abort();
         }
-        if(!--hs_init_count) {
+        if (!--hs_init_count) {
                 jhc_alloc_fini();
                 jhc_exit(0);
         }

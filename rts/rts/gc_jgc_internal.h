@@ -9,12 +9,12 @@
 
 struct s_arena {
         struct s_megablock *current_megablock;
-        SLIST_HEAD(,s_block) free_blocks;
+        SLIST_HEAD(, s_block) free_blocks;
         unsigned block_used;
         unsigned block_threshold;
-        SLIST_HEAD(,s_cache) caches;
-        SLIST_HEAD(,s_block) monolithic_blocks;
-        SLIST_HEAD(,s_megablock) megablocks;
+        SLIST_HEAD(, s_cache) caches;
+        SLIST_HEAD(, s_block) monolithic_blocks;
+        SLIST_HEAD(, s_megablock) megablocks;
         unsigned number_gcs;    // number of garbage collections
         unsigned number_allocs; // number of allocations since last garbage collection
 };
@@ -47,8 +47,8 @@ struct s_block {
 
 struct s_cache {
         SLIST_ENTRY(s_cache) next;
-        SLIST_HEAD(,s_block) blocks;
-        SLIST_HEAD(,s_block) full_blocks;
+        SLIST_HEAD(, s_block) blocks;
+        SLIST_HEAD(, s_block) full_blocks;
         unsigned char color;
         unsigned char size;
         unsigned char num_ptrs;

@@ -64,7 +64,7 @@
 // the program will provide the following
 void _amain(void);
 void jhc_hs_init(void);
-extern const void * const nh_stuff[];
+extern const void *const nh_stuff[];
 
 #include "rts/profile.h"
 #include "rts/rts_support.h"

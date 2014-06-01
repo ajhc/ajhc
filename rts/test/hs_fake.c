@@ -7,4 +7,4 @@ char jhc_command[] = "(command)";
 char jhc_version[] = "(version)";
 
 void jhc_hs_init(void) {}
-const void * const nh_stuff[] = { NULL };
+const void *const nh_stuff[] = { NULL };
