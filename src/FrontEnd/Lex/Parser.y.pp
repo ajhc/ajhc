@@ -157,7 +157,7 @@ decl :: { HsDecl }
     | 'deriving' 'instance' classhead { HsDeclDeriving $1 $3 }
     | 'default' type { HsDefaultDecl $1 $2 }
     | rulecatalyst rules '#-}' {
-        HsPragmaRules $ map (\x -> x { hsRuleIsMeta = $1 }) (reverse $2) }
+        HsPragmaRules $ map (\x -> x { hsRuleIsMeta = $1 }) ($2) }
     | srcloc specialize m_con var '::' type '#-}'
                       { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = $4, hsDeclType = $6
                                            , hsDeclUniq = error "hsDeclUniq not set"  } }

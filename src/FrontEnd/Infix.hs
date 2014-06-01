@@ -16,7 +16,9 @@
 
 -------------------------------------------------------------------------------}
 
-module FrontEnd.Infix (buildFixityMap, infixHsModule, FixityMap,size, infixStatement, restrictFixityMap) where
+module FrontEnd.Infix (
+    buildFixityMap, infixHsModule, FixityMap,size,
+    infixStatement, restrictFixityMap, dumpFixityMap) where
 
 import Data.Binary
 import Data.Monoid
@@ -46,6 +48,10 @@ instance Binary FixityMap where
 
 restrictFixityMap :: (Name -> Bool) -> FixityMap -> FixityMap
 restrictFixityMap f (FixityMap fm) = FixityMap (Map.filterWithKey (\k _ -> f k) fm)
+
+dumpFixityMap :: FixityMap -> IO ()
+dumpFixityMap (FixityMap ts) = do
+    mapM_ print (Map.toList ts)
 
 ----------------------------------------------------------------------------
 

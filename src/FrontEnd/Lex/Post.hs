@@ -59,7 +59,7 @@ checkBangType xs = checkSconType' xs >>= \s -> case s of
     f (SconApp (SconOp x) [ta,tb]) | x == tc_Arrow = do HsTyFun <$> f tb <*> f ta
     f (SconType True _) = parseErrorK "(!) annotation in wrong place."
     f SconOp {} =  parseErrorK "unexpected operator in type signature."
-    f (SconApp t ts) = do foldl HsTyApp <$> f t <*> mapM f ts
+    f (SconApp t ts) = do foldl HsTyApp <$> f t <*> mapM f (reverse ts)
 
 checkSconType' :: [Either Name HsType] -> P Scon
 checkSconType' xs = ans where

@@ -125,6 +125,8 @@ tiModules htc ms = do
     let thisFixityMap = buildFixityMap . concat $
             [filter isHsInfixDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms]
     let fixityMap = thisFixityMap  `mappend` hoFixities htc
+    wdump FD.Fixity $ do
+       dumpFixityMap fixityMap
     thisTypeSynonyms <- declsToTypeSynonyms (hoTypeSynonyms htc) $ concat
         [ filter isHsTypeDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms]
     let ts = thisTypeSynonyms `mappend` hoTypeSynonyms htc
