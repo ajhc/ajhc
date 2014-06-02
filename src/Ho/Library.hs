@@ -225,7 +225,7 @@ list_fields = Set.fromList $ [
       ++ map snd alias_fields
 
 alias_fields = [
-   ("other-modules","hidden-modules"),
+ --  ("other-modules","hidden-modules"),
    ("exported-modules","exposed-modules"),
    ("hs-source-dir","hs-source-dirs")
    ]

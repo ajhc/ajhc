@@ -156,16 +156,17 @@ decl :: { HsDecl }
     | propspragma srcloc m_slist ecl_var '#-}'  { HsPragmaProps $2 $1 $4 }
     | 'deriving' 'instance' classhead { HsDeclDeriving $1 $3 }
     | 'default' type { HsDefaultDecl $1 $2 }
-    | rulecatalyst rules '#-}' {
-        HsPragmaRules $ map (\x -> x { hsRuleIsMeta = $1 }) ($2) }
+    | rulecatalyst m_slist rules '#-}' {
+        HsPragmaRules $ map (\x -> x { hsRuleIsMeta = $1 }) ($3) }
     | srcloc specialize m_con var '::' type '#-}'
                       { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = $4, hsDeclType = $6
                                            , hsDeclUniq = error "hsDeclUniq not set"  } }
-    | srcloc specialize 'instance'  type '#-}'
-                      { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = nameName u_instance , hsDeclType = $4
+    | srcloc specialize 'instance'  cl_type '#-}'
+                      { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = nameName u_instance , hsDeclType = head $4
                                            , hsDeclUniq = error "hsDeclUniq not set"  } }
 #maybe con
 #maybe slist
+#maybe semi ';'
 
 slist :: { [HsExp] }
     : '[' ecl_exp ']' { $2 }

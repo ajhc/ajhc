@@ -103,10 +103,12 @@ haskell :-
 --<line_pragma> @stringlit{ mkL LString }
 
 "{-#" @ws "OPTIONS"             { begin discard_pragma }
+"{-#" @ws "OPTIONS_GHC"         { begin discard_pragma }
 "{-#" @ws "LANGUAGE"            { begin discard_pragma }
 "{-#" @ws "GHC"                 { begin discard_pragma }
 <discard_pragma> "#-}"          { begin hs }
 <discard_pragma> .              ;
+<discard_pragma> @ws              ;
 
 "{-#"                           { mkL LSpecial }
 "#-}"                           { mkL LSpecial }
