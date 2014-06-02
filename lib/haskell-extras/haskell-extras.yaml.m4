@@ -7,6 +7,7 @@ Options: [ --noauto ]
 Exposed-Modules:
         - Control.Exception
         - Control.Monad
+        - Data.String
         - Data.Array
         - Data.Char
         - Data.Complex

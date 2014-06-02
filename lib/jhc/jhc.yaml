@@ -7,11 +7,11 @@ Hidden-Modules:
         - Jhc.Int
         - Jhc.Inst.Enum
         - Jhc.Inst.PrimEnum
-        - Jhc.Inst.Read
         - Jhc.Inst.Show
         - Jhc.Inst.Storable
 Exposed-Modules:
         - Data.Ratio
+        - Data.String
         - Foreign.C.Error
         - Foreign.C.String
         - Foreign.C.Types
@@ -22,15 +22,20 @@ Exposed-Modules:
         - Foreign.Storable
         - Jhc.Addr
         - Jhc.Basics
+        - Jhc.Class.Num
+        - Jhc.Class.Ord
+        - Jhc.Class.Real
         - Jhc.Enum
         - Jhc.Float
-        - Jhc.Numeric
+        - Jhc.ForeignPtr
         - Jhc.Handle
         - Jhc.IO
+        - Jhc.Inst.Read
         - Jhc.List
         - Jhc.Maybe
         - Jhc.Monad
         - Jhc.Num
+        - Jhc.Numeric
         - Jhc.Options
         - Jhc.Order
         - Jhc.Prim
@@ -38,7 +43,12 @@ Exposed-Modules:
         - Jhc.String
         - Jhc.Text.Read
         - Jhc.Tuples
-        - Jhc.ForeignPtr
+        - Jhc.Type.Basic
+        - Jhc.Type.C
+        - Jhc.Type.Float
+        - Jhc.Type.Handle
+        - Jhc.Type.Ptr
+        - Jhc.Type.Word
         - Numeric
         - Prelude.CType
         - Prelude.Float
@@ -48,14 +58,5 @@ Exposed-Modules:
         - System.IO.Unsafe
         - System.Mem
         - System.Mem.StableName
-        - Jhc.Type.Basic
-        - Jhc.Type.Handle
-        - Jhc.Type.Ptr
-        - Jhc.Type.C
-        - Jhc.Type.Float
-        - Jhc.Type.Word
-        - Jhc.Class.Num
-        - Jhc.Class.Ord
-        - Jhc.Class.Real
 #        - Jhc.Hole
 #        - Jhc.JumpPoint
