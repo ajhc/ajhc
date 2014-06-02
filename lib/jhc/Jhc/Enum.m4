@@ -25,7 +25,6 @@ instance Enum $1 where
 
 foreign import primitive "increment" increment$1 :: $1 -> $1
 foreign import primitive "decrement" decrement$1 :: $1 -> $1
-
 }})
 
 m4_define(BOUNDED,{{
@@ -46,8 +45,5 @@ foreign import primitive "umaxBound" umaxBound$1 :: $1
 foreign import primitive "zero" zero$1 :: $1
 
 }})
-
-
-
 
 m4_divert

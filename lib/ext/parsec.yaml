@@ -1,0 +1,25 @@
+---
+author: 'Daan Leijen <daan@cs.uu.nl>'
+build-depends: []
+build-suggestions: []
+category: Parsing
+description: |-
+  Parsec is designed from scratch as an industrial-strength parser
+  library.  It is simple, safe, well documented (on the package
+  homepage), has extensive libraries and good error messages,
+  and is also fast.
+exposed-modules:
+  - Text.ParserCombinators.Parsec.Error
+  - Text.ParserCombinators.Parsec.Char
+  - Text.ParserCombinators.Parsec.Combinator
+  - Text.ParserCombinators.Parsec.Expr
+  - Text.ParserCombinators.Parsec.Pos
+  - Text.ParserCombinators.Parsec.Prim
+  - Text.ParserCombinators.Parsec
+homepage: http://www.cs.uu.nl/~daan/parsec.html
+license: BSD3
+license-file: LICENSE
+maintainer: 'Daan Leijen <daan@cs.uu.nl>'
+name: parsec
+synopsis: Monadic parser combinators
+version: 2.1.0.1

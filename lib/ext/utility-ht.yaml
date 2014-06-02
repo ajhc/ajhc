@@ -1,0 +1,40 @@
+---
+author: 'Henning Thielemann <haskell@henning-thielemann.de>'
+build-depends: []
+build-suggestions: []
+category: 'Data, List'
+description: |-
+  Various small helper functions for Lists, Maybes, Tuples, Functions.
+  Some of these functions are improved implementations of standard functions.
+  They have the same name as their standard counterparts.
+  The package only contains functions
+  that do not require packages other than the base package.
+  Thus you do not risk a dependency avalanche by importing it.
+  However, further splitting the base package might invalidate this statement.
+exposed-modules:
+  - Data.Bool.HT
+  - Data.Eq.HT
+  - Data.Function.HT
+  - Data.List.HT
+  - Data.List.Key
+  - Data.List.Match
+  - Data.Maybe.HT
+  - Data.Ord.HT
+  - Data.Record.HT
+  - Data.String.HT
+  - Data.Tuple.HT
+  - Control.Monad.HT
+  - Data.Strictness.HT
+  - Text.Read.HT
+  - Text.Show.HT
+hidden-modules:
+  - Data.Bool.HT.Private
+  - Data.List.HT.Private
+  - Data.List.Key.Private
+  - Data.List.Match.Private
+  - Data.Function.HT.Private
+  - Data.Record.HT.Private
+maintainer: 'Henning Thielemann <haskell@henning-thielemann.de>'
+name: utility-ht
+synopsis: 'Various small helper functions for Lists, Maybes, Tuples, Functions'
+version: 0.0.5.1

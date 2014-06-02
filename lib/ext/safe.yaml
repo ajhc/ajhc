@@ -1,0 +1,29 @@
+---
+author: 'Neil Mitchell <ndmitchell@gmail.com>'
+build-depends: [applicative]
+build-suggestions:
+  - base
+build-type: Simple
+cabal-version: '>= 1.6'
+category: Unclassified
+copyright: Neil Mitchell 2007-2014
+description: |-
+  Partial functions from the base library, such as @head@ and @!!@, modified
+  to return more descriptive error messages, programmer defined error messages,
+  @Maybe@ wrapped results and default values.
+  These functions can be used to reduce the number of unsafe pattern matches in
+  your code.
+exposed-modules:
+  - Safe
+  - Safe.Foldable
+extra-source-files: CHANGES.txt
+homepage: http://community.haskell.org/~ndm/safe/
+license: BSD3
+license-file: LICENSE
+location: https://github.com/ndmitchell/safe.git
+maintainer: 'Neil Mitchell <ndmitchell@gmail.com>'
+name: safe
+synopsis: Library for safe (pattern match free) functions
+tested-with: 'GHC==7.6.3, GHC==7.4.2, GHC==7.2.2'
+type: git
+version: 0.3.4

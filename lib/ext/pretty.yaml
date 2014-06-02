@@ -1,12 +1,5 @@
 ---
 bug-reports: http://github.com/haskell/pretty/issues
-build-depends:
-  - QuickCheck
-build-suggestions:
-  - base
-  - QuickCheck
-build-type: Simple
-cabal-version: '>= 1.8'
 category: Text
 description: |-
   This package contains a pretty-printing library, a set of API's
@@ -38,5 +31,4 @@ other-modules:
   - TestStructures
 stability: Stable
 synopsis: Pretty-printing library
-type: "git\nexitcode-stdio-1.0"
 version: 1.1.1.1

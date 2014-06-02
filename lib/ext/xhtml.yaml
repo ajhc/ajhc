@@ -1,0 +1,45 @@
+---
+author: Bjorn Bringert
+build-depends: []
+build-suggestions:
+  - base
+build-type: Simple
+cabal-version: '>= 1.6'
+category: 'Web, XML, Pretty Printer'
+copyright: |-
+  Bjorn Bringert 2004-2006, Andy Gill and the Oregon
+  Graduate Institute of Science and Technology, 1999-2001
+description: |-
+  This package provides combinators for producing
+  XHTML 1.0, including the Strict, Transitional and
+  Frameset variants.
+exposed-modules:
+  - Text.XHtml
+  - Text.XHtml.Frameset
+  - Text.XHtml.Strict
+  - Text.XHtml.Transitional
+  - Text.XHtml.Debug
+  - Text.XHtml.Table
+extensions:
+  - CPP
+ghc-options: -Wall
+homepage: https://github.com/haskell/xhtml
+license: BSD3
+license-file: LICENSE
+location: https://github.com/haskell/xhtml
+maintainer: 'Chris Dornan <chris@chrisdornan.com>'
+name: xhtml
+other-modules:
+  - Text.XHtml.Strict.Attributes
+  - Text.XHtml.Strict.Elements
+  - Text.XHtml.Frameset.Attributes
+  - Text.XHtml.Frameset.Elements
+  - Text.XHtml.Transitional.Attributes
+  - Text.XHtml.Transitional.Elements
+  - Text.XHtml.BlockTable
+  - Text.XHtml.Extras
+  - Text.XHtml.Internals
+stability: Stable
+synopsis: An XHTML combinator library
+type: git
+version: 3000.2.1

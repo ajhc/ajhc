@@ -1,0 +1,35 @@
+---
+bug-reports: http://hackage.haskell.org/trac/ghc/newticket?component=libraries%20%28other%29
+name: containers
+version: 0.4.2.1
+build-depends:
+  - deepseq
+  - applicative
+category: Data Structures
+description: |-
+  This package contains efficient general-purpose implementations
+  of various basic immutable container types.  The declared cost of
+  each operation is either worst-case or amortized, but remains
+  valid even if structures are shared.
+exposed-modules:
+  - Data.IntMap
+  - Data.IntSet
+  - Data.Map
+  - Data.Set
+  - Data.Graph
+  - Data.Sequence
+  - Data.Tree
+extensions:
+  - CPP
+  - DeriveDataTypeable
+  - StandaloneDeriving
+  - MagicHash
+  - Rank2Types
+extra-source-files: include/Typeable.h
+ghc-options: -O2
+options: ["-fcpp", "-Isrc/data"]
+include-dirs: include
+license: BSD3
+license-file: LICENSE
+location: http://github.com/haskell/containers.git
+synopsis: Assorted concrete container types

@@ -1,0 +1,10 @@
+name: QuickCheck
+version: 1.2.0.1
+options: -fcpp
+synopsis: "Automatic testing of Haskell programs"
+exposed-modules:
+        - Test.QuickCheck.Batch
+        - Test.QuickCheck.Poly
+        - Test.QuickCheck.Utils
+        - Test.QuickCheck
+license: BSD3

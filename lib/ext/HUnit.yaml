@@ -1,0 +1,50 @@
+---
+author: Dean Herington
+build-depends:
+  - deepseq
+build-suggestions:
+  - deepseq
+build-type: Simple
+cabal-version: '>= 1.8'
+category: Testing
+cpp-options: -DBASE4
+data-files: |-
+  doc/Guide.html
+  examples/Example.hs
+  prologue.txt
+  README
+description: |-
+  HUnit is a unit testing framework for Haskell, inspired by the
+  JUnit tool for Java, see: <http://www.junit.org>.
+exposed-modules:
+  - Test.HUnit.Base
+  - Test.HUnit.Lang
+  - Test.HUnit.Terminal
+  - Test.HUnit.Text
+  - Test.HUnit
+extensions:
+  - CPP
+extra-source-files: |-
+  HUnit.cabal.hugs
+  HUnit.cabal.tests
+  Setup.hs.hugs
+  tests/HUnitTests.hs
+  tests/HUnitTestBase.lhs
+  tests/HUnitTestExtended.hs
+  tests/HUnitTestOptimize.hs
+  tests/TerminalTest.hs
+ghc-options: -Wall
+homepage: http://hunit.sourceforge.net/
+license: BSD3
+license-file: LICENSE
+location: http://code.haskell.org/HUnit/
+maintainer: hunit@richardg.name
+name: HUnit
+stability: stable
+synopsis: A unit testing framework for Haskell
+tested-with: |-
+  GHC == 7.4.1
+  GHC == 7.4.2
+  GHC == 7.7
+type: darcs
+version: 1.2.5.2

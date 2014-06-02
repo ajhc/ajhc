@@ -3,12 +3,14 @@
 use strict;
 use warnings;
 
+use YAML;
 use LWP::Simple;
 use Cwd;
 use Getopt::Std;
+use List::MoreUtils qw/distinct/;
 
-our ($opt_l,$opt_d);
-getopts('ld') or die "unknown opt";
+our ($opt_l,$opt_d,$opt_n,$opt_v, $opt_c);
+getopts('ldn:v:c:') or die "unknown opt";
 
 # clean out environment
 delete $ENV{JHC_PATH};
@@ -26,6 +28,120 @@ sub mysystem {
     system @_ and die "Running Command Failed!";
 }
 
+sub makelibyaml {
+    my ($fn) = @_;
+    my %y;
+    #$y{Name} = $n;
+    #$y{Version} = $v;
+    open my $fd, "<", $fn or die "$!: $fn";
+    while(my $l = <$fd>) {
+        begin:
+        last unless defined $l;
+        chomp $l;
+        $l =~ s/\-\-+.*//;
+        next unless $l =~ /\S/;
+        if ($l =~ /^(\s*)([\w-]+):\s*(.*?)\s*$/) {
+            my $z = $1;
+            my ($n,$v) = ($2,$3);
+#            print YAML::Dump([$z,$n,$v]);
+            while ($l = <$fd>) {
+                chomp $l;
+                $l =~ s/\-\-+.*//;
+                next unless $l =~ /\S/;
+                $l =~ s/^$z\s+// ? $v .= "\n$l" : last;
+            }
+            $y{$n} .= "\n$v";
+            $y{$n} =~ s/^\s*//;
+            $y{$n} =~ s/\s*$//;
+            goto begin;
+        } elsif  ($l =~ /^(benchmark|test-suite|executable)\s*/) {
+            last;
+        }
+    }
+    my %z;
+    for (keys %y) {
+        $z{lc $_} = $y{$_};
+    }
+    %y = %z;
+    my $list = sub {
+        return unless exists $y{$_[0]};
+        my @ls = split(/\s*[,\n]\s*/, $y{$_[0]});
+        map { s/^\s*//; s/\s*$//; } @ls;
+        $y{$_[0]} = [ distinct @ls ];
+    };
+    $list->('exposed-modules');
+    $list->('other-modules');
+    $list->('hidden-modules');
+    $list->('build-depends');
+    $list->('extensions');
+    $y{'build-suggestions'} = $y{'build-depends'};
+    delete $y{'build-depends'};
+    $y{'build-depends'} = [grep { s/([\w-]+).*/$1/; !/^(base|integer|integer-gmp|ghc-prim|array)/ }  @{$y{'build-suggestions'}}];
+    my $res = YAML::Dump(\%y);
+    print $res;
+    return $res;
+}
+
+if ($opt_c) {
+    makelibyaml $opt_c;
+    exit(0);
+}
+
+sub fetchsource {
+    my ($name,$version) = @_;
+    my $url = "http://hackage.haskell.org/packages/archive/$name/$version/$name-$version.tar.gz";
+    print "Fetching $url\n";
+    unless(-e "$tmpdir/$name-$version.tar.gz") {
+        my $rc = getstore($url, "$tmpdir/$name-$version.tar.gz");
+        if (is_error $rc) { die "$url: $rc" } ;
+    }
+    mysystem "tar -zxv --directory $tmpdir -f $tmpdir/$name-$version.tar.gz" and die "$!: tar";
+    my $src = -d "$tmpdir/$name-$version/src" ? "/src" : "";
+    return $src;
+}
+
+my %index;
+
+sub fill_index {
+    return if %index;
+    my $url = "http://hackage.haskell.org/00-index.tar.gz";
+    unless(-e "$tmpdir/00-index.tar.gz") {
+        print "Fetching $url\n";
+        my $rc = getstore($url, "$tmpdir/00-index.tar.gz");
+        if (is_error $rc) { die "$url: $rc" } ;
+    }
+    my $res = `tar ztf $tmpdir/00-index.tar.gz`;
+    my @rs = split /\n/,$res;
+    for (@rs) {
+        my ($p,$v) = split '/';
+        $index{$p} = $v;
+    }
+#    print YAML::Dump(\%index);
+}
+
+sub fetch_package {
+    my ($name,$version) = @_;
+    if (!defined $version || $version eq 'latest') {
+        if ($version ne 'latest' && -f "lib/ext/$name.yaml") {
+            push @ARGV, "lib/ext/$name.yaml";
+            return;
+        }
+        fill_index;
+        $version = $index{$name};
+        die "could not get hackage index, specify version with -v" unless $version;
+    }
+    fetchsource($name,$version);
+    my $yl = makelibyaml "tmp/build/$name-$version/$name.cabal";
+    my $fn = "tmp/build/$name.yaml";
+    open my $fh, ">", $fn or die "$!: $fn";
+    print $fh  $yl;
+    close $fh;
+    push @ARGV, $fn;
+}
+
+if ($opt_n) {
+    fetch_package($opt_n,$opt_v);
+}
 foreach my $fn (@ARGV) {
     next unless $fn =~ /\.(cabal|yaml)$/;
     my $patch = $fn;
@@ -47,14 +163,7 @@ foreach my $fn (@ARGV) {
     print("$name-$version.hl\n"),next if $opt_l;
 
     print "Processing $fn, found $name-$version\n";
-    my $url = "http://hackage.haskell.org/packages/archive/$name/$version/$name-$version.tar.gz";
-    print "Fetching $url\n";
-    unless(-e "$tmpdir/$name-$version.tar.gz") {
-        my $rc = getstore($url, "$tmpdir/$name-$version.tar.gz");
-        if (is_error $rc) { die "$url: $rc" } ;
-    }
-    mysystem "tar -zxv --directory $tmpdir -f $tmpdir/$name-$version.tar.gz" and die "$!: tar";
-    my $src = -d "$tmpdir/$name-$version/src" ? "/src" : "";
+    my $src = fetchsource($name,$version);
     mysystem "patch -d $tmpdir/$name-$version -p1 < $patch" if -e $patch;
     mysystem("cp '$fn' '$tmpdir/$name-$version'");
     $fn =~ s/.*\///;

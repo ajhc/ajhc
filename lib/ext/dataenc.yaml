@@ -1,0 +1,42 @@
+---
+author: Magnus Therning
+build-depends:
+  - containers
+build-suggestions:
+  - array
+  - base
+  - containers
+build-type: Simple
+cabal-version: '>= 1.6'
+category: Codec
+copyright: 'Magnus Therning, 2007-2012, Gracjan Polak, 2014'
+default: False
+description: |-
+  Data encoding library currently providing Base16, Base32,
+  Base32Hex, Base64, Base64Url, Base85, Python string escaping,
+  Quoted-Printable, URL encoding, uuencode, xxencode, and yEncoding.
+exposed-modules:
+  - Codec.Binary.Base16
+  - Codec.Binary.Base32
+  - Codec.Binary.Base32Hex
+  - Codec.Binary.Base64
+  - Codec.Binary.Base64Url
+  - Codec.Binary.Base85
+  - Codec.Binary.DataEncoding
+  - Codec.Binary.PythonString
+  - Codec.Binary.QuotedPrintable
+  - Codec.Binary.Url
+  - Codec.Binary.Uu
+  - Codec.Binary.Xx
+  - Codec.Binary.Yenc
+extra-source-files: test-src/DataencUT.hs test-src/DataencQC.hs test-src/Test.hs GNUmakefile
+homepage: http://www.haskell.org/haskellwiki/Library/Data_encoding
+hs-source-dirs: src
+license: BSD3
+license-file: LICENSE
+maintainer: 'Gracjan Polak <gracjanpolak@gmail.com>'
+name: dataenc
+hidden-modules:
+  - Codec.Binary.Util
+synopsis: Data encoding library
+version: 0.14.0.7

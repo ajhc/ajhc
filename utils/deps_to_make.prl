@@ -23,6 +23,7 @@ sub pdeps {
 my @targets;
 
 foreach (@ARGV) {
+    next unless -f $_;
     my $y = YAML::LoadFile($_);
     next unless exists $y->{Target};
     my @deps;

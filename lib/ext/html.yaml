@@ -1,0 +1,19 @@
+---
+build-depends: []
+build-suggestions:
+  - base
+build-type: Simple
+category: Web
+description: |-
+  This package contains a combinator library for constructing
+  HTML documents.
+exposed-modules:
+  - Text.Html
+  - Text.Html.BlockTable
+license: BSD3
+license-file: LICENSE
+maintainer: libraries@haskell.org
+name: html
+nhc98-options: -K2M
+synopsis: HTML combinator library
+version: 1.0.1.2

@@ -1,0 +1,19 @@
+---
+author: Neil Mitchell
+bug-reports: http://hackage.haskell.org/trac/ghc/newticket?component=libraries%20%28other%29
+build-depends: []
+build-suggestions: []
+build-type: Simple
+cabal-version: '>=1.6'
+category: System
+exposed-modules:
+  - System.FilePath
+  - System.FilePath.Posix
+  - System.FilePath.Windows
+extra-source-files: System/FilePath/Internal.hs
+homepage: http://www-users.cs.york.ac.uk/~ndm/filepath/
+license: BSD3
+license-file: LICENSE
+name: filepath
+synopsis: Library for manipulating FilePaths in a cross platform way.
+version: 1.3.0.1

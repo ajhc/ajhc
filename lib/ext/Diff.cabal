@@ -1,5 +1,0 @@
-name:                Diff
-version:             0.2.0
-synopsis:            O(ND) diff algorithm in haskell.
-description:         Basic implementation of the standard diff algorithm.
-exposed-modules:   Data.Algorithm.Diff

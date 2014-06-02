@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fno-prelude #-}
+{-# OPTIONS_JHC -fno-prelude -fm4 #-}
 module Data.Ix ( Ix(range, index, inRange, rangeSize) ) where
 
 import Jhc.Int
@@ -8,6 +8,8 @@ import Jhc.Basics
 import Jhc.Num
 import Jhc.Tuples
 import Jhc.IO
+import Data.Word
+import Data.Int
 
 class  Ord a => Ix a  where
     range     :: (a,a) -> [a]
@@ -30,6 +32,22 @@ instance  Ix Char  where
         | inRange b ci  =  fromEnum ci `minus` fromEnum c
         | otherwise     =  error "Ix.index: Index out of range."
     inRange (c,c') i    =  c <= i && i <= c'
+
+m4_define(IXINST,{{
+instance Ix $1 where
+    range (m,n) = [m..n]
+    index b@(c,c') ci
+        | inRange b ci  =  fromEnum ci `minus` fromEnum c
+        | otherwise     =  error "Ix.index: Index out of range :: ($1)"
+    inRange (c,c') i    =  c <= i && i <= c'
+}})
+
+IXINST(Word8)
+IXINST(Word16)
+IXINST(Word32)
+IXINST(Int8)
+IXINST(Int16)
+IXINST(Int32)
 
 instance  Ix Int  where
     range (m,n)		= [m..n]

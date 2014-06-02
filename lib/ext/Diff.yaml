@@ -1,0 +1,27 @@
+---
+author: Sterling Clover
+build-depends:
+  - pretty
+build-suggestions:
+  - base
+  - array
+  - base
+  - pretty
+build-type: Simple
+cabal-version: '>= 1.6'
+category: Algorithms
+description: Basic implementation of the standard diff algorithm.
+exposed-modules:
+  - Data.Algorithm.Diff
+  - Data.Algorithm.DiffOutput
+ghc-options: -O2 -Wall -funbox-strict-fields
+hs-source-dirs: src
+license: BSD3
+license-file: LICENSE
+location: http://patch-tag.com/r/sclv/diff
+maintainer: s.clover@gmail.com
+name: Diff
+synopsis: O(ND) diff algorithm in haskell.
+tested-with: GHC == 6.8.2
+type: darcs
+version: 0.3.0
