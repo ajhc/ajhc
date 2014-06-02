@@ -31,12 +31,18 @@ parse opt fp s = case scanner opt s of
         wdump FD.Tokens $ do
             putStrLn "-- scanned"
             putStrLn $ unwords [ s | L _ _ s <- s ]
-        s <- doLayout opt fp s
+            let pp = preprocessLexemes opt fp s
+            putStrLn "-- preprocessed"
+            forM_ pp $ \c -> case c of
+                Token (L _ _ s) -> putStr s >> putStr " "
+                TokenNL n -> putStr ('\n':replicate (n - 1) ' ')
+                TokenVLCurly _ i -> putStr $ "{" ++ show (i - 1) ++ " "
+            putStrLn ""
+        laidOut <- doLayout opt fp s
         wdump FD.Tokens $ do
             putStrLn "-- after layout"
-            putStrLn $ unwords [ s | L _ _ s <- s ]
-            putStrLn $ unwords [ show t ++ ":" ++s | L _ t s <- s ]
-        case runP (withSrcLoc bogusASrcLoc { srcLocFileName = packString fp } $ P.parseModule s) opt of
+            putStrLn $ unwords [ s | L _ _ s <- laidOut ]
+        case runP (withSrcLoc bogusASrcLoc { srcLocFileName = packString fp } $ P.parseModule laidOut) opt of
             (ws, ~(Just p)) -> do
                 processErrors ws
                 return p { hsModuleOpt = opt }

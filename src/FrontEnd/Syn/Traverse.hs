@@ -300,8 +300,8 @@ instance (TraverseHsOps a,T.Traversable f) => TraverseHsOps (f a) where
     traverseHsOps hops xs = T.traverse (applyHsOps hops) xs
 
 maybeGetDeclName :: Monad m => HsDecl -> m Name
-maybeGetDeclName (HsPatBind sloc (HsPVar name) rhs wheres) = return (toName Val name)
-maybeGetDeclName (HsActionDecl sloc (HsPVar name) _) = return (toName Val name)
+maybeGetDeclName HsPatBind { hsDeclPat = HsPVar name } = return (toName Val name)
+maybeGetDeclName HsActionDecl { hsDeclPat = HsPVar name } = return (toName Val name)
 maybeGetDeclName (HsFunBind ((HsMatch _ name _ _ _):_)) = return (toName Val name)
 maybeGetDeclName HsDataDecl { hsDeclDeclType = DeclTypeKind, hsDeclName } = return (toName SortName hsDeclName)
 maybeGetDeclName HsDataDecl { hsDeclName = name } = return (toName TypeConstructor name)

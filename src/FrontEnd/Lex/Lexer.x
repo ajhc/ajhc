@@ -185,6 +185,7 @@ data LexemeClass
   | LPragmaStart
   -- cues to post process
   | LQReservedId
+  | LLexError
   | LEOF
   deriving (Eq,Show)
 

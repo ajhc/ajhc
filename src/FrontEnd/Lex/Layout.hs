@@ -1,5 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
-module FrontEnd.Lex.Layout(doLayout,preprocessLexemes) where
+module FrontEnd.Lex.Layout(doLayout,preprocessLexemes,Token(..)) where
 
 import Control.Applicative
 import Control.Monad.Reader
@@ -36,8 +36,8 @@ preprocessLexemes opt fn xs = toplevel xs where
     toplevel ls = case skipComments ls of
         (L _ LReservedId "module":_) -> g defaultSrcLoc defaultSrcLoc 0 ls
         (L _ _ "{":_) -> g defaultSrcLoc defaultSrcLoc 0 ls
-        (L sl  _ _:_) -> TokenVLCurly "main" (srcLocColumn sl):g defaultSrcLoc defaultSrcLoc 0 ls
-        [] -> [TokenVLCurly "main" 0]
+        (L sl  _ _:_) -> TokenVLCurly (L sl LReservedId "where") (srcLocColumn sl):g defaultSrcLoc defaultSrcLoc 0 ls
+        [] -> [TokenVLCurly (L defaultSrcLoc LReservedId "where") 0]
     g floc nloc n ls = f n ls where
         token (L cloc x y) = Token (L (srcLocRelative floc nloc cloc) x y)
 
@@ -64,6 +64,8 @@ preprocessLexemes opt fn xs = toplevel xs where
             [(L nloc LInteger num),L _ LString s] -> g SrcLoc {
                 srcLocFileName = packString (read s), srcLocLine = read num, srcLocColumn = 0 }
                     nloc { srcLocColumn = 0 } n rs
+            [(L nloc LInteger num)] -> g floc {srcLocLine = read num, srcLocColumn = 0 }
+                    nloc { srcLocColumn = 0 } n rs
             _ -> f n rs
         f n (x@(fromL -> "{-#"):(fromL -> "JHC"):xs) = f n (x:xs)
         f n (L sl _ "{-#":(fromL -> pn):xs) | Just npn <- Map.lookup pn pragmaMap = f n (L sl LPragmaStart npn:xs)
@@ -73,9 +75,9 @@ preprocessLexemes opt fn xs = toplevel xs where
             d [] = []
         f n rs@(L sl@SrcLoc { .. } _ _:_) | n /= srcLocLine =
             TokenNL srcLocColumn:f srcLocLine rs
-        f n (ls@(L _ _ s):rs@(L sl _ nv:_)) = if s `elem` layoutStarters && nv /= "{"
-            then token ls:TokenVLCurly s (srcLocColumn sl):f n rs else token ls:f n rs
-        f n [ls@(L _ _ s)] | s `elem` layoutStarters = token ls:TokenVLCurly s 0:[]
+        f n (ls@(L _ _ s):rs@(skipComments -> L sl _ nv:_)) = if s `elem` layoutStarters && nv /= "{"
+            then token ls:TokenVLCurly ls (srcLocColumn sl):f n rs else token ls:f n rs
+        f n [ls@(L _ _ s)] | s `elem` layoutStarters = token ls:TokenVLCurly ls 0:[]
         f n (r:rs) = token r:f n rs
         f _ [] = []
 
@@ -121,44 +123,62 @@ pragma _ ls = (Nothing,ls)
 
 layout :: (Applicative m,Monad m) => [Token Lexeme] -> m [Lexeme]
 layout ls = runReaderT (g ls []) bogusASrcLoc where
-    g ts@(Token (L sl _ _):rs) ctx = local (const sl) $ f ts ctx
-    g ts ctx = f ts ctx
-  --  f (TokenNL n:(Token inn@(L _ _ "in")):rs) (Layout "let" n':ls) =
-   --     ([rbrace inn,inn] ++) <$> g rs ls
---    f (TokenNL n:Token s:rs) (Layout h n':ls)
---        | s `elem` layoutContinuers = layout (Token s:rs) (Layout h (min n' n):ls)
-    f (TokenNL n:rs@(Token r:_)) ctx@(Layout _ n':ls)
-        | n == n', fromL r == "where" = (rbrace r:) <$> g (TokenNL n:rs) ls
-        | n == n' = (semi r:) <$> g rs ctx
-        | n > n' = f rs ctx
-        | n < n' = (rbrace r:) <$> g (TokenNL n:rs) ls
-    f (TokenNL _:rs) ls = g rs ls
-    f (TokenVLCurly h n:rs) (Layout h' n':ls)
+    g (TokenNL n:Token t:ts) ctx = h t $ f_nl n t ts ctx
+    g (TokenVLCurly t n:ts) ctx = h t $ f_vb n t ts ctx
+    g (Token t:ts) ctx = h t $ f t ts ctx
+    g [] (Layout _ n:ls) = liftA2 (:) rbrace' (g [] ls)
+    g [] [] = return []
+    g x y = do
+        sl <- ask
+        return [L sl LLexError (show $ show (x,y))]
+
+    h (L sl _ _) action = local (const sl) action
+
+    f_nl n l@(L _ _ "in") rs (Layout "let" n':ls) =
+        ([rbrace l,l] ++) <$> g rs ls
+    f_nl n l@(L _ _ "in") rs (NoLayout "let" _:ls) =
+        ([l] ++) <$> g rs ls
+    f_nl n l@(L _ _ "where") rs ctx@(Layout _ n':ls)
+        | n <= n' = (rbrace l:) <$> g (TokenNL n:Token l:rs) ls
+    f_nl n l rs ctx@(Layout _ n':ls)
+        | n == n' = g (Token (semi l):Token l:rs) ctx
+        | n > n' = g (Token l:rs) ctx
+        | n < n' = (rbrace l:) <$> g (TokenNL n:Token l:rs) ls
+    f_nl n t rs ls = g (Token t:rs) ls
+
+    f_vb n (L _ _ h) rs (Layout h' n':ls)
         | n >= n' = mcons lbrace' (g rs (Layout h n:Layout h' n':ls))
         | otherwise = mcons3 lbrace' rbrace' (g rs (Layout h' n':ls))
-    f (TokenVLCurly h n:rs) ls = mcons lbrace' (g rs (Layout h n:ls))
-    --f ((Token t@(L _ _ "in")):rs) ls = case ls of
-    --    Layout "let" n:ls -> mcons3 rbrace' (return t) (g rs ls)
-    --    Layout {}:ls ->  (rbrace t:) <$> g (Token t:rs) ls
-    --    ls -> (t:) `fmap` g rs ls
-    f ((Token t@(L _ _ s)):rs) (dropLayouts -> (n,Just (b,e),ls)) | s == e = do
-        rb <- rbrace'
-        liftA2 (++) (return $ replicate n rb ++ [t]) (g rs ls)
-    f ((Token t@(L _ _ s)):rs) ls | Just e <- lookup s layoutBrackets
-        = (t:) `fmap` g rs (NoLayout s e:ls)
-    f ((Token t@(L _ _ s)):rs) ls@(Layout c _:_) |
-        Just e <- lookup c conditionalBrackets >>= lookup s = (t:) `fmap` g rs (NoLayout s e:ls)
-    f (t@(Token (L _ _ ",")):rs) (Layout "let" _:NoLayout "|" e:ls) = rbrace' `mcons` g (t:rs) (NoLayout "|" e:ls)
-    f ((Token t@(L _ _ "where")):rs) ls = case ls of
-        Layout l n : rest | l `elem` ["do"]
-            -> mcons3 rbrace' (return t) (g rs rest) -- 'where' closes 'do' and 'case' on equal indentation.
-        _otherwise -> (t:) `fmap` g rs ls
-    f (Token t:rs) ls = return t `mcons` f rs ls
-    f [] (Layout _ n:ls) = liftA2 (:) rbrace' (f [] ls)
-    f [] [] = return []
-    f x y = error $ "unexpected layout: " ++ show (x,y)
+      --  | otherwise = err "implicit layout indent level must not decrease"
+    f_vb n l@(L _ _ "let") rs (NoLayout "let" _:ls) = f_vb n l rs ls
+    f_vb n (L _ _ h) rs ls = mcons lbrace' (g rs (Layout h n:ls))
+
+    f t@(L _ _ "in") rs ls = case ls of
+       Layout "let" n:ls -> mcons3 rbrace' (return t) (g rs ls)
+       NoLayout "let" _:ls ->  (t:) <$> g rs ls
+       Layout {}:ls ->  (rbrace t:) <$> g (Token t:rs) ls
+       ls -> (t:) `fmap` g rs ls
+    f t@(L _ _ s) rs (dropLayouts -> (n,Just (b,e),ls)) | s == e = do
+       rb <- rbrace'
+       liftA2 (++) (return $ replicate n rb ++ [t]) (g rs ls)
+    f t@(L _ _ s) rs ls
+       | Just e <- lookup s layoutBrackets = (t:) <$> g rs (NoLayout s e:ls)
+    f t@(L _ _ s) rs ls@(Layout c _:_) |
+       Just e <- lookup c conditionalBrackets >>= lookup s = (t:) <$> g rs (NoLayout s e:ls)
+    f t@(L _ _ s) rs ls@(NoLayout c _:_) |
+       Just e <- lookup c conditionalBrackets >>= lookup s = (t:) <$> g rs (NoLayout s e:ls)
+    f t@(L _ _ ",") rs (Layout "let" _:NoLayout "|" e:ls) = rbrace' `mcons` g (Token t:rs) (NoLayout "|" e:ls)
+    f t@(L _ _ ",") rs (Layout "let" _:ls@(NoLayout "[" e:_)) = rbrace' `mcons` g (Token t:rs) ls
+    f t@(L _ _ "where") rs ls = case ls of
+        Layout l n : rest | l `elem` ["do"] -> mcons3 rbrace' (return t) (g rs rest)
+        _otherwise -> (t:) <$> g rs ls
+    f t rs ls =  (t:) <$> g rs ls
+
     rbrace (L sl _ _) = L sl LSpecial "}"
     semi (L sl _ _) = L sl LSpecial ";"
+    err s = do
+        sl <- ask
+        fail $ show sl ++ ":unexpected layout: " ++ s
 
     mcons = liftA2 (:)
     mcons3 x y zs = liftA2 (:) x (liftA2 (:) y zs)
@@ -184,7 +204,7 @@ skipComments ls = f ls where
 -- for clarity.
 data Token t =
     Token t
-    | TokenVLCurly String !Int
+    | TokenVLCurly t !Int
     | TokenNL !Int
     deriving(Show)
 
@@ -193,8 +213,16 @@ data Context
     | Layout String !Int
     deriving(Show)
 
+{-
+data Context = Layout [(String,Int)] ContextCont
+data ContextCont = NoLayout String String Context | ContextDone
+-}
+
 dropLayouts :: [Context] -> (Int,Maybe (String,String),[Context])
-dropLayouts cs = f 0 cs where
+dropLayouts cs = g cs where
+    g (NoLayout "let" _:ls) = g ls
+    g ls = f 0 ls
+
     f n [] = (n,Nothing,[])
     f n (NoLayout b e:ls) = (n,Just (b,e),ls)
     f n (Layout {}:ls) = f (n + 1) ls
@@ -216,8 +244,11 @@ layoutBrackets = [
     ("{","}")
     ]
 
+rlayoutBrackets = [ (y,x) | (x,y) <- layoutBrackets ]
+
 conditionalBrackets = [
     ("of",[("|","->")]),
-    ("let",[("|","=")]),
-    ("[",[("|","]")])
+    ("let",[("|","=")])
+--    ("where",[("|","=")])
+--    ("[",[("|","]")])
     ]
