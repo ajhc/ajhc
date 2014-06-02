@@ -1,6 +1,9 @@
 Jhc Haskell Compiler
 ====================
 
+[***How to install***](building.shtml)
+======================================
+
 jhc is a haskell compiler which aims to produce the most efficient programs
 possible via whole program analysis and other optimizations.
 
@@ -18,7 +21,6 @@ Developing Jhc
 
  * [the development page](development.shtml) has information on how to pull the development tree from the darcs repository
  * [the bug tracker](bug) tracks known jhc issues, bugs can be added by submitting darcs patches or just posting to the mailing list jhc@haskell.org
- * [Browse The Repository](http://repetae.net/dw/darcsweb.cgi?r=jhc)
  * An informal graph of the internal code motion in jhc is [here (pdf)](big-picture.pdf).
 
 Historical

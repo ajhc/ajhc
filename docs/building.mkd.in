@@ -14,7 +14,7 @@ jhc is also distributed via a autoconf/automake style tarball. Building jhc
 has the following dependencies, many of them are included with ghc
 distributions so run ./configure first and it will report any that are missing.
 
- * GHC 6.12.1 or better
+ * GHC 7.4 or better
  * [binary](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/binary)
  * [zlib](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/zlib)
  * [utf8-string](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/utf8-string)
@@ -23,6 +23,7 @@ distributions so run ./configure first and it will report any that are missing.
  * [regex-compat](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/regex-compat)
  * [HsSyck](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/HsSyck)
  * [mtl](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/mtl)
+ * [syb](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/syb)
 
 You can get the tarball
 at <http://repetae.net/dist/@PACKAGE@-@VERSION@.tar.gz>. In order
