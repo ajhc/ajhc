@@ -11,9 +11,7 @@ module Jhc.ForeignPtr(
 
 import Jhc.Addr
 import Jhc.IO
-import Jhc.Prim.Prim
 import Jhc.Prim.Rts
-import Jhc.Type.Basic
 import Jhc.Basics
 
 type FinalizerPtr  a = FunPtr (Ptr a -> IO ())

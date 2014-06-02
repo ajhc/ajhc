@@ -48,6 +48,7 @@ import Jhc.IO
 import Jhc.Num
 import Jhc.Type.C
 import System.C.Stdio
+import System.IO.Error
 
 data BufferMode = NoBuffering | LineBuffering | BlockBuffering (Maybe Int)
     deriving(Eq, Ord, Read, Show)

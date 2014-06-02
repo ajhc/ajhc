@@ -1,13 +1,11 @@
 {-# OPTIONS_JHC -fm4 -fno-prelude -fffi #-}
 module Jhc.Inst.Order() where
 
-
 m4_include(Jhc/Order.m4)
 
 import Jhc.Order
-import Jhc.Prim
-import Jhc.Type.Word
 import Jhc.Type.C
+import Jhc.Type.Word
 
 INST_EQORDER(Int8,,Int8,)
 INST_EQORDER(Int16,,Int16,)
@@ -23,7 +21,6 @@ INST_EQORDER(Word32,,Word32,U)
 INST_EQORDER(Word64,,Word64,U)
 INST_EQORDER(WordPtr,,WordPtr,U)
 INST_EQORDER(WordMax,,WordMax,U)
-
 
 INST_EQORDER(CChar,,CChar,)
 INST_EQORDER(CUChar,,CUChar,)

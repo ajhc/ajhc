@@ -9,7 +9,6 @@ module Jhc.Prim.Options(
     ) where
 
 import Jhc.Prim.Prim
-import Jhc.Prim.Bits
 
 isBigEndian,isLittleEndian :: Bool
 isLittleEndian = case isBigEndian  of

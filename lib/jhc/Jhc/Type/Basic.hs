@@ -1,6 +1,6 @@
 module Jhc.Type.Basic(module Jhc.Type.Basic, module Jhc.Type.Word)  where
 
-import Jhc.Prim.Prim
+-- CI import Jhc.Prim.Prim
 import Jhc.Type.Word
 
 type String = [Char]

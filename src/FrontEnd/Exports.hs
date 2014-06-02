@@ -68,8 +68,16 @@ determineExports defs ae ms = do
                 putStrLn $ " -- Exports: " ++ show (modInfoName m)
                 mapM_ putStrLn (sort [ show (nameType n) ++ " " ++ show n | n <- modInfoExport m])
     mapM_ g ms
+    mapM_ checkModuleExports ms
     processIOErrors "import/export processing"
     return ms
+
+checkModuleExports :: ModInfo -> IO ()
+checkModuleExports ModInfo { modInfoHsModule = HsModule { .. } } = mapM_ f exports where
+    exports = [ m | HsEModuleContents m <- join (maybeToList hsModuleExports) ]
+    imports = hsModuleName : concat  [ hsImportDeclModule i : maybeToList (hsImportDeclAs i) | i <- hsModuleImports ]
+    f n | n `elem` imports = return ()
+    f n = do warn hsModuleSrcLoc WarnFailure $ "export of 'module " ++ show n ++ "' that is not imported."
 
 determineExports' :: [(Name,[Name])] -> [(Module,[Name])] -> [ModInfo] -> IO [ModInfo]
 determineExports' owns doneMods todoMods = mdo
