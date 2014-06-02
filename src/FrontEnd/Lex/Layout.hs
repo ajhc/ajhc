@@ -62,9 +62,9 @@ preprocessLexemes opt fn xs = toplevel xs where
         f n ((pragma "LINE") -> (Just lp,rs)) =  case lp of
             [(L _ _ "default")] -> g defaultSrcLoc defaultSrcLoc n rs
             [(L nloc LInteger num),L _ LString s] -> g SrcLoc {
-                srcLocFileName = packString (read s), srcLocLine = read num, srcLocColumn = 0 }
+                srcLocFileName = packString (read s), srcLocLine = read num - 1, srcLocColumn = 0 }
                     nloc { srcLocColumn = 0 } n rs
-            [(L nloc LInteger num)] -> g floc {srcLocLine = read num, srcLocColumn = 0 }
+            [(L nloc LInteger num)] -> g floc {srcLocLine = read num - 1, srcLocColumn = 0 }
                     nloc { srcLocColumn = 0 } n rs
             _ -> f n rs
         f n (x@(fromL -> "{-#"):(fromL -> "JHC"):xs) = f n (x:xs)
@@ -126,11 +126,11 @@ layout ls = runReaderT (g ls []) bogusASrcLoc where
     g (TokenNL n:Token t:ts) ctx = h t $ f_nl n t ts ctx
     g (TokenVLCurly t n:ts) ctx = h t $ f_vb n t ts ctx
     g (Token t:ts) ctx = h t $ f t ts ctx
-    g [] (Layout _ n:ls) = liftA2 (:) rbrace' (g [] ls)
+    g [] (dropBars -> Layout _ n:ls) = liftA2 (:) rbrace' (g [] ls)
     g [] [] = return []
     g x y = do
         sl <- ask
-        return [L sl LLexError (show $ show (x,y))]
+        return [L sl LLexError ("mismatched brackets: " ++ show (show (x,y)))]
 
     h (L sl _ _) action = local (const sl) action
 
@@ -144,6 +144,7 @@ layout ls = runReaderT (g ls []) bogusASrcLoc where
         | n == n' = g (Token (semi l):Token l:rs) ctx
         | n > n' = g (Token l:rs) ctx
         | n < n' = (rbrace l:) <$> g (TokenNL n:Token l:rs) ls
+    f_nl n l rs (dropBars -> ls@(Layout _ n':_)) | n == n' = f_nl n l rs ls
     f_nl n t rs ls = g (Token t:rs) ls
 
     f_vb n (L _ _ h) rs (Layout h' n':ls)
@@ -176,15 +177,14 @@ layout ls = runReaderT (g ls []) bogusASrcLoc where
 
     rbrace (L sl _ _) = L sl LSpecial "}"
     semi (L sl _ _) = L sl LSpecial ";"
-    err s = do
-        sl <- ask
-        fail $ show sl ++ ":unexpected layout: " ++ s
-
     mcons = liftA2 (:)
     mcons3 x y zs = liftA2 (:) x (liftA2 (:) y zs)
     rbrace' = ask >>= \sl -> return $ L sl LSpecial "}"
     lbrace' = ask >>= \sl -> return $ L sl LSpecial "{"
     --semi'   = ask >>= \sl -> return $ L sl LSpecial ";"
+
+dropBars (NoLayout "|" _:xs) = dropBars xs
+dropBars xs = xs
 
 skipComments :: [Lexeme] -> [Lexeme]
 skipComments ls = f ls where
@@ -192,10 +192,10 @@ skipComments ls = f ls where
         d (r@(L sl _ _):rs) | srcLocLine sl /= srcLocLine bsl = r:rs
         d (_:rs) = d rs
         d [] = []
-    f (L _ _ "{-#":rs) = f (d rs) where
-        d (L _ _ "#-}":rs) = rs
-        d (_:rs) = d rs
-        d [] = error "unterminated pragma"
+    f (L sl _ "{-#":rs) = f (d sl rs) where
+        d _ (L _ _ "#-}":rs) = rs
+        d _ (L sl _ _:rs) = d sl rs
+        d sl [] = [L sl LLexError "unterminated pragma"]
     f (l:ls) = l:f ls
     f [] = []
 
@@ -248,7 +248,7 @@ rlayoutBrackets = [ (y,x) | (x,y) <- layoutBrackets ]
 
 conditionalBrackets = [
     ("of",[("|","->")]),
-    ("let",[("|","=")])
---    ("where",[("|","=")])
+    ("let",[("|","=")]),
+    ("where",[("|","=")])
 --    ("[",[("|","]")])
     ]

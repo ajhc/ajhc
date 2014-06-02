@@ -69,7 +69,7 @@ GHCOPTS= $(HSOPTS) -O @GHCFLAGS@ $(GHCDEBUGOPTS) $(GHCINC) $(GHCLANG)
 LIB_OPTIONS=$(RTSOPTS) $(JHC_TEST)  -L- -L.
 include library_deps.make
 
-EXTRA_DIST = src/data rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
+EXTRA_DIST = src/data rts utils docs $(BUILT_SOURCES) \
              lib/jhc lib/jhc-prim lib/haskell-extras lib/haskell98 lib/haskell2010 lib/flat-foreign $(JHC_LIBS) $(JHC_EXT_LIBS) \
 	     src/StringTable/StringTable_cbits.c src/StringTable/StringTable_cbits.h src/cbits/md5sum.c jhc.1 \
 	     src/StringTable/Atom.hsc jhc.spec src/cbits/lookup3.c \

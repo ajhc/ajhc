@@ -153,7 +153,7 @@ decl :: { HsDecl }
     | 'foreign' 'import' ewl_var mstring '::' qualtype
                     {% doForeign $1 (vu_import:$3) $4 $6  }
     | 'foreign' wl_var mstring '::' qualtype {% doForeign $1 $2 $3 $5  }
-    | propspragma srcloc ecl_var '#-}'  { HsPragmaProps $2 $1 $3 }
+    | propspragma srcloc m_slist ecl_var '#-}'  { HsPragmaProps $2 $1 $4 }
     | 'deriving' 'instance' classhead { HsDeclDeriving $1 $3 }
     | 'default' type { HsDefaultDecl $1 $2 }
     | rulecatalyst rules '#-}' {
@@ -165,6 +165,10 @@ decl :: { HsDecl }
                       { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = nameName u_instance , hsDeclType = $4
                                            , hsDeclUniq = error "hsDeclUniq not set"  } }
 #maybe con
+#maybe slist
+
+slist :: { [HsExp] }
+    : '[' ecl_exp ']' { $2 }
 
 rulecatalyst ::  { Bool }
     : 'RULE' { False }
@@ -528,6 +532,9 @@ srcloc :: { SrcLoc } :       {%^ \ (L sl _ _) -> return sl }
 
 happyError [] = do
     addWarn ParseError "parse error at EOF"
+    parseNothing
+happyError (L sl LLexError t:_) = do
+    warn sl ParseError $ "lexer error " ++ show t
     parseNothing
 happyError (L sl _ t:_) = do
     warn sl ParseError $ "parse error at " ++ show t
