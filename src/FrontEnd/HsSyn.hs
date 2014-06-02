@@ -19,8 +19,6 @@ type LHsPat = Located HsPat
 
 type HsBangType = HsBangType' HsType
 type HsContext = [HsAsst]
-type HsGuardedRhs = HsGuardedRhs' HsExp
-type HsRhs = HsRhs' HsExp
 
 type HsName = Name
 type HsFieldUpdate = HsField HsExp
@@ -215,13 +213,8 @@ data HsBangType' a
 	 | HsUnBangedTy { hsBangType :: a }
   deriving(Eq,Show,Functor,Ord,Traversable,Foldable)
 
-data HsRhs' a
-	 = HsUnGuardedRhs a
-	 | HsGuardedRhss  [HsGuardedRhs' a]
-  deriving(Eq,Show,Functor,Ord,Traversable,Foldable)
-
-data HsGuardedRhs' a = HsGuardedRhs SrcLoc a a
-  deriving(Eq,Show,Functor,Ord,Traversable,Foldable)
+data HsRhs = HsUnGuardedRhs HsExp | HsGuardedRhss [HsComp]
+  deriving(Eq,Show,Ord)
 
 data HsQualType = HsQualType {
     hsQualTypeContext :: HsContext,
@@ -327,7 +320,7 @@ data HsExp
     | HsLeftSection HsExp HsExp
     | HsRightSection HsExp HsExp
     | HsDo { hsExpStatements :: [HsStmt] }
-    | HsListComp HsExp [HsStmt]
+    | HsListComp { hsExpComp :: HsComp }
     -- removed after fixity
     | HsWords    { hsExpExps :: [HsExp] }  -- precedence parser does applications
     | HsParen    HsExp
@@ -369,6 +362,12 @@ data HsPat
 
 data HsField a = HsField Name a
     deriving(Eq,Ord,Show,Functor,Traversable,Foldable)
+
+data HsComp = HsComp {
+    hsCompSrcLoc :: SrcLoc,
+    hsCompStmts :: [HsStmt],
+    hsCompBody  :: HsExp
+    } deriving(Eq,Ord,Show)
 
 data HsStmt
     = HsGenerator SrcLoc HsPat HsExp

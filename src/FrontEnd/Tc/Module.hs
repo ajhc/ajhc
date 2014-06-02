@@ -9,6 +9,7 @@ import qualified Data.Set as Set
 
 import DataConstructors
 import DerivingDrift.Drift
+import Doc.PPrint
 import Doc.PPrint as PPrint
 import FrontEnd.Class
 import FrontEnd.DataConsAssump     (dataConsEnv)
@@ -21,13 +22,12 @@ import FrontEnd.Infix
 import FrontEnd.KindInfer
 import FrontEnd.Rename
 import FrontEnd.SrcLoc
+import FrontEnd.Syn.Traverse
 import FrontEnd.Tc.Main
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
 import FrontEnd.TypeSigs           (collectSigs, listSigsToSigEnv)
 import FrontEnd.TypeSynonyms
-import FrontEnd.TypeSyns
-import FrontEnd.Utils
 import FrontEnd.Warning
 import Ho.Type
 import Info.Types
@@ -37,6 +37,7 @@ import Options
 import Util.Gen
 import Util.Inst()
 import Util.SetLike
+import qualified Doc.DocLike as D
 import qualified FlagDump as FD
 import qualified FrontEnd.HsPretty as HsPretty
 
@@ -302,3 +303,6 @@ tiModules htc ms = do
         }
     processIOErrors "module typechecking"
     return (hoEx,tiData)
+
+pprintEnvMap :: (PPrint d k, PPrint d a) => Map.Map k a -> d
+pprintEnvMap m = D.vcat [ pprint x D.<+> D.text "::" D.<+> pprint y | (x,y) <- Map.toList m ]

@@ -4,7 +4,6 @@ module FrontEnd.Lex.Lexer (scanner,Lexeme(..),LexemeClass(..),AlexPosn(..)) wher
 
 import Control.Monad
 import Data.Word (Word8)
-import FrontEnd.Lexer(Token(..))
 import FrontEnd.SrcLoc
 import Name.Name
 import Options

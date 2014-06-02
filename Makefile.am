@@ -4,7 +4,7 @@ bin_PROGRAMS = jhc
 
 jhc_SOURCES = src/Main.hs $(HSFILES) $(BUILT_SOURCES) $(HSBOOT) $(DRIFTFILES)
 
-BUILT_SOURCES= src/RawFiles.hs src/FrontEnd/HsParser.hs src/FlagDump.hs \
+BUILT_SOURCES= src/RawFiles.hs src/FlagDump.hs \
 	       src/FlagOpts.hs src/Name/Prim.hs src/Info/Properties.hs $(DRIFTFILES) \
 	       src/FrontEnd/Lex/Parser.hs src/FrontEnd/Lex/Lexer.hs
 
@@ -19,11 +19,11 @@ HSFILES=src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/
 	src/E/Show.hs src/E/Subst.hs src/E/Traverse.hs src/E/TypeAnalysis.hs src/E/Values.hs src/E/WorkerWrapper.hs \
 	src/FindFixpoint.hs src/Fixer/Fixer.hs src/Fixer/Supply.hs src/Fixer/VMap.hs src/FlagDump.hs src/FlagOpts.hs \
 	src/FrontEnd/DataConsAssump.hs src/FrontEnd/DeclsDepends.hs src/FrontEnd/DependAnalysis.hs src/FrontEnd/Desugar.hs \
-	src/FrontEnd/Diagnostic.hs src/FrontEnd/FrontEnd.hs src/FrontEnd/HsErrors.hs src/FrontEnd/HsParser.hs \
-	src/FrontEnd/HsPretty.hs src/FrontEnd/Infix.hs src/FrontEnd/Lexer.hs src/FrontEnd/ParseMonad.hs src/FrontEnd/ParseUtils.hs \
+	src/FrontEnd/Diagnostic.hs src/FrontEnd/FrontEnd.hs src/FrontEnd/HsErrors.hs \
+	src/FrontEnd/HsPretty.hs src/FrontEnd/Infix.hs \
 	src/FrontEnd/Rename.hs src/FrontEnd/Syn/Options.hs src/FrontEnd/Syn/Traverse.hs src/FrontEnd/Tc/Class.hs src/FrontEnd/Tc/Main.hs \
 	src/FrontEnd/Tc/Module.hs src/FrontEnd/Tc/Type.hs src/FrontEnd/Tc/Unify.hs src/FrontEnd/TypeSigs.hs src/FrontEnd/TypeSynonyms.hs\
-	src/FrontEnd/TypeSyns.hs src/FrontEnd/Unlit.hs src/FrontEnd/Utils.hs src/FrontEnd/Warning.hs src/GenUtil.hs src/Grin/DeadCode.hs\
+	src/FrontEnd/Unlit.hs src/FrontEnd/Warning.hs src/GenUtil.hs src/Grin/DeadCode.hs\
 	src/Grin/Devolve.hs src/Grin/EvalInline.hs src/Grin/FromE.hs src/Grin/Grin.hs src/Grin/HashConst.hs src/Grin/Lint.hs\
 	src/Grin/NodeAnalyze.hs src/Grin/Noodle.hs src/Grin/Optimize.hs src/Grin/Show.hs src/Grin/Val.hs \
 	src/Grin/Whiz.hs src/Ho/Binary.hs src/Ho/Collected.hs src/Ho/Library.hs src/Info/Binary.hs src/Info/Info.hs src/Info/Properties.hs \

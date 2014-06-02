@@ -17,14 +17,12 @@ module FrontEnd.KindInfer (
     getConstructorKinds
     ) where
 
-import Control.Applicative(Applicative)
-import Control.Monad.Identity
-import Control.Monad.Reader
+import Util.Std
 import Control.Monad.Writer
+import Control.Monad.Reader
 import Data.Binary
 import Data.Generics(Typeable, everything, mkQ)
 import Data.IORef
-import Data.List
 import System.IO.Unsafe
 import Util.Inst()
 import qualified Data.Map as Map
@@ -35,9 +33,9 @@ import Doc.DocLike hiding ((<>))
 import Doc.PPrint
 import FrontEnd.HsSyn
 import FrontEnd.SrcLoc
+import FrontEnd.Syn.Traverse
 import FrontEnd.Tc.Kind
 import FrontEnd.Tc.Type
-import FrontEnd.Utils
 import FrontEnd.Warning
 import Name.Name
 import Options
@@ -77,7 +75,7 @@ instance DocLike d =>  PPrint d KindEnv where
         [ pprint x <+> text "=>" <+> pprint y | (x,y) <- Map.toList m] ++
         [ text "associated type" <+> pprint n <+> pprint ab  | (n,ab) <- Map.toList ev] ++
         [ text "class" <+> pprint n <+> pprint ab  | (n,ab) <- Map.toList cs] ++
-        [empty]
+        [Doc.DocLike.empty]
 
 --------------------------------------------------------------------------------
 
@@ -445,7 +443,7 @@ kiDecl d = withSrcLoc (srcLoc d) (f d) where
             newClassBodies = map typeFromSig $ filter isHsTypeSig sigsAndDefaults
             typeFromSig (HsTypeSig _sloc _names qualType) = qualType
             typeFromSig _ = error "KindInfer.typeFromSig: bad."
-            g (HsTyVar n') | hsNameToOrig n' == hsNameToOrig classArg = Seq.singleton (toName TypeVal n')
+            g (HsTyVar n') | removeUniquifier n' == removeUniquifier classArg = Seq.singleton (toName TypeVal n')
             g _ = mempty
         carg <- lookupKind KindSimple (toName TypeVal classArg)
         mapM_ (\n -> lookupKind KindSimple n >>= unify carg ) rn

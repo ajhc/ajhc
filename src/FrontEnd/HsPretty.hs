@@ -418,12 +418,12 @@ instance DL.DocLike d => P.PPrint d HsKind where
 ppHsRhs :: HsRhs -> Doc
 ppHsRhs (HsUnGuardedRhs exp) = equals <+> ppHsExp exp
 ppHsRhs (HsGuardedRhss guardList) =
-	myVcat . map ppHsGuardedRhs $ guardList
+	myVcat . map (ppHsGuardedRhs equals) $ guardList
 
-ppHsGuardedRhs :: HsGuardedRhs -> Doc
-ppHsGuardedRhs (HsGuardedRhs pos guard body) =
+ppHsGuardedRhs :: Doc -> HsComp -> Doc
+ppHsGuardedRhs equals (HsComp pos guard body) =
 	       myFsep [ char '|',
-		      ppHsExp guard,
+                      hsep $ punctuate comma $ map ppHsStmt guard,
 		      equals,
 		      ppHsExp body]
 
@@ -519,7 +519,7 @@ ppHsExp (HsEnumFromThen from thenE) =
 ppHsExp (HsEnumFromThenTo from thenE to) =
 	bracketList [ppHsExp from <> comma, ppHsExp thenE,
 			text "..", ppHsExp to]
-ppHsExp (HsListComp exp stmtList) =
+ppHsExp (HsListComp (HsComp _ stmtList exp)) =
 	bracketList ([ppHsExp exp, char '|']
 		++ (punctuate comma . map ppHsStmt $ stmtList))
 ppHsExp (HsExpTypeSig pos exp ty) =
@@ -580,8 +580,7 @@ ppGAlts :: HsRhs -> Doc
 ppGAlts (HsUnGuardedRhs exp) = text "->" <+> ppHsExp exp
 ppGAlts (HsGuardedRhss altList) = myVcat . map ppGAlt $ altList
 
-ppGAlt (HsGuardedRhs pos exp body) =
-	 myFsep [char '|', ppHsExp exp, text "->", ppHsExp body]
+ppGAlt c = ppHsGuardedRhs (text "->") c
 
 ------------------------- Statements in monads & list comprehensions -----
 ppHsStmt :: HsStmt -> Doc

@@ -12,7 +12,6 @@ import FrontEnd.Class
 import FrontEnd.HsSyn
 import FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse
-import FrontEnd.Utils(maybeGetDeclName)
 import FrontEnd.Warning
 import GenUtil(hasRepeatUnder)
 import Name.Name

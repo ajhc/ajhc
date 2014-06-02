@@ -47,9 +47,9 @@ import Doc.PPrint
 import FrontEnd.HsSyn
 import FrontEnd.KindInfer
 import FrontEnd.SrcLoc
+import FrontEnd.Syn.Traverse
 import FrontEnd.Tc.Kind
 import FrontEnd.Tc.Type
-import FrontEnd.Utils
 import FrontEnd.Warning
 import Name.Names
 import Options (verbose)
@@ -157,7 +157,7 @@ qualifyMethod :: [HsAsst] -> HsDecl -> HsDecl
 qualifyMethod ~[HsAsst c [n]] ~(HsTypeSig sloc names (HsQualType oc t))
     = HsTypeSig sloc names (HsQualType (HsAsst c [n']:oc) t) where
         Just n' = (something (mkQ mzero f)) t
-        f (HsTyVar n') | hsNameToOrig n' == hsNameToOrig n = return n'
+        f (HsTyVar n') | removeUniquifier n' == removeUniquifier n = return n'
         f _ = mzero
 
 printClassSummary :: ClassHierarchy -> IO ()

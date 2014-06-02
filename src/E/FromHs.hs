@@ -695,7 +695,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
         convertMatches bs pg els
 
     cGuard (HsUnGuardedRhs e) = liftM const $ cExpr e
-    cGuard (HsGuardedRhss (HsGuardedRhs _ g e:gs)) = do
+    cGuard (HsGuardedRhss (HsComp _ ~[HsQualifier g] e:gs)) = do
         g <- cExpr g
         e <- cExpr e
         fg <- cGuard (HsGuardedRhss gs)
@@ -713,8 +713,8 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
     lp  p e  =  error $ "unsupported pattern:" <+> tshow p  <+> tshow e
     cRhs sl (HsUnGuardedRhs e) = cExpr e
     cRhs sl (HsGuardedRhss []) = error "HsGuardedRhss: empty"
-    cRhs sl (HsGuardedRhss gs@(HsGuardedRhs _ _ e:_)) = f gs where
-        f (HsGuardedRhs _ g e:gs) = join $ liftM3 createIf (cExpr g) (cExpr e) (f gs)
+    cRhs sl (HsGuardedRhss gs@(HsComp _ _ e:_)) = f gs where
+        f (HsComp _ ~[HsQualifier g] e:gs) = join $ liftM3 createIf (cExpr g) (cExpr e) (f gs)
         f [] = do
             e <- cExpr e
             return $ ump sl $ getType e

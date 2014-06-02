@@ -514,9 +514,9 @@ instance Rename HsRhs where
     rename (HsUnGuardedRhs hsExp) = HsUnGuardedRhs <$> rename hsExp
     rename (HsGuardedRhss rs) = HsGuardedRhss <$> rename rs
 
-instance Rename HsGuardedRhs where
-    rename (HsGuardedRhs srcLoc e1 e2) = withSrcLoc srcLoc $
-        HsGuardedRhs srcLoc <$> rename e1 <*> rename e2
+instance Rename HsComp where
+    rename (HsComp srcLoc e1 e2) = withSrcLoc srcLoc $
+        HsComp srcLoc <$> rename e1 <*> rename e2
 
 f_fromRational = HsVar (toUnqualified v_fromRational)
 
@@ -581,13 +581,13 @@ instance Rename HsExp where
     rename (HsEnumFromThen hsExp1 hsExp2) = desugarEnum vu_enumFromThen [hsExp1, hsExp2]
     rename (HsEnumFromThenTo hsExp1 hsExp2 hsExp3) = desugarEnum vu_enumFromThenTo [hsExp1, hsExp2, hsExp3]
    -- rename (HsList []) = return $ HsCon dc_EmptyList
-    rename orig@(HsListComp hsExp hsStmts) = do
+    rename orig@(HsListComp (HsComp sl hsStmts hsExp)) = withSrcLoc sl $ do
         (ss,e) <- renameHsStmts hsStmts (rename hsExp)
         sugar <- flagOpt FO.Sugar
         if sugar
         then listCompToExp newVar e ss
         else do eWarn "list comprehension desugaring disabled by -fno-sugar"
-                return $ HsListComp e ss
+                return $ HsListComp $ HsComp sl ss e
     rename (HsExpTypeSig srcLoc hsExp hsQualType) = do
         hsExp' <- rename hsExp
         updateWith hsQualType $ do
@@ -667,68 +667,6 @@ buildRecUpdate fm n us = do
     as <- mapM g rs
     pe <- createError HsErrorRecordUpdate "Record Update Error"
     return $ HsCase n (as ++ [HsAlt sl HsPWildCard (HsUnGuardedRhs pe) []])
-
-{-
-buildRecPat :: FieldMap -> Name -> [HsPatField] -> RM HsPat
-buildRecPat (FieldMap amp fls) n us = case mlookup n amp of
-    Nothing -> failRename $ "Unknown Constructor: " ++ show n
-    Just t -> do
-        let (dotDotList,fieldLabels) = partition (u_DotDot ==) [ n | HsField n _ <- us ]
-            hasDotDot = not $ null dotDotList
-        when (hasDuplicates fieldLabels) $ do
-            failRename "Duplicate field labels in pattern"
-        when hasDotDot $ do
-            failRename "Wildcard pattern not supported"
-        let f (HsField n _) | n == u_DotDot = return []
-            f (HsField x p) = case mlookup x fls of
-                Nothing -> failRename $ "Field Label does not exist: " ++ show x
-                Just cs -> case lookup n cs of
-                    Nothing -> failRename $ "Field Label does not belong to constructor: " ++ show (x,n)
-                    Just i -> return [(i,HsPParen p)]
-        fm <- concat <$> mapM f us
-        let g i | Just e <- lookup i fm = return e
-                | otherwise = do
-                    v <- newVar
-                    return $ HsPVar v
-        rs <- mapM g [0 .. t - 1 ]
-        return $ HsPApp n rs
-
-buildRecConstr ::  FieldMap -> Name -> [HsFieldUpdate] -> RM HsExp
-buildRecConstr (FieldMap amp fls) n us = do
-    undef <- createError HsErrorUninitializedField "Uninitialized Field"
-    case mlookup n amp of
-        Nothing -> failRename $ "Unknown Constructor: " ++ show n
-        Just t -> do
-            let f (HsField x e) = case  mlookup (toName FieldLabel x) fls of
-                    Nothing -> failRename $ "Field Label does not exist: " ++ show x
-                    Just cs -> case lookup n [ (x,(y)) | (x,y) <- cs ] of
-                        Nothing -> failRename $ "Field Label does not belong to constructor: " ++ show (x,n)
-                        Just i -> return (i,hsParen e)
-            fm <- mapM f us
-            let rs = map g [0 .. t - 1 ]
-                g i | Just e <- lookup i fm = e
-                    | otherwise = undef
-            return $ foldl HsApp (HsCon n) rs
-
-buildRecUpdate ::  FieldMap -> HsExp -> [HsFieldUpdate] -> RM HsExp
-buildRecUpdate (FieldMap amp fls) n us = do
-        sl <- getSrcLoc
-        let f (HsField x e) = case  mlookup (toName FieldLabel x) fls of
-                Nothing -> failRename $ "Field Label does not exist: " ++ show x
-                Just cs -> return [ (x,(y,hsParen e)) | (x,y) <- cs ]
-        fm <- liftM concat $ mapM f us
-        let fm' = sortGroupUnderFG fst snd fm
-        let g (c,zs) = case mlookup c amp of
-                Nothing -> failRename $ "Unknown Constructor: " ++ show n
-                Just t -> do
-                    vars <- replicateM (fromIntegral t) newVar
-                    let vars' = (map HsVar vars)
-                    let x = foldl HsApp (HsCon c) [ maybe v id (lookup i zs) | v <- vars' | i <- [ 0 .. t - 1] ]
-                    return $ HsAlt sl (HsPApp c (map HsPVar vars))  (HsUnGuardedRhs x) []
-        as <- mapM g fm'
-        pe <- createError HsErrorRecordUpdate "Record Update Error"
-        return $ HsCase n (as ++ [HsAlt sl HsPWildCard (HsUnGuardedRhs pe) []])
--}
 
 instance Rename HsAlt where
     rename (HsAlt srcLoc hsPat hsGuardedAlts {-where-} hsDecls) = withSrcLoc srcLoc $ do
@@ -988,6 +926,12 @@ instance DeNameable HsAlt where
     deName mod (HsAlt sl p rhs ds) = HsAlt sl (dn p) (dn rhs) ds where
         dn x = deName mod x
 
+instance DeNameable HsRhs where
+    deName mod (HsUnGuardedRhs e) = HsUnGuardedRhs (deName mod e)
+    deName mod (HsGuardedRhss es) = HsGuardedRhss (deName mod es)
+instance DeNameable HsComp where
+    deName mod c = runIdentity $ traverseHsExp (return . deName mod) c
+
 instance DeNameable HsExp where
     deName mod e = f e where
         dn :: DeNameable b => b -> b
@@ -1051,7 +995,7 @@ listCompToExp newName exp ss = hsParen `liftM` f ss where
         npvar <- newName
         ss' <- f ss
         let kase = HsCase (HsVar npvar) [a1, a2 ]
-            a1 =  HsAlt srcLoc pat (HsGuardedRhss [HsGuardedRhs srcLoc q ss']) []
+            a1 =  HsAlt srcLoc pat (HsGuardedRhss [HsComp srcLoc [HsQualifier q] ss']) []
             a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs $ HsList []) []
         return $ hsParen $ HsVar v_concatMap `app`  HsLambda srcLoc [HsPVar npvar] kase `app`  e
     f ((HsGenerator srcLoc pat e):ss) | isFailablePat pat || Nothing == g ss = do

@@ -7,9 +7,8 @@ module Ho.ReadSource(
    parseHsSource
 ) where
 
-import Control.Monad
+import Util.Std
 import Data.Char
-import Data.Maybe
 import System.FilePath as FP
 import System.Process
 import qualified Data.ByteString as BS
@@ -18,9 +17,7 @@ import qualified Data.ByteString.Lazy.UTF8 as LBSU
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import FrontEnd.HsParser
 import FrontEnd.HsSyn
-import FrontEnd.ParseMonad
 import FrontEnd.SrcLoc
 import FrontEnd.Syn.Options
 import FrontEnd.Unlit
@@ -126,13 +123,8 @@ parseHsSource options fn lbs = do
     unless ogood $
         warn (bogusASrcLoc { srcLocFileName = packString fn })
             UnknownOption "Invalid options in OPTIONS pragma"
-    if fopts' fileOpts' FO.NewParser
-    then do
-        p <- FLP.parse fileOpts' fn s'
-        return (p,LBSU.fromString s')
-    else case runParserWithMode (parseModeOptions fileOpts') { parseFilename = fn } parse  s'  of
-                      (ws,ParseOk e) -> processErrors ws >> return (e { hsModuleOpt = fileOpts' },LBSU.fromString s')
-                      (_,ParseFailed sl err) -> putErrDie $ show sl ++ ": " ++ err
+    p <- FLP.parse fileOpts' fn s'
+    return (p,LBSU.fromString s')
 
 fetchCompilerFlags :: IO (FilePath,     -- ^ file path to compiler
                           [String])     -- ^ compiler arguments

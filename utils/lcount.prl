@@ -1,0 +1,16 @@
+#!/usr/bin/perl
+use strict;
+my $lines = 0;
+while(<>) {
+    if (/^M\s+(\S+)\s+(-\d+)\s+\+(\d+)/) {
+        print "$1 ", $2 + $3, "\n";
+        $lines += $2;
+        $lines += $3;
+    } elsif (/^R\s+(\S+)/) {
+        my $l = `wc -l "tmp/jhc/$1"`;
+        print "$1 ", $l, "\n";
+        $lines -= $l;
+    }
+}
+
+print $lines,"\n";

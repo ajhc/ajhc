@@ -3,6 +3,7 @@ module FrontEnd.TypeSynonyms (
     declsToTypeSynonyms,
     TypeSynonyms,
     restrictTypeSynonyms,
+    expandTypeSyns,
     showSynonyms,
     showSynonym
     ) where
@@ -75,6 +76,12 @@ removeSynonymsFromType :: (Applicative m,MonadSrcLoc m, MonadWarn m) => TypeSyno
 removeSynonymsFromType syns t = do
     sl <- getSrcLoc
     evalTypeSyms sl syns t
+
+expandTypeSyns :: (TraverseHsOps a,MonadWarn m) => TypeSynonyms -> a -> m a
+expandTypeSyns syns m =  runSLM (applyHsOps ops m) where
+    ops = (hsOpsDefault ops) { opHsDecl, opHsType = removeSynonymsFromType syns } where
+        opHsDecl td@HsTypeDecl {} = return td
+        opHsDecl d = traverseHsOps ops d
 
 quantifyHsType :: [HsName] -> HsQualType -> HsType
 quantifyHsType inscope t

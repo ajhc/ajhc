@@ -43,9 +43,6 @@ profile enable profiling code in generated executable
 debug enable debugging code in generated executable
 raw just evaluate main to WHNF and nothing else.
 
-!Experimental
-new-parser use new parser based on different layout rule.
-
 !Default settings
-@default inline-pragmas rules wrapper defaulting type-analysis monomorphism-restriction global-optimize full-int prelude new-parser sugar
+@default inline-pragmas rules wrapper defaulting type-analysis monomorphism-restriction global-optimize full-int prelude sugar
 @glasgow-exts forall ffi unboxed-tuples

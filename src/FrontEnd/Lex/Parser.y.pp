@@ -263,15 +263,15 @@ rhs :: { HsRhs }
     : '=' exp   { HsUnGuardedRhs $2 }
     | wl_gdrh   { HsGuardedRhss $1 }
 
-gdrh :: { HsGuardedRhs }
-      : '|' exp '=' exp        { HsGuardedRhs $1 $2 $4 }
+gdrh :: { HsComp }
+      : '|' exp '=' exp        { HsComp $1 [HsQualifier $2] $4 }
 
 rhs_case :: { HsRhs }
     : '->' exp      { HsUnGuardedRhs $2 }
     | wl_gdrh_case  { HsGuardedRhss $1 }
 
-gdrh_case :: { HsGuardedRhs }
-      : '|' exp '->' exp        { HsGuardedRhs $1 $2 $4 }
+gdrh_case :: { HsComp }
+      : '|' exp '->' exp        { HsComp $1 [HsQualifier $2] $4 }
 
 assoc :: { (SrcLoc,HsAssoc) }
     : 'infix'  { ($1,HsAssocNone) }
@@ -405,7 +405,7 @@ optwhere :: { [HsDecl] }
 
 list :: { HsExp }
     : ecl_exp                 { HsList $1 }
-    | exp '|' cl_stmt         { HsListComp $1 $3 }
+    | exp '|' cl_stmt         { HsListComp HsComp { hsCompSrcLoc = $2, hsCompBody = $1, hsCompStmts = $3 }  }
     | cl_exp '..'             {% case $1 of
         [x]   -> return $ HsEnumFrom x
         [x,y] -> return $ HsEnumFromThen x y

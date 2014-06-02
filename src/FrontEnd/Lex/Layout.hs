@@ -123,8 +123,8 @@ layout :: (Applicative m,Monad m) => [Token Lexeme] -> m [Lexeme]
 layout ls = runReaderT (g ls []) bogusASrcLoc where
     g ts@(Token (L sl _ _):rs) ctx = local (const sl) $ f ts ctx
     g ts ctx = f ts ctx
-    f (TokenNL n:(Token inn@(L _ _ "in")):rs) (Layout "let" n':ls) =
-        ([rbrace inn,inn] ++) <$> g rs ls
+  --  f (TokenNL n:(Token inn@(L _ _ "in")):rs) (Layout "let" n':ls) =
+   --     ([rbrace inn,inn] ++) <$> g rs ls
 --    f (TokenNL n:Token s:rs) (Layout h n':ls)
 --        | s `elem` layoutContinuers = layout (Token s:rs) (Layout h (min n' n):ls)
     f (TokenNL n:rs@(Token r:_)) ctx@(Layout _ n':ls)
@@ -137,6 +137,10 @@ layout ls = runReaderT (g ls []) bogusASrcLoc where
         | n >= n' = mcons lbrace' (g rs (Layout h n:Layout h' n':ls))
         | otherwise = mcons3 lbrace' rbrace' (g rs (Layout h' n':ls))
     f (TokenVLCurly h n:rs) ls = mcons lbrace' (g rs (Layout h n:ls))
+    --f ((Token t@(L _ _ "in")):rs) ls = case ls of
+    --    Layout "let" n:ls -> mcons3 rbrace' (return t) (g rs ls)
+    --    Layout {}:ls ->  (rbrace t:) <$> g (Token t:rs) ls
+    --    ls -> (t:) `fmap` g rs ls
     f ((Token t@(L _ _ s)):rs) (dropLayouts -> (n,Just (b,e),ls)) | s == e = do
         rb <- rbrace'
         liftA2 (++) (return $ replicate n rb ++ [t]) (g rs ls)
@@ -144,10 +148,6 @@ layout ls = runReaderT (g ls []) bogusASrcLoc where
         = (t:) `fmap` g rs (NoLayout s e:ls)
     f ((Token t@(L _ _ s)):rs) ls@(Layout c _:_) |
         Just e <- lookup c conditionalBrackets >>= lookup s = (t:) `fmap` g rs (NoLayout s e:ls)
-    f ((Token t@(L _ _ "in")):rs) ls = case ls of
-        Layout "let" n:ls -> mcons3 rbrace' (return t) (g rs ls)
-        Layout {}:ls ->  (rbrace t:) <$> g (Token t:rs) ls
-        ls -> (t:) `fmap` g rs ls
     f (t@(Token (L _ _ ",")):rs) (Layout "let" _:NoLayout "|" e:ls) = rbrace' `mcons` g (t:rs) (NoLayout "|" e:ls)
     f ((Token t@(L _ _ "where")):rs) ls = case ls of
         Layout l n : rest | l `elem` ["do"]
@@ -199,53 +199,6 @@ dropLayouts cs = f 0 cs where
     f n (NoLayout b e:ls) = (n,Just (b,e),ls)
     f n (Layout {}:ls) = f (n + 1) ls
 
-    {-
-
-layout :: [Token] -> [Context] -> [Token]
-layout (TokenNL n:Token "in":rs) (Layout "let" n':ls) = rbrace:Token "in":layout rs ls
-layout (TokenNL n:Token s:rs) (Layout h n':ls)
-    | s `elem` layoutContinuers = layout (Token s:rs) (Layout h (min n' n):ls)
-layout (TokenNL n:rs) (Layout h n':ls)
-    | n == n' = semi:layout rs (Layout h n':ls)
-    | n > n' = layout rs (Layout h n':ls)
-    | n < n' = rbrace:layout (TokenNL n:rs) ls
-layout (TokenNL _:rs) ls = layout rs ls
-layout (TokenVLCurly h n:rs) (Layout h' n':ls)
-    | n > n' = lbrace:layout rs (Layout h n:Layout h' n':ls)
-    | otherwise = lbrace : rbrace : layout rs (Layout h' n':ls)
-layout (TokenVLCurly h n:rs) ls = lbrace:layout rs (Layout h n:ls)
-layout (t@(Token s):rs) (dropLayouts -> (n,Just (b,e),ls)) | s == e
-    = replicate n rbrace ++ t:layout rs ls
-layout (t@(Token s):rs) ls | Just e <- lookup s layoutBrackets
-    = t:layout rs (NoLayout s e:ls)
-layout (t@(Token s):rs) ls@(Layout c _:_) |
-    Just e <- lookup c conditionalBrackets >>= lookup s = t:layout rs (NoLayout s e:ls)
-layout (t@(Token "in"):rs) ls = case ls of
-    Layout "let" n:ls -> rbrace:t:layout rs ls
-    ls -> t:layout rs ls
-layout (t@(Token ","):rs) (Layout "let" _:NoLayout "|" e:ls) = rbrace:layout (t:rs) (NoLayout "|" e:ls)
-layout (t@(Token "where"):rs) ls = case ls of
-    Layout l n : rest | l `elem` ["do","of"]
-        -> rbrace : t : layout rs rest -- 'where' closes 'do' and 'case' on equal indentation.
-    _otherwise -> t : layout rs ls
-
-layout (t:rs) ls = t:layout rs ls
-layout [] (Layout _ n:ls) = rbrace:layout [] ls
-layout [] [] = []
-layout x y = error $ "unexpected layout: " ++ show (x,y)
-
--- unwind all pending layouts
-dropLayouts :: [Context] -> (Int,Maybe (String,String),[Context])
-dropLayouts cs = f 0 cs where
-    f n [] = (n,Nothing,[])
-    f n (NoLayout b e:ls) = (n,Just (b,e),ls)
-    f n (Layout {}:ls) = f (n + 1) ls
-
-semi = Token ";"
-lbrace = Token "{"
-rbrace = Token "}"
--}
-
 layoutStarters   = ["where","let","of","do"]
 
 -- these symbols will never close a layout.
@@ -256,6 +209,7 @@ layoutBrackets = [
     ("case","of"),
     ("if","then"),
     ("then","else"),
+    ("let","in"),
     ("(",")"),
     ("(#","#)"),
     ("[","]"),

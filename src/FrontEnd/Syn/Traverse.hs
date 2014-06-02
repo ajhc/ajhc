@@ -1,8 +1,8 @@
 {-# OPTIONS_GHC -fwarn-unused-matches  -fwarn-incomplete-patterns -fwarn-type-defaults #-}
 module FrontEnd.Syn.Traverse where
 
-import Control.Applicative
 import Control.Monad.Writer
+import Util.Std
 import qualified Data.Set as Set
 import qualified Data.Traversable as T
 
@@ -11,11 +11,6 @@ import FrontEnd.SrcLoc
 import Name.Name
 import Support.FreeVars
 import Util.Inst()
-
---instance FreeVars HsType (Set.Set HsName) where
---    freeVars t = execWriter (f t) where
---        f (HsTyVar v) = tell (Set.singleton v)
---        f t = traverseHsType_ f t
 
 instance FreeVars HsType (Set.Set Name) where
     freeVars t = execWriter (f t) where
@@ -29,130 +24,12 @@ traverse_ fn x = fn x *> pure x
 traverseHsExp_ :: (Monad m,Applicative m,MonadSetSrcLoc m) => (HsExp -> m ()) -> HsExp -> m ()
 traverseHsExp_ fn e = traverseHsExp (traverse_ fn) e *> pure ()
 
-traverseHsExp :: (Monad m,MonadSetSrcLoc m) => (HsExp -> m HsExp) -> HsExp -> m HsExp
-traverseHsExp fn e = f e where
-    fns = mapM fn
-    f e@HsVar {} = return e
-    f e@HsCon {} = return e
-    f e@HsLit {} = return e
-    f e@HsError {} = return e
-    f (HsInfixApp hsExp1 hsExp2 hsExp3) = do
-        hsExp1' <- fn hsExp1
-        hsExp2' <- fn hsExp2
-        hsExp3' <- fn hsExp3
-        return (HsInfixApp hsExp1' hsExp2' hsExp3')
-    f (HsApp hsExp1 hsExp2)  = do
-        hsExp1' <- fn hsExp1
-        hsExp2' <- fn hsExp2
-        return (HsApp hsExp1' hsExp2')
-    f (HsNegApp hsExp)  = do
-        hsExp' <- fn hsExp
-        return (HsNegApp hsExp')
-    f (HsLambda srcLoc hsPats hsExp) = withSrcLoc srcLoc $ do
-        hsExp' <- fn hsExp
-        return (HsLambda srcLoc hsPats hsExp')
-    f (HsIf hsExp1 hsExp2 hsExp3)  = do
-        hsExp1' <- fn hsExp1
-        hsExp2' <- fn hsExp2
-        hsExp3' <- fn hsExp3
-        return (HsIf hsExp1' hsExp2' hsExp3')
-    f (HsTuple hsExps)  = do
-        hsExps' <- fns hsExps
-        return (HsTuple hsExps')
-    f (HsUnboxedTuple hsExps)  = do
-        hsExps' <- fns hsExps
-        return (HsUnboxedTuple hsExps')
-    f (HsList hsExps)  = do
-        hsExps' <- fns hsExps
-        return (HsList hsExps')
-    f (HsParen hsExp)  = do
-        hsExp' <- fn hsExp
-        return (HsParen hsExp')
-    f (HsLeftSection hsExp1 hsExp2)  = do
-        hsExp1' <- fn hsExp1
-        hsExp2' <- fn hsExp2
-        return (HsLeftSection hsExp1' hsExp2')
-    f (HsRightSection hsExp1 hsExp2)  = do
-        hsExp1' <- fn hsExp1
-        hsExp2' <- fn hsExp2
-        return (HsRightSection hsExp1' hsExp2')
-    f (HsEnumFrom hsExp)  = do
-        hsExp' <- fn hsExp
-        return (HsEnumFrom hsExp')
-    f (HsEnumFromTo hsExp1 hsExp2)  = do
-        hsExp1' <- fn hsExp1
-        hsExp2' <- fn hsExp2
-        return (HsEnumFromTo hsExp1' hsExp2')
-    f (HsEnumFromThen hsExp1 hsExp2)  = do
-        hsExp1' <- fn hsExp1
-        hsExp2' <- fn hsExp2
-        return (HsEnumFromThen hsExp1' hsExp2')
-    f (HsEnumFromThenTo hsExp1 hsExp2 hsExp3)  = do
-        hsExp1' <- fn hsExp1
-        hsExp2' <- fn hsExp2
-        hsExp3' <- fn hsExp3
-        return (HsEnumFromThenTo hsExp1' hsExp2' hsExp3')
-    f (HsExpTypeSig srcLoc hsExp hsQualType)  = withSrcLoc srcLoc $ do
-        hsExp' <- fn hsExp
-        return (HsExpTypeSig srcLoc hsExp' hsQualType)
-    f (HsAsPat hsName hsExp)  = do
-        hsExp' <- fn hsExp
-        return (HsAsPat hsName hsExp')
-    f (HsWildCard x) = do return (HsWildCard x)
-    f (HsIrrPat hsExp)  = do
-        hsExp' <- fnl hsExp
-        return (HsIrrPat hsExp')
-    f (HsBangPat hsExp)  = do
-        hsExp' <- fnl hsExp
-        return (HsBangPat hsExp')
-    f (HsRecConstr n fus) = do
-        fus' <- mapM (T.mapM fn) fus
-        return $ HsRecConstr n fus'
-    f (HsRecUpdate e fus) = do
-        fus' <- mapM (T.mapM fn) fus
-        e' <- fn e
-        return $ HsRecUpdate e' fus'
-    f (HsLocatedExp le) = HsLocatedExp `liftM` fnl le
-    f (HsLet hsDecls hsExp)  = do
-        ds <- mapM (traverseHsDeclHsExp fn) hsDecls
-        e <- fn hsExp
-        return $ HsLet ds e
-    f (HsDo hsStmts)  = HsDo `liftM` mapM (traverseHsStmtHsExp fn) hsStmts
-    f (HsWords ws) = HsWords <$> T.traverse fn ws
-    f (HsBackTick e) = HsBackTick <$> fn e
-    f h = error $ "FrontEnd.Syn.Traverse.traverseHsExp f unrecognized construct: " ++ show h
-    fnl (Located l e) = withSrcSpan l $ Located l `liftM` fn e
-
-    {-
--- not done
-    f (HsRecUpdate hsExp hsFieldUpdates)  = do
-        hsExp' <- fn hsExp
-        hsFieldUpdates' <- renameHsFieldUpdates hsFieldUpdates
-        return (HsRecUpdate hsExp' hsFieldUpdates')
-    fn (HsRecConstr hsName hsFieldUpdates)  = do
-        hsName' <- renameHsName hsName   -- do I need to change this name?
-        hsFieldUpdates' <- renameHsFieldUpdates hsFieldUpdates
-        return (HsRecConstr hsName' hsFieldUpdates')
---    fn (HsCase hsExp hsAlts)  = do
---        hsExp' <- fn hsExp
---        hsAlts' <- renameHsAlts hsAlts
---        return (HsCase hsExp' hsAlts')
---    fn (HsDo hsStmts)  = do
---        let e = doToExp hsStmts
---        fn e
-        --(hsStmts',_) <- renameHsStmts hsStmts
-        --return (doToExp hsStmts')
-    fn (HsListComp hsExp hsStmts)  = do
-        (hsStmts',') <- renameHsStmts hsStmts
-        hsExp' <- fn hsExp '
-        return (HsListComp hsExp' hsStmts')
-    fn (HsLet hsDecls hsExp)  = do
-        ' <- updateSubTableWithHsDecls  hsDecls LetFun
-        hsDecls' <- renameHsDecls hsDecls '
-        hsExp' <- fn hsExp '
-        return (HsLet hsDecls' hsExp')
-
--}
+traverseHsExp :: (Monad m,MonadSetSrcLoc m,TraverseHsOps e) => (HsExp -> m HsExp) -> e -> m e
+traverseHsExp fn e = traverseHsOps ops e where
+    ops = (hsOpsDefault ops) { opHsExp, opHsPat, opHsType } where
+            opHsExp e = fn e
+            opHsPat p = return p
+            opHsType t = return t
 
 traverseHsType_ :: Applicative m => (HsType -> m b) -> HsType -> m ()
 traverseHsType_ fn p = traverseHsType (traverse_ fn) p *> pure ()
@@ -189,92 +66,14 @@ doQual hsTyForall f vs qt = cr <$> cntx <*> f (hsQualTypeType qt) where
 traverseHsPat_ :: (Monad m,Applicative m,MonadSetSrcLoc m) => (HsPat -> m b) -> HsPat -> m ()
 traverseHsPat_ fn p = traverseHsPat (traverse_ fn) p *> pure ()
 
-traverseHsPat :: (Monad m,MonadSetSrcLoc m) => (HsPat -> m HsPat) -> HsPat -> m HsPat
-traverseHsPat fn p = f p where
-    f p@HsPVar {} = return p
-    f p@HsPLit {} = return p
-    f (HsPNeg hsPat)  = do
-          hsPat' <- fn hsPat
-          return (HsPNeg hsPat')
-    f (HsPInfixApp hsPat1 hsName hsPat2)  = do
-          hsPat1' <- fn hsPat1
-          hsPat2' <- fn hsPat2
-          return (HsPInfixApp hsPat1' hsName hsPat2')
-    f (HsPApp hsName hsPats)  = do
-          hsPats' <- mapM fn hsPats
-          return (HsPApp hsName hsPats')
-    f (HsPTuple hsPats)  = do
-          hsPats' <- mapM fn hsPats
-          return (HsPTuple hsPats')
-    f (HsPUnboxedTuple hsPats)  = do
-          hsPats' <- mapM fn hsPats
-          return (HsPUnboxedTuple hsPats')
-    f (HsPList hsPats)  = do
-          hsPats' <- mapM fn hsPats
-          return (HsPList hsPats')
-    f (HsPParen hsPat)  = do
-          hsPat' <- fn hsPat
-          return (HsPParen hsPat')
-    f (HsPAsPat hsName hsPat)  = do
-          hsPat' <- fn hsPat
-          return (HsPAsPat hsName hsPat')
-    f HsPWildCard  = do return HsPWildCard
-    f (HsPIrrPat hsPat)  = do
-          hsPat' <- fnl hsPat
-          return (HsPIrrPat hsPat')
-    f (HsPBangPat hsPat)  = do
-          hsPat' <- fnl hsPat
-          return (HsPBangPat hsPat')
-    f (HsPTypeSig srcLoc hsPat qt) = withSrcLoc srcLoc $ do
-          hsPat' <- fn hsPat
-          return (HsPTypeSig srcLoc hsPat' qt)
-    f (HsPRec hsName hsPatFields)  = do
-          hsPatFields' <- mapM (T.mapM fn) hsPatFields
-          return (HsPRec hsName hsPatFields')
-    f p@HsPatExp {} = return p
-    f (HsPatWords ws) = HsPatWords <$> mapM fn ws
-    f (HsPatBackTick ws) = HsPatBackTick <$> fn ws
-    fnl (Located l e) = withSrcSpan l (Located l `liftM` fn e)
-
-traverseHsRhsHsExp :: (Monad m,MonadSetSrcLoc m) => (HsExp -> m HsExp) -> HsRhs -> m HsRhs
-traverseHsRhsHsExp fn d = f d where
-    f (HsUnGuardedRhs a1) = HsUnGuardedRhs `liftM` fn a1
-    f (HsGuardedRhss a1) = HsGuardedRhss `liftM` mapM g a1
-    g (HsGuardedRhs sl a1 a2) = HsGuardedRhs sl `liftM` fn a1 `ap` fn a2
-
-traverseHsStmtHsExp :: (Monad m,MonadSetSrcLoc m) => (HsExp -> m HsExp) -> HsStmt -> m HsStmt
-traverseHsStmtHsExp fn d = f d where
-    f (HsGenerator sl p e) = withSrcLoc sl $ HsGenerator sl p `liftM` fn e
-    f (HsQualifier e) = HsQualifier `liftM` fn e
-    f (HsLetStmt ds) = HsLetStmt `liftM` mapM (traverseHsDeclHsExp fn) ds
+traverseHsPat :: (Monad m,MonadSetSrcLoc m,TraverseHsOps e) => (HsPat -> m HsPat) -> e -> m e
+traverseHsPat fn e = traverseHsOps ops e where
+    ops = (hsOpsDefault ops) { opHsPat, opHsType } where
+        opHsPat p = fn p
+        opHsType t = return t
 
 traverseHsDeclHsExp :: (Monad m,MonadSetSrcLoc m) => (HsExp -> m HsExp) -> HsDecl -> m HsDecl
-traverseHsDeclHsExp fn d = f d where
-    f (HsPatBind srcLoc hsPat hsRhs {-where-} hsDecls) = withSrcLoc srcLoc $ do
-        hsDecls'  <- mapM (traverseHsDeclHsExp fn) hsDecls
-        hsRhs'    <- traverseHsRhsHsExp fn hsRhs
-        return (HsPatBind srcLoc hsPat hsRhs' {-where-} hsDecls')
-    f (HsActionDecl sl p e) = withSrcLoc sl $ do
-        e <- fn e
-        return $ HsActionDecl sl p e
---    f (HsFunBind hsMatches)  = do
---        hsMatches'     <- mapM (traverseHsMatchHsExp fn) hsMatches
---        return (HsFunBind hsMatches')
-    f (HsClassDecl srcLoc hsQualType hsDecls)  = withSrcLoc srcLoc $ do
-        hsDecls'  <- mapM (traverseHsDeclHsExp fn) hsDecls
-        return (HsClassDecl srcLoc hsQualType hsDecls')
-    f decl@(HsClassAliasDecl { hsDeclSrcLoc = sl})  = withSrcLoc sl $ do
-        hsDecls'  <- mapM (traverseHsDeclHsExp fn) (hsDeclDecls decl)
-        return (decl { hsDeclDecls = hsDecls' })
-    f (HsInstDecl srcLoc hsQualType hsDecls)  = withSrcLoc srcLoc $ do
-        hsDecls'  <- mapM (traverseHsDeclHsExp fn) hsDecls
-        return (HsInstDecl srcLoc hsQualType hsDecls')
---    f prules@HsPragmaRules { hsDeclSrcLoc = srcLoc, hsDeclFreeVars = fvs, hsDeclLeftExpr = e1, hsDeclRightExpr = e2 }  = withSrcLoc srcLoc $ do
---        fvs' <- sequence [ fmapM (`renameHsType` ) t  >>= return . (,) n | (n,t) <- fvs]
---        e1' <- renameHsExp e1
---        e2' <- renameHsExp e2
---        return prules {  hsDeclFreeVars = fvs', hsDeclLeftExpr = e1', hsDeclRightExpr = e2' }
-    f otherHsDecl = return otherHsDecl
+traverseHsDeclHsExp fn d = traverseHsExp fn d
 
 getNamesFromHsPat :: HsPat -> [Name]
 getNamesFromHsPat p = execWriter (getNamesFromPat p) where
@@ -297,20 +96,7 @@ data HsOps m = HsOps {
     opHsExp   :: HsExp  -> m HsExp,
     opHsPat   :: HsPat  -> m HsPat,
     opHsType  :: HsType -> m HsType,
-    opHsStmt  :: HsStmt -> m HsStmt,
-    opHsList  :: HsOps' [] m,
-    opHsMaybe :: HsOps' Maybe m
-    }
-
--- allow specialization on traversables via the same trick used for showing
--- lists of chars different than other lists.
-data HsOps' f m = HsOps' {
-    opHsDecl' :: f HsDecl -> m (f HsDecl),
-    opHsExp'  :: f HsExp  -> m (f HsExp),
-    opHsPat'  :: f HsPat  -> m (f HsPat),
-    opHsType' :: f HsType -> m (f HsType),
-    opHsStmt' :: f HsStmt -> m (f HsStmt),
-    opHsOps'  :: HsOps m
+    opHsStmt  :: HsStmt -> m HsStmt
     }
 
 -- | provides a default hsOps that recurses further down the tree for undeclared
@@ -330,54 +116,8 @@ hsOpsDefault hops = HsOps { .. } where
     opHsPat  = f
     opHsStmt = f
     opHsType = f
-    opHsList = HsOps' {
-        opHsDecl' = T.traverse opHsDecl,
-        opHsExp'  = T.traverse opHsExp,
-        opHsPat'  = T.traverse opHsPat,
-        opHsStmt' = T.traverse opHsStmt,
-        opHsType' = T.traverse opHsType,
-        opHsOps'  = hops
-        }
-    opHsMaybe = HsOps' {
-        opHsDecl' = T.traverse opHsDecl,
-        opHsExp'  = T.traverse opHsExp,
-        opHsPat'  = T.traverse opHsPat,
-        opHsStmt' = T.traverse opHsStmt,
-        opHsType' = T.traverse opHsType,
-        opHsOps'  = hops
-        }
-
--- hsOpsSetList :: (Applicative m, MonadSetSrcLoc m) => HsOps' [] m -> HsOps' [] m
--- hsOpsSetList hops = HsOps { .. } where
---     f x = traverseHsOps hops x
---     opHsDecl = f
---     opHsExp  = f
---     opHsPat  = f
---     opHsStmt = f
---     opHsType = f
---     opHsList = HsOps' {
---         opHsDecl' = T.traverse opHsDecl,
---         opHsExp'  = T.traverse opHsExp,
---         opHsPat'  = T.traverse opHsPat,
---         opHsStmt' = T.traverse opHsStmt,
---         opHsType' = T.traverse opHsType,
---         opHsOps'  = hops
---         }
---     opHsMaybe = HsOps' {
---         opHsDecl' = T.traverse opHsDecl,
---         opHsExp'  = T.traverse opHsExp,
---         opHsPat'  = T.traverse opHsPat,
---         opHsStmt' = T.traverse opHsStmt,
---         opHsType' = T.traverse opHsType,
---         opHsOps'  = hops
---         }
 
 class TraverseHsOps a where
-    -- experimental traversable overloading.
-    applyHsOps'  :: (MonadSetSrcLoc m,Applicative m,T.Traversable f) =>
-        HsOps' f m -> f a -> m (f a)
-    applyHsOps' HsOps' { .. } fa = T.traverse (applyHsOps opHsOps') fa
-
     -- act on the direct children of the argument.
     traverseHsOps :: (Applicative m,MonadSetSrcLoc m) => HsOps m -> a -> m a
     -- act on the argument itself or its children.
@@ -385,8 +125,8 @@ class TraverseHsOps a where
     applyHsOps os x = traverseHsOps os x
 
 instance TraverseHsOps HsAlt where
-    traverseHsOps HsOps { .. } (HsAlt sl p rhs ds) =
-        HsAlt sl <$> opHsPat p <*> T.traverse opHsExp rhs <*> T.traverse opHsDecl ds
+    traverseHsOps ops@HsOps { .. } (HsAlt sl p rhs ds) =
+        HsAlt sl <$> opHsPat p <*> applyHsOps ops rhs <*> T.traverse opHsDecl ds
 
 instance TraverseHsOps HsModule where
     traverseHsOps  HsOps { .. } HsModule { .. } = cr <$> T.traverse opHsDecl hsModuleDecls
@@ -498,6 +238,13 @@ instance TraverseHsOps HsAsst where
     traverseHsOps HsOps { .. } (HsAsstEq a b) = HsAsstEq <$> opHsType a <*> opHsType b
     traverseHsOps _ x = pure x
 
+instance TraverseHsOps HsComp where
+    traverseHsOps ops HsComp { .. } = h <$> applyHsOps ops hsCompStmts <*> applyHsOps ops hsCompBody where
+        h hsCompStmts hsCompBody = HsComp { .. }
+instance TraverseHsOps HsRhs where
+    traverseHsOps ops (HsUnGuardedRhs rhs) = HsUnGuardedRhs <$> applyHsOps ops rhs
+    traverseHsOps ops (HsGuardedRhss rhss) = HsGuardedRhss <$> applyHsOps ops rhss
+
 instance TraverseHsOps HsStmt where
     applyHsOps = opHsStmt
     traverseHsOps hops@HsOps { .. } x = f x where
@@ -515,7 +262,7 @@ instance TraverseHsOps HsExp where
         f (HsExpTypeSig srcLoc e hsQualType) = HsExpTypeSig srcLoc <$> fn e <*> fn hsQualType
         f (HsLambda srcLoc hsPats e)         = HsLambda srcLoc <$> fn hsPats <*> fn e
         f (HsLet hsDecls e)                  = HsLet <$> fn hsDecls <*> fn e
-        f (HsListComp e ss)                  = HsListComp <$> fn e <*> fn ss
+        f (HsListComp c)                     = HsListComp <$> fn c
         f (HsRecConstr n fus)                = HsRecConstr n <$> fn fus
         f (HsRecUpdate e fus)                = HsRecUpdate <$> fn e <*> fn fus
         -- only exp
@@ -549,16 +296,20 @@ instance TraverseHsOps HsExp where
 instance TraverseHsOps e => TraverseHsOps (Located e) where
     traverseHsOps hops (Located l e) = withSrcSpan l (Located l <$> applyHsOps hops e)
 
---        f e = traverseHsExp opHsExp e
-
---instance TraverseHsOps a => TraverseHsOps [a] where
---    applyHsOps hops xs = applyHsOps' (opHsList hops) xs
---    traverseHsOps hops xs = T.traverse (applyHsOps hops) xs
---instance TraverseHsOps a => TraverseHsOps (Maybe a) where
---    applyHsOps hops xs = applyHsOps' (opHsMaybe hops) xs
---    traverseHsOps hops xs = T.traverse (applyHsOps hops) xs
 instance (TraverseHsOps a,T.Traversable f) => TraverseHsOps (f a) where
     traverseHsOps hops xs = T.traverse (applyHsOps hops) xs
 
---instance TraverseHsOps a => TraverseHsOps (HsField a) where
---    traverseHsOps hops x = T.traverse (traverseHsOps hops) x
+maybeGetDeclName :: Monad m => HsDecl -> m Name
+maybeGetDeclName (HsPatBind sloc (HsPVar name) rhs wheres) = return (toName Val name)
+maybeGetDeclName (HsActionDecl sloc (HsPVar name) _) = return (toName Val name)
+maybeGetDeclName (HsFunBind ((HsMatch _ name _ _ _):_)) = return (toName Val name)
+maybeGetDeclName HsDataDecl { hsDeclDeclType = DeclTypeKind, hsDeclName } = return (toName SortName hsDeclName)
+maybeGetDeclName HsDataDecl { hsDeclName = name } = return (toName TypeConstructor name)
+maybeGetDeclName HsClassDecl { hsDeclClassHead = h } = return $ toName ClassName $ hsClassHead h
+maybeGetDeclName x@HsForeignDecl {} = return $ toName Val $ hsDeclName x
+maybeGetDeclName (HsForeignExport _ e _ _)   = return $ ffiExportName e
+--maybeGetDeclName (HsTypeSig _ [n] _ ) = return n
+maybeGetDeclName d = fail  $ "getDeclName: could not find name for a decl: " ++ show d
+
+getDeclName :: HsDecl -> Name
+getDeclName d =  runIdentity $ maybeGetDeclName d

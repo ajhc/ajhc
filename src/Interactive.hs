@@ -12,19 +12,16 @@ import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
 import FrontEnd.Desugar(desugarHsStmt)
-import FrontEnd.HsParser(parseHsStmt)
 import FrontEnd.HsPretty()
 import FrontEnd.HsSyn
 import FrontEnd.KindInfer
-import FrontEnd.ParseMonad
 import FrontEnd.Rename
 import FrontEnd.Tc.Class
 import FrontEnd.Tc.Main
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
 import FrontEnd.TypeSigs
-import FrontEnd.TypeSynonyms(showSynonym)
-import FrontEnd.TypeSyns
+import FrontEnd.TypeSynonyms(showSynonym,expandTypeSyns)
 import FrontEnd.Warning
 import GenUtil
 import Ho.Type
@@ -151,10 +148,11 @@ interact cho = mre where
 kindShow (KBase b) = pprint b
 kindShow x = parens (pprint x)
 
+parseStmt s  = fail "no parser"
 parseStmt ::  Monad m => String -> m HsStmt
-parseStmt s = case snd $ runParserWithMode (parseModeOptions options) { parseFilename = "(jhci)" } parseHsStmt  s  of
-                      ParseOk e -> return e
-                      ParseFailed sl err -> fail $ show sl ++ ": " ++ err
+--parseStmt s = case snd $ runParserWithMode (parseModeOptions options) { parseFilename = "(jhci)" } parseHsStmt  s  of
+--                      ParseOk e -> return e
+--                      ParseFailed sl err -> fail $ show sl ++ ": " ++ err
 
 printStatement stmt = do
         liftIO $ putStrLn $ HsPretty.render $ HsPretty.ppHsStmt $  stmt

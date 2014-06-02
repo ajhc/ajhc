@@ -18,7 +18,6 @@ import FrontEnd.DependAnalysis(debugBindGroups)
 import FrontEnd.HsSyn
 import FrontEnd.Rename(unRename)
 import FrontEnd.Syn.Traverse
-import FrontEnd.Utils(getDeclName)
 import Name.Name
 
 --------------------------------------------------------------------------------
@@ -59,9 +58,9 @@ getRhsDeps :: HsRhs -> [HsName]
 getRhsDeps (HsUnGuardedRhs e) = getExpDeps e
 getRhsDeps (HsGuardedRhss rhss) = foldr (++) [] (map getGuardedRhsDeps rhss)
 
-getGuardedRhsDeps :: HsGuardedRhs -> [HsName]
-getGuardedRhsDeps (HsGuardedRhs _sloc guardExp rhsExp)
-   = getExpDeps guardExp ++ getExpDeps rhsExp
+getGuardedRhsDeps :: HsComp -> [HsName]
+getGuardedRhsDeps (HsComp _sloc guardExp rhsExp)
+   = concatMap getStmtDeps guardExp ++ getExpDeps rhsExp
 
 getExpDeps :: HsExp -> [HsName]
 getExpDeps e = execWriter (expDeps e)
@@ -75,7 +74,7 @@ expDeps (HsCase e alts) = do
     tell $ foldr (++) [] (map getAltDeps alts)
 expDeps (HsDo stmts) = do
     tell $ foldr (++) [] (map getStmtDeps stmts)
-expDeps (HsListComp e stmts) = do
+expDeps (HsListComp (HsComp _ stmts e)) = do
     expDeps e
     tell $ foldr (++) [] (map getStmtDeps stmts)
 expDeps e = traverseHsExp_ expDeps e
@@ -91,9 +90,9 @@ getGuardedAltsDeps (HsUnGuardedRhs e) = getExpDeps e
 
 getGuardedAltsDeps (HsGuardedRhss gAlts) = foldr (++) [] (map getGAltsDeps gAlts)
 
-getGAltsDeps :: HsGuardedRhs -> [HsName]
-getGAltsDeps (HsGuardedRhs _sloc e1 e2)
-   = getExpDeps e1 ++
+getGAltsDeps :: HsComp -> [HsName]
+getGAltsDeps (HsComp _sloc e1 e2)
+   = concatMap getStmtDeps e1 ++
      getExpDeps e2
 
 getStmtDeps :: HsStmt -> [HsName]

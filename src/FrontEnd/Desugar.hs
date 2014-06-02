@@ -109,7 +109,7 @@ replaceVarNamesInPat name p = f p where
 --    f name p = error $ "replaceVarNamesInPat: " ++ show (name,p)
 
 desugarRhs :: HsRhs -> PatSM HsRhs
-desugarRhs  = traverseHsRhsHsExp desugarExp
+desugarRhs  = traverseHsExp desugarExp
 
 desugarExp :: HsExp -> PatSM HsExp
 desugarExp (HsLambda sloc pats e)
@@ -143,10 +143,6 @@ desugarExp (HsCase e alts) = do
     newAlts <- mapM desugarAlt alts
     return (HsCase newE newAlts)
 desugarExp (HsDo stmts) = HsDo `liftM` mapM desugarStmt stmts
-desugarExp (HsListComp e stmts) = do
-    e <- desugarExp e
-    stmts <- mapM desugarStmt stmts
-    return (HsListComp e stmts)
 desugarExp e = traverseHsExp desugarExp e
 
 desugarAlt :: (HsAlt) -> PatSM (HsAlt)

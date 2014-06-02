@@ -18,15 +18,14 @@ import FrontEnd.HsPretty
 import FrontEnd.HsSyn
 import FrontEnd.KindInfer
 import FrontEnd.SrcLoc
+import FrontEnd.Syn.Traverse
 import FrontEnd.Tc.Class
 import FrontEnd.Tc.Kind
 import FrontEnd.Tc.Monad hiding(listenPreds)
 import FrontEnd.Tc.Type
 import FrontEnd.Tc.Unify
-import FrontEnd.Utils(getDeclName,maybeGetDeclName)
 import FrontEnd.Warning
 import GenUtil
-import Name.Name
 import Name.Names
 import Name.VConsts
 import Options
@@ -381,17 +380,20 @@ tcAlt scrutinee typ alt@(HsAlt sloc pat gAlts wheres) = do
             gas <- mapM (tcGuardedAlt typ) as
             return (HsAlt sloc pat' (HsGuardedRhss gas) wheres')
 
-tcGuardedAlt typ gAlt@(HsGuardedRhs sloc eGuard e) = withContext (locMsg sloc "in the guarded alternative" $ render $ ppGAlt gAlt) $ do
+tcGuardedAlt typ gAlt@(HsComp sloc ~[HsQualifier eGuard] e) = withContext (locMsg sloc "in the guarded alternative" $ render $ ppGAlt gAlt) $ do
     typ <- evalType typ
     g' <- tcExpr eGuard tBool
     e' <- tcExpr e typ
-    return  (HsGuardedRhs sloc g' e')
+    return  (HsComp sloc [HsQualifier g'] e')
 
+tcGuardedRhs = tcGuardedAlt
+{-
 tcGuardedRhs typ gAlt@(HsGuardedRhs sloc eGuard e) = withContext (locMsg sloc "in the guarded alternative" $ render $ ppHsGuardedRhs gAlt) $ do
     typ <- evalType typ
     g' <- tcExpr eGuard tBool
     e' <- tcExpr e typ
     return  (HsGuardedRhs sloc g' e')
+    -}
 
 -- Typing Patterns
 
