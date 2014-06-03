@@ -129,6 +129,13 @@ CTYPE :: { String } :  'CTYPE' STRING '#-}'  { $2 }
 decl :: { HsDecl }
     : exp0 srcloc rhs optwhere  {% checkValDef $2 $1 $3 $4 }
     | cl_var '::' qualtype { HsTypeSig $2 $1 $3 }
+    | 'type' con ewl_atype mkind  { HsTypeFamilyDecl {
+            hsDeclSrcLoc = $1,
+            hsDeclFamily = False,
+            hsDeclData = False,
+            hsDeclName = $2,
+            hsDeclTArgs = $3,
+            hsDeclHasKind = $4 } }
     | 'type' con ewl_atype '=' type
                       { HsTypeDecl {
                         hsDeclSrcLoc = $1,
@@ -167,6 +174,10 @@ decl :: { HsDecl }
 #maybe con
 #maybe slist
 #maybe semi ';'
+
+mkind :: { Maybe HsKind }
+    : '::' kind { Just $2 }
+    | { Nothing }
 
 slist :: { [HsExp] }
     : '[' ecl_exp ']' { $2 }
@@ -338,6 +349,7 @@ atype :: { HsType }
     | var                    { HsTyVar (nameTyLevel_s typeLevel $1) }
     | '(' '->' ')'           { HsTyCon $ quoteName tc_Arrow }
     | '(' ')'                { HsTyTuple [] }
+    | '(' type '::' kind ')' { HsTyExpKind (lspan $1 $3 $2) $4 }
     | '[' ']'                { HsTyCon $ quoteName tc_List }
     | '(' cl2_type ')'       { HsTyTuple $2 }
     | '(#' ecl_type '#)'     { HsTyUnboxedTuple $2 }
@@ -546,6 +558,7 @@ x `cat` y = HsWords [x,y]
 
 eloc p e =  HsLocatedExp (Located (srcSpan p) e)
 espan p1 p2 e =  HsLocatedExp (Located (SrcSpan p1 p2) e)
+lspan p1 p2 e =  (Located (SrcSpan p1 p2) e)
 withSpan p1 p2 e =  withSrcSpan (SrcSpan p1 p2) e
 
 tuple_con_name i = quoteName $ name_TupleConstructor termLevel (i + 1)

@@ -39,7 +39,9 @@ typeVars t = execWriter $ f t where
 
 hsDecl :: (MonadSetSrcLoc m,MonadSrcLoc m, MonadWarn m) => Context -> HsDecl -> m ()
 hsDecl cntx decl = withSrcLoc (srcLoc decl) $ f cntx decl where
-    f _ d@HsTypeFamilyDecl { } = do
+    f _ d@HsTypeFamilyDecl { hsDeclFamily = True } = do
+        warn (srcLoc d) UnsupportedFeature "Type families currently not supported"
+    f TopLevel d@HsTypeFamilyDecl { hsDeclFamily = False, hsDeclHasKind = Nothing } = do
         warn (srcLoc d) UnsupportedFeature "Type families currently not supported"
     f l d@HsTypeDecl { } | l /= TopLevel= do
         warn (srcLoc d) UnsupportedFeature "Type families currently not supported"

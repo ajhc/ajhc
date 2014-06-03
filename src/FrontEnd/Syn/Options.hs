@@ -1,12 +1,12 @@
 module FrontEnd.Syn.Options(parseOptions) where
 
-import Char
-import List
+import Data.Char
+import Data.List
 import Text.ParserCombinators.ReadP
 
 parseOptions :: String -> [(String,String)]
 parseOptions s = case readP_to_S parse s of
-    os -> head $ sortBy (\x y -> compare (negate $ length x) (negate $ length y)) [ x | (x,_) <- os ]
+        os -> head $ sortBy (\x y -> compare (negate $ length x) (negate $ length y)) [ x | (x,_) <- os ]
 
 token x = x >>= \r -> spaces >> return r
 

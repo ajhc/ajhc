@@ -1,6 +1,5 @@
 module Ho.Library(
     LibDesc(..),
-    readDescFile,
     collectLibraries,
     libModMap,
     libHash,
@@ -13,20 +12,12 @@ module Ho.Library(
     listLibraries
     ) where
 
-import Control.Monad
-import Data.Char
-import Data.List
-import Data.Maybe
-import Data.Monoid
+import Util.Std
 import Data.Version
-import Data.Yaml.Syck
 import System.Directory
 import Text.Printf
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import qualified System.FilePath as FP
 
 import Ho.Binary
 import Ho.ReadSource
@@ -36,8 +27,6 @@ import Options
 import PackedString(PackedString,packString,unpackPS)
 import Util.Gen
 import Util.YAML
-import qualified FlagDump as FD
-import qualified FlagOpts as FO
 import qualified Support.MD5 as MD5
 
 libModMap = hoModuleMap . libHoLib
@@ -169,57 +158,3 @@ collectLibraries libs = ans where
         let mbad = Map.toList $ Map.filter (\c -> case c of [_] -> False; _ -> True)  $ Map.fromListWith (++) [ (m,[l]) | l <- ms, m <- fst $ libModules l]
         forM_ mbad $ \ (m,l) -> putErrLn $ printf "Module '%s' is exported by multiple libraries: %s" (show m) (show $ map libName l)
         unless (null mbad) $ putErrDie "There were conflicting modules!"
-
-procYaml :: YamlNode -> LibDesc
-procYaml MkNode { n_elem = EMap ms } = f ms mempty mempty where
-    f [] dlm dsm = LibDesc (combineAliases dlm) dsm
-    f ((n_elem -> EStr (map toLower . unpackBuf -> x),y):rs) dlm dsm = if x `Set.member` list_fields then dlist y else dsing y where
-        dlist (n_elem -> EStr y)  = f rs (Map.insert x [unpackBuf y] dlm) dsm
-        dlist (n_elem -> ESeq ss) = f rs (Map.insert x [ unpackBuf y | (n_elem -> EStr y) <- ss ] dlm) dsm
-        dlist _ = f rs dlm dsm
-        dsing (n_elem -> EStr y) = f rs dlm (Map.insert x (unpackBuf y) dsm)
-        dsing _ = f rs dlm dsm
-    f (_:xs) dlm dsm = f xs dlm dsm
-procYaml _ = LibDesc mempty mempty
-
-list_fields = Set.fromList $ [
-    "exposed-modules",
-    "include-dirs",
-    "extensions",
-    "options",
-    "c-sources",
-    "include-sources",
-    "build-depends"
-    ] ++ map fst alias_fields
-      ++ map snd alias_fields
-
-alias_fields = [
- --  ("other-modules","hidden-modules"),
-   ("exported-modules","exposed-modules"),
-   ("hs-source-dir","hs-source-dirs")
-   ]
-
-combineAliases mp = f alias_fields mp where
-    f [] mp = mp
-    f ((x,y):rs) mp = case Map.lookup x mp of
-        Nothing -> f rs mp
-        Just ys -> f rs $ Map.delete x $ Map.insertWith (++) y ys mp
-
-data LibDesc = LibDesc (Map.Map String [String]) (Map.Map String String)
-
-readDescFile :: FilePath -> IO LibDesc
-readDescFile fp = do
-    wdump FD.Progress $ putErrLn $ "Reading: " ++ show fp
-    let doYaml opt = do
-            lbs <- LBS.readFile fp
-            dt <- preprocess opt fp lbs
-            desc <- iocatch (parseYamlBytes $ BS.concat (LBS.toChunks dt))
-                (\e -> putErrDie $ "Error parsing desc file '" ++ fp ++ "'\n" ++ show e)
-            when verbose2 $ do
-                yaml <- emitYaml desc
-                putStrLn yaml
-            return $ procYaml desc
-    case FP.splitExtension fp of
-        (_,".yaml") -> doYaml options
-        (FP.takeExtension -> ".yaml",".m4") -> doYaml options { optFOptsSet = FO.M4 `Set.insert` optFOptsSet options }
-        _ -> putErrDie $ "Do not recoginize description file type: " ++ fp

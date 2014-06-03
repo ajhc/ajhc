@@ -1,25 +1,28 @@
-{-# OPTIONS -w -funbox-strict-fields #-}
 module Options(
     processOptions,
     Opt(..),
     options,
     Mode(..),
     StopCondition(..),
-    putVerbose,
-    putVerboseLn,
     putProgress,
     putProgressLn,
+    putVerbose,
+    putVerboseLn,
     getArguments,
     findHoCache,
     verbose,
     verbose2,
     progress,
+    preprocess,
+    languageFlags,
     dump,
     wdump,
     fopts,
     wdump',
     fopts',
     flint,
+    LibDesc(..),
+    readYamlOpts,
     fileOptions,
     withOptions,
     withOptionsT,
@@ -32,25 +35,33 @@ module Options(
     ) where
 
 import Control.Monad.Error()    -- IO MonadPlus instance
-import Control.Monad.Identity
 import Control.Monad.Reader
-import Data.List(nub)
-import Data.Maybe
+import Data.Char
+import Data.Yaml.Syck
 import System
 import System.Console.GetOpt
 import System.Directory
 import System.IO.Unsafe
+import Util.Std
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.UTF8 as BS
 import qualified Data.Map as M
+import qualified Data.Map as Map
 import qualified Data.Set as S
+import qualified Data.Set as Set
+import qualified System.FilePath as FP
 
+import Util.FilterInput
+import Support.TempDir
+import Options.Type
 import RawFiles(targets_ini)
 import Support.IniParse
-import Support.TempDir
 import Util.ExitCodes
 import Util.Gen
 import Util.YAML
 import Version.Config
+import RawFiles(prelude_m4)
 import Version.Version(versionString,versionContext)
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
@@ -104,16 +115,16 @@ include in addition to default.
 jhc will attempt to read several targets.ini files in order. they are
 
 $PREFIX/etc/jhc-\$VERSION/targets.ini
-: this is the targets.ini that is included with jhc and contains the default options.
+:   this is the targets.ini that is included with jhc and contains the default options.
 
-$PREFIX/etc/jhc-\$VERSION/targets-local.ini
-: jhc will read this if it exists, it is used to specify custom system wide configuration options, such as the name of local compilers.
+`$PREFIX/etc/jhc-\$VERSION/targets-local.ini`
+:   jhc will read this if it exists, it is used to specify custom system wide configuration options, such as the name of local compilers.
 
 $HOME/.jhc/targets.ini
-: this is where a users local configuration information goes.
+:   this is where a users local configuration information goes.
 
 $HOME/etc/jhc/targets.ini
-: this is simply for people that prefer to not use hidden directories for configuration
+:   this is simply for people that prefer to not use hidden directories for configuration
 
 The last value specified for an option is the one used, so a users local
 configuration overrides the system local version which overrides the built in
@@ -150,178 +161,6 @@ Define                             Meaning
 
 -}
 
-data Mode = BuildHl FilePath         -- ^ Build the specified hl-file given a description file.
-          | Interactive              -- ^ Run interactively.
-          | Version                  -- ^ Print version and die.
-          | VersionCtx               -- ^ Print version context and die.
-          | ShowHelp                 -- ^ Show help message and die.
-          | ShowConfig               -- ^ Show configuration info.
-          | CompileExe               -- ^ Compile executable
-          | ShowHo String            -- ^ Show ho-file.
-          | ListLibraries            -- ^ List libraries
-          | PrintHscOptions          -- ^ Print options for hsc2hs
-          | PurgeCache               -- ^ Purge the cache
-          | Preprocess               -- ^ Filter through preprocessor
-            deriving(Eq)
-
-data StopCondition
-    = StopError String         -- ^ error
-    | StopParse                -- ^ Just parse and rename modules then exit
-    | StopTypeCheck            -- ^ Stop after type checking
-    | StopC                    -- ^ Stop after producing C code.
-    | CompileHo                -- ^ Compile ho
-    | StopNot                  -- ^ Don't stop believing.
-            deriving(Eq)
-
-data Opt = Opt {
-    optMode        ::  Mode,      -- ^ Mode of interaction
-    optColumns     :: !Int,       -- ^ Width of terminal.
-    optDump        ::  [String],  -- ^ Dump options (raw).
-    optStmts       ::  [String],  -- ^ statements to execute
-    optFOpts       ::  [String],  -- ^ Flag options (raw).
-    optIncdirs     ::  [String],  -- ^ Include directories.
-    optCCargs      ::  [String],  -- ^ Optional arguments to the C compiler.
-    optHls         ::  [String],  -- ^ Load the specified hl-files (haskell libraries).
-    optAutoLoads   ::  [String],  -- ^ AutoLoaded haskell libraries.
-    optHlPath      ::  [String],  -- ^ Path to look for libraries.
-    optIncs        ::  [String],
-    optDefs        ::  [String],
-    optExtensions  ::  [String],
-    optStop        ::  StopCondition,
-    optWorkDir     ::  Maybe FilePath,
-    optAnnotate    ::  Maybe FilePath,
-    optDeps        ::  Maybe FilePath,
-    optHoDir       ::  Maybe FilePath,
-    optHoCache     ::  Maybe FilePath,
-    optArgs        ::  [String],
-    optStale       ::  [String],  -- ^ treat these modules as stale
-    optKeepGoing   :: !Bool,      -- ^ Keep going when encountering errors.
-    optMainFunc    ::  Maybe (Bool,String),    -- ^ Entry point name for the main function.
-    optArch        ::  [String],           -- ^ target architecture
-    optCross       ::  Bool,
-    optOutName     ::  Maybe String,           -- ^ Name of output file.
-    optIgnoreHo    :: !Bool,                   -- ^ Ignore ho-files.
-    optNoWriteHo   :: !Bool,                   -- ^ Don't write ho-files.
-    optNoAuto      :: !Bool,                   -- ^ Don't autoload packages
-    optVerbose     :: !Int,                    -- ^ Verbosity
-    optStatLevel   :: !Int,                    -- ^ Level to print statistics
-    optInis        ::  M.Map String String,    -- ^ options read from ini files
-    optDumpSet     ::  S.Set FD.Flag,    -- ^ Dump flags.
-    optFOptsSet    ::  S.Set FO.Flag     -- ^ Flag options (-f\<opt\>).
-  } {-!derive: update !-}
-
-emptyOpt = Opt {
-    optMode        = CompileExe,
-    optColumns     = getColumns,
-    optCross       = False,
-    optIncdirs     = initialIncludes,
-    optAnnotate    = Nothing,
-    optDeps        = Nothing,
-    optHls         = [],
-    optAutoLoads   = [],
-    optHlPath      = initialLibIncludes,
-    optIncs        = [],
-    optDefs        = [],
-    optExtensions  = [],
-    optStop        = StopNot,
-    optDump        = [],
-    optStale       = [],
-    optStmts       = [],
-    optFOpts       = ["default"],
-    optCCargs      = [],
-    optWorkDir     = Nothing,
-    optHoDir       = Nothing,
-    optHoCache     = Nothing,
-    optArgs        = [],
-    optIgnoreHo    = False,
-    optNoWriteHo   = False,
-    optKeepGoing   = False,
-    optMainFunc    = Nothing,
-    optArch        = ["default"],
-    optOutName     = Nothing,
-    optVerbose     = 0,
-    optStatLevel   = 1,
-    optNoAuto      = False,
-    optDumpSet     = S.singleton FD.Progress,
-    optFOptsSet    = S.empty
-}
-
-idu "-" _ = []
-idu d ds = ds ++ [d]
-
-theoptions :: [OptDescr (Opt -> Opt)]
-theoptions =
-    [ Option ['V'] ["version"]         (NoArg  (optMode_s Version))          "print version info and exit"
-    , Option []    ["version-context"] (NoArg  (optMode_s VersionCtx))       "print version context info and exit"
-    , Option []    ["help"]            (NoArg  (optMode_s ShowHelp))         "print help information and exit"
-    , Option []    ["info"]            (NoArg  (optMode_s ShowConfig))       "show compiler configuration information and exit"
-    , Option []    ["purge-cache"]     (NoArg  (optMode_s PurgeCache))       "clean out jhc compilation cache"
-    , Option ['v'] ["verbose"]         (NoArg  (optVerbose_u (+1)))          "chatty output on stderr"
-    , Option ['z'] []                  (NoArg  (optStatLevel_u (+1)))        "Increase verbosity of statistics"
-    , Option ['d'] []                  (ReqArg (optDump_u . (:))  "[no-]flag") "dump specified data during compilation"
-    , Option ['f'] []                  (ReqArg (optFOpts_u . (:)) "[no-]flag") "set or clear compilation options"
-    , Option ['X'] []                  (ReqArg (optExtensions_u . (:))  "Extension") "enable the given language extension"
-    , Option ['o'] ["output"]          (ReqArg (optOutName_s . Just) "FILE") "output to FILE"
-    , Option ['i'] ["include"]         (ReqArg (optIncdirs_u . idu) "DIR")   "where to look for source files"
-    , Option ['I'] []                  (ReqArg (optIncs_u . idu) "DIR")       "add to preprocessor include path"
-    , Option ['D'] []                  (ReqArg (optDefs_u . (:)) "NAME=VALUE") "add new definitions to set in preprocessor"
-    , Option []    ["optc"]            (ReqArg (optCCargs_u . idu) "option") "extra options to pass to c compiler"
-    , Option ['c'] []                  (NoArg  (optStop_s CompileHo))        "just compile the modules, caching the results."
-    , Option ['C'] []                  (NoArg  (optStop_s StopC))            "compile to C code"
-    , Option ['E'] []                  (NoArg  (optMode_s Preprocess))       "preprocess the input and print result to stdout"
-    , Option ['k'] ["keepgoing"]       (NoArg  (optKeepGoing_s True))        "keep going on errors"
-    , Option []    ["cross"]           (NoArg  (optCross_s True))            "enable cross-compilation, choose target with the -m flag"
-    , Option []    ["stop"]            (ReqArg (optStop_s . stop) "parse/typecheck/c") "stop after the given pass, parse/typecheck/c"
-    , Option []    ["width"]           (ReqArg (optColumns_s . read) "COLUMNS") "width of screen for debugging output"
-    , Option []    ["main"]            (ReqArg (optMainFunc_s . Just . (,) False) "Main.main")  "main entry point"
-    , Option ['m'] ["arch"]            (ReqArg (optArch_u . idu ) "arch")      "target architecture options"
-    , Option []    ["entry"]           (ReqArg (optMainFunc_s . Just . (,) True)  "<expr>")  "main entry point, showable expression"
-    --    , Option ['e'] []            (ReqArg (\d -> optStmts_u ( d:)) "<statement>")  "run given statement as if on jhci prompt"
-    , Option []    ["show-ho"]         (ReqArg (optMode_s . ShowHo) "file.ho") "Show ho file"
-    , Option []    ["noauto"]          (NoArg  (optNoAuto_s True))           "Don't automatically load base and haskell98 packages"
-    , Option ['p'] []                  (ReqArg (optHls_u . (:)) "package")   "Load given haskell library package"
-    , Option ['L'] []                  (ReqArg (optHlPath_u . idu) "path")   "Look for haskell libraries in the given directory"
-    , Option []    ["build-hl"]        (ReqArg (optMode_s . BuildHl) "desc.yaml") "Build hakell library from given library description file"
-    , Option []    ["annotate-source"] (ReqArg (optAnnotate_s . Just) "<dir>") "Write preprocessed and annotated source code to the directory specified"
-    , Option []    ["deps"]            (ReqArg (optDeps_s . Just) "<file.yaml>") "Write dependency information to file specified"
-    , Option []    ["interactive"]     (NoArg  (optMode_s Interactive))      "run interactivly ( for debugging only)"
-    , Option []    ["ignore-cache"]    (NoArg  (optIgnoreHo_s True))         "Ignore existing compilation cache entries."
-    , Option []    ["readonly-cache"]  (NoArg  (optNoWriteHo_s True))        "Do not write new information to the compilation cache."
-    , Option []    ["no-cache"]        (NoArg  (optNoWriteHo_s True . optIgnoreHo_s True)) "Do not use or update the cache."
-    , Option []    ["cache-dir"]       (ReqArg (optHoCache_s . Just ) "JHC_CACHE")  "Use a global cache located in the directory passed as an argument."
---    , Option []    ["ho-dir"]          (ReqArg (optHoDir_s . Just ) "<dir>")    "Where to place and look for ho files"
-    , Option []    ["stale"]           (ReqArg (optStale_u . idu) "Module")  "Treat these modules as stale, even if they exist in the cache"
-    , Option []    ["list-libraries"]  (NoArg  (optMode_s ListLibraries))    "List of installed libraries"
-    , Option []    ["tdir"]            (ReqArg (optWorkDir_s . Just) "dir/") "specify the directory where all intermediate files/dumps will be placed."
---    , Option []    ["print-hsc-options"] (NoArg (optMode_s PrintHscOptions)) "print options to pass to hsc2hs"
-    ]
-
-stop "parse" = StopParse
-stop "deps" = StopParse
-stop "typecheck" = StopTypeCheck
-stop "c" = StopC
-stop s = StopError s
-
--- | Width of terminal.
-getColumns :: Int
-getColumns = read $ unsafePerformIO (getEnv "COLUMNS" `mplus` return "80")
-
-postProcessFD :: Monad m => Opt -> m Opt
-postProcessFD o = case FD.process (optDumpSet o) (optDump o ++ vv) of
-        (s,[]) -> return $ o { optDumpSet = s, optDump = [] }
-        (_,xs) -> fail ("Unrecognized dump flag passed to '-d': "
-                        ++ unwords xs ++ "\nValid dump flags:\n\n" ++ FD.helpMsg)
-    where
-    vv | optVerbose o >= 2 = ["veryverbose"]
-       | optVerbose o >= 1 = ["verbose"]
-       | otherwise = []
-
-postProcessFO :: Monad m => Opt -> m Opt
-postProcessFO o = case FO.process (optFOptsSet o) (optFOpts o) of
-        (s,[]) -> return $ o { optFOptsSet = s, optFOpts = [] }
-        (_,xs) -> fail ("Unrecognized flag passed to '-f': "
-                        ++ unwords xs ++ "\nValid flags:\n\n" ++ FO.helpMsg)
-
 getArguments = do
     x <- lookupEnv "JHC_OPTS"
     let eas = maybe [] words x
@@ -353,16 +192,23 @@ processOptions = do
     -- initial argument processing
     argv <- getArguments
     let (o,ns,rc) = getOpt Permute theoptions argv
-    o <- return (foldl (flip ($)) emptyOpt o)
+    optColumns <- getColumns
+    optIncdirs <- initialIncludes
+    optHlPath <- initialLibIncludes
+    o <- return (foldl (flip ($)) emptyOpt { optColumns, optIncdirs, optHlPath } o)
     when (rc /= []) $ putErrLn (concat rc ++ helpUsage) >> exitWith exitCodeUsage
     case optStop o of
         StopError s -> putErrLn "bad option passed to --stop should be one of parse, deps, typecheck, or c" >> exitWith exitCodeUsage
         _ -> return ()
+    let readYaml o fp = do
+            when (dopts' o FD.Progress) $ putStrLn $ "Reading " ++ fp
+            snd <$> readYamlOpts o fp
+    o <- foldM readYaml o (optWith o)
     case optMode o of
         ShowHelp    -> doShowHelp
         ShowConfig  -> doShowConfig
+        Version   | optVerbose o > 0  -> putStrLn (versionString ++ BS.toString versionContext) >> exitSuccess
         Version     -> putStrLn versionString >> exitSuccess
-        VersionCtx  -> putStrLn (versionString ++ BS.toString versionContext) >> exitSuccess
         PrintHscOptions -> do
             putStrLn $ "-I" ++ VC.datadir ++ "/" ++ VC.package ++ "-" ++ VC.shortVersion ++ "/include"
             exitSuccess
@@ -379,9 +225,9 @@ processOptions = do
             Just "boehm" -> optFOptsSet_u (S.insert FO.Boehm) o
             _ -> o
     o2 <- either putErrDie return $ postProcessFO o1
-    when (FD.Ini `S.member` optDumpSet o) $ do
-        putStrLn (show $ optDumpSet o)
-        putStrLn (show $ optFOptsSet o)
+--    when (FD.Ini `S.member` optDumpSet o) $ do
+--        putStrLn (show $ optDumpSet o)
+--        putStrLn (show $ optFOptsSet o)
     -- add autoloads based on ini options
     let autoloads = maybe [] (tokens (',' ==)) (M.lookup "autoload" inis)
     return o2 { optArgs = ns, optInis = inis, optAutoLoads = autoloads }
@@ -391,16 +237,15 @@ doShowHelp = do
     exitSuccess
 
 doShowConfig = do
-    --mapM_ (\ (x,y) -> putStrLn (x ++ ": " ++ y))  configs
-    putStrLn $ showYAML  configs
+    configs >>= putStrLn . showYAML
     exitSuccess
 
 findHoCache :: IO (Maybe FilePath)
 findHoCache = do
     cd <- lookupEnv "JHC_CACHE"
     case optHoCache options `mplus` cd of
-        Just s -> do return (Just s)
         Just "-" -> do return Nothing
+        Just s -> do return (Just s)
         Nothing | isNothing (optHoDir options) -> do
             Just home <- fmap (`mplus` Just "/") $ lookupEnv "HOME"
             let cd = home ++ "/.jhc/cache"
@@ -408,24 +253,20 @@ findHoCache = do
             return (Just cd)
         _  -> return Nothing
 
-configs :: Node
-configs = toNode [
-    "jhclibpath" ==> initialLibIncludes,
-    "version" ==> version,
-    "package" ==> package,
-    "libdir" ==> libdir,
-    "datadir" ==> datadir,
-    "libraryInstall" ==> libraryInstall,
-    "host" ==> host
-    ] where
-    (==>) :: ToNode b => String -> b -> (String,Node)
-    a ==> b = (a,toNode b)
-
-{-# NOINLINE fileOptions #-}
-fileOptions :: Monad m => Opt -> [String] -> m Opt
-fileOptions options xs = case getOpt Permute theoptions xs of
-    (os,[],[]) -> postProcessFD (foldl (flip ($)) options os) >>= postProcessFO
-    (_,_,errs) -> fail (concat errs)
+configs :: IO Node
+configs = do
+    ls <- initialLibIncludes
+    return $ toNode [
+        "jhclibpath" ==> ls,
+        "version" ==> version,
+        "package" ==> package,
+        "libdir" ==> libdir,
+        "datadir" ==> datadir,
+        "libraryInstall" ==> libraryInstall,
+        "host" ==> host
+        ] where
+        (==>) :: ToNode b => String -> b -> (String,Node)
+        a ==> b = (a,toNode b)
 
 {-# NOINLINE options #-}
 -- | The global options currently used.
@@ -471,6 +312,9 @@ wdump f = when (dump f)
 -- | Test whether an option flag is set.
 fopts' :: Opt -> FO.Flag -> Bool
 fopts' opt s = s `S.member` optFOptsSet opt
+-- | Test whether an option flag is set.
+dopts' :: Opt -> FD.Flag -> Bool
+dopts' opt s = s `S.member` optDumpSet opt
 -- | Do the action when the suplied dump flag is set.
 wdump' :: (Monad m) => Opt -> FD.Flag -> m () -> m ()
 wdump' opt f = when $ f `S.member` optDumpSet opt
@@ -478,24 +322,6 @@ wdump' opt f = when $ f `S.member` optDumpSet opt
 -- | Is the \"lint\" option flag set?
 flint :: Bool
 flint = FO.Lint `S.member` optFOptsSet options
-
--- | Include directories taken from JHCPATH enviroment variable.
-initialIncludes :: [String]
-initialIncludes = unsafePerformIO $ do
-    p <- lookupEnv "JHC_PATH"
-    let x = fromMaybe "" p
-    return (".":(tokens (== ':') x))
-
--- | Include directories taken from JHCLIBPATH enviroment variable.
-initialLibIncludes :: [String]
-initialLibIncludes = unsafePerformIO $ do
-    ps <- lookupEnv "JHC_LIBRARY_PATH"
-    h <- lookupEnv "HOME"
-    let paths = h ++ ["/usr/local","/usr"]
-        bases = ["/lib","/share"]
-        vers = ["/jhc-" ++ shortVersion, "/jhc"]
-    return $ nub $ maybe [] (tokens (':' ==))  ps ++ [ p ++ b ++ v | p <- paths, v <- vers, b <- bases ]
-               ++ [d ++ v | d <- [libdir,datadir], v <- vers] ++ [libraryInstall]
 
 class Monad m => OptionMonad m where
     getOptions :: m Opt
@@ -529,3 +355,145 @@ getArgString = do
     name <- System.getProgName
     args <- getArguments
     return (simpleQuote (name:args),head $ lines versionString)
+
+--prettyOptions :: Opt -> String
+--prettyOptions _ = ""
+
+-- | Width of terminal.
+getColumns :: IO Int
+getColumns = do
+    mcol <- lookupEnv "COLUMNS"
+    return $ fromMaybe 80 (mcol >>= readM)
+
+-- | Include directories taken from JHCPATH enviroment variable.
+initialIncludes :: IO [String]
+initialIncludes = do
+    p <- lookupEnv "JHC_PATH"
+    let x = fromMaybe "" p
+    return (".":(tokens (== ':') x))
+
+-- | Include directories taken from JHCLIBPATH enviroment variable.
+initialLibIncludes :: IO [String]
+initialLibIncludes = do
+    ps <- lookupEnv "JHC_LIBRARY_PATH"
+    h <- lookupEnv "HOME"
+    let paths = h ++ ["/usr/local","/usr"]
+        bases = ["/lib","/share"]
+        vers = ["/jhc-" ++ shortVersion, "/jhc"]
+    return $ nub $ maybe [] (tokens (':' ==))  ps ++ [ p ++ b ++ v | p <- paths, v <- vers, b <- bases ]
+               ++ [d ++ v | d <- [libdir,datadir], v <- vers] ++ [libraryInstall]
+data LibDesc = LibDesc (Map.Map String [String]) (Map.Map String String)
+
+readDescFile :: Opt -> FilePath -> IO LibDesc
+readDescFile origOpt fp = do
+--    wdump FD.Progress $ putErrLn $ "Reading: " ++ show fp
+    let doYaml opt = do
+            lbs <- LBS.readFile fp
+            dt <- preprocess opt fp lbs
+            desc <- iocatch (parseYamlBytes $ BS.concat (LBS.toChunks dt))
+                (\e -> putErrDie $ "Error parsing desc file '" ++ fp ++ "'\n" ++ show e)
+            when (optVerbose origOpt > 1) $ do
+                yaml <- emitYaml desc
+                putStrLn yaml
+            return $ procYaml desc
+    case FP.splitExtension fp of
+        (_,".yaml") -> doYaml origOpt
+        (FP.takeExtension -> ".yaml",".m4") -> doYaml origOpt { optFOptsSet = FO.M4 `Set.insert` optFOptsSet origOpt }
+        _ -> putErrDie $ "Do not recoginize description file type: " ++ fp
+
+readYamlOpts :: Opt -> FilePath -> IO (LibDesc,Opt)
+readYamlOpts origOpt fp = do
+    ld@(LibDesc dlist dsing) <- readDescFile origOpt fp
+    let mfield x = maybe [] id $ Map.lookup x dlist
+        Just bopt = fileOptions origOpt modOptions `mplus` Just origOpt
+        (pfs,nfs,_) = languageFlags (mfield "extensions")
+        lproc opt = opt { optFOptsSet = Set.union pfs (optFOptsSet opt) Set.\\ nfs }
+        dirs = [ "-i" ++ dd x | x <- mfield "hs-source-dirs" ]
+            ++ [ "-I" ++ dd x | x <- mfield "include-dirs" ]
+            ++ [ "-p" ++ x | x <- mfield "build-depends" ]
+        modOptions =  (mfield "options" ++ dirs)
+        dd "." = FP.takeDirectory fp
+        dd ('.':'/':x) = dd x
+        dd x = FP.takeDirectory fp FP.</> x
+    return (ld,lproc bopt)
+
+preprocess :: Opt -> FilePath -> LBS.ByteString -> IO LBS.ByteString
+preprocess opt fn lbs = do
+    let fopts s = s `Set.member` optFOptsSet opt
+        incFlags = [ "-I" ++ d | d <- optIncdirs opt ++ optIncs opt]
+        defFlags = ("-D__JHC__=" ++ revision):("-D__JHC_VERSION__=" ++ version):[ "-D" ++ d | d <- optDefs opt]
+    case () of
+        _ | fopts FO.Cpp -> readSystem "cpphs" $ incFlags ++ defFlags ++ [fn]
+          | fopts FO.M4  -> do
+                m4p <- m4Prelude
+                readSystem "m4" $ ["-s", "-P"] ++ incFlags ++ defFlags ++ [m4p,fn]
+          | otherwise -> return lbs
+
+m4Prelude :: IO FilePath
+m4Prelude = fileInTempDir "prelude.m4" $ \fp -> do putStrLn $ "Writing stuff:" ++ fp ; BS.writeFile fp prelude_m4 ; return ()
+
+procYaml :: YamlNode -> LibDesc
+procYaml MkNode { n_elem = EMap ms } = f ms mempty mempty where
+    f [] dlm dsm = LibDesc (combineAliases dlm) dsm
+    f ((n_elem -> EStr (map toLower . unpackBuf -> x),y):rs) dlm dsm = if x `Set.member` list_fields then dlist y else dsing y where
+        dlist (n_elem -> EStr y)  = f rs (Map.insert x [unpackBuf y] dlm) dsm
+        dlist (n_elem -> ESeq ss) = f rs (Map.insert x [ unpackBuf y | (n_elem -> EStr y) <- ss ] dlm) dsm
+        dlist _ = f rs dlm dsm
+        dsing (n_elem -> EStr y) = f rs dlm (Map.insert x (unpackBuf y) dsm)
+        dsing _ = f rs dlm dsm
+    f (_:xs) dlm dsm = f xs dlm dsm
+procYaml _ = LibDesc mempty mempty
+
+list_fields = Set.fromList $ [
+    "exposed-modules",
+    "include-dirs",
+    "extensions",
+    "options",
+    "c-sources",
+    "include-sources",
+    "build-depends"
+    ] ++ map fst alias_fields
+      ++ map snd alias_fields
+
+alias_fields = [
+ --  ("other-modules","hidden-modules"),
+   ("exported-modules","exposed-modules"),
+   ("hs-source-dir","hs-source-dirs")
+   ]
+
+combineAliases mp = f alias_fields mp where
+    f [] mp = mp
+    f ((x,y):rs) mp = case Map.lookup x mp of
+        Nothing -> f rs mp
+        Just ys -> f rs $ Map.delete x $ Map.insertWith (++) y ys mp
+
+-- translates a list of language extensions as pased to a LANGUAGE pragma or
+-- the -X option to the equivalent '-f' flags. The first return value are the
+-- positive flags, the negative flags, and the third is the unrecognized extensions.
+languageFlags :: [String] -> (Set.Set FO.Flag,Set.Set FO.Flag,[String])
+languageFlags ls = f ls Set.empty Set.empty [] where
+    f [] pfs nfs us = (pfs,nfs,us)
+    f (l:ls) pfs nfs us | Just lo <- Map.lookup ll langmap =  f ls (Set.union lo pfs) nfs us
+                        | 'n':'o':ll <- ll, Just lo <- Map.lookup ll langmap = f ls pfs (nfs `Set.union` lo) us
+                        | otherwise = f ls pfs nfs (l:us)
+        where ll = map toLower l
+
+langmap = Map.fromList [
+    "m4" ==> FO.M4,
+    "cpp" ==> FO.Cpp,
+    "foreignfunctioninterface" ==> FO.Ffi,
+    "implicitprelude" ==> FO.Prelude,
+    "unboxedtuples" ==> FO.UnboxedTuples,
+    "unboxedvalues" ==> FO.UnboxedValues,
+    "monomorphismrestriction" ==> FO.MonomorphismRestriction,
+    "explicitforall" ==> FO.Forall,
+    "existentialquantification" =+> [FO.Forall,FO.Exists],
+    "scopedtypevariables" ==> FO.Forall,
+    "rankntypes" ==> FO.Forall,
+    "rank2types" ==> FO.Forall,
+    "bangpatterns" ==> FO.BangPatterns,
+    "polymorphiccomponents" ==> FO.Forall,
+    "TypeFamilies" ==> FO.TypeFamilies,
+    "magichash" ==> FO.UnboxedValues
+    ] where x ==> y = (x,Set.singleton y)
+            x =+> y = (x,Set.fromList y)

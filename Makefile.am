@@ -12,37 +12,62 @@ MY_CINCLUDES= -I$(srcdir)/src/data -I$(srcdir)/src/StringTable -I$(srcdir)/src/c
 MY_CFLAGS= $(MY_CINCLUDES) -optc-std=c99 -optc-O2 -optc-Wall
 CC = $(HC)
 
-HSFILES=src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/DataP.hs \
-	src/DerivingDrift/Drift.hs src/DerivingDrift/RuleUtils.hs src/Doc/Attr.hs src/Doc/Chars.hs src/Doc/DocLike.hs \
-	src/Doc/PPrint.hs src/Doc/Pretty.hs src/E/Annotate.hs src/E/Binary.hs src/E/Diff.hs src/E/E.hs src/E/Eta.hs src/E/Eval.hs \
-	src/E/FreeVars.hs src/E/FromHs.hs src/E/Inline.hs src/E/LetFloat.hs src/E/PrimOpt.hs src/E/Program.hs src/E/Rules.hs \
-	src/E/Show.hs src/E/Subst.hs src/E/Traverse.hs src/E/TypeAnalysis.hs src/E/Values.hs src/E/WorkerWrapper.hs \
-	src/FindFixpoint.hs src/Fixer/Fixer.hs src/Fixer/Supply.hs src/Fixer/VMap.hs src/FlagDump.hs src/FlagOpts.hs \
-	src/FrontEnd/DataConsAssump.hs src/FrontEnd/DeclsDepends.hs src/FrontEnd/DependAnalysis.hs src/FrontEnd/Desugar.hs \
-	src/FrontEnd/Diagnostic.hs src/FrontEnd/FrontEnd.hs src/FrontEnd/HsErrors.hs \
-	src/FrontEnd/HsPretty.hs src/FrontEnd/Infix.hs \
-	src/FrontEnd/Rename.hs src/FrontEnd/Syn/Options.hs src/FrontEnd/Syn/Traverse.hs src/FrontEnd/Tc/Class.hs src/FrontEnd/Tc/Main.hs \
-	src/FrontEnd/Tc/Module.hs src/FrontEnd/Tc/Type.hs src/FrontEnd/Tc/Unify.hs src/FrontEnd/TypeSigs.hs src/FrontEnd/TypeSynonyms.hs\
-	src/FrontEnd/Unlit.hs src/FrontEnd/Warning.hs src/GenUtil.hs src/Grin/DeadCode.hs\
-	src/Grin/Devolve.hs src/Grin/EvalInline.hs src/Grin/FromE.hs src/Grin/Grin.hs src/Grin/HashConst.hs src/Grin/Lint.hs\
-	src/Grin/NodeAnalyze.hs src/Grin/Noodle.hs src/Grin/Optimize.hs src/Grin/Show.hs src/Grin/Val.hs \
-	src/Grin/Whiz.hs src/Ho/Binary.hs src/Ho/Collected.hs src/Ho/Library.hs src/Info/Binary.hs src/Info/Info.hs src/Info/Properties.hs \
-	src/Info/Types.hs src/Interactive.hs src/Main.hs src/Name/Binary.hs src/Name/Id.hs src/Name/Name.hs src/Name/Names.hs \
-	src/Name/Prim.hs src/Options.hs src/PackedString.hs src/Ho/ReadSource.hs \
-	src/RawFiles.hs src/Stats.hs src/Support/CanType.hs src/Support/CFF.hs src/Support/Compat.hs \
-	src/Support/FreeVars.hs src/Support/MapBinaryInstance.hs src/Support/MD5.hs src/Support/Tickle.hs src/Support/Transform.hs \
-	src/Support/Tuple.hs src/Support/Unparse.hs src/Util/BitSet.hs src/Util/ContextMonad.hs src/Util/FilterInput.hs \
-	src/Util/Gen.hs src/Util/Graph.hs src/Util/Graphviz.hs src/Util/HasSize.hs src/Util/Histogram.hs src/Util/Inst.hs \
-	src/Util/IntBag.hs src/Util/Interact.hs src/Util/NameMonad.hs src/Util/Once.hs src/Util/Perhaps.hs src/Util/ReaderWriter.hs \
-	src/Util/Relation.hs src/Util/RWS.hs src/Util/SameShape.hs src/Util/Seq.hs src/Util/SetLike.hs src/Util/UnionFind.hs \
-	src/Util/UnionSolve.hs src/Util/UniqueMonad.hs src/Util/Util.hs src/Util/VarName.hs src/Version/Config.hs src/Version/Version.hs \
-	src/Support/IniParse.hs src/E/Lint.hs src/Util/Progress.hs src/Grin/StorageAnalysis.hs src/Util/YAML.hs src/Grin/Main.hs \
-        src/E/Main.hs src/Util/GMap.hs src/Util/ExitCodes.hs src/Support/TempDir.hs src/E/PrimDecode.hs \
-        src/DerivingDrift/StandardRules.hs src/FrontEnd/Exports.hs \
-	src/FrontEnd/Lex/Parser.hs src/FrontEnd/Lex/Parse.hs src/FrontEnd/Lex/Lexer.hs \
-	src/FrontEnd/Lex/Post.hs src/FrontEnd/Lex/Layout.hs src/FrontEnd/Lex/Fixity.hs \
-	src/FrontEnd/Lex/ParseMonad.hs src/Util/Std.hs src/Name/VConsts.hs src/E/LambdaLift.hs \
-	src/E/TypeCheck.hs src/Ho/Build.hs src/Ty/Level.hs src/Name/Internals.hs
+HSFILES= \
+    src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs \
+    src/DerivingDrift/DataP.hs src/DerivingDrift/Drift.hs \
+    src/DerivingDrift/RuleUtils.hs src/DerivingDrift/StandardRules.hs \
+    src/Doc/Attr.hs src/Doc/Chars.hs src/Doc/DocLike.hs src/Doc/PPrint.hs \
+    src/Doc/Pretty.hs src/E/Annotate.hs src/E/Binary.hs src/E/Diff.hs \
+    src/E/E.hs src/E/Eta.hs src/E/Eval.hs src/E/FreeVars.hs \
+    src/E/FromHs.hs src/E/Inline.hs src/E/LambdaLift.hs src/E/LetFloat.hs \
+    src/E/Lint.hs src/E/Main.hs src/E/PrimDecode.hs src/E/PrimOpt.hs \
+    src/E/Program.hs src/E/Rules.hs src/E/Show.hs src/E/Subst.hs \
+    src/E/Traverse.hs src/E/TypeAnalysis.hs src/E/TypeCheck.hs \
+    src/E/Values.hs src/E/WorkerWrapper.hs src/FindFixpoint.hs \
+    src/Fixer/Fixer.hs src/Fixer/Supply.hs src/Fixer/VMap.hs \
+    src/FlagDump.hs src/FlagOpts.hs src/FrontEnd/DataConsAssump.hs \
+    src/FrontEnd/DeclsDepends.hs src/FrontEnd/DependAnalysis.hs \
+    src/FrontEnd/Desugar.hs src/FrontEnd/Diagnostic.hs \
+    src/FrontEnd/Exports.hs src/FrontEnd/FrontEnd.hs \
+    src/FrontEnd/HsErrors.hs src/FrontEnd/HsPretty.hs \
+    src/FrontEnd/Infix.hs src/FrontEnd/Lex/Fixity.hs \
+    src/FrontEnd/Lex/Layout.hs src/FrontEnd/Lex/Lexer.hs \
+    src/FrontEnd/Lex/Parse.hs src/FrontEnd/Lex/ParseMonad.hs \
+    src/FrontEnd/Lex/Parser.hs src/FrontEnd/Lex/Post.hs \
+    src/FrontEnd/Rename.hs src/FrontEnd/Syn/Options.hs \
+    src/FrontEnd/Syn/Traverse.hs src/FrontEnd/Tc/Class.hs \
+    src/FrontEnd/Tc/Main.hs src/FrontEnd/Tc/Module.hs \
+    src/FrontEnd/Tc/Type.hs src/FrontEnd/Tc/Unify.hs \
+    src/FrontEnd/TypeSigs.hs src/FrontEnd/TypeSynonyms.hs \
+    src/FrontEnd/Unlit.hs src/FrontEnd/Warning.hs src/GenUtil.hs \
+    src/Grin/DeadCode.hs src/Grin/Devolve.hs src/Grin/EvalInline.hs \
+    src/Grin/FromE.hs src/Grin/Grin.hs src/Grin/HashConst.hs \
+    src/Grin/Lint.hs src/Grin/Main.hs src/Grin/NodeAnalyze.hs \
+    src/Grin/Noodle.hs src/Grin/Optimize.hs src/Grin/Show.hs \
+    src/Grin/StorageAnalysis.hs src/Grin/Val.hs src/Grin/Whiz.hs \
+    src/Ho/Binary.hs src/Ho/Build.hs src/Ho/Collected.hs \
+    src/Ho/Library.hs src/Ho/ReadSource.hs src/Info/Binary.hs \
+    src/Info/Info.hs src/Info/Properties.hs src/Info/Types.hs \
+    src/Interactive.hs src/Main.hs src/Name/Binary.hs src/Name/Id.hs \
+    src/Name/Internals.hs src/Name/Name.hs src/Name/Names.hs \
+    src/Name/Prim.hs src/Name/VConsts.hs src/Options.hs \
+    src/Options/Type.hs src/PackedString.hs src/RawFiles.hs src/Stats.hs \
+    src/Support/CFF.hs src/Support/CanType.hs src/Support/Compat.hs \
+    src/Support/FreeVars.hs src/Support/IniParse.hs src/Support/MD5.hs \
+    src/Support/MapBinaryInstance.hs src/Support/TempDir.hs \
+    src/Support/Tickle.hs src/Support/Transform.hs src/Support/Tuple.hs \
+    src/Support/Unparse.hs src/Ty/Level.hs src/Util/BitSet.hs \
+    src/Util/ContextMonad.hs src/Util/ExitCodes.hs src/Util/FilterInput.hs \
+    src/Util/GMap.hs src/Util/Gen.hs src/Util/Graph.hs \
+    src/Util/Graphviz.hs src/Util/HasSize.hs src/Util/Histogram.hs \
+    src/Util/Inst.hs src/Util/IntBag.hs src/Util/Interact.hs \
+    src/Util/NameMonad.hs src/Util/Once.hs src/Util/Perhaps.hs \
+    src/Util/Progress.hs src/Util/RWS.hs src/Util/ReaderWriter.hs \
+    src/Util/Relation.hs src/Util/SameShape.hs src/Util/Seq.hs \
+    src/Util/SetLike.hs src/Util/Std.hs src/Util/UnionFind.hs \
+    src/Util/UnionSolve.hs src/Util/UniqueMonad.hs src/Util/Util.hs \
+    src/Util/VarName.hs src/Util/YAML.hs src/Version/Config.hs \
+    src/Version/Version.hs
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
 GHCPROFOPTS= -prof -fprof-auto -rtsopts -auto-all -osuf prof.o -hisuf prof.hi
@@ -129,7 +154,7 @@ DRIFTFILES = drift_processed/C/FFI.hs drift_processed/C/FromGrin2.hs \
     drift_processed/FrontEnd/Representation.hs drift_processed/FrontEnd/SrcLoc.hs \
     drift_processed/FrontEnd/Tc/Kind.hs drift_processed/FrontEnd/Tc/Monad.hs \
     drift_processed/Grin/SSimplify.hs drift_processed/Ho/Type.hs \
-    drift_processed/Options.hs
+    drift_processed/Options.hs drift_processed/Options/Type.hs
 
 drift_processed/%: src/%
 	mkdir -p `echo $@ | sed -e 's@/[^/]*$$@@'`
@@ -326,4 +351,4 @@ TESTS=HelloWorld Primes
 
 JHC_MANUAL_FILES = docs/make.mkd options.mkd docs/dependency_format.mkd docs/pragmas.mkd docs/differences.mkd \
 	docs/unboxed.mkd rts/rts/jhc_rts.c src/FlagOpts.mkd src/FlagDump.mkd src/E/PrimOpt.hs \
-	drift_processed/E/TypeCheck.hs drift_processed/Options.hs
+	drift_processed/E/TypeCheck.hs drift_processed/Options/Type.hs

@@ -32,25 +32,24 @@ import qualified Interactive
 main = wrapMain $ do
     hSetEncoding stdout utf8
     hSetEncoding stderr utf8
-    o <- processOptions
     when (dump FD.Atom) $ do
         addAtExit dumpStringTableStats
         addAtExit dumpToFile
     -- set temporary directory
-    maybeDo $ do x <- optWorkDir o; return $ setTempDir x
+    maybeDo $ do x <- optWorkDir options; return $ setTempDir x
     let darg = progressM $ do
         (argstring,_) <- getArgString
         return (argstring ++ "\n" ++ versionSimple)
-    case optMode o of
+    case optMode options of
         BuildHl hl    -> darg >> buildLibrary processInitialHo processDecls hl
         ListLibraries -> listLibraries
         ShowHo ho     -> dumpHoFile ho
         PurgeCache    -> purgeCache
-        Preprocess    -> forM_ (optArgs o) $ \fn -> do
+        Preprocess    -> forM_ (optArgs options) $ \fn -> do
             lbs <- LBS.readFile fn
             res <- preprocessHs options fn lbs
             LBS.putStr res
-        _               -> darg >> processFiles (optArgs o)
+        _             -> darg >> processFiles (optArgs options)
 
 -- we are very careful to only delete cache files.
 purgeCache = do

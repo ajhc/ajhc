@@ -65,6 +65,7 @@ data DeclType = DeclTypeData | DeclTypeNewtype | DeclTypeKind
 data HsDecl
     = HsTypeFamilyDecl {
         hsDeclSrcLoc  :: SrcLoc,
+        hsDeclFamily  :: !Bool,    -- whether 'family' is explicity mentioned.
         hsDeclData    :: !Bool,
         hsDeclName    :: !Name,
         hsDeclTArgs   :: [HsType],

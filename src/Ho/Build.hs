@@ -657,94 +657,82 @@ buildLibrary :: (CollectedHo -> Ho -> IO CollectedHo)
              -> (CollectedHo -> Ho -> TiData -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
              -> FilePath
              -> IO ()
-buildLibrary ifunc func = ans where
-    ans fp = do
-        (desc,name,vers,hmods,emods,modOpts,sources) <- parse fp
-        vers <- runReadP parseVersion vers
-        let allMods = emodSet `Set.union` hmodSet
-            emodSet = Set.fromList emods
-            hmodSet = Set.fromList hmods
-        let outName = case optOutName modOpts of
-                Nothing -> name ++ "-" ++ showVersion vers ++ ".hl"
-                Just fn -> fn
-        -- TODO - must check we depend only on libraries
-        (rnode@(CompNode lhash _ _),cho) <- parseFiles modOpts [outName] [] (map Left $ Set.toList allMods) ifunc func
-        (_,(mmap,mdeps,prvds,lcor,ldef)) <- let
-            f (CompNode hs cd ref) = do
-                cl <- readIORef ref
-                case cl of
-                    CompLinkLib l _ -> return l
-                    CompCollected _ y -> g hs cd ref y
-                    _ -> error "Build.buildLibrary: bad1."
-            g hh deps ref cn = do
-                deps <- mapM f deps
-                let (mg,mll) = case cn of
-                        CompDummy -> (error "modgroup of dummy",mempty)
-                        CompLibrary ho lib -> (hoModuleGroup ho,mempty)
-                        CompHo hoh hidep ho -> (mg,(
-                                    Map.fromList $ zip (providesModules hidep) (repeat mg),
-                                    Map.singleton mg (sort $ fsts deps),
-                                    Set.fromList $ providesModules hidep,
-                                    Map.singleton mg (hoBuild ho'),
-                                    Map.singleton mg (hoTcInfo ho')
-                                    )) where
-                                        mg = hoModuleGroup ho
-                                        ho' = mapHoBodies eraseE ho
-                        _ -> error "Build.buildLibrary: bad2."
-                    res = (mg,mconcat (snds deps) `mappend` mll)
-                writeIORef ref (CompLinkLib res cn)
-                return res
-          in f rnode
-        let unknownMods = Set.toList $ Set.filter (`Set.notMember` allMods) prvds
-        mapM_ ((putStrLn . ("*** Module depended on in library that is not in export list: " ++)) . show) unknownMods
-        mapM_ ((putStrLn . ("*** We are re-exporting the following modules from other libraries: " ++)) . show) $ Set.toList (allMods Set.\\ prvds)
-        let hoh =  HoHeader {
-                hohHash = lhash,
-                hohName = Right (packString name,vers),
-                hohLibDeps = Map.toList (choLibDeps cho),
-                hohArchDeps = [],
-                hohVersion = error "hohVersion"
-                }
-        let pdesc = [(packString n, packString v) | (n,v) <- ("jhc-hl-filename",outName):("jhc-description-file",fp):("jhc-compiled-by",versionString):desc, n /= "exposed-modules" ]
-            libr = HoLib {
-                hoReexports = Map.fromList [ (m,m) | m <- Set.toList $ allMods Set.\\ prvds ],
-                hoMetaInfo = pdesc,
-                hoModuleMap = mmap,
-                hoModuleDeps = mdeps
-                }
-        putProgressLn $ "Writing Library: " ++ outName
-        efs <- mapM fetchExtraFile sources
-        recordHlFile Library { libHoHeader = hoh, libHoLib =  libr, libTcMap = ldef,
-            libBuildMap = lcor, libFileName = outName, libExtraFiles = efs }
-    -- parse library description file
-    parse fp = do
-        putProgressLn $ "Creating library from description file: " ++ show fp
-        LibDesc dlist dsing <- readDescFile fp
-        when verbose2 $ do
-            mapM_ print (Map.toList dlist)
-            mapM_ print (Map.toList dsing)
-        let jfield x = maybe (fail $ "createLibrary: description lacks required field " ++ show x) return $ Map.lookup x dsing
-            mfield x = maybe [] id $ Map.lookup x dlist
-            --mfield x = maybe [] (words . map (\c -> if c == ',' then ' ' else c)) $ Map.lookup x dlist
-        name <- jfield "name"
-        vers <- jfield "version"
-        let (modOpts,flags) = (lproc bopt,modOptions) where
-                Just bopt = fileOptions options modOptions `mplus` Just options
-                (pfs,nfs,_) = languageFlags (mfield "extensions")
-                lproc opt = opt { optFOptsSet = Set.union pfs (optFOptsSet opt) Set.\\ nfs }
-                dirs = [ "-i" ++ dd x | x <- mfield "hs-source-dirs" ]
-                    ++ [ "-I" ++ dd x | x <- mfield "include-dirs" ]
-                    ++ [ "-p" ++ x | x <- mfield "build-depends" ]
-                modOptions =  (mfield "options" ++ dirs)
-                dd "." = FP.takeDirectory fp
-                dd ('.':'/':x) = dd x
-                dd x = FP.takeDirectory fp FP.</> x
-        when verbose $
-            print (flags,optFOptsSet modOpts)
-        let hmods = map toModule $ snub $ mfield "hidden-modules"
-            emods = map toModule $ snub $ mfield "exposed-modules"
-            sources = map (FP.takeDirectory fp FP.</>) $ snub $ mfield "c-sources" ++ mfield "include-sources"
-        return (Map.toList dsing,name,vers,hmods,emods,modOpts,sources)
+buildLibrary ifunc func fp = do
+    (desc,name,vers,hmods,emods,modOpts,sources) <- parseYamlFile fp
+    vers <- runReadP parseVersion vers
+    let allMods = emodSet `Set.union` hmodSet
+        emodSet = Set.fromList emods
+        hmodSet = Set.fromList hmods
+    let outName = case optOutName modOpts of
+            Nothing -> name ++ "-" ++ showVersion vers ++ ".hl"
+            Just fn -> fn
+    -- TODO - must check we depend only on libraries
+    (rnode@(CompNode lhash _ _),cho) <- parseFiles modOpts [outName] [] (map Left $ Set.toList allMods) ifunc func
+    (_,(mmap,mdeps,prvds,lcor,ldef)) <- let
+        f (CompNode hs cd ref) = do
+            cl <- readIORef ref
+            case cl of
+                CompLinkLib l _ -> return l
+                CompCollected _ y -> g hs cd ref y
+                _ -> error "Build.buildLibrary: bad1."
+        g hh deps ref cn = do
+            deps <- mapM f deps
+            let (mg,mll) = case cn of
+                    CompDummy -> (error "modgroup of dummy",mempty)
+                    CompLibrary ho lib -> (hoModuleGroup ho,mempty)
+                    CompHo hoh hidep ho -> (mg,(
+                                Map.fromList $ zip (providesModules hidep) (repeat mg),
+                                Map.singleton mg (sort $ fsts deps),
+                                Set.fromList $ providesModules hidep,
+                                Map.singleton mg (hoBuild ho'),
+                                Map.singleton mg (hoTcInfo ho')
+                                )) where
+                                    mg = hoModuleGroup ho
+                                    ho' = mapHoBodies eraseE ho
+                    _ -> error "Build.buildLibrary: bad2."
+                res = (mg,mconcat (snds deps) `mappend` mll)
+            writeIORef ref (CompLinkLib res cn)
+            return res
+        in f rnode
+    let unknownMods = Set.toList $ Set.filter (`Set.notMember` allMods) prvds
+    mapM_ ((putStrLn . ("*** Module depended on in library that is not in export list: " ++)) . show) unknownMods
+    mapM_ ((putStrLn . ("*** We are re-exporting the following modules from other libraries: " ++)) . show) $ Set.toList (allMods Set.\\ prvds)
+    let hoh =  HoHeader {
+            hohHash = lhash,
+            hohName = Right (packString name,vers),
+            hohLibDeps = Map.toList (choLibDeps cho),
+            hohArchDeps = [],
+            hohVersion = error "hohVersion"
+            }
+    let pdesc = [(packString n, packString v) | (n,v) <- ("jhc-hl-filename",outName):("jhc-description-file",fp):("jhc-compiled-by",versionString):desc, n /= "exposed-modules" ]
+        libr = HoLib {
+            hoReexports = Map.fromList [ (m,m) | m <- Set.toList $ allMods Set.\\ prvds ],
+            hoMetaInfo = pdesc,
+            hoModuleMap = mmap,
+            hoModuleDeps = mdeps
+            }
+    putProgressLn $ "Writing Library: " ++ outName
+    efs <- mapM fetchExtraFile sources
+    recordHlFile Library { libHoHeader = hoh, libHoLib =  libr, libTcMap = ldef,
+        libBuildMap = lcor, libFileName = outName, libExtraFiles = efs }
+
+-- parse library description file
+parseYamlFile fp = do
+    putProgressLn $ "Creating library from description file: " ++ show fp
+    (LibDesc dlist dsing,modOpts) <- readYamlOpts options fp
+    when verbose2 $ do
+        mapM_ print (Map.toList dlist)
+        mapM_ print (Map.toList dsing)
+    let jfield x = maybe (fail $ "createLibrary: description lacks required field " ++ show x) return $ Map.lookup x dsing
+        mfield x = maybe [] id $ Map.lookup x dlist
+        --mfield x = maybe [] (words . map (\c -> if c == ',' then ' ' else c)) $ Map.lookup x dlist
+    name <- jfield "name"
+    vers <- jfield "version"
+    putVerboseLn $ show (optFOptsSet modOpts)
+    let hmods = map toModule $ snub $ mfield "hidden-modules"
+        emods = map toModule $ snub $ mfield "exposed-modules"
+        sources = map (FP.takeDirectory fp FP.</>) $ snub $ mfield "c-sources" ++ mfield "include-sources"
+    return (Map.toList dsing,name,vers,hmods,emods,modOpts,sources)
 
 fetchExtraFile fp = do
     c <- BS.readFile fp
