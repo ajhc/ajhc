@@ -1,48 +1,63 @@
-{-#Pragmas
+{-@Pragmas
 
 Pragmas are special compiler directives that change its behavior in certain
 ways. In general, each compiler is free to define its own pragmas however jhc
 does try to implement the same ones as other compilers when it makes sense.
-pragmas appear in source code  as {-# PRAGMANAME ... #-}
+pragmas appear in source code  as `{-# PRAGMANAME ... #-}`
 
-# Function Properties
+All of these pragmas may be prefixed with `JHC_` or the bareword `JHC` in order to
+trigger only with JHC. -fignore-pragmas will not ignore these.
+
+## Function Properties
 
 These must appear in the same file as the definition of a function. To apply
 one to a instance or class method, you must place it in the where clause of the
 instance or class declaration.
 
-Pragma
+-----------------------------
+Function Pragmas
 ------             ----------------------------------------------------
-_NOINLINE_         Do not inline the given function during core transformations. The function _may_ be inlined during grin transformations.
-_INLINE_           Inline this function whenever possible
-_SUPERINLINE_      Always inline no matter what, even if it means making a local copy of the functions body.
-_VCONSTRUCTOR_     Treat the function as a virtual constructor. CPR analysis and the worker/wrapper transforms will treat the function application as if it were a constructor. This implies 'NOINLINE'.
+NOINLINE           Do not inline the given function during core transformations. The function _may_ be inlined during grin transformations.
 
-# Class Pragmas
+INLINE             Inline this function whenever possible
 
-Pragma
-------             ---------------------------------------------------
-_NOETA_            By default, jhc eta-expands all class methods to help enable optimizations. This disables this behavior.
+SUPERINLINE        Always inline no matter what, even if it means making a local copy of the functions body.
 
-# Rules/Specializations
+VCONSTRUCTOR       Treat the function as a virtual constructor. CPR analysis and the worker/wrapper transforms will treat the function application as if it were a constructor. This implies 'NOINLINE'.
+----------------------------------------------------------------------------------
 
-Pragma
+## Other Pragmas
+
+-----------------------------
+Class Method Pragmas
+------                ---------------------------------------------------
+NOETA                 By default, jhc eta-expands all class methods to help enable optimizations. This disables this behavior.
+-----------------------------
+
+-----------------------------
+Rules/Specialization
 ------              ---------------------------------------------------
-_RULES_             rewrite rules. These have the same syntax and behave similarly to GHC's rewrite rules, except 'phase' information is not allowed.
-_CATALYST_          A special type of rewrite rule that only fires if it enables the use of another RULE, so a CATALYST may allow optimizations that require passing through a non-optimal intermediate stage.
-_SPECIALIZE_        create a version of a function that is specialized for a given type
-_SUPERSPECIALIZE_   has the same effect as SPECIALIZE, but also places a run-time check in the generic version of the function to determine whether to call the specialized version.
+RULES               rewrite rules. These have the same syntax and behave similarly to GHC's rewrite rules, except 'phase' information is not allowed.
 
-# Type Pragmas
+CATALYST            A special type of rewrite rule that only fires if it enables the use of another RULE, so a CATALYST may allow optimizations that require passing through a non-optimal intermediate stage.
 
-Pragma
-------             ---------------------------------------------------
-_CTYPE_            Specify the external type that a data or newtype should use for foreign function interfaces.
-                   The type must be a newtype or unary data constructor of a type that is already foreignable.
-                   Example
-                   ~~~
-                   data {-# CTYPE "unsigned short" #-} CUShort = CUShort Word16
-                   ~~~
+SPECIALIZE          create a version of a function that is specialized for a given type
+
+SUPERSPECIALIZE     has the same effect as SPECIALIZE, but also places a run-time check in the generic version of the function to determine whether to call the specialized version.
+-----------------------------
+
+## Type Pragmas
+
+CTYPE
+:   Specify the external type that a data or newtype should use for foreign function interfaces.
+    The type must be a newtype or unary data constructor of a type that is already foreignable.
+    By not including a string, the type is made unFFIable. This
+    can be used to preserve abstraction.
+
+    ```haskell
+    data {-# CTYPE "unsigned short" #-} CUShort = CUShort Word16  -- use unsigned short calling convention
+    newtype {-# CTYPE #-} Opaque = Opaque Int    -- disable FFI ability for this type
+    ```
 
 # Header Pragmas
 
@@ -51,9 +66,36 @@ before the initial 'module' definition and in the first 4096 bytes of the file
 and must be preceded by and contain only characters in the ASCII character set.
 
 OPTIONS_JHC
-: Specify extra options to use when processing this file. The options available
-are equivalent to the command line options, though, not all may have meaning
-when applied to a single file.
+:   Specify extra options to use when processing this file. The options available
+    are equivalent to the command line options, though, not all may have meaning
+    when applied to a single file.
+
+    ```haskell
+    {-# OPTIONS_JHC -fno-sugar #-}
+    ```
 
 LANGUAGE
-: Specify various language options
+:   Specify various language options, options that are not understood are ignored.
+    Specifying something here is equivalent to passing it as '-X' on the command
+    line.
+
+    ```haskell
+    {-# LANGUAGE NoMonomorphismRestriction, CPP #-}
+    ```
+
+# Special Pragmas
+
+LINE pragmas change the logical name of the file that is being parsed, several
+preprocessors output these to ensure error messages refer to the original file.
+Jhc understands a few variants.
+
+ - `{-# LINE linenumber "filename" #-}`  change the current line number and
+   filename to the ones given.
+ - `{-# LINE linenumber #-}`  change the line number to the one given.
+ - `{-# LINE default #-}` revert the line number and file name to the actual file
+   being read.
+
+In addition, for compatibility with cpp and m4, the following form is also
+accepted if it appears at the beginning of a line.
+
+    #line linenumber "filename"?
