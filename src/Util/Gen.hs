@@ -8,7 +8,7 @@ import Data.Maybe
 import Directory
 import Text.ParserCombinators.ReadP
 
-import GenUtil hiding(replicateM, intercalate)
+import GenUtil hiding(replicateM)
 
 mconcatMap f xs = mconcat (map f xs)
 mintercalate x xs = mconcat (intersperse x xs)

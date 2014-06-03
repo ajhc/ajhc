@@ -69,6 +69,7 @@ preprocessLexemes opt fn xs = toplevel xs where
             _ -> f n rs
         f n (x@(fromL -> "{-#"):(fromL -> "JHC"):xs) = f n (x:xs)
         f n (L sl _ "{-#":(fromL -> pn):xs) | Just npn <- Map.lookup pn pragmaMap = f n (L sl LPragmaStart npn:xs)
+        f n (L sl _ "{-#":(fromL -> 'J':'H':'C':'_':pn):xs) | Just npn <- Map.lookup pn pragmaMap = f n (L sl LPragmaStart npn:xs)
         f n (L _ _ "{-#":rs) = f n (d rs) where
             d (L _ _ "#-}":rs) = rs
             d (_:rs) = d rs
@@ -243,8 +244,6 @@ layoutBrackets = [
     ("[","]"),
     ("{","}")
     ]
-
-rlayoutBrackets = [ (y,x) | (x,y) <- layoutBrackets ]
 
 conditionalBrackets = [
     ("of",[("|","->")]),

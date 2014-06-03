@@ -4,7 +4,6 @@ import Data.Monoid
 import Maybe
 
 import Data.Binary
-import GenUtil(replicateM)
 import Name.Id
 import Name.Internals
 import Support.MapBinaryInstance

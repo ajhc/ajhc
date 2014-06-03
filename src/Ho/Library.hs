@@ -170,37 +170,6 @@ collectLibraries libs = ans where
         forM_ mbad $ \ (m,l) -> putErrLn $ printf "Module '%s' is exported by multiple libraries: %s" (show m) (show $ map libName l)
         unless (null mbad) $ putErrDie "There were conflicting modules!"
 
-parseLibraryDescription :: Monad m => String -> m [(String,String)]
-parseLibraryDescription fs =  g [] (lines (f [] fs)) where
-    --f rs ('\n':s:xs) | isSpace s = f rs (dropWhile isSpace xs)
-    f rs ('-':'-':xs) = f rs (dropWhile (/= '\n') xs)
-    f rs ('{':'-':xs) = eatCom rs xs
-    f rs (x:xs) = f (x:rs) xs
-    f rs [] = reverse rs
-    eatCom rs ('\n':xs) = eatCom ('\n':rs) xs
-    eatCom rs ('-':'}':xs) = f rs xs
-    eatCom rs (_:xs) = eatCom rs xs
-    eatCom rs [] = f rs []
-    g rs (s:ss) | all isSpace s = g rs ss
-    g rs (s:s':ss) | all isSpace s' = g rs (s:ss)
-    g rs (s:(h:cl):ss) | isSpace h = g rs ((s ++ h:cl):ss)
-    g rs (r:ss) | (':':bd') <- bd = g ((map toLower $ condenseWhitespace nm,condenseWhitespace bd'):rs) ss
-         | otherwise = fail $ "could not find ':' marker: " ++ show (rs,r:ss) where
-            (nm,bd) = break (== ':') r
-    g rs [] = return rs
-
-condenseWhitespace xs =  reverse $ dropWhile isSpace (reverse (dropWhile isSpace (cw xs))) where
-    cw (x:y:zs) | isSpace x && isSpace y = cw (' ':zs)
-    cw (x:xs) = x:cw xs
-    cw [] = []
-
-procCabal :: [(String,String)] -> LibDesc
-procCabal xs = f xs mempty mempty where
-    f [] dlm dsm = LibDesc (combineAliases dlm) dsm
-    f ((map toLower -> x,y):rs) dlm dsm | x `Set.member` list_fields = f rs (Map.insert x (spit y) dlm) dsm
-                                        | otherwise = f rs dlm (Map.insert x y dsm)
-    spit = words . map (\c -> if c == ',' then ' ' else c)
-
 procYaml :: YamlNode -> LibDesc
 procYaml MkNode { n_elem = EMap ms } = f ms mempty mempty where
     f [] dlm dsm = LibDesc (combineAliases dlm) dsm
@@ -250,13 +219,7 @@ readDescFile fp = do
                 yaml <- emitYaml desc
                 putStrLn yaml
             return $ procYaml desc
-        doCabal = do
-            fc <- readFile fp
-            case parseLibraryDescription fc of
-                Left err -> fail $ "Error reading library description file: " ++ show fp ++ " " ++ err
-                Right ps -> return $ procCabal ps
     case FP.splitExtension fp of
-        (_,".cabal") -> doCabal
         (_,".yaml") -> doYaml options
         (FP.takeExtension -> ".yaml",".m4") -> doYaml options { optFOptsSet = FO.M4 `Set.insert` optFOptsSet options }
         _ -> putErrDie $ "Do not recoginize description file type: " ++ fp

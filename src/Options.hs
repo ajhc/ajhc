@@ -52,8 +52,8 @@ import Util.Gen
 import Util.YAML
 import Version.Config
 import Version.Version(versionString,versionContext)
-import qualified FlagDump
-import qualified FlagOpts
+import qualified FlagDump as FD
+import qualified FlagOpts as FO
 import qualified Version.Config as VC
 
 {-@CrossCompilation
@@ -206,8 +206,8 @@ data Opt = Opt {
     optVerbose     :: !Int,                    -- ^ Verbosity
     optStatLevel   :: !Int,                    -- ^ Level to print statistics
     optInis        ::  M.Map String String,    -- ^ options read from ini files
-    optDumpSet     ::  S.Set FlagDump.Flag,    -- ^ Dump flags.
-    optFOptsSet    ::  S.Set FlagOpts.Flag     -- ^ Flag options (-f\<opt\>).
+    optDumpSet     ::  S.Set FD.Flag,    -- ^ Dump flags.
+    optFOptsSet    ::  S.Set FO.Flag     -- ^ Flag options (-f\<opt\>).
   } {-!derive: update !-}
 
 emptyOpt = Opt {
@@ -242,7 +242,7 @@ emptyOpt = Opt {
     optVerbose     = 0,
     optStatLevel   = 1,
     optNoAuto      = False,
-    optDumpSet     = S.singleton FlagDump.Progress,
+    optDumpSet     = S.singleton FD.Progress,
     optFOptsSet    = S.empty
 }
 
@@ -260,7 +260,7 @@ theoptions =
     , Option ['z'] []                  (NoArg  (optStatLevel_u (+1)))        "Increase verbosity of statistics"
     , Option ['d'] []                  (ReqArg (optDump_u . (:))  "[no-]flag") "dump specified data during compilation"
     , Option ['f'] []                  (ReqArg (optFOpts_u . (:)) "[no-]flag") "set or clear compilation options"
-    , Option ['X'] []                  (ReqArg (optExtensions_u . (:))  "ExtensionName") "enable the given language extension"
+    , Option ['X'] []                  (ReqArg (optExtensions_u . (:))  "Extension") "enable the given language extension"
     , Option ['o'] ["output"]          (ReqArg (optOutName_s . Just) "FILE") "output to FILE"
     , Option ['i'] ["include"]         (ReqArg (optIncdirs_u . idu) "DIR")   "where to look for source files"
     , Option ['I'] []                  (ReqArg (optIncs_u . idu) "DIR")       "add to preprocessor include path"
@@ -284,7 +284,7 @@ theoptions =
     , Option []    ["build-hl"]        (ReqArg (optMode_s . BuildHl) "desc.yaml") "Build hakell library from given library description file"
     , Option []    ["annotate-source"] (ReqArg (optAnnotate_s . Just) "<dir>") "Write preprocessed and annotated source code to the directory specified"
     , Option []    ["deps"]            (ReqArg (optDeps_s . Just) "<file.yaml>") "Write dependency information to file specified"
-    , Option []    ["interactive"]     (NoArg  (optMode_s Interactive))      "run interactivly                                                             ( for debugging only)"
+    , Option []    ["interactive"]     (NoArg  (optMode_s Interactive))      "run interactivly ( for debugging only)"
     , Option []    ["ignore-cache"]    (NoArg  (optIgnoreHo_s True))         "Ignore existing compilation cache entries."
     , Option []    ["readonly-cache"]  (NoArg  (optNoWriteHo_s True))        "Do not write new information to the compilation cache."
     , Option []    ["no-cache"]        (NoArg  (optNoWriteHo_s True . optIgnoreHo_s True)) "Do not use or update the cache."
@@ -307,20 +307,20 @@ getColumns :: Int
 getColumns = read $ unsafePerformIO (getEnv "COLUMNS" `mplus` return "80")
 
 postProcessFD :: Monad m => Opt -> m Opt
-postProcessFD o = case FlagDump.process (optDumpSet o) (optDump o ++ vv) of
+postProcessFD o = case FD.process (optDumpSet o) (optDump o ++ vv) of
         (s,[]) -> return $ o { optDumpSet = s, optDump = [] }
         (_,xs) -> fail ("Unrecognized dump flag passed to '-d': "
-                        ++ unwords xs ++ "\nValid dump flags:\n\n" ++ FlagDump.helpMsg)
+                        ++ unwords xs ++ "\nValid dump flags:\n\n" ++ FD.helpMsg)
     where
     vv | optVerbose o >= 2 = ["veryverbose"]
        | optVerbose o >= 1 = ["verbose"]
        | otherwise = []
 
 postProcessFO :: Monad m => Opt -> m Opt
-postProcessFO o = case FlagOpts.process (optFOptsSet o) (optFOpts o) of
+postProcessFO o = case FO.process (optFOptsSet o) (optFOpts o) of
         (s,[]) -> return $ o { optFOptsSet = s, optFOpts = [] }
         (_,xs) -> fail ("Unrecognized flag passed to '-f': "
-                        ++ unwords xs ++ "\nValid flags:\n\n" ++ FlagOpts.helpMsg)
+                        ++ unwords xs ++ "\nValid flags:\n\n" ++ FO.helpMsg)
 
 getArguments = do
     x <- lookupEnv "JHC_OPTS"
@@ -343,7 +343,7 @@ pfill maxn length xs = f maxn xs [] [] where
 
 helpUsage = usageInfo header theoptions ++ trailer where
     header = "Usage: jhc [OPTION...] Main.hs"
-    trailer = "\n" ++ mkoptlist "-d" FlagDump.helpFlags ++ "\n" ++ mkoptlist "-f" FlagOpts.helpFlags
+    trailer = "\n" ++ mkoptlist "-d" FD.helpFlags ++ "\n" ++ mkoptlist "-f" FO.helpFlags
     mkoptlist d os = "valid " ++ d ++ " arguments: 'help' for more info\n    " ++ intercalate "\n    " (map (intercalate ", ") $ pfill 100 ((2 +) . length) os) ++ "\n"
 
 {-# NOINLINE processOptions #-}
@@ -372,14 +372,14 @@ processOptions = do
     inis <- parseIniFiles (optVerbose o > 0) (BS.toString targets_ini) [confDir ++ "/targets.ini", confDir ++ "/targets-local.ini", home ++ "/etc/jhc/targets.ini", home ++ "/.jhc/targets.ini"] (optArch o)
     -- process dump flags
     o <- either putErrDie return $ postProcessFD o
-    when (FlagDump.Ini `S.member` optDumpSet o) $ flip mapM_ (M.toList inis) $ \(a,b) -> putStrLn (a ++ "=" ++ b)
+    when (FD.Ini `S.member` optDumpSet o) $ flip mapM_ (M.toList inis) $ \(a,b) -> putStrLn (a ++ "=" ++ b)
     -- set flags based on ini options
     let o1 = case M.lookup "gc" inis of
-            Just "jgc" -> optFOptsSet_u (S.insert FlagOpts.Jgc) o
-            Just "boehm" -> optFOptsSet_u (S.insert FlagOpts.Boehm) o
+            Just "jgc" -> optFOptsSet_u (S.insert FO.Jgc) o
+            Just "boehm" -> optFOptsSet_u (S.insert FO.Boehm) o
             _ -> o
     o2 <- either putErrDie return $ postProcessFO o1
-    when (FlagDump.Ini `S.member` optDumpSet o) $ do
+    when (FD.Ini `S.member` optDumpSet o) $ do
         putStrLn (show $ optDumpSet o)
         putStrLn (show $ optFOptsSet o)
     -- add autoloads based on ini options
@@ -449,7 +449,7 @@ putProgressLn s = putProgress (s ++ "\n")
 
 -- | Is verbose > 0?
 progress :: Bool
-progress = dump FlagDump.Progress
+progress = dump FD.Progress
 
 -- | Is verbose > 0?
 verbose :: Bool
@@ -459,25 +459,25 @@ verbose2 :: Bool
 verbose2 = optVerbose options > 1
 
 -- | Test whether a dump flag is set.
-dump :: FlagDump.Flag -> Bool
+dump :: FD.Flag -> Bool
 dump s = s `S.member` optDumpSet options
 -- | Test whether an option flag is set.
-fopts :: FlagOpts.Flag -> Bool
+fopts :: FO.Flag -> Bool
 fopts s = s `S.member` optFOptsSet options
 -- | Do the action when the suplied dump flag is set.
-wdump :: (Monad m) => FlagDump.Flag -> m () -> m ()
+wdump :: (Monad m) => FD.Flag -> m () -> m ()
 wdump f = when (dump f)
 
 -- | Test whether an option flag is set.
-fopts' :: Opt -> FlagOpts.Flag -> Bool
+fopts' :: Opt -> FO.Flag -> Bool
 fopts' opt s = s `S.member` optFOptsSet opt
 -- | Do the action when the suplied dump flag is set.
-wdump' :: (Monad m) => Opt -> FlagDump.Flag -> m () -> m ()
+wdump' :: (Monad m) => Opt -> FD.Flag -> m () -> m ()
 wdump' opt f = when $ f `S.member` optDumpSet opt
 
 -- | Is the \"lint\" option flag set?
 flint :: Bool
-flint = FlagOpts.Lint `S.member` optFOptsSet options
+flint = FO.Lint `S.member` optFOptsSet options
 
 -- | Include directories taken from JHCPATH enviroment variable.
 initialIncludes :: [String]
@@ -520,7 +520,7 @@ withOptionsT opt (OptT x) = runReaderT x opt
 
 outputName = fromMaybe "hs.out" (optOutName options)
 
-flagOpt :: OptionMonad m => FlagOpts.Flag -> m Bool
+flagOpt :: OptionMonad m => FO.Flag -> m Bool
 flagOpt flag = do
     opt <- getOptions
     return (flag `S.member` optFOptsSet opt)

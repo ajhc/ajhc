@@ -37,7 +37,7 @@ foreach (@ARGV) {
     map { s/^\.\/// } @deps;
     foreach (@deps) {
         my $patch = $_;
-        push @deps, $patch if $patch =~ s/\.(cabal|yaml)(.m4)?$/.patch/ and -e $patch;
+        push @deps, $patch if $patch =~ s/\.yaml(.m4)?$/.patch/ and -e $patch;
     }
     push @targets, @{$y->{Target}};
     for (@{$y->{Target}}) {

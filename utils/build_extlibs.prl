@@ -143,9 +143,9 @@ if ($opt_n) {
     fetch_package($opt_n,$opt_v);
 }
 foreach my $fn (@ARGV) {
-    next unless $fn =~ /\.(cabal|yaml)$/;
+    next unless $fn =~ /\.yaml$/;
     my $patch = $fn;
-    $patch =~ s/\.(cabal|yaml)$/.patch/;
+    $patch =~ s/\.yaml$/.patch/;
     print "Processing $fn\n" unless $opt_l;
     open my $fh, "<", $fn or die "$!: $fn";
     my ($name,$version,$options);
