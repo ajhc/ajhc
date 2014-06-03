@@ -39,13 +39,13 @@ libraries in a YAML format suitable for processing by external tools.
 Jhc's behavior is modified by several enviornment variables.
 
 JHC_OPTS
-: this is read and appended to the command line of jhc invocations.
+:   this is read and appended to the command line of jhc invocations.
 
 JHC_PATH
-: This specifies the path to search for modules.
+:   This specifies the path to search for modules; it is equivalent to '-i' on the command line.
 
 JHC_LIBRARY_PATH
-: This specifies the path to search for libraries.
+:   This specifies the path to search for libraries; it is equivalent to '-L' on the command line.
 
 JHC_CACHE
 : This specified the directory jhc will use to cache values. having a valid

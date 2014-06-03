@@ -42,7 +42,7 @@ anywhere the imported function appears. This differs from 'ccall' in that ccall
 makes no guarentees the given header file will be in scope and that a linker
 symbol of the exact name is exported.
 
-## package relative dependencies
+## private package C code.
 
 dependecies in a foreign import may be written as p:foo.c or p:foo.h, this
 means that the file should be interpreted as part of the internal
@@ -65,6 +65,7 @@ In addition, another extension is that classes and types are in independent
 namespaces, so a type and a class of the same name may be in scope and not
 conflict.
 
+<!--
 # user defined kinds
 
 Jhc allows users to define custom kinds when the -fuser-kinds extension is
@@ -77,10 +78,17 @@ data kind Nat = Z | S Nat
 This will define a new kind 'Nat' and two types 'Z' and 'S' which inhabit it.
 The types introduced by kind declarations represent unboxed values with no
 values, So they have no run-time representation (notably, not even ⊥)
+-->
 
 # Standalone deriving
 
-Jhc supports a standalone deriving mechanism under certain circumstances.
+Jhc supports standalone deriving for a few built in classes that have
+especially efficient implementations that cannot be hand written. Eq, Ord,
+Enum, and Bounded for enumerations.
+
+```haskell
+deriving instance Eq Ordering
+```
 
 # Rank-N Polymorphism
 

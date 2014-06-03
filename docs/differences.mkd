@@ -1,4 +1,4 @@
-{-#Differences
+{-@Differences
 
 # Differences from Haskell 98
 

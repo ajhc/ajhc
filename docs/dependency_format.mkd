@@ -1,15 +1,21 @@
-{-#Using
+{-@Using
 
-# Dependency Information
+Dependency Information
+======================
 
-Jhc can output dependency information describing how source files and libraries
-depend on each other while compiling code. The dependency information is
-generated when the --deps name.yaml option is passed to jhc. It is presented in the
-standard YAML format and its fields are as described below.
+Jhc can output dependency information describing how source files and
+libraries depend on each other while compiling code. The dependency
+information is generated when the `--deps name.yaml` option is passed to
+jhc. It is presented in the standard YAML format and its fields are as
+described below.
 
-  - LibraryDeps: the libraries that are dependend on. It is a hash of library ids to the specific filename of the library used.
-  - LibraryDesc: if building a library, this field contains the name of the library description file used.
-  - ModuleDeps:  a hash of module names to the list of modules that are directly dependend on by said module.
-  - ModuleSouce: a hash of module name to the haskell source file used.
+-   LibraryDeps: the libraries that are dependend on. It is a hash of
+    library ids to the specific filename of the library used.
+-   LibraryDesc: if building a library, this field contains the name of
+    the library description file used.
+-   ModuleDeps: a hash of module names to the list of modules that are
+    directly dependend on by said module.
+-   ModuleSouce: a hash of module name to the haskell source file used.
 
-An example tool to processs the deps.yaml file and spit out appropriate Makefile rules is included as 'utils/deps_to_make.prl'.
+An example tool to processs the deps.yaml file and spit out appropriate
+Makefile rules is included as `utils/deps_to_make.prl`.
