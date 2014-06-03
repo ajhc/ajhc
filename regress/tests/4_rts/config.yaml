@@ -23,4 +23,7 @@ tests:
   HelloWorld_win:
     jhc_flags: -mwin32
     opt_win: 1
+  HelloWorld_win64:
+    jhc_flags: -mwin64
+    opt_win: 1
 

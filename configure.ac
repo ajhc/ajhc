@@ -43,6 +43,8 @@ fi
 
 AC_CHECK_PROGS([MINGW],[mingw-gcc mingw32-gcc i386-mingw32-gcc i586-mingw32msvc-gcc],
                [i386-mingw32-gcc])
+AC_CHECK_PROGS([MINGW64],[mingw64-gcc x86_64-w64-mingw32-gcc],
+               [x86_64-w64-mingw32-gcc])
 
 GHC=$HC
 GHCFLAGS="-hide-all-packages -package base"
@@ -121,6 +123,7 @@ AC_SUBST(HSC2HS)
 AC_SUBST(JETCPATH)
 AC_SUBST(JLIBPATH)
 AC_SUBST(MINGW)
+AC_SUBST(MINGW64)
 AC_SUBST(RPMRELEASE)
 AC_SUBST(SHORTVERSION)
 AC_SUBST(VERSION)

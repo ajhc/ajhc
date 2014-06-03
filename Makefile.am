@@ -297,7 +297,7 @@ manual.html :
 .PHONY: libs
 libs: $(JHC_LIBS) $(JHC_EXT_LIBS)
 
-show_elibs: lib/ext/*.cabal  lib/ext/*.yaml
+show_elibs: lib/ext/*.yaml
 	-perl utils/build_extlibs.prl -l $^
 
 %: examples/%.hs jhc $(JHC_LIBS)

@@ -30,6 +30,11 @@ cc=@MINGW@
 executable_extension=.exe
 merge=i686
 
+[win64]
+cc=@MINGW64@
+executable_extension=.exe
+merge=x86_64
+
 [wii]
 cc=powerpc-eabi-gcc
 byteorder=be

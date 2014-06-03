@@ -38,6 +38,8 @@
 #define __BYTE_ORDER __LITTLE_ENDIAN
 #elif defined(__i386__)
 #define __BYTE_ORDER __LITTLE_ENDIAN
+#elif defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#define __BYTE_ORDER __LITTLE_ENDIAN
 #else
 #error Could not determine Byte Order
 #endif
