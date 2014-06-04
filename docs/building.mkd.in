@@ -19,7 +19,6 @@ distributions so run ./configure first and it will report any that are missing.
  * [zlib](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/zlib)
  * [utf8-string](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/utf8-string)
  * [readline](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/readline)
- * [fgl](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/fgl)
  * [regex-compat](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/regex-compat)
  * [HsSyck](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/HsSyck)
  * [mtl](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/mtl)

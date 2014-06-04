@@ -15,8 +15,6 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import C.Prims
-import Data.Graph.Inductive.Graph(mkGraph)
-import Data.Graph.Inductive.Tree
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
@@ -166,11 +164,12 @@ hPrintGrin handle grin@Grin { grinCafs = cafs } = do
 {-# NOINLINE graphGrin #-}
 
 graphGrin :: Grin -> String
-graphGrin grin = graphviz' gr [] fnode fedge  where
+graphGrin grin = mkDotGraph' nodes edges [] fnode fedge  where
     nodes = zip [0..] (grinFuncs grin)
     nodeMap = Map.fromList [ (y,x) | (x,(y,_)) <- nodes]
-    gr :: Gr (Atom,Lam) CallType
-    gr =   mkGraph nodes [ (n,n2,tc) | (n,(_,_ :-> l)) <- nodes, (tc,fv) <- Set.toList (freeVars l), n2 <- maybeToList $ Map.lookup fv nodeMap ]
+    --gr :: Gr (Atom,Lam) CallType
+    --gr =   mkGraph nodes 
+    edges = [ (n,n2,tc) | (n,(_,_ :-> l)) <- nodes, (tc,fv) <- Set.toList (freeVars l), n2 <- maybeToList $ Map.lookup fv nodeMap ]
     fnode :: (Atom,Lam) -> [(String,String)]
     fnode (x,_ :-> e) = [("label",show x)]
         ++ (if hasError e then [("color","red")] else [])

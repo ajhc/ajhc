@@ -23,6 +23,8 @@ module Util.Graph(
     restitchGraph,
     mapGraph,
     transitiveClosure,
+    groupOverlapping,
+    getBindGroups,
     transitiveReduction
     ) where
 
@@ -33,10 +35,14 @@ import Data.Array.ST hiding(unsafeFreeze)
 import Data.Array.Unsafe (unsafeFreeze)
 import Data.Graph hiding(Graph)
 import Data.Maybe
+import Data.STRef
 import GenUtil
-import List(sort,sortBy,group,delete)
+import Data.List(sort,sortBy,group,delete)
+import Util.UnionFindST
 import qualified Data.Graph as G
 import qualified Data.Map as Map
+import qualified Data.Set as Set
+import qualified Data.Traversable as A
 
 data Graph n = Graph G.Graph (Table n)
 
@@ -83,7 +89,7 @@ findLoopBreakers func ex (Graph g ln) = ans where
     scc = G.scc g
     ans = f g scc [] [] where
         f g (Node v []:sccs) fs lb
-            | v `elem` g ! v = let ng = (fmap (List.delete v) g) in  f ng (G.scc ng) [] (v:lb)
+            | v `elem` g ! v = let ng = (fmap (Data.List.delete v) g) in  f ng (G.scc ng) [] (v:lb)
             | otherwise = f g sccs (v:fs) lb
 
         f g (n:_) fs lb = f ng (G.scc ng) [] (mv:lb) where
@@ -91,7 +97,7 @@ findLoopBreakers func ex (Graph g ln) = ans where
                 ((mv,_):_) -> mv
                 [] -> error "findLoopBreakers: no valid loopbreakers"
             ns = dec n []
-            ng = fmap (List.delete mv) g
+            ng = fmap (Data.List.delete mv) g
 
         f _ [] xs lb = (map ((ln!) . head) (group $ sort lb),reverse $ map (ln!) xs)
     dec (Node v ts) vs = v:foldr dec vs ts
@@ -217,3 +223,41 @@ mapGraph f (Graph gr nr) = runST $ do
     mnr <- mapArray fromRight mnr
     mnr <- unsafeFreeze mnr
     return (Graph gr mnr)
+
+-- this uses a very efficient union-find algorithm.
+groupOverlapping :: Ord b => (a -> [b]) -> [a] -> (Map.Map b Int,[(Int,[a])])
+groupOverlapping fn xs = runUF $ do
+    es <- forM xs $ \x -> new_ x
+    mref <- liftST (newSTRef Map.empty)
+    forM_ es $ \e -> do
+        let bs = fn $ fromElement e
+        cmap <- liftST $ readSTRef mref
+        sequence_ [ union_ x e | b <- bs, Just x <- [Map.lookup b cmap]]
+        liftST $ modifySTRef mref (Map.union (Map.fromList [ (x,e) | x <- bs ]))
+    cmap <- liftST $ readSTRef mref
+    cmap' <- A.mapM getUnique cmap
+    es <- (Set.toList . Set.fromList) `liftM` mapM find es
+    es' <- forM es $ \e -> do
+        u <- getUnique e
+        es <- getElements e
+        return (u,map fromElement es)
+    return (cmap',es')
+
+-- Given a list of nodes, a function to convert nodes to a list of its names,
+-- function to convert nodes to a list of names on which the node is
+-- dependendant, bindgroups will return a list of bind groups generater from the
+-- list of nodes given.  nodes with matching keys are placed in the same binding
+-- groups.
+
+getBindGroups :: Ord name =>
+    [node]           ->      -- List of nodes
+    (node -> [name]) ->      -- Function to convert nodes to unique names
+    (node -> [name]) ->      -- Function to return dependencies of this node
+    [Either [node] [[node]]] -- binding groups, collecting nodes with overlapping names together
+
+getBindGroups ns fn fd = ans where
+    (mp,ns') = (groupOverlapping fn ns)
+    ans = map f $ stronglyConnComp
+        [(xs,Just n,map (`Map.lookup` mp) (concatMap fd xs)) | (n,xs) <- ns']
+    f (AcyclicSCC x) = Left x
+    f (CyclicSCC xs) = Right xs

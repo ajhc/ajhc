@@ -1,10 +1,9 @@
 -- | Simple graphviz output.
 module Util.Graphviz(
     Orient(..),
-    graphviz, graphviz'
+    mkDotGraph,mkDotGraph'
 ) where
 
-import Data.Graph.Inductive.Graph
 import List(intersperse)
 
 data Orient = Portrait | Landscape deriving (Eq, Show)
@@ -18,12 +17,6 @@ i2d :: Int -> Double
 i2d = fromInteger . toInteger
 -}
 
-
--- | Format a graph for graphviz with reasonable defaults: title of \"fgl\",
--- 8.5x11 pages, one page, landscape orientation
-graphviz' :: Graph g => g a b -> [(String,String)] -> (a -> [(String,String)]) -> (b -> [(String,String)]) -> String
-graphviz' g headers fnode fedge = graphviz g "fgl" headers fnode fedge  (8.5,11.0) (1,1) Landscape
-
 sq :: String -> String
 sq ('"':s) | last s == '"'  = init s
 	   | otherwise	    = s
@@ -31,35 +24,31 @@ sq ('\'':s) | last s == '\''	= init s
 	    | otherwise		= s
 sq s = s
 
-
 sl :: [(String,String)] -> String
 sl [] = []
-sl a = " [" ++ foldr ($) "]" (intersperse (',':) (map showEq a)) where
+sl a = " [" ++ foldr ($) "]" (intersperse (',':) (map showEq a))
 
 showEq :: (String,String) -> String -> String
 showEq (x,y) = ((x ++ " = " ++  (show y)) ++)
 
-
-
-graphviz :: Graph g =>    g a b   -- ^ The graph to format
-			  -> String  -- ^ The title of the graph
-                          -> [(String,String)]
-                          -> (a -> [(String,String)])
-                          -> (b -> [(String,String)])
-			  -> (Double, Double)	-- ^ The size
-			  -- of the page
-			  -> (Int, Int)	-- ^ The width and
-			  -- height of the page
-			  -- grid
-			  -> Orient  -- ^ The orientation of
-			  -- the graph.
-			  -> String
-
-
-graphviz g t headers fnode fedge (w, h) p@(pw', ph') o =
-    let n = labNodes g
-	e = labEdges g
-	ns = concatMap sn n
+-- | Format a graph for graphviz with reasonable defaults: title of \"fgl\",
+-- 8.5x11 pages, one page, landscape orientation
+mkDotGraph' :: [(Int,a)] -> [(Int,Int,b)] -> [(String,String)] -> (a -> [(String,String)]) -> (b -> [(String,String)]) -> String
+mkDotGraph' n e headers fnode fedge = mkDotGraph n e "fgl" headers fnode fedge  (8.5,11.0) (1,1) Landscape
+-- graph
+mkDotGraph
+    :: [(Int,a)]
+    -> [(Int,Int,b)]
+    -> String  -- ^ The title of the graph
+    -> [(String,String)]
+    -> (a -> [(String,String)])
+    -> (b -> [(String,String)])
+    -> (Double, Double)	-- ^ The size -- of the page
+    -> (Int, Int)	-- ^ The width and height of the page grid
+    -> Orient  -- ^ The orientation of -- the graph.
+    -> String
+mkDotGraph n e t headers fnode fedge (w, h) p@(pw', ph') o =
+    let ns = concatMap sn n
 	es = concatMap se e
 	--sz w' h' = if o == Portrait then show w'++","++show h' else show h'++","++show w'
 	--ps = show w++","++show h
@@ -80,6 +69,4 @@ graphviz g t headers fnode fedge (w, h) p@(pw', ph') o =
 		    | otherwise	= '\t':(show n ++ sa ++ "\n")
 	    where sa = sl (fnode a)
 	  se (n1, n2, b) = '\t':(show n1 ++ " -> " ++ show n2 ++ sl (fedge b) ++ "\n")
-
-
 

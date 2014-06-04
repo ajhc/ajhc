@@ -214,7 +214,7 @@ depend.make: deps.txt
 built-sources: $(BUILT_SOURCES)
 
 i: $(BUILT_SOURCES)
-	$(HC) --interactive $(GHCOPTS) src/Main.hs $(CFILES)
+	$(HC) --interactive $(GHCOPTS) -odir $(builddir)/obj/i -hidir $(builddir)/obj/i -fobject-code src/Main.hs $(CFILES)
 
 i2: $(BUILT_SOURCES)
 	$(HC) --interactive $(GHCOPTS)  $(CFILES)
