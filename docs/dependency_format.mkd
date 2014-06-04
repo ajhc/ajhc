@@ -1,7 +1,6 @@
 {-@Using
 
-Dependency Information
-======================
+## Dependency Information
 
 Jhc can output dependency information describing how source files and
 libraries depend on each other while compiling code. The dependency

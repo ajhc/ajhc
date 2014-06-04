@@ -83,7 +83,7 @@ CTYPE
     ~~~~
 
 Header Pragmas
-==============
+--------------
 
 These pragmas are only valid in the 'head' of a file, meaning they must
 come before the initial 'module' definition and in the first 4096 bytes
@@ -109,7 +109,7 @@ LANGUAGE
     ~~~~
 
 Special Pragmas
-===============
+---------------
 
 LINE pragmas change the logical name of the file that is being parsed,
 several preprocessors output these to ensure error messages refer to the

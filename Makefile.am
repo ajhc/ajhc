@@ -285,6 +285,7 @@ manual.mkd: $(JHC_MANUAL_FILES)
 
 manual: manual.mkd
 	pandoc $< --toc -s -f markdown -t html -s -c manual.css -o $@.html
+	sed -e '/^<col width/d' -i $@.html
 
 updatepo: manual.mkd
 	po4a-updatepo -M utf8 -f text -m manual.mkd -p po/ja.po
@@ -306,7 +307,8 @@ man: jhc_man.mkd
 
 options.mkd: drift_processed/Options.hs | jhc
 	echo "{-@Options 1" > $@
-	./jhc --help | sed -e 's/^/    /'  >> $@
+	echo "" >> $@
+	./jhc --help -v  >> $@
 
 fix-whitespace:
 	find src -not \( -name .svn -prune -o -name .git -prune \) -type f \( -name \*.hs -o -name \*.\[ch\] \)  -print0 | xargs -0 sed -i  -E 's/[ 	]*$$//'
@@ -351,4 +353,4 @@ TESTS=HelloWorld Primes
 
 JHC_MANUAL_FILES = docs/make.mkd options.mkd docs/dependency_format.mkd docs/pragmas.mkd docs/differences.mkd \
 	docs/unboxed.mkd rts/rts/jhc_rts.c src/FlagOpts.mkd src/FlagDump.mkd src/E/PrimOpt.hs \
-	drift_processed/E/TypeCheck.hs drift_processed/Options/Type.hs
+	drift_processed/E/TypeCheck.hs drift_processed/Options/Type.hs docs/libraries.mkd

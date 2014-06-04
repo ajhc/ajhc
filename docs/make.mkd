@@ -1,115 +1,135 @@
-{-#Using
+{-@Using
 
-# Building Projects
+Building Projects
+-----------------
 
-Jhc does its own dependency chasing to track down source files, you need only
-provide it with the file containing your 'main' function on the command line.
-For instance, if you had a program 'HelloWorld.hs', the following would compile
-it to an executable named 'hello'.
+Jhc does its own dependency chasing to track down source files, you need
+only provide it with the file containing your 'main' function on the
+command line.
 
     ; jhc HelloWorld.hs -o hello
 
-Jhc searches for modules in its search path, which defaults to the current
-directory. Modules are searched for based on their names. For instance, the
-module Data.Foo will be searched for in 'Data/Foo.hs' and 'Data.Foo.hs'.
-The search path may be modifed with the '-i' command line option, or by
-setting the 'JHC_PATH' environment variable.
+Jhc searches for modules in its search path, which defaults to the
+current directory. Modules are searched for based on their names. For
+instance, `import Data.Foo` will search for a file as `Data/Foo.hs` and
+`Data.Foo.hs`. The search path may be modifed with the `-i` command line
+option or by setting the `JHC_PATH` environment variable.
 
-# Using Libraries
+Using Libraries
+---------------
 
-jhc libraries are distributed as files with an 'hl' suffix, such as
-'base-1.0.hl'. In order to use a haskell  library you simply need to place the
-file in a directory that jhc will search for it. For instance, $HOME/lib/jhc.
-You may set the environment variable  JHC_LIBRARY_PATH to specify alternate
-locations to search for libraries or specify directory to search with the -L
-command line option. -L- will clear the search path.
+jhc libraries are distributed as files with an `hl` suffix, such as
+`applicative-1.0.hl`. In order to install a haskell library you simply
+need to place the file in a directory that jhc will search for it. For
+example `$HOME/lib/jhc`. You may set the environment variable
+`JHC_LIBRARY_PATH` to specify alternate locations to search for
+libraries or specify directory to search with the -L command line
+option. -L- will clear the search path. You can see jhc's built in
+search path by passing the --info option.
 
-You can then use libraries with the '-p' command line option, for instance if
-you had a library 'mylibrary-1.0.hl' in your search path, the following would
-use it.
+You can then use libraries with the '-p' command line option.
 
     ; jhc -p mylibrary MyProgram.hs -o myprogram
 
-You can list all available libraries by passing the --list-libraries option to jhc. If
-you include '-v' for verbose output, you will get detailed information about the
-libraries in a YAML format suitable for processing by external tools.
+You can list all available libraries by passing the `--list-libraries`
+option to jhc. If you include `-v` for verbose output, you will get
+detailed information about the libraries in a YAML format suitable for
+processing by external tools.
 
-# Environment Variables
+Library development
+-------------------
+
+It is often useful to use jhc directly on files in a library during
+development. In order to support this you can use `--with file.yaml`
+which will load the same environment from the yaml file as it would when
+building the library but allow different commands to be specified.
+
+Environment Variables
+---------------------
 
 Jhc's behavior is modified by several enviornment variables.
 
-JHC_OPTS
-:   this is read and appended to the command line of jhc invocations.
+JHC\_OPTS
+  ~ this is read and appended to the command line of jhc invocations.
 
-JHC_PATH
-:   This specifies the path to search for modules; it is equivalent to '-i' on the command line.
+JHC\_PATH
+  ~ This specifies the path to search for modules; it is equivalent to
+    '-i' on the command line.
 
-JHC_LIBRARY_PATH
-:   This specifies the path to search for libraries; it is equivalent to '-L' on the command line.
+JHC\_LIBRARY\_PATH
+  ~ This specifies the path to search for libraries; it is equivalent to
+    '-L' on the command line.
 
-JHC_CACHE
-: This specified the directory jhc will use to cache values. having a valid
-cache is essential for jhc performance. It defaults to ~/.jhc/cache.
+JHC\_CACHE
+  ~ This specified the directory jhc will use to cache values. having a
+    valid cache is essential for jhc performance. It defaults to
+    \~/.jhc/cache.
 
-# Building Haskell Libraries
+Building Haskell Libraries
+--------------------------
 
 Libraries are built by passing jhc a file describing the library via the
 --build-hl option. The library file format is a stadard YAML file.
 
     ; jhc --build-hl mylibrary.yaml
 
-## Library File Format
+Library File Format
+-------------------
 
-The library file is a YAML document, jhc will recognize several fields and
-ignore unknown ones.
+The library file is a YAML document, jhc will recognize several fields
+and ignore unknown ones.
 
 Name
-: The name of your library
+  ~ The name of your library
 
 Version
-: The version of your library, The version number is used to differentiate
-different versions of the library passed to the '-p' command line option but is
-not otherwise special to jhc.
+  ~ The version of your library, The version number is used to
+    differentiate different versions of the library passed to the '-p'
+    command line option but is not otherwise special to jhc.
 
 Exposed-Modules
-: A list of modules to be included in the library and exposed to users of the
-library as its public interface. This may include modules that are part of
-another library, they will be re-exported by the current library.
+  ~ A list of modules to be included in the library and exposed to users
+    of the library as its public interface. This may include modules
+    that are part of another library, they will be re-exported by the
+    current library.
 
 Hidden-Modules
-: A list of modules that the library may use internally but that should not be
-exposed to the user. Jhc may optimize based on this information. If this list
-is not exhaustive jhc will still build your library, but it will print out a
-warning.
+  ~ A list of modules that the library may use internally but that
+    should not be exposed to the user. Jhc may optimize based on this
+    information. If this list is not exhaustive jhc will still build
+    your library, but it will print out a warning.
 
 Extensions
-: A list of extensions which should be enabled during compilation of this
-module. When possible, jhc will match ghc extensions to their closest jhc
-counterparts.
+  ~ A list of extensions which should be enabled during compilation of
+    this module. When possible, jhc will match ghc extensions to their
+    closest jhc counterparts.
 
 Options
-: Extra command line options to jhc for this library build.
+  ~ Extra command line options to jhc for this library build.
 
 Build-Depends
-: libraries to include, in the same format as passed to the '-p' command line
-option
+  ~ libraries to include, in the same format as passed to the '-p'
+    command line option
 
 Hs-Source-Dirs
-: Directory to search for Haskell source files in, this differs from the '-i'
-command line option in that the directory in this field is relative to the
-directory the library description .yaml file is located while the '-i' option
-is always relative to the current working directory.
+  ~ Directory to search for Haskell source files in, this differs from
+    the '-i' command line option in that the directory in this field is
+    relative to the directory the library description .yaml file is
+    located while the '-i' option is always relative to the current
+    working directory.
 
 Include-Dirs
-: directories to be included in the preprocessor search path as if via '-I'.
-The directories are interpreted relative to the directory that contains the
-yaml file.
+  ~ directories to be included in the preprocessor search path as if via
+    '-I'. The directories are interpreted relative to the directory that
+    contains the yaml file.
 
 C-Sources
-: C files that should be linked into programs that utilize this library.
+  ~ C files that should be linked into programs that utilize this
+    library.
 
 Include-Sources
-: files that should be made available for inclusion when compiling the
-generated C code but don't need to be linked into the executable.
+  ~ files that should be made available for inclusion when compiling the
+    generated C code but don't need to be linked into the executable.
 
-example library files can be seen in lib/jhc/jhc.yaml and lib/base/base.yaml
+example library files can be seen in lib/hasklel98/haskell98.yaml and
+lib/jhc/jhc.yaml

@@ -11,6 +11,7 @@ getopts('h:c:t:l',\%o) or die "unknown option";
 my @order = $o{c} ? split /,/,$o{c} : qw(
     Using
     Options
+    Libraries
     Pragmas
     Extensions
     Differences

@@ -130,7 +130,7 @@ The last value specified for an option is the one used, so a users local
 configuration overrides the system local version which overrides the built in
 options.
 
-# Options available
+## targets.ini options available
 
 Option                    Meaning
 ------                    ---------------------------------------------------------------------------
@@ -148,7 +148,15 @@ _bits_                    the number of bits a pointer contains on this architec
 _bits\_max_               the number of bits in the largest integral type. should be the number of bits in the 'intmax_t' C type.
 _arch_                    what to pass to gcc as the architecture
 
-# Special defines to set cflags
+# Unusual Cross compilation
+
+When you need to do more interesting things than just specify a different
+compiler, such as modifying or replacing parts of the rts, or importing the code
+into another build environment such as android, you can have jhc create a
+standalone directory of C code that can then be made with make. specify the
+`-tdir dir` option along with `-C` to create the project in the given directory.
+
+## Internal RTS macros
 
 Define                             Meaning
 ------                             ---------------------------------------------------------------------------
@@ -205,6 +213,7 @@ processOptions = do
             snd <$> readYamlOpts o fp
     o <- foldM readYaml o (optWith o)
     case optMode o of
+        ShowHelp  | optVerbose o > 0  -> putStrLn prettyOptions >> exitSuccess
         ShowHelp    -> doShowHelp
         ShowConfig  -> doShowConfig
         Version   | optVerbose o > 0  -> putStrLn (versionString ++ BS.toString versionContext) >> exitSuccess
@@ -380,8 +389,10 @@ initialLibIncludes = do
     let paths = h ++ ["/usr/local","/usr"]
         bases = ["/lib","/share"]
         vers = ["/jhc-" ++ shortVersion, "/jhc"]
-    return $ nub $ maybe [] (tokens (':' ==))  ps ++ [ p ++ b ++ v | p <- paths, v <- vers, b <- bases ]
+    let lpath = nub $ maybe [] (tokens (':' ==))  ps ++ [ p ++ b ++ v | p <- paths, v <- vers, b <- bases ]
                ++ [d ++ v | d <- [libdir,datadir], v <- vers] ++ [libraryInstall]
+    return $ if "." `elem` lpath then lpath else ".":lpath
+
 data LibDesc = LibDesc (Map.Map String [String]) (Map.Map String String)
 
 readDescFile :: Opt -> FilePath -> IO LibDesc

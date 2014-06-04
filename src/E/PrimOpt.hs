@@ -27,51 +27,53 @@ haskell visible entities are introduced via foreign declarations in jhc.
 
 They all have the form
 
-    foreign import primitive "specification" haskell_name :: type
+```haskell
+foreign import primitive "specification" haskell_name :: type
+```
 
-where "specification" is one of the following
+where the specification string is one of the following
 
 seq
-: evaluate first argument to WHNF, then return the second argument
+:   evaluate first argument to WHNF, then return the second argument
 
 zero,one
-: the values zero and one of any primitive type.
+:   the values zero and one of any primitive type.
 
 const.C_CONSTANT
-: the text following const is directly inserted into the resulting C file
+:   the text following const is directly inserted into the resulting C file
 
 peek.TYPE
-: the peek primitive for raw value TYPE
+:   the peek primitive for raw value TYPE
 
 poke.TYPE
-: the poke primitive for raw value TYPE
+:   the poke primitive for raw value TYPE
 
 sizeOf.TYPE, alignmentOf.TYPE, minBound.TYPE, maxBound.TYPE, umaxBound.TYPE
-: various properties of a given internal type.
+:   various properties of a given internal type.
 
 error.MESSAGE
-: results in an error with constant message MESSAGE.
+:   results in an error with constant message MESSAGE.
 
 constPeekByte
-: peek of a constant value specialized to bytes, used internally by Jhc.String
+:   peek of a constant value specialized to bytes, used internally by Jhc.String
 
 box
-: take an unboxed value and box it, the shape of the box is determined by the type at which this is imported
+:   take an unboxed value and box it, the shape of the box is determined by the type at which this is imported
 
 unbox
-: take an boxed value and unbox it, the shape of the box is determined by the type at which this is imported
+:   take an boxed value and unbox it, the shape of the box is determined by the type at which this is imported
 
 increment, decrement
-: increment or decrement a numerical integral primitive value
+:   increment or decrement a numerical integral primitive value
 
 fincrement, fdecrement
-: increment or decrement a numerical floating point primitive value
+:   increment or decrement a numerical floating point primitive value
 
 exitFailure__
-: abort the program immediately
+:   abort the program immediately
 
-C-- Primitive
-: any C-- primitive may be imported in this manner.
+C-- Primitive, such as Sub,Mul,NEq...
+:   any C-- primitive may be imported in this manner.
 
 -}
 

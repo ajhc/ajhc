@@ -1,0 +1,29 @@
+{-@Libraries
+
+Libraries
+=========
+
+Jhc comes with a few custom libraries in lib/ and various packaged
+external libraries specified in lib/ext
+
+Primitive Libraries
+-------------------
+
+`jhc-prim` is the only library that must be linked with all programs
+though this is done behind the scenes. It contains no code, only
+definitions the compiler internals expect to exist, so it will not
+increase the size of executables. For creating a specific environment
+that substantially differs from standard haskell, you would build on
+this layer.
+
+`jhc` contains definitions useful for building the standards based
+libraries.
+
+`haskell98` provides a haskell 98 compatible environment.
+
+`haskell2010` provides a haskell 2010 compatible environment. It may be
+combined with `haskell98` to have both.
+
+`flat-foreign` provides non hierarchical versions of the libraries
+specified in the FFI addendum to the standard. They existed briefly
+before hierarchical modules were standard.

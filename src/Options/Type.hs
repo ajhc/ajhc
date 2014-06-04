@@ -1,14 +1,24 @@
 {-# OPTIONS -w -funbox-strict-fields #-}
 module Options.Type(
-    StopCondition(..),theoptions,Opt(..),Mode(..),optFOptsSet_u,emptyOpt,postProcessFD,postProcessFO
+    StopCondition(..),
+    theoptions,Opt(..),
+    Mode(..),
+    optFOptsSet_u,
+    prettyOptions,
+    emptyOpt,
+    postProcessFD
+    ,postProcessFO
     ,fileOptions) where
 
+import Data.List(intercalate)
+import Util.DocLike
 import System.Console.GetOpt
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 
+{-# NOINLINE theoptions #-}
 theoptions :: [OptDescr (Opt -> Opt)]
 theoptions =
     [Option ['V'] ["version"]         (NoArg  (optMode_s Version))          "print version info and exit"
@@ -122,13 +132,11 @@ emptyOpt = Opt {
     optMode        = CompileExe,
     optColumns     = 80,
     optCross       = False,
---    optIncdirs     = initialIncludes,
     optIncdirs     = [],
     optAnnotate    = Nothing,
     optDeps        = Nothing,
     optHls         = [],
     optAutoLoads   = [],
---    optHlPath      = initialLibIncludes,
     optHlPath      = [],
     optIncs        = [],
     optWith        = [],
@@ -188,3 +196,26 @@ postProcessFO o = case FO.process (optFOptsSet o) (optFOpts o) of
         (s,[]) -> return $ o { optFOptsSet = s, optFOpts = [] }
         (_,xs) -> fail ("Unrecognized flag passed to '-f': "
                         ++ unwords xs ++ "\nValid flags:\n\n" ++ FO.helpMsg)
+
+{-# NOINLINE prettyOptions #-}
+prettyOptions :: String
+prettyOptions =  showSD $ vcat ([h1 "Usage Examples"] ++ usages
+        ++ [h1 "Option Flags"] ++ flags) where
+    h1 t = text "# " <> text t $$ text ""
+    flags = dashes $+$ header $+$ hdash $+$ vsep (map f theoptions) $+$ dashes
+    cmd =  text "    ./jhc [OPTION]"
+    dashes = text $ replicate 40 '-'
+    usages =
+        [cmd <+> text "File.hs   # compile given module"
+        ,cmd <+> text "--build-hl libdef.yaml   # compile library described by file"]
+    f (Option cs vs arg msg) = pads [unwords sflg,unwords mflg,msg] where
+        sflg = map (\c -> ['-',c,' '] ++ rg) cs
+        mflg =  map (\s -> "--" ++ s ++ " " ++ rg) vs
+        rg = rarg arg
+    rarg NoArg {} = ""
+    rarg (ReqArg _ n) = n
+    vsep xs = vcat $ intercalate (text "") xs
+    hdash = pads ["----","----","--------"]
+    header = pads ["flag","","description"]
+    pads (x:y:xs) = hsep $ pad 18 x:pad 25 y:[ pad 20 x | x <- xs ]
+    pad n t = text $ t ++ replicate (n - length t) ' '

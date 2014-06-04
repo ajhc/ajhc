@@ -4,48 +4,15 @@
 
 ## Language Differences
 
-* Class contexts on data types are silently ignored.
+* Class contexts on data types are silently ignored. They have been deprecated
+  in any case.
 
 * Class methods are fully 'eta expanded' out to the argument count specified
   by the type. This is often beneficial as instances that need to share
   partial applications are rare. This behavior can be turned off with the
   NOETA pragma for specific methods.
 
-## Library Changes
-
-In addition to a larger set of base libraries roughly modeled on GHC's base.
-Jhc provides a number of extensions/minor modifications to the standard
-libraries. These are designed to be mostly backwards compatible and most are
-to the class system.
-
-* Data.Bits
-    * Num is no longer a super class of Data.Bits. It never should have been.
-    * There are new methods logicalShiftR and arithmeticShiftR that do a logical and
-      arithmetic shift respectively. shiftR will always map to one of those as
-      appropriate.
-    * shiftR and shiftL do not check for negative arguments, if you might want
-      negative arguments, use the general 'shift' routine. 'shift' also comes
-      in logical and arithmetic varieties.
-
-
-## Library Additions
-
-There are many other additional libraries provided with jhc, here I list only
-changes that affect modules that are defined by the haskell 98 or FFI
-specifications.
-
-* Data.Int and Data.Word provide WordPtr, WordMax, IntPtr, and IntMax that
-   correspond to the C types uintptr_t, uintmax_t, intptr_t, and intmax_t
-   respectively.
-
-* fromInt,toInt,fromDouble,toDouble have been added
-   alongside Integer and Rational routines in their respective classes.
-
-* floating point truncation and rounding functions have varieties that don't
-   return an integral type, but rather return something of the same type
-   as its argument. These have the same name but end in 'f'.
-
-# Notable Differences from GHC
+## Notable Differences from GHC
 
 Jhc differs from GHC in certain ways that are allowed by Haskell 98, but might
 come as a surprise to some.
@@ -65,8 +32,13 @@ come as a surprise to some.
    performed by simple truncation of chars down to 8 bits will fail. Use the
    explicit binary routines if you need binary IO.
 
+ * There is no special syntax for unboxed types, give them names like any
+   other. By convention an underscore is used to end the name.
 
-# Differences That are Considered Misfeatures
+ * Jhc is polymorphic in unboxed types. so 0\# will be an unboxed int, word, or
+   even an unboxed False.
+
+## Differences That are Considered Misfeatures
 
 These misfeatures will be fixed at some point.
 
@@ -76,3 +48,37 @@ These misfeatures will be fixed at some point.
 
  * Ix is not derivable.
 
+<!--
+## Library Changes
+
+In addition to a larger set of base libraries roughly modeled on GHC's base.
+Jhc provides a number of extensions/minor modifications to the standard
+libraries. These are designed to be mostly backwards compatible and most are
+to the class system.
+
+* Data.Bits
+    * Num is no longer a super class of Data.Bits. It never should have been.
+    * There are new methods logicalShiftR and arithmeticShiftR that do a logical and
+      arithmetic shift respectively. shiftR will always map to one of those as
+      appropriate.
+    * shiftR and shiftL do not check for negative arguments, if you might want
+      negative arguments, use the general 'shift' routine. 'shift' also comes
+      in logical and arithmetic varieties.
+
+## Library Additions
+
+There are many other additional libraries provided with jhc, here I list only
+changes that affect modules that are defined by the haskell 98 or FFI
+specifications.
+
+* Data.Int and Data.Word provide WordPtr, WordMax, IntPtr, and IntMax that
+   correspond to the C types uintptr_t, uintmax_t, intptr_t, and intmax_t
+   respectively.
+
+* fromInt,toInt,fromDouble,toDouble have been added
+   alongside Integer and Rational routines in their respective classes.
+
+* floating point truncation and rounding functions have varieties that don't
+   return an integral type, but rather return something of the same type
+   as its argument. These have the same name but end in 'f'.
+ -->
