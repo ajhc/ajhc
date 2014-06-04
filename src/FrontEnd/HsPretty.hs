@@ -392,7 +392,7 @@ ppHsTypePrec p (HsTyEq a b) =
 ppHsTypePrec p (HsTyTuple l) = parenList . map ppHsType $ l
 ppHsTypePrec p (HsTyUnboxedTuple l) = parenListzh . map ppHsType $ l
 -- special case
-ppHsTypePrec p (HsTyApp (HsTyCon lcons) b ) | lcons == nameName tc_List = brackets $ ppHsType b
+ppHsTypePrec p (HsTyApp (HsTyCon lcons) b ) | lcons == tc_List = brackets $ ppHsType b
 ppHsTypePrec p (HsTyApp a b) =
 	parensIf (p > 1) $ myFsep[ppHsType a, ppHsTypeArg b]
 ppHsTypePrec p (HsTyVar name) = ppHsName name

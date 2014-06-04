@@ -925,8 +925,8 @@ convertMatches bs ms err = do
                         return $ eCase b [Alt litCons { litName = vCons, litArgs = [z], litType = getType b } (eCase (EVar z) as err')] Unknown
             | otherwise = error $ "Heterogenious list: " ++ show (map fst3 ps)
         pappConvert (p@HsPApp {},x,y) = return (p,x,y)
-        pappConvert (HsPLit (HsString ""),ps,b) = return (HsPApp (nameName $ dc_EmptyList) [],ps,b)
-        pappConvert (HsPLit (HsString (c:cs)),ps,b) = return (HsPApp (nameName $ dc_Cons) [HsPLit (HsChar c),HsPLit (HsString cs)],ps,b)
+        pappConvert (HsPLit (HsString ""),ps,b) = return (HsPApp dc_EmptyList [],ps,b)
+        pappConvert (HsPLit (HsString (c:cs)),ps,b) = return (HsPApp dc_Cons [HsPLit (HsChar c),HsPLit (HsString cs)],ps,b)
         pappConvert _ = fail "pappConvert"
         isHsPString (HsPLit HsString {}) = True
         isHsPString _ = False

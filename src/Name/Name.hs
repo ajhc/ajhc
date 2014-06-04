@@ -16,7 +16,6 @@ module Name.Name(
     isOpLike,
     mapName,
     mapName',
-    nameName,
     nameParts,
     nameType,
     parseName,
@@ -161,9 +160,6 @@ parseName t name = toName t (intercalate "." ms, intercalate "." (ns ++ [last sn
 
 nameType :: Name -> NameType
 nameType (Name a) = toEnum $ fromIntegral ( a `unsafeByteIndex` 0) - ord '1'
-
-nameName :: Name -> Name
-nameName n = n
 
 nameParts :: Name -> (NameType,Maybe Module,String)
 nameParts n@(Name atom) = (nameType n,a,b) where

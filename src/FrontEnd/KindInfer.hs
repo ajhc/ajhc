@@ -609,7 +609,7 @@ hsQualTypeToType kindEnv qs qualType = return $ hoistType $ tForAll quantOver ( 
    quantOver = nub $ freeVars ps' ++ fvs
    fvs = case qs of
        Nothing -> []
-       Just xs -> [ v | v <- freeVars t', nameName (tyvarName v) `notElem` xs]
+       Just xs -> [ v | v <- freeVars t', (tyvarName v) `notElem` xs]
 
 hoistType :: Type -> Type
 hoistType t = f t where

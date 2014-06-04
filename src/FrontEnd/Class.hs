@@ -326,12 +326,12 @@ renameOneDecl newName (HsFunBind matches)
 -- all pattern bindings are simple by this stage
 -- (ie no compound patterns)
 renameOneDecl newName (HsPatBind sloc (HsPVar patName) rhs wheres)
-   = HsPatBind sloc (HsPVar (nameName newName)) rhs wheres
+   = HsPatBind sloc (HsPVar newName) rhs wheres
 renameOneDecl _ _ = error "Class.renameOneDecl"
 
 renameOneMatch :: Name -> HsMatch -> HsMatch
 renameOneMatch newName (HsMatch sloc oldName pats rhs wheres)
-   = HsMatch sloc (nameName newName) pats rhs wheres
+   = HsMatch sloc newName pats rhs wheres
 
 newMethodSig' :: KindEnv -> Name -> [Pred] -> Sigma -> Type -> Sigma
 newMethodSig' kt methodName newCntxt qt' instanceType  = newQualType where

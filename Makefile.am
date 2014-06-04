@@ -21,7 +21,7 @@ HSFILES= \
     src/E/Rules.hs src/E/Show.hs src/E/Subst.hs src/E/Traverse.hs src/E/TypeAnalysis.hs \
     src/E/TypeCheck.hs src/E/Values.hs src/E/WorkerWrapper.hs src/FindFixpoint.hs \
     src/Fixer/Fixer.hs src/Fixer/Supply.hs src/Fixer/VMap.hs src/FlagDump.hs src/FlagOpts.hs \
-    src/FrontEnd/DataConsAssump.hs src/FrontEnd/DeclsDepends.hs src/FrontEnd/DependAnalysis.hs \
+    src/FrontEnd/DataConsAssump.hs src/FrontEnd/DependAnalysis.hs \
     src/FrontEnd/Desugar.hs src/FrontEnd/Diagnostic.hs src/FrontEnd/Exports.hs \
     src/FrontEnd/FrontEnd.hs src/FrontEnd/HsErrors.hs src/FrontEnd/HsPretty.hs \
     src/FrontEnd/Infix.hs src/FrontEnd/Lex/Fixity.hs src/FrontEnd/Lex/Layout.hs \

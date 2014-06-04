@@ -12,7 +12,7 @@ import qualified Text.PrettyPrint.HughesPJ as P
 import Doc.DocLike
 import Doc.PPrint as PPrint
 import FrontEnd.Class
-import FrontEnd.DeclsDepends(getDeclDeps)
+import FrontEnd.DependAnalysis(getDeclDeps)
 import FrontEnd.Diagnostic
 import FrontEnd.HsPretty
 import FrontEnd.HsSyn
@@ -31,6 +31,7 @@ import Name.VConsts
 import Options
 import Support.FreeVars
 import Util.Progress
+import Util.Graph
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 
@@ -867,18 +868,8 @@ tiLit _ = error "Main.tiLit: bad."
 getFunDeclsBg :: TypeEnv -> [HsDecl] -> [BindGroup]
 getFunDeclsBg sigEnv decls = makeProgram sigEnv equationGroups where
    equationGroups :: [[HsDecl]]
-   equationGroups = getBindGroups bindDecls getDeclName getDeclDeps
+   equationGroups = easySCC bindDecls getDeclName getDeclDeps
    bindDecls = collectBindDecls decls
-
-getBindGroups :: Ord name =>
-                 [node]           ->    -- List of nodes
-                 (node -> name)   ->    -- Function to convert nodes to a unique name
-                 (node -> [name]) ->    -- Function to return dependencies of this node
-                 [[node]]               -- Bindgroups
-
-getBindGroups ns fn fd = map f $ stronglyConnComp [ (n, fn n, fd n) | n <- ns] where
-    f (AcyclicSCC x) = [x]
-    f (CyclicSCC xs) = xs
 
 -- | make a program from a set of binding groups
 makeProgram :: TypeEnv -> [[HsDecl]] -> [BindGroup]

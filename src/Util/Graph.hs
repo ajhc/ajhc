@@ -4,27 +4,28 @@
 
 module Util.Graph(
     Graph(),
-    fromGraph,
-    newGraph,
-    newGraph',
-    newGraphReachable,
-    reachableFrom,
-    Util.Graph.reachable,
-    fromScc,
-    findLoopBreakers,
-    sccGroups,
-    Util.Graph.scc,
-    sccForest,
-    Util.Graph.dff,
     Util.Graph.components,
+    Util.Graph.dff,
+    Util.Graph.reachable,
+    Util.Graph.scc,
     Util.Graph.topSort,
     cyclicNodes,
-    toDag,
-    restitchGraph,
-    mapGraph,
-    transitiveClosure,
-    groupOverlapping,
+    findLoopBreakers,
+    fromGraph,
+    fromScc,
     getBindGroups,
+    groupOverlapping,
+    mapGraph,
+    newGraph',
+    newGraph,
+    newGraphReachable,
+    reachableFrom,
+    restitchGraph,
+    sccForest,
+    easySCC,
+    sccGroups,
+    toDag,
+    transitiveClosure,
     transitiveReduction
     ) where
 
@@ -48,6 +49,12 @@ data Graph n = Graph G.Graph (Table n)
 
 instance Show n => Show (Graph n) where
     showsPrec n g = showsPrec n (Util.Graph.scc g)
+
+-- simple scc interface
+easySCC :: Ord name => [node]  -> (node -> name)   ->  (node -> [name]) ->  [[node]]
+easySCC ns fn fd = map f $ stronglyConnComp [ (n, fn n, fd n) | n <- ns] where
+    f (AcyclicSCC x) = [x]
+    f (CyclicSCC xs) = xs
 
 fromGraph :: Graph n -> [(n,[n])]
 fromGraph (Graph g lv) = [ (lv!v,map (lv!) vs) | (v,vs) <- assocs g ]

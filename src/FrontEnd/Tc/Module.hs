@@ -13,8 +13,7 @@ import Doc.PPrint
 import Doc.PPrint as PPrint
 import FrontEnd.Class
 import FrontEnd.DataConsAssump     (dataConsEnv)
-import FrontEnd.DeclsDepends       (getDeclDeps, debugDeclBindGroups)
-import FrontEnd.DependAnalysis     (getBindGroups)
+import FrontEnd.DependAnalysis     (getDeclDeps, debugDeclBindGroups)
 import FrontEnd.Exports
 import FrontEnd.HsErrors
 import FrontEnd.HsSyn
@@ -35,6 +34,7 @@ import Name.Name as Name
 import Name.Names
 import Options
 import Util.Gen
+import Util.Graph
 import Util.Inst()
 import Util.SetLike
 import qualified Doc.DocLike as D
@@ -222,7 +222,7 @@ tiModules htc ms = do
         classNoDefaults = snub (concat [ getDeclNames z | z <- cDefBinds ]) -- List.\\ classDefaults
         noDefaultSigs = Map.fromList [ (n,maybe (error $ "sigEnv:"  ++ show n) id $ Map.lookup n sigEnv) | n <- classNoDefaults ]
     --when verbose2 $ putStrLn (show bindings)
-    let programBgs = getBindGroups bindings (nameName . getDeclName) getDeclDeps
+    let programBgs = easySCC bindings getDeclName getDeclDeps
 
     when (dump FD.Bindgroups) $
          do {putStrLn " \n ---- toplevel variable binding groups ---- ";

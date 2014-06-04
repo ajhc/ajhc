@@ -494,9 +494,9 @@ deriveClasses cmap dt@(DataTable mp) ctd = concatMap f ctd where
 --                    iv v_inRange inRange_body,
                     iv v_index index_body
                 ])]
-            iv_te = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName v_toEnum (nameName $ conName c), tvrType = getType ib_te }
-            iv_fe = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName v_fromEnum (nameName $ conName c), tvrType = getType ib_fe }
-            iv fname body = (setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName fname (nameName $ conName c), tvrType = getType body },body)
+            iv_te = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName v_toEnum (conName c), tvrType = getType ib_te }
+            iv_fe = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName v_fromEnum (conName c), tvrType = getType ib_fe }
+            iv fname body = (setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName fname (conName c), tvrType = getType body },body)
             succ_body = foldl EAp (lupvar v_enum_succ) [typ, box, debox, max]
             pred_body = foldl EAp (lupvar v_enum_pred) [typ, box, debox]
             from_body = foldl EAp (lupvar v_enum_from) [typ, box, debox, max]
@@ -519,7 +519,7 @@ deriveClasses cmap dt@(DataTable mp) ctd = concatMap f ctd where
         h _ = []
         mkCmpFunc fname op = (iv_eq,ib_eq) where
             ib_eq = unbox (eStrictLet b3 (oper_IIB op (EVar i1) (EVar i2)) (ELit (litCons { litName = dc_Boolzh, litArgs = [EVar b3], litType = tBool })))
-            iv_eq = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName fname (nameName $ conName c), tvrType = getType ib_eq }
+            iv_eq = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName fname (conName c), tvrType = getType ib_eq }
     oper_IIB op a b = EPrim (Op (Op.BinOp op Op.bits16 Op.bits16) Op.bits16) [a,b] tBoolzh
 
 create_integralCast conv c1 t1 c2 t2 e t = eCase e [Alt (litCons { litName = c1, litArgs = [tvra], litType = te }) cc] Unknown  where
@@ -596,8 +596,8 @@ toDataTable km cm ds currentDataTable = newDataTable  where
             virt = Just (map conName virtualCons')
             f (n,vc) = vc { conExpr = ELit (litCons { litName = consName, litArgs = [ELit (LitInt (fromIntegral n) rtype)], litType = conType vc }), conVirtual = virt }
             virtualCons = map f (zip [(0 :: Int) ..] virtualCons')
-            consName =  mapName (id,(++ "#")) $ toName DataConstructor (nameName (conName theType))
-            rtypeName =  mapName (id,(++ "#")) $ toName TypeConstructor (nameName (conName theType))
+            consName =  mapName (id,(++ "#")) $ toName DataConstructor ((conName theType))
+            rtypeName =  mapName (id,(++ "#")) $ toName TypeConstructor ((conName theType))
             rtype = ELit litCons { litName = rtypeName, litType = eHash, litAliasFor = Just tEnumzh }
             dataCons = fc { conName = consName, conType = getType (conExpr dataCons), conOrigSlots = [SlotNormal rtype], conExpr = ELam (tVr (anonymous 3) rtype) (ELit (litCons { litName = consName, litArgs = [EVar (tVr (anonymous 6) rtype)], litType =  conExpr theType })) }
             rtypeCons = emptyConstructor {

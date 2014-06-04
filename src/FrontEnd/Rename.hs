@@ -802,8 +802,8 @@ instance UpdateTable HsType where
 getNamesAndASrcLocsFromHsDecl :: HsDecl -> [(Name, SrcLoc)]
 getNamesAndASrcLocsFromHsDecl d = f d where
     f (HsPatBind srcLoc (HsPVar hsName) _ _) = [(hsName, srcLoc)]
---    f (HsPatBind sloc p _ _) = [ (fromValishHsName n, sloc) | n <- (getNamesFromHsPat p) ]
-    f (HsPatBind sloc _ _ _) = error $ "non simple pattern binding found (sloc): " ++ show sloc
+    f (HsPatBind sloc p _ _) = [ (n, sloc) | n <- (getNamesFromHsPat p) ]
+--    f (HsPatBind sloc _ _ _) = error $ "non simple pattern binding found (sloc): " ++ show sloc
     f (HsFunBind (HsMatch { .. }:_)) = [(hsMatchName,hsMatchSrcLoc)]
     f (HsForeignDecl { .. }) = [(hsDeclName, hsDeclSrcLoc)]
     f _ = []

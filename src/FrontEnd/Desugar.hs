@@ -29,6 +29,7 @@ desugarHsModule :: HsModule -> HsModule
 desugarHsModule m = hsModuleDecls_s ds' m where
     (ds', _) = runUniq 0 (dsm (hsModuleDecls m)) -- (0::Int)
     dsm ds = fmap concat $ mapM desugarDecl ds
+--desugarHsModule m = m
 
 desugarHsStmt :: Monad m => HsStmt -> m HsStmt
 desugarHsStmt s = return $ fst $ runUniq 0 (desugarStmt s)

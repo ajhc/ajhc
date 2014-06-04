@@ -169,7 +169,7 @@ decl :: { HsDecl }
                       { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = $4, hsDeclType = $6
                                            , hsDeclUniq = error "hsDeclUniq not set"  } }
     | srcloc specialize 'instance'  cl_type '#-}'
-                      { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = nameName u_instance , hsDeclType = head $4
+                      { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = u_instance , hsDeclType = head $4
                                            , hsDeclUniq = error "hsDeclUniq not set"  } }
 #maybe con
 #maybe slist

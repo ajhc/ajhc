@@ -19,9 +19,9 @@ instance FreeVars HsType (Set.Set Name) where
         f t = traverseHsType_ f t
 
 traverse_ :: Applicative m => (a -> m b) -> a -> m a
-traverse_ fn x = fn x *> pure x
+traverse_ fn x =  x <$ fn x
 
-traverseHsExp_ :: (Monad m,Applicative m,MonadSetSrcLoc m) => (HsExp -> m ()) -> HsExp -> m ()
+traverseHsExp_ :: (Monad m,Applicative m,MonadSetSrcLoc m,TraverseHsOps e) => (HsExp -> m ()) -> e -> m ()
 traverseHsExp_ fn e = traverseHsExp (traverse_ fn) e *> pure ()
 
 traverseHsExp :: (Monad m,MonadSetSrcLoc m,TraverseHsOps e) => (HsExp -> m HsExp) -> e -> m e
