@@ -1,0 +1,5 @@
+tests:
+    haskell98:
+        jhc_flags: --noauto -phaskell98 -XHaskell98
+    haskell2010:
+        jhc_flags: --noauto -phaskell2010 -XHaskell2010
