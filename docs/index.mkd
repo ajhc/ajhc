@@ -4,7 +4,7 @@ Jhc Haskell Compiler
 [***How to install***](building.shtml)
 ======================================
 
-[***The Manual***](manual.shtml)
+[***The Manual***](manual.html)
 ======================================
 
 jhc is a haskell compiler which aims to produce the most efficient programs

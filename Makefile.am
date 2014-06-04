@@ -98,7 +98,7 @@ EXTRA_DIST = src/data rts utils docs $(BUILT_SOURCES) \
              lib/jhc lib/jhc-prim lib/haskell-extras lib/haskell98 lib/haskell2010 lib/flat-foreign $(JHC_LIBS) $(JHC_EXT_LIBS) \
 	     src/StringTable/StringTable_cbits.c src/StringTable/StringTable_cbits.h src/cbits/md5sum.c jhc.1 \
 	     src/StringTable/Atom.hsc jhc.spec src/cbits/lookup3.c \
-	     manual.html lib/applicative examples/HelloWorld.hs examples/Calendar.hs \
+	     docs/manual.html lib/applicative examples/HelloWorld.hs examples/Calendar.hs \
 	     examples/Primes.hs src/FlagOpts.flags src/FlagDump.flags lib/ext compat LICENSE \
 	     src/FrontEnd/Lex/Lexer.x src/FrontEnd/Lex/Parser.y.pp  src/FrontEnd/Lex/Parser.y
 
@@ -277,15 +277,22 @@ CLEANFILES= $(JHC_LIBS) $(JHC_EXT_LIBS) HelloWorld Primes src/StringTable/Atom.h
 	pandoc $< -f markdown -t html >> $@
 	cat $(srcdir)/docs/template/my_footer.shtml >> $@
 
-publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/index.shtml docs/jhc.shtml manual.html docs/manual.css
-	cp -- $^ /home/john/public_html/computer/jhc
+PUBLISH_DIR=/home/john/public_html/computer/jhc
+
+publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/index.shtml docs/jhc.shtml docs/manual.html docs/manual.css md5css.txt
+	cp -- docs/manual.css $(PUBLISH_DIR)/`cat md5css.txt`
+	cp -- $^ $(PUBLISH_DIR)
+
+md5css.txt: docs/manual.css
+	echo `md5sum $< | cut -f 1 -d' '`.css > $@
+	ln -s manual.css docs/`cat $@`
 
 manual.mkd: $(JHC_MANUAL_FILES)
 	perl $(srcdir)/utils/stitch.prl $^ > $@
 
-manual: manual.mkd
-	pandoc $< --toc -s -f markdown -t html -s -c manual.css -o $@.html
-	sed -e '/^<col width/d' -i $@.html
+manual: manual.mkd md5css.txt
+	pandoc $< --toc -s -f markdown -t html -s -c `cat md5css.txt` -o docs/$@.html
+	sed -e '/^<col width/d' -i docs/$@.html
 
 updatepo: manual.mkd
 	po4a-updatepo -M utf8 -f text -m manual.mkd -p po/ja.po
@@ -294,7 +301,7 @@ manual_ja.mkd: manual.mkd po/ja.po
 	po4a-translate -M utf8 -f text -m manual.mkd -p po/ja.po -l manual_ja.mkd
 
 manual_ja: manual_ja.mkd
-	pandoc $< --toc -s -f markdown -t html -s -c manual.css -o $@.html
+	pandoc $< --toc -s -f markdown -t html -s -c `cat md5css.txt` -o $@.html
 
 $(firstword $(JHC_MANUAL_FILES)): utils/stitch.prl docs/man_header.mkd
 	touch $@
@@ -318,7 +325,7 @@ fix-whitespace:
 jhc.1 :
 	$(MAKE) man
 
-manual.html :
+docs/manual.html :
 	$(MAKE) manual
 
 .PHONY: libs
