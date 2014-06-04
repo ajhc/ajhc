@@ -14,7 +14,6 @@ module Options(
     verbose2,
     progress,
     preprocess,
-    languageFlags,
     dump,
     wdump,
     fopts,
@@ -52,16 +51,17 @@ import qualified Data.Set as S
 import qualified Data.Set as Set
 import qualified System.FilePath as FP
 
-import Util.FilterInput
-import Support.TempDir
+import Options.Map
 import Options.Type
+import RawFiles(prelude_m4)
 import RawFiles(targets_ini)
 import Support.IniParse
+import Support.TempDir
 import Util.ExitCodes
+import Util.FilterInput
 import Util.Gen
 import Util.YAML
 import Version.Config
-import RawFiles(prelude_m4)
 import Version.Version(versionString,versionContext)
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
@@ -205,6 +205,11 @@ processOptions = do
     optHlPath <- initialLibIncludes
     o <- return (foldl (flip ($)) emptyOpt { optColumns, optIncdirs, optHlPath } o)
     when (rc /= []) $ putErrLn (concat rc ++ helpUsage) >> exitWith exitCodeUsage
+    let (nset,errs) = processLanguageFlags (reverse $ optExtensions o) (optFOptsSet o)
+    o <- return $ o { optFOptsSet = nset }
+    unless (null errs) $ do
+        putErrLn $ "Unrecognized -X flags: " ++  concatMap (' ':) errs
+
     case optStop o of
         StopError s -> putErrLn "bad option passed to --stop should be one of parse, deps, typecheck, or c" >> exitWith exitCodeUsage
         _ -> return ()
@@ -215,7 +220,6 @@ processOptions = do
     case optMode o of
         ShowHelp  | optVerbose o > 0  -> putStrLn prettyOptions >> exitSuccess
         ShowHelp    -> doShowHelp
-        ShowConfig  -> doShowConfig
         Version   | optVerbose o > 0  -> putStrLn (versionString ++ BS.toString versionContext) >> exitSuccess
         Version     -> putStrLn versionString >> exitSuccess
         PrintHscOptions -> do
@@ -234,19 +238,23 @@ processOptions = do
             Just "boehm" -> optFOptsSet_u (S.insert FO.Boehm) o
             _ -> o
     o2 <- either putErrDie return $ postProcessFO o1
---    when (FD.Ini `S.member` optDumpSet o) $ do
---        putStrLn (show $ optDumpSet o)
---        putStrLn (show $ optFOptsSet o)
+
     -- add autoloads based on ini options
     let autoloads = maybe [] (tokens (',' ==)) (M.lookup "autoload" inis)
-    return o2 { optArgs = ns, optInis = inis, optAutoLoads = autoloads }
+        Opt { .. } = o2
+        fopt = o2 {
+            optIncdirs = nub optIncdirs,
+            optHlPath = nub optHlPath,
+            optIncs = nub optIncs,
+            optArgs = ns,
+            optInis = inis,
+            optAutoLoads = autoloads }
+    case optMode of
+        ShowConfig  -> doShowConfig fopt
+        _ -> return fopt
 
 doShowHelp = do
     putStrLn helpUsage
-    exitSuccess
-
-doShowConfig = do
-    configs >>= putStrLn . showYAML
     exitSuccess
 
 findHoCache :: IO (Maybe FilePath)
@@ -262,20 +270,30 @@ findHoCache = do
             return (Just cd)
         _  -> return Nothing
 
-configs :: IO Node
-configs = do
+doShowConfig Opt { .. } = do
     ls <- initialLibIncludes
-    return $ toNode [
-        "jhclibpath" ==> ls,
+    let (==>) :: ToNode b => String -> b -> (String,Node)
+        a ==> b = (a,toNode b)
+    putStrLn $ showYAML $ toNode [
+        "name" ==> package,
         "version" ==> version,
-        "package" ==> package,
         "libdir" ==> libdir,
         "datadir" ==> datadir,
         "libraryInstall" ==> libraryInstall,
-        "host" ==> host
-        ] where
-        (==>) :: ToNode b => String -> b -> (String,Node)
-        a ==> b = (a,toNode b)
+        "host" ==> host,
+        "jhclibpath" ==> optHlPath,
+        "hs-source-dirs" ==> optIncdirs,
+        "include-dirs" ==> optIncs,
+        "build-depends" ==> optHls,
+        "flags-option"  ==> optFOptsSet,
+        "flags-dump"    ==> optDumpSet
+        ]
+    exitSuccess
+
+instance ToNode FO.Flag where
+    toNode = toNode . show
+instance ToNode FD.Flag where
+    toNode = toNode . show
 
 {-# NOINLINE options #-}
 -- | The global options currently used.
@@ -413,20 +431,30 @@ readDescFile origOpt fp = do
         _ -> putErrDie $ "Do not recoginize description file type: " ++ fp
 
 readYamlOpts :: Opt -> FilePath -> IO (LibDesc,Opt)
-readYamlOpts origOpt fp = do
+readYamlOpts origOpt@Opt { .. } fp = do
     ld@(LibDesc dlist dsing) <- readDescFile origOpt fp
+
     let mfield x = maybe [] id $ Map.lookup x dlist
-        Just bopt = fileOptions origOpt modOptions `mplus` Just origOpt
-        (pfs,nfs,_) = languageFlags (mfield "extensions")
-        lproc opt = opt { optFOptsSet = Set.union pfs (optFOptsSet opt) Set.\\ nfs }
-        dirs = [ "-i" ++ dd x | x <- mfield "hs-source-dirs" ]
-            ++ [ "-I" ++ dd x | x <- mfield "include-dirs" ]
-            ++ [ "-p" ++ x | x <- mfield "build-depends" ]
-        modOptions =  (mfield "options" ++ dirs)
         dd "." = FP.takeDirectory fp
         dd ('.':'/':x) = dd x
         dd x = FP.takeDirectory fp FP.</> x
-    return (ld,lproc bopt)
+    (optFOptsSet,errs) <- return $ processLanguageFlags (mfield "extensions") optFOptsSet
+    unless (null errs) $ do
+        putErrLn $ "---"
+        putErrLn $ fp ++ ":Unrecognized extensions" ++  show errs
+    optIncdirs <- return $ map dd (mfield "hs-source-dirs") ++ optIncdirs
+    optIncs <- return $ map dd (mfield "include-dirs") ++ optIncs
+    optHls <- return $ mfield "build-depends" ++ optHls
+    let nopt = Opt { .. }
+        fileOpts = fileOptions nopt (mfield "options")
+    bopt <- case fileOpts of
+        Left errs -> do
+            putErrLn $ "---"
+            putErrLn $ fp ++ ":Unrecognized options" ++  show (mfield "options")
+            putErrLn $ errs
+            return nopt
+        Right o -> return o
+    return (ld,bopt)
 
 preprocess :: Opt -> FilePath -> LBS.ByteString -> IO LBS.ByteString
 preprocess opt fn lbs = do
@@ -477,34 +505,3 @@ combineAliases mp = f alias_fields mp where
     f ((x,y):rs) mp = case Map.lookup x mp of
         Nothing -> f rs mp
         Just ys -> f rs $ Map.delete x $ Map.insertWith (++) y ys mp
-
--- translates a list of language extensions as pased to a LANGUAGE pragma or
--- the -X option to the equivalent '-f' flags. The first return value are the
--- positive flags, the negative flags, and the third is the unrecognized extensions.
-languageFlags :: [String] -> (Set.Set FO.Flag,Set.Set FO.Flag,[String])
-languageFlags ls = f ls Set.empty Set.empty [] where
-    f [] pfs nfs us = (pfs,nfs,us)
-    f (l:ls) pfs nfs us | Just lo <- Map.lookup ll langmap =  f ls (Set.union lo pfs) nfs us
-                        | 'n':'o':ll <- ll, Just lo <- Map.lookup ll langmap = f ls pfs (nfs `Set.union` lo) us
-                        | otherwise = f ls pfs nfs (l:us)
-        where ll = map toLower l
-
-langmap = Map.fromList [
-    "m4" ==> FO.M4,
-    "cpp" ==> FO.Cpp,
-    "foreignfunctioninterface" ==> FO.Ffi,
-    "implicitprelude" ==> FO.Prelude,
-    "unboxedtuples" ==> FO.UnboxedTuples,
-    "unboxedvalues" ==> FO.UnboxedValues,
-    "monomorphismrestriction" ==> FO.MonomorphismRestriction,
-    "explicitforall" ==> FO.Forall,
-    "existentialquantification" =+> [FO.Forall,FO.Exists],
-    "scopedtypevariables" ==> FO.Forall,
-    "rankntypes" ==> FO.Forall,
-    "rank2types" ==> FO.Forall,
-    "bangpatterns" ==> FO.BangPatterns,
-    "polymorphiccomponents" ==> FO.Forall,
-    "TypeFamilies" ==> FO.TypeFamilies,
-    "magichash" ==> FO.UnboxedValues
-    ] where x ==> y = (x,Set.singleton y)
-            x =+> y = (x,Set.fromList y)

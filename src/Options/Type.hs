@@ -11,8 +11,10 @@ module Options.Type(
     ,fileOptions) where
 
 import Data.List(intercalate)
-import Util.DocLike
 import System.Console.GetOpt
+
+import Options.Map
+import Util.DocLike
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified FlagDump as FD
@@ -50,7 +52,7 @@ theoptions =
 --  ,Option ['e'] []                  (ReqArg (\d -> optStmts_u ( d:)) "<statement>")  "run given statement as if on jhci prompt"
     ,Option []    ["show-ho"]         (ReqArg (optMode_s . ShowHo) "file.ho") "Show contents of ho or hl file"
     ,Option []    ["noauto"]          (NoArg  (optNoAuto_s True))           "Don't automatically load base and haskell98 packages"
-    ,Option ['p'] []                  (ReqArg (optHls_u . (:)) "package")   "Load given haskell library package"
+    ,Option ['p'] []                  (ReqArg (optHls_u . idu) "package")   "Load given haskell library package"
     ,Option ['L'] []                  (ReqArg (optHlPath_u . idu) "path")   "Look for haskell libraries in the given directory"
     ,Option []    ["build-hl"]        (ReqArg (optMode_s . BuildHl) "desc.yaml") "Build hakell library from given library description file"
     ,Option []    ["annotate-source"] (ReqArg (optAnnotate_s . Just) "<dir>") "Write preprocessed and annotated source code to the directory specified"
@@ -79,7 +81,7 @@ data Mode
     | PrintHscOptions          -- ^ Print options for hsc2hs
     | PurgeCache               -- ^ Purge the cache
     | Preprocess               -- ^ Filter through preprocessor
-      deriving(Eq)
+    deriving(Eq)
 
 data StopCondition
     = StopError String         -- ^ error
@@ -88,7 +90,7 @@ data StopCondition
     | StopC                    -- ^ Stop after producing C code.
     | CompileHo                -- ^ Compile ho
     | StopNot                  -- ^ Don't stop believing.
-            deriving(Eq)
+    deriving(Eq)
 
 data Opt = Opt {
     optMode        :: !Mode,      -- ^ Mode of interaction
@@ -163,7 +165,7 @@ emptyOpt = Opt {
     optStatLevel   = 1,
     optNoAuto      = False,
     optDumpSet     = S.singleton FD.Progress,
-    optFOptsSet    = S.empty
+    optFOptsSet    = languageDefault
 }
 
 idu "-" _ = []

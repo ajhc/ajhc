@@ -2,7 +2,6 @@
 module Ho.ReadSource(
    preprocess,
    preprocessHs,
-   languageFlags,
    fetchCompilerFlags,
    parseHsSource
 ) where
@@ -13,7 +12,6 @@ import System.Process
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Lazy.UTF8 as LBSU
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 
 import FrontEnd.HsSyn
 import FrontEnd.SrcLoc
@@ -21,6 +19,7 @@ import FrontEnd.Syn.Options
 import FrontEnd.Unlit
 import FrontEnd.Warning
 import Options
+import Options.Map
 import PackedString
 import Support.TempDir
 import Util.Gen
@@ -37,9 +36,9 @@ collectFileOpts options fn s = (lproc opt,isJust fopts)  where
     fopts = fileOptions options opts
     popts = parseOptions $ if FP.takeExtension fn == ".lhs" then unlit fn s else s
     opts = concatMap words (copts ["OPTIONS","JHC_OPTIONS","OPTIONS_JHC"])
-    (pfs,nfs,_) = languageFlags $ concatMap (words . (map (\c -> if c == ',' then ' ' else c)))
-        (copts ["LANGUAGE","JHC_LANGUAGE"] ++ optExtensions options ++ [ o | '-':'X':o <- opts])
-    lproc opt = opt { optFOptsSet = Set.union pfs (optFOptsSet opt) Set.\\ nfs }
+    lflags = concatMap (words . (map (\c -> if c == ',' then ' ' else c)))
+        (copts ["LANGUAGE","JHC_LANGUAGE"] ++ [ o | '-':'X':o <- opts])
+    lproc opt@Opt { optFOptsSet } = opt { optFOptsSet = fst $ processLanguageFlags lflags optFOptsSet }
 
 parseHsSource :: Opt -> FilePath -> LBS.ByteString -> IO (HsModule,LBS.ByteString)
 parseHsSource options fp@(FP.splitExtension -> (base,".hsc")) _ = do
