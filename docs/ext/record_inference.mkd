@@ -1,0 +1,73 @@
+Record Type Inference
+=====================
+
+An extension to the named field mechanism that will greatly enhance the
+utility of them when combined with the existing `DisambiguateRecordFields`,
+`RecordPuns`, and `RecordWildCards`.
+
+The proposal is to allow the types of record fields to be inferred by the
+normal type inference engine. It would look like
+
+~~~~ {.haskell}
+data Rec = Rec {fieldA,fieldB,fieldC}
+
+f Rec { .. } = Rec { .. } where
+    fieldA = True
+    fieldB = 4
+~~~~
+
+This would infer the types `Bool`, `Int`, and `forall a . a` for the fields of
+the record constructor and `f :: Rec -> Rec` for f. For the purposes of type
+checking the fields are treated as monomorphic and not generalized but
+defaulted like normal after typechecking the module. Other than infering the
+types of the record fields, the records have the normal syntax. The extensions
+`RecordPuns`, `RecordWildCards` and `DisambiguateRecordFields` will be enabled
+when record field inference is enabled.
+
+Selector functions will not be created for infered records, as in, the names
+are field labels and not functions. This means they do not share a namespace
+with functions and do not conflict with each other. Multiple records may have
+the same field names in the same module. This means the following is fine.
+
+~~~~ {.haskell}
+data Rec1 = Rec1 {input, withFoo, withoutFoo }
+data Rec2 = Rec2 {input, withBar, withoutBar }
+
+f Rec1 { .. } = case input of
+    [] -> Rec1 { .. }
+    (x:xs) -> if hasFoo x
+        then Rec1 { withFoo = x:withFoo, .. }
+        else Rec1 { withoutFoo = x:withoutFoo, .. }
+~~~~
+
+Possible extensions
+-------------------
+
+### as-pattern disambiguation
+
+In order to make the disambiguation of record fields more useful without
+relying on the type checker for disambiguation, We can declare that variables
+explicitly bound to a constsructor in a pattern match use that constructor to
+disambiguate fields for operations on the variable. This is a purely syntactic
+transformation that can happen before typechecking. It can be used as follows.
+
+~~~~ {.haskell}
+-- use the input bound by a Rec1 to update the input bound by a Rec2
+f r1@Rec1 { input } r2@Rec2 {} = case input of
+    xs | any hasBar xs = f r1 { input = [] } r2 { input }
+~~~~
+
+### Field label inference
+
+It is concievable that we may want to infer the fields themselves of a record,
+as in:
+
+~~~~ {.haskell}
+-- infer that R has the field labels bob and susan
+data R = R { ..}
+f x@R {bob} = R {susan = bob}
+~~~~
+
+In order to implement this, a pass through the file will collect every field
+label that is used with an explicit R constructor and treat the record as if
+it were declared with those names as infered fields.
