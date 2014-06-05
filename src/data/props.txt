@@ -5,6 +5,8 @@ NOINLINE
 SRCLOC_ANNOTATE
 SUPERINLINE
 NOETA
+HOT
+COLD
 
 # these are used internaly by the compiler
 _CYCLIC

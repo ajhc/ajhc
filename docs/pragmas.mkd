@@ -15,11 +15,13 @@ Function Properties
 
 These must appear in the same file as the definition of a function. To
 apply one to a instance or class method, you must place it in the where
-clause of the instance or class declaration.
+clause of the instance or class declaration. If no function is specified
+as in `{-# INLINE #-}` then it will be as if it were declared for every
+applicable declaration.
 
-  ------------------------------------------------------------------------
+  ----------------------------------------------------------------------
   Function Pragmas    
-  ------------------- ----------------------------------------------------
+  ------------------- --------------------------------------------------
   NOINLINE            Do not inline the given function during core
                       transformations. The function *may* be inlined
                       during grin transformations.
@@ -33,22 +35,40 @@ clause of the instance or class declaration.
                       analysis and the worker/wrapper transforms will
                       treat the function application as if it were a
                       constructor. This implies 'NOINLINE'.
-  ------------------------------------------------------------------------
+
+  COLD                The function is not in a critical path, this lets
+                      the compiler avoid work in the future by
+                      pre-computing the final code and including it in
+                      the cache at the expense of non-local
+                      optimizations involving this function. This can
+                      decrease code size and compilation time. It may
+                      also set the gcc cold attribute on the generated C
+                      code.
+
+  HOT                 The function is in a critical path, optimize
+                      heavily at the expense of compilation speed or
+                      final code size. This may also set the gcc hot
+                      attribute on the generated code.
+
+  NOETA               Do not perform the eta expansion optimization
+                      on this function.  `f x = \y -> z` will remain
+                      a one argument function through optiminization.
+  ----------------------------------------------------------------------
 
 Other Pragmas
 -------------
 
-  ------------------------------------------------------------------------
+  ----------------------------------------------------------------------
   Class Method Pragmas  
-  --------------------- --------------------------------------------------
+  --------------------- ------------------------------------------------
   NOETA                 By default, jhc eta-expands all class methods to
                         help enable optimizations. This disables this
                         behavior.
-  ------------------------------------------------------------------------
+  ----------------------------------------------------------------------
 
-  ------------------------------------------------------------------------
+  ----------------------------------------------------------------------
   Rules/Specialization 
-  -------------------- ---------------------------------------------------
+  -------------------- -------------------------------------------------
   RULES                rewrite rules. These have the same syntax and
                        behave similarly to GHC's rewrite rules, except
                        'phase' information is not allowed.
@@ -58,14 +78,14 @@ Other Pragmas
                        may allow optimizations that require passing
                        through a non-optimal intermediate stage.
 
-  SPECIALIZE           create a version of a function that is specialized
-                       for a given type
+  SPECIALIZE           create a version of a function that is
+                       specialized for a given type
 
-  SUPERSPECIALIZE      has the same effect as SPECIALIZE, but also places
-                       a run-time check in the generic version of the
-                       function to determine whether to call the
+  SUPERSPECIALIZE      has the same effect as SPECIALIZE, but also
+                       places a run-time check in the generic version of
+                       the function to determine whether to call the
                        specialized version.
-  ------------------------------------------------------------------------
+  ----------------------------------------------------------------------
 
 Type Pragmas
 ------------

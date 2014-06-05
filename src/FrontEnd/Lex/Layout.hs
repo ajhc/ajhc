@@ -89,7 +89,7 @@ preprocessLexemes opt fn xs = toplevel xs where
             ,("kind", FO.UserKinds), ("family", FO.TypeFamilies), ("alias", FO.Never)
             ,("prefixx", FO.Never), ("prefixy", FO.Never), ("closed", FO.Never)
             ]
-        pragmaKeep = ["NOETA", "SUPERINLINE", "CTYPE", "INLINE"]
+        pragmaKeep = ["NOETA", "SUPERINLINE", "CTYPE", "INLINE", "HOT", "COLD"]
         pragmaKeepMap =
             [["NOINLINE", "NOTINLINE"]
             ,["CATALYST", "CATALYSTS"]

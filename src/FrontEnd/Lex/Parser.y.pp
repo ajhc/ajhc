@@ -32,7 +32,7 @@ import qualified Data.Map as Map
 #map { token('LReservedOp',$_) } qw/.. :: = \\\\ | <- -> =>/
 #def pragma qq[    '$a' { L _ LPragmaStart \$\$@"$a" }\n]
 
-#map {pragma($_)} qw/NOINLINE CATALYST SPECIALIZE MULTISPECIALIZE SUPERSPECIALIZE RULE NOETA SUPERINLINE CTYPE INLINE SRCLOC_ANNOTATE/
+#map {pragma($_)} qw/NOINLINE CATALYST SPECIALIZE MULTISPECIALIZE SUPERSPECIALIZE RULE NOETA SUPERINLINE CTYPE INLINE SRCLOC_ANNOTATE HOT COLD/
  '.' { L $$ LVarSym "." }
  'as' { L $$ LVarId "as" }
  FORALL { L $$ LVarId "forall" }   -- used inside of rules when -fno-forall is in effect
@@ -215,6 +215,8 @@ propspragma :: { String }
     | 'SRCLOC_ANNOTATE' { $1 }
     | 'SUPERINLINE' { $1 }
     | 'NOETA' { $1 }
+    | 'HOT' { $1 }
+    | 'COLD' { $1 }
 
 -- FFI parts
 mstring :: { Maybe (String,Name) }

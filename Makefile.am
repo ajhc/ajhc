@@ -50,7 +50,8 @@ HSFILES= \
     src/Util/RWS.hs src/Util/ReaderWriter.hs src/Util/Relation.hs src/Util/SameShape.hs \
     src/Util/Seq.hs src/Util/SetLike.hs src/Util/Std.hs src/Util/UnionFind.hs \
     src/Util/UnionSolve.hs src/Util/UniqueMonad.hs src/Util/Util.hs src/Util/VarName.hs \
-    src/Util/YAML.hs src/Version/Config.hs src/Version/Version.hs src/Util/DocLike.hs
+    src/Util/YAML.hs src/Version/Config.hs src/Version/Version.hs src/Util/DocLike.hs \
+    src/Util/UnionFindST.hs
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
 GHCPROFOPTS= -prof -fprof-auto -rtsopts -auto-all -odir @builddir@/obj/prof -hidir @builddir@/obj/prof
