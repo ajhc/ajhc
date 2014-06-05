@@ -28,6 +28,7 @@ my %done;
 my ($nametype,$leader);
 open my $fd, "<", $input or die "$!: $input";
 my %mods;
+my %quoted;
 while(<$fd>) {
     chomp;
     s/;.*$//;
@@ -36,7 +37,11 @@ while(<$fd>) {
     ($nametype,$leader) = ($1,$2),next if /^([A-Za-z]+):([a-z]+):\s*$/;
     die "need nametype:leader declaration" unless defined $nametype && defined $leader;
     my ($name,$mod,$var,$smod);
-    if ($nametype eq 'Module') {
+    if ($nametype eq 'Quoted') {
+        /^([0-9_A-Za-z]+)\s*$/ or die "unrecognized line $_";
+        $quoted{$1}++;
+        next;
+    } elsif ($nametype eq 'Module') {
         /^([0-9_A-Za-z.@]+)\s*$/ or die "unrecognized line $_";
         $mod = $1;
     } else {
@@ -68,4 +73,10 @@ foreach (sort keys %mods) {
     my $mod = $_;
     print "{-# NOINLINE $mods{$_} #-}\n";
     print "$mods{$_} = Module (unsafePerformIO \$ addrToAtom_ \"$mod\"# $lmod# )\n";
+}
+foreach (sort keys %quoted) {
+    my $lmod = length $_;
+    my $mod = $_;
+    print "{-# NOINLINE q$_ #-}\n";
+    print "q$_ = quoteName $_\n";
 }

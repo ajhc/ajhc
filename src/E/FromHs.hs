@@ -37,7 +37,6 @@ import E.Values
 import FrontEnd.Class
 import FrontEnd.HsSyn as HS
 import FrontEnd.Rename(unRename)
-import FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse(getNamesFromHsPat)
 import FrontEnd.Tc.Main(isTypePlaceholder)
 import FrontEnd.Tc.Module(TiData(..))

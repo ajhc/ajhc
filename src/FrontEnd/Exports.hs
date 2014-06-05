@@ -15,7 +15,6 @@ import FindFixpoint
 import FlagDump as FD
 import FlagOpts as FO
 import FrontEnd.HsSyn
-import FrontEnd.SrcLoc
 import FrontEnd.Warning
 import Name.Names as Name
 import Options

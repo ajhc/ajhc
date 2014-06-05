@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fwarn-unused-matches  -fwarn-incomplete-patterns -fwarn-type-defaults #-}
-module FrontEnd.Syn.Traverse where
+module FrontEnd.Syn.Traverse(module FrontEnd.Syn.Traverse, module FrontEnd.HsSyn) where
 
 import Control.Monad.Writer
 import Util.Std
@@ -7,7 +7,6 @@ import qualified Data.Set as Set
 import qualified Data.Traversable as T
 
 import FrontEnd.HsSyn
-import FrontEnd.SrcLoc
 import Name.Name
 import Support.FreeVars
 import Util.Inst()

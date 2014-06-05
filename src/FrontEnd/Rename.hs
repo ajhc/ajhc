@@ -23,7 +23,6 @@ import DerivingDrift.Drift
 import Doc.DocLike(tupled)
 import FrontEnd.Desugar (desugarHsModule)
 import FrontEnd.HsSyn
-import FrontEnd.SrcLoc hiding(srcLoc)
 import FrontEnd.Syn.Traverse
 import FrontEnd.Warning
 import Name.Name as Name
@@ -35,7 +34,6 @@ import Util.Inst()
 import Util.SetLike
 import qualified FlagOpts as FO
 import qualified FrontEnd.HsErrors as HsErrors
-import qualified FrontEnd.SrcLoc
 import qualified Name.VConsts as V
 
 {-
@@ -256,7 +254,7 @@ renameHsDecls c ds = f ds where
     g _ = return []
 
 instance Rename HsDecl where
-    rename d = withSrcLoc (FrontEnd.SrcLoc.srcLoc d) $ renameHsDecl d
+    rename d = withSrcLoc (srcLoc d) $ renameHsDecl d
 
 renameHsDecl d = f d where
     f (HsPatBind srcLoc hsPat hsRhs {-where-} hsDecls) = do

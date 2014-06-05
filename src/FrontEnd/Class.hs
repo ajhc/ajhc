@@ -44,9 +44,7 @@ import qualified Text.PrettyPrint.HughesPJ as PPrint
 import Data.Binary
 import Doc.DocLike
 import Doc.PPrint
-import FrontEnd.HsSyn
 import FrontEnd.KindInfer
-import FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse
 import FrontEnd.Tc.Kind
 import FrontEnd.Tc.Type

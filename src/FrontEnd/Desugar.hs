@@ -7,8 +7,6 @@
 
 module FrontEnd.Desugar (desugarHsModule, desugarHsStmt) where
 
-import FrontEnd.HsSyn
-import FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse
 import Name.Names
 import Ty.Level

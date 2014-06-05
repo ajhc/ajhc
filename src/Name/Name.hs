@@ -11,6 +11,7 @@ module Name.Name(
     getIdent,
     getModule,
     isConstructorLike,
+    isConstructor,
     isTypeNamespace,
     isValNamespace,
     isOpLike,
@@ -195,8 +196,8 @@ type Class = Name
 -- Quoting
 -------------
 
-quoteName :: Name -> Name
-quoteName (Name n) = createUName QuotedName (fromAtom n)
+--quoteName :: Name -> Name
+--quoteName (Name n) = createUName QuotedName (fromAtom n)
 fromQuotedName :: Name -> Maybe Name
 fromQuotedName n = case nameParts n of
     (QuotedName,Nothing,s) -> Just $ Name (toAtom s)

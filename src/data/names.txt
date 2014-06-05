@@ -62,16 +62,20 @@ DataConstructor:dc:
 Boolzh     Jhc.Prim.Prim.Bool#
 Char       Jhc.Type.Basic.Char
 Cons       Jhc.Prim.Prim.:
+EQ         Jhc.Prim.Prim.EQ
 EmptyList  Jhc.Prim.Prim.[]
+False      Jhc.Prim.Prim.False
+GT         Jhc.Prim.Prim.GT
 Int        Jhc.Type.Word.Int
 Integer    Jhc.Type.Basic.Integer
-Ratio      Jhc.Type.Float.:%
-Unit       Jhc.Prim.Prim.()
+Just       Jhc.Type.Basic.Just
+LT         Jhc.Prim.Prim.LT
+Nothing    Jhc.Type.Basic.Nothing
 Pair       Jhc.Prim.Prim.(,)
-Word       Jhc.Type.Word.Word
+Ratio      Jhc.Type.Float.:%
 True       Jhc.Prim.Prim.True
-False      Jhc.Prim.Prim.True
-EQ         Jhc.Prim.Prim.EQ
+Unit       Jhc.Prim.Prim.()
+Word       Jhc.Type.Word.Word
 
 ClassName:class:
 Eq              Jhc.Class.Ord.Eq
@@ -242,6 +246,20 @@ kind         kind
 qualified    qualified
 instance     instance
 import       import
+
+Quoted:q:
+dc_True
+dc_False
+dc_Just
+dc_Nothing
+dc_Unit
+dc_Pair
+v_equals
+v_and
+dc_EQ
+dc_GT
+dc_LT
+v_compare
 
 Module:mod:
 

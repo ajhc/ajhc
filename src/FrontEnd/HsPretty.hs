@@ -28,8 +28,6 @@ import Doc.PPrint(pprint)
 import FlagDump as FD
 import FrontEnd.HsSyn
 import FrontEnd.Rename(unRename)
-import FrontEnd.SrcLoc(Located(..))
-import Name.Name
 import Name.Names
 import Options
 import qualified Doc.DocLike as DL

@@ -16,8 +16,6 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Doc.DocLike
-import FrontEnd.HsSyn
-import FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse
 import FrontEnd.Warning
 import GenUtil

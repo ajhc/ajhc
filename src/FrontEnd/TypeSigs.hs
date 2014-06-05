@@ -9,9 +9,7 @@ import Util.Std
 import qualified Data.Map as Map
 import qualified Util.Seq as Seq
 
-import FrontEnd.HsSyn
 import FrontEnd.KindInfer
-import FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse
 import FrontEnd.Tc.Type
 import Name.Name

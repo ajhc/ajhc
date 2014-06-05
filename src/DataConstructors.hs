@@ -63,8 +63,6 @@ import E.Traverse
 import E.TypeCheck
 import E.Values
 import FrontEnd.Class(instanceName)
-import FrontEnd.HsSyn
-import FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse
 import FrontEnd.Tc.Type
 import GenUtil

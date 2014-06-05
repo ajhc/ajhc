@@ -36,7 +36,6 @@ import FrontEnd.Class
 import FrontEnd.FrontEnd
 import FrontEnd.HsSyn
 import FrontEnd.Infix
-import FrontEnd.SrcLoc
 import FrontEnd.Warning(warn,processIOErrors,WarnType(..))
 import Ho.Binary
 import Ho.Collected()

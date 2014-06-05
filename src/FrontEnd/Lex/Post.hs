@@ -19,7 +19,6 @@ import Util.Std
 import Data.Char
 import FrontEnd.HsSyn
 import FrontEnd.Lex.ParseMonad
-import FrontEnd.SrcLoc
 import Name.Names
 import Options
 import PackedString

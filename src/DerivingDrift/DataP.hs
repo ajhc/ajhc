@@ -1,6 +1,6 @@
 module DerivingDrift.DataP where
 
-import Name.Name(Name)
+import Name.Name hiding(Class)
 import FrontEnd.HsSyn
 
 data Statement = DataStmt | NewTypeStmt
@@ -8,10 +8,10 @@ data Statement = DataStmt | NewTypeStmt
 
 data Data = D {
     name :: Name,		-- type name
-    constraints :: [(Class,Var)],
+    constraints :: [(String,Var)],
     vars :: [Var],		-- Parameters
     body :: [Body],
-    derives :: [Class],		-- derived classes
+    derives :: [String],		-- derived classes
     statement :: Statement
     } deriving (Eq,Show)
 

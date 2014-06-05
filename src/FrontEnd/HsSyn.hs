@@ -1,4 +1,4 @@
-module FrontEnd.HsSyn where
+module FrontEnd.HsSyn(module FrontEnd.HsSyn, module FrontEnd.SrcLoc) where
 
 import Data.Binary
 import Data.Generics

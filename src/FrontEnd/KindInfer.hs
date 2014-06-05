@@ -31,8 +31,6 @@ import qualified Data.Traversable as T
 
 import Doc.DocLike hiding ((<>))
 import Doc.PPrint
-import FrontEnd.HsSyn
-import FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse
 import FrontEnd.Tc.Kind
 import FrontEnd.Tc.Type

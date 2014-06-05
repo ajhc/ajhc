@@ -1,4 +1,4 @@
-module Name.Internals(NameType(..),Module(..),Name(..),QualifiedName,UnqualifiedName,ClassName,FieldName,QuotedName,UnQuotedName,forgeName,nameCompare) where
+module Name.Internals(NameType(..),Module(..),Name(..),QualifiedName,UnqualifiedName,ClassName,FieldName,QuotedName,UnQuotedName,forgeName,nameCompare,quoteName) where
 
 import StringTable.Atom
 import Data.Binary
@@ -59,6 +59,9 @@ instance Show Module where
 forgeName :: NameType -> Maybe Module -> String -> Name
 forgeName t Nothing  i = Name $ toAtom $ (chr $ fromEnum t + ord '1'):";" ++ i
 forgeName t (Just m) i = Name $ toAtom $ (chr $ ord '1' + fromEnum t):show m ++ ";" ++ i
+
+quoteName :: Name -> Name
+quoteName (Name n) = forgeName QuotedName Nothing (fromAtom n)
 
 -- lexigraphic comparison
 Name x `nameCompare` Name y = x `atomCompare` y
