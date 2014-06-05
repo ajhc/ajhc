@@ -477,7 +477,7 @@ procYaml MkNode { n_elem = EMap ms } = f ms mempty mempty where
     f [] dlm dsm = LibDesc (combineAliases dlm) dsm
     f ((n_elem -> EStr (map toLower . unpackBuf -> x),y):rs) dlm dsm = if x `Set.member` list_fields then dlist y else dsing y where
         dlist (n_elem -> EStr y)  = f rs (Map.insert x [unpackBuf y] dlm) dsm
-        dlist (n_elem -> ESeq ss) = f rs (Map.insert x [ unpackBuf y | (n_elem -> EStr y) <- ss ] dlm) dsm
+        dlist (n_elem -> ESeq ss) = f rs (Map.insert x [unpackBuf y | (n_elem -> EStr y) <- ss ] dlm) dsm
         dlist _ = f rs dlm dsm
         dsing (n_elem -> EStr y) = f rs dlm (Map.insert x (unpackBuf y) dsm)
         dsing _ = f rs dlm dsm

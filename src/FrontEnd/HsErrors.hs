@@ -49,8 +49,7 @@ hsDecl cntx decl = withSrcLoc (srcLoc decl) $ f cntx decl where
     f TopLevel HsActionDecl {} = do
         wDecl "top level actions not supported"
     f TopLevel HsDataDecl { .. } = do
-        let ds = map (toName ClassName) hsDeclDerives
-        checkDeriving False ds
+        checkDeriving False hsDeclDerives
         when (hasRepeatUnder hsConDeclName hsDeclCons) $ do
             wDecl "repeated constructor name is not allowed"
 
@@ -107,13 +106,6 @@ preTypecheckChecks x = traverseHsOps ops x where
 --    f context@(InClass ts) decl@HsTypeDecl { hsDeclTArgs = as }
 
 hasDuplicates xs = any ((> 1) . length) $ group (sort xs)
-
---        | any (not . isHsTyVar) as = warn (srcLoc decl) InvalidDecl $ "complex type arguments not allowed " ++ show context
-    --    | length as < length ts || or (zipWith (/=) as ts) = warn (srcLoc decl) "invalid-assoc" $ "arguments to associated type must match class decl" ++ show (as,ts)
---    f TopLevel HsNewTypeDecl { hsDeclSrcLoc = sl, hsDeclDerives = ds' } = do
---        let ds = map (toName ClassName) ds'
---        checkDeriving sl True ds
---        return ()
 
 --    f context decl@HsNewTypeDecl {} = warn (srcLoc decl) InvalidDecl $ "newtype declaration not allowed " ++ show context
 --    f TopLevel decl@HsClassDecl { hsDeclQualType = qt, hsDeclDecls = decls } = do args <- fetchQtArgs (srcLoc decl) qt; mapM_ (f (InClass args)) decls

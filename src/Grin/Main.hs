@@ -25,6 +25,7 @@ import Grin.SSimplify
 import Grin.Show
 import Grin.StorageAnalysis
 import Ho.ReadSource
+import Options.Map
 import Options
 import PackedString
 import RawFiles
@@ -100,6 +101,7 @@ compileGrinToC grin = do
            ("jhc_rts_header.h",jhc_rts_header_h),
            ("lib/lib_cbits.c",lib_cbits_c),
            ("lib/lib_cbits.h",lib_cbits_h),
+           ("jhc/ext_defs.h", generateJhcParams),
            ("rts/cdefs.h",cdefs_h),
            ("rts/constants.h",constants_h),
            ("rts/gc.h",gc_h),

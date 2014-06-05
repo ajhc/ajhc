@@ -320,7 +320,7 @@ kiType k HsTyExists { hsTypeVars = vs, hsTypeType = HsQualType con t } = do
 kiType _ _ = error "KindInfer.kiType: bad."
 
 initTyVarBind HsTyVarBind { hsTyVarBindName = name, hsTyVarBindKind = kk } = do
-    nk <- lookupKind KindSimple (toName TypeVal name)
+    nk <- lookupKind KindSimple name
     case kk of
         Nothing -> return ()
         Just kk -> unify nk (hsKindToKind kk)
@@ -330,7 +330,7 @@ hsKindToKind a | a == hsKindStar       = kindStar
                | a == hsKindHash       = kindHash
                | a == hsKindQuest      = kindFunRet
                | a == hsKindQuestQuest = kindArg
-hsKindToKind (HsKind n) = KBase (KNamed (toName SortName n))
+hsKindToKind (HsKind n) = KBase (KNamed n)
 -- hsKindToKind (HsKind n) = toName SortName n
 
 kiApps :: Kind -> [HsType] -> Kind -> Ki ()
@@ -367,7 +367,7 @@ kiPred :: HsAsst -> Ki ()
 kiPred asst@(HsAsst n ns) = do
     env <- getEnv
     let f k n = do
-            k' <- lookupKind KindAny (toName TypeVal n)
+            k' <- lookupKind KindAny n
             unify k k'
     case Map.lookup n (kindEnvClasses env) of
         Nothing -> do
@@ -404,7 +404,7 @@ kiDecl d = withSrcLoc (srcLoc d) (f d) where
         (HsTyCon {},as) -> all varLike as
         _ -> False
     f HsTypeFamilyDecl { .. } = do
-        kc <- lookupKind KindSimple (toName TypeConstructor hsDeclName)
+        kc <- lookupKind KindSimple hsDeclName
         kiApps kc hsDeclTArgs (maybe kindStar hsKindToKind hsDeclHasKind)
     f HsDataDecl { hsDeclDeclType = DeclTypeKind, .. } = kiDataKind hsDeclName hsDeclCons
     f HsDataDecl {
@@ -413,16 +413,16 @@ kiDecl d = withSrcLoc (srcLoc d) (f d) where
             hsDeclArgs = args,
             hsDeclCons = [],
             hsDeclHasKind = Just kk } = do
-        args <- mapM (lookupKind KindSimple . toName TypeVal) args
-        kc <- lookupKind KindAny (toName TypeConstructor tyconName)
+        args <- mapM (lookupKind KindSimple) args
+        kc <- lookupKind KindAny tyconName
         kiApps' kc args (hsKindToKind kk)
         mapM_ kiPred context
     f HsDataDecl { hsDeclDeclType = DeclTypeNewtype, .. } = kiAlias hsDeclContext hsDeclName hsDeclArgs (head hsDeclCons)
     f HsDataDecl { .. }    = kiData hsDeclContext hsDeclName hsDeclArgs hsDeclCons
-    f HsTypeDecl { hsDeclName = name, hsDeclTArgs = args, hsDeclType = ty } = do
+    f HsTypeDecl { hsDeclName, hsDeclTArgs = args, hsDeclType = ty } = do
         wh <- asks kiWhere
         let theconstraint = if wh == Other then KindAny else KindSimple
-        kc <- lookupKind theconstraint (toName TypeConstructor name)
+        kc <- lookupKind theconstraint hsDeclName
         mv <- newKindVar theconstraint
         kiApps kc args (KVar mv)
         kiType' (KVar mv) ty
@@ -443,9 +443,9 @@ kiDecl d = withSrcLoc (srcLoc d) (f d) where
             newClassBodies = map typeFromSig $ filter isHsTypeSig sigsAndDefaults
             typeFromSig (HsTypeSig _sloc _names qualType) = qualType
             typeFromSig _ = error "KindInfer.typeFromSig: bad."
-            g (HsTyVar n') | removeUniquifier n' == removeUniquifier classArg = Seq.singleton (toName TypeVal n')
+            g (HsTyVar n') | removeUniquifier n' == removeUniquifier classArg = Seq.singleton n'
             g _ = mempty
-        carg <- lookupKind KindSimple (toName TypeVal classArg)
+        carg <- lookupKind KindSimple classArg
         mapM_ (\n -> lookupKind KindSimple n >>= unify carg ) rn
         local (\e -> e { kiWhere = InClass }) $ mapM_ kiDecl sigsAndDefaults
     f HsDeclDeriving { hsDeclClassHead = ch } = checkInstance ch

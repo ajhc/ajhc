@@ -1,15 +1,12 @@
-module Util.Seq(
-            Seq()
-
-          , singleton
-          , cons
-          , snoc
-
-          , toList
-          , appendToList
-          , fromList
-          , Util.Seq.concat
-          ) where
+module Util.Seq
+    (Seq()
+    ,Util.Seq.concat
+    ,appendToList
+    ,cons
+    ,fromList
+    ,singleton
+    ,snoc
+    ,toList) where
 
 import Control.Applicative
 import Control.Monad
@@ -67,3 +64,6 @@ instance MonadPlus Util.Seq.Seq where
 instance Monoid (Seq a) where
     mempty = Seq (\xs -> xs)
     Seq f `mappend` Seq g = Seq (\xs -> f (g xs))
+
+instance Show a => Show (Seq a) where
+    showsPrec n s = showsPrec n (toList s)

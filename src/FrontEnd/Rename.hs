@@ -146,7 +146,7 @@ addTopLevels  hsmod action = do
 
 createSelectors sloc ds = mapM g ns where
     ds' :: [(Name,[(Name,HsBangType)])]
-    ds' = [ (c,[(n,t) | (ns,t) <- rs , n <- ns ]) | HsRecDecl { hsConDeclName = c, hsConDeclRecArg = rs } <- ds ]
+    ds' = [ (c,[(toName Val n,t) | (ns,t) <- rs , n <- ns ]) | HsRecDecl { hsConDeclName = c, hsConDeclRecArg = rs } <- ds ]
     ns = sortGroupUnderF fst $ concatMap f ds' -- [  | (c,nts) <- ds' ]
     f (c,nts) = [ (n,(c,i,length nts)) | (n,_) <- nts | i <- [0..]]
     g (n,cs) = do

@@ -1,8 +1,10 @@
-module Options.Map(processLanguageFlags,languageDefault) where
+module Options.Map(processLanguageFlags,languageDefault,generateJhcParams) where
 
 -- LANGUAGE -> FlagOpts mapping
 
 import Data.Char(toLower)
+import Data.List(sort)
+import qualified Data.ByteString.Char8 as BS8
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified FlagOpts as FO
@@ -85,6 +87,14 @@ alwaysOn = Set.fromList
     ,TraditionalRecordSyntax
     ,TypeOperators
     ,TypeSynonymInstances]
+
+
+{-# NOINLINE generateJhcParams #-}
+generateJhcParams :: BS8.ByteString
+generateJhcParams = BS8.pack $ unlines $ ["#ifndef _JHC_EXT_DEFS" ,"#define _JHC_EXT_DEFS"] 
+    ++ map f (sort $ Set.toList alwaysOn ++  Map.keys langMap) ++ ["#endif"] where
+        f x = "#define HS_EXT_" ++ show x ++ " 1"
+        g (x,_) = f x
 
 data KnownExtension
     = M4

@@ -11,11 +11,12 @@ import FrontEnd.SrcLoc
 import Name.Name
 import Support.FreeVars
 import Util.Inst()
+import qualified Util.Seq as Seq
 
 instance FreeVars HsType (Set.Set Name) where
     freeVars t = execWriter (f t) where
-        f (HsTyVar v) = tell (Set.singleton $ toName TypeVal v)
-        f (HsTyCon v) = tell (Set.singleton $ toName TypeConstructor v)
+        f (HsTyVar v) = tell (Set.singleton v)
+        f (HsTyCon v) = tell (Set.singleton v)
         f t = traverseHsType_ f t
 
 traverse_ :: Applicative m => (a -> m b) -> a -> m a
@@ -76,20 +77,10 @@ traverseHsDeclHsExp :: (Monad m,MonadSetSrcLoc m) => (HsExp -> m HsExp) -> HsDec
 traverseHsDeclHsExp fn d = traverseHsExp fn d
 
 getNamesFromHsPat :: HsPat -> [Name]
-getNamesFromHsPat p = execWriter (getNamesFromPat p) where
-    getNamesFromPat (HsPVar hsName) = tell [hsName]
-    getNamesFromPat (HsPAsPat hsName hsPat) = do
-        tell [hsName]
-        getNamesFromPat hsPat
-    getNamesFromPat (HsPatExp e) = f e where
-        f (HsVar v) = do
-            tell [v]
-        f (HsAsPat v e) = do
-            tell [v]
-            f e
-        f e = traverseHsExp_ f e
-
-    getNamesFromPat p = traverseHsPat_ getNamesFromPat p
+getNamesFromHsPat p = Seq.toList $ execWriter (f p) where
+    f (HsPVar hsName) = tell $ Seq.singleton hsName
+    f (HsPAsPat hsName hsPat) = do tell $ Seq.singleton hsName; f hsPat
+    f p = traverseHsPat_ f p
 
 data HsOps m = HsOps {
     opHsDecl  :: HsDecl -> m HsDecl,
@@ -299,17 +290,29 @@ instance TraverseHsOps e => TraverseHsOps (Located e) where
 instance (TraverseHsOps a,T.Traversable f) => TraverseHsOps (f a) where
     traverseHsOps hops xs = T.traverse (applyHsOps hops) xs
 
-maybeGetDeclName :: Monad m => HsDecl -> m Name
-maybeGetDeclName HsPatBind { hsDeclPat = HsPVar name } = return (toName Val name)
-maybeGetDeclName HsActionDecl { hsDeclPat = HsPVar name } = return (toName Val name)
-maybeGetDeclName (HsFunBind ((HsMatch _ name _ _ _):_)) = return (toName Val name)
-maybeGetDeclName HsDataDecl { hsDeclDeclType = DeclTypeKind, hsDeclName } = return (toName SortName hsDeclName)
-maybeGetDeclName HsDataDecl { hsDeclName = name } = return (toName TypeConstructor name)
-maybeGetDeclName HsClassDecl { hsDeclClassHead = h } = return $ toName ClassName $ hsClassHead h
-maybeGetDeclName x@HsForeignDecl {} = return $ toName Val $ hsDeclName x
-maybeGetDeclName (HsForeignExport _ e _ _)   = return $ ffiExportName e
+getDeclNames :: HsDecl -> [Name]
+getDeclNames d = f d where
+    f HsPatBind { .. } = getNamesFromHsPat hsDeclPat
+    f HsActionDecl { .. } = getNamesFromHsPat hsDeclPat
+    f (HsFunBind ((HsMatch _ name _ _ _):_)) = [name]
+    f HsDataDecl { .. } = [hsDeclName]
+    f HsClassDecl { hsDeclClassHead = h } = [hsClassHead h]
+    f HsForeignDecl { .. } = [hsDeclName]
+    f (HsForeignExport _ e _ _) = [ffiExportName e]
+    f _ = []
+
 --maybeGetDeclName (HsTypeSig _ [n] _ ) = return n
-maybeGetDeclName d = fail  $ "getDeclName: could not find name for a decl: " ++ show d
+maybeGetDeclName :: Monad m => HsDecl -> m Name
+maybeGetDeclName d = case getDeclNames d of
+    [] ->  fail  $ "getDeclName: could not find name for a decl: " ++ show d
+    [x] -> return x
+    _ ->   fail  $ "getDeclName: found too many names for decl: " ++ show d
 
 getDeclName :: HsDecl -> Name
 getDeclName d =  runIdentity $ maybeGetDeclName d
+
+-- HsDecl getDeps function
+getDeclDeps :: HsDecl -> [HsName]
+getDeclDeps = Seq.toList . execWriter . traverseHsExp_ f where
+    f (HsVar name) = tell $ Seq.singleton name
+    f e = traverseHsExp_ f e

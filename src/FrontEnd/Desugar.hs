@@ -26,10 +26,10 @@ newPatVarName :: HsName
 newPatVarName = toName Val ("pv@"::String)
 
 desugarHsModule :: HsModule -> HsModule
+--desugarHsModule m = m
 desugarHsModule m = hsModuleDecls_s ds' m where
     (ds', _) = runUniq 0 (dsm (hsModuleDecls m)) -- (0::Int)
     dsm ds = fmap concat $ mapM desugarDecl ds
---desugarHsModule m = m
 
 desugarHsStmt :: Monad m => HsStmt -> m HsStmt
 desugarHsStmt s = return $ fst $ runUniq 0 (desugarStmt s)
@@ -38,11 +38,6 @@ desugarDecl :: HsDecl -> PatSM [HsDecl]
 desugarDecl (HsFunBind matches) = do
     newMatches <- mapM desugarMatch matches
     return [HsFunBind newMatches]
-
---desugarDecl pb@(HsPatBind sloc p rhs wheres) = do
---    newRhs <- desugarRhs rhs
---    newWheres <- mapM desugarDecl wheres
---    return [HsPatBind sloc p newRhs (concat newWheres)]
 
 --variable pattern bindings remain unchanged
 desugarDecl HsPatBind { hsDeclPat = hsDeclPat@HsPVar {}, .. } = do
@@ -87,12 +82,10 @@ genBindsForPat pat sloc rhs = ans where
 
 getPatSelFuns :: SrcLoc -> HsPat -> Name -> [(Name, HsExp)]
 getPatSelFuns sloc pat rhsvar = ans where
-    --ans = [(v, HsParen (HsLambda sloc [HsPVar newPatVarName] (kase (replaceVarNamesInPat v pat)))) | v <- getNamesFromHsPat pat, nameType v == Val]
     ans = [(v, kase (replaceVarNamesInPat v pat)) | v <- getNamesFromHsPat pat, nameType v == Val]
     kase p =  HsCase (HsVar rhsvar) [a1, a2 ] where
        a1 =  HsAlt sloc p (HsUnGuardedRhs (HsVar newPatVarName)) []
        a2 =  HsAlt sloc HsPWildCard (HsUnGuardedRhs (HsError { hsExpSrcLoc = sloc, hsExpErrorType = HsErrorPatternFailure, hsExpString = show sloc ++ " failed pattern match" })) []
-       --a2 =  HsAlt sloc HsPWildCard (HsUnGuardedRhs (HsApp (HsVar (toName Val ("error"::String))) (HsLit $ HsString $ show sloc ++ " failed pattern match"))) []
 
 -- replaces all occurrences of a name with a new variable
 -- and every other name with underscore

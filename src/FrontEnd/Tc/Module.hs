@@ -12,8 +12,8 @@ import DerivingDrift.Drift
 import Doc.PPrint
 import Doc.PPrint as PPrint
 import FrontEnd.Class
-import FrontEnd.DataConsAssump     (dataConsEnv)
-import FrontEnd.DependAnalysis     (getDeclDeps, debugDeclBindGroups)
+import FrontEnd.DataConsAssump(dataConsEnv)
+import FrontEnd.DependAnalysis(debugDeclBindGroups)
 import FrontEnd.Exports
 import FrontEnd.HsErrors
 import FrontEnd.HsSyn
@@ -21,11 +21,11 @@ import FrontEnd.Infix
 import FrontEnd.KindInfer
 import FrontEnd.Rename
 import FrontEnd.SrcLoc
-import FrontEnd.Syn.Traverse
+import FrontEnd.Syn.Traverse hiding(getDeclNames)
 import FrontEnd.Tc.Main
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
-import FrontEnd.TypeSigs           (collectSigs, listSigsToSigEnv)
+import FrontEnd.TypeSigs(collectSigs, listSigsToSigEnv)
 import FrontEnd.TypeSynonyms
 import FrontEnd.Warning
 import Ho.Type

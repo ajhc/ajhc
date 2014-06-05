@@ -12,7 +12,6 @@ import qualified Text.PrettyPrint.HughesPJ as P
 import Doc.DocLike
 import Doc.PPrint as PPrint
 import FrontEnd.Class
-import FrontEnd.DependAnalysis(getDeclDeps)
 import FrontEnd.Diagnostic
 import FrontEnd.HsPretty
 import FrontEnd.HsSyn
@@ -555,8 +554,8 @@ tiImplGroups (Right x:xs) = do
     return (ds ++ ds', te `mappend` te')
 
 tiNonRecImpl :: HsDecl -> Tc (HsDecl, TypeEnv)
-tiNonRecImpl decl = withContext (locSimple (srcLoc decl) ("in the implicitly typed: " ++ show (getDeclName decl))) $ do
-    when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "*** tiimpls " ++ show (getDeclName decl)
+tiNonRecImpl decl = withContext (locSimple (srcLoc decl) ("in the implicitly typed: " ++ show (getDeclNames decl))) $ do
+    when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "*** tiimpls " ++ show (getDeclNames decl)
     mv <- newMetaVar Sigma kindStar
     (res,ps) <- listenPreds $ tcDecl decl mv
     ps' <- flattenType ps
@@ -587,8 +586,8 @@ tiNonRecImpl decl = withContext (locSimple (srcLoc decl) ("in the implicitly typ
 
 tiImpls ::  [HsDecl] -> Tc ([HsDecl], TypeEnv)
 tiImpls [] = return ([],Map.empty)
-tiImpls bs = withContext (locSimple (srcLoc bs) ("in the recursive implicitly typed: " ++ (show (map getDeclName bs)))) $ do
-    let names = map getDeclName bs
+tiImpls bs = withContext (locSimple (srcLoc bs) ("in the recursive implicitly typed: " ++ (show (concatMap getDeclNames bs)))) $ do
+    let names = concatMap getDeclNames bs
     when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "*** tiimpls " ++ show names
     ts <- sequence [newMetaVar Tau kindStar | _ <- bs]
     (res,ps) <- listenPreds $
@@ -787,7 +786,7 @@ tiExpl ::  Expl -> Tc (HsDecl,TypeEnv)
 tiExpl (sc, decl@HsForeignDecl {}) = do return (decl,Map.empty)
 tiExpl (sc, decl@HsForeignExport {}) = do return (decl,Map.empty)
 tiExpl (sc, decl) = withContext (locSimple (srcLoc decl) ("in the explicitly typed " ++  (render $ ppHsDecl decl))) $ do
-    when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "** typing expl: " ++ show (getDeclName decl) ++ " " ++ prettyPrintType sc
+    when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "** typing expl: " ++ show (getDeclNames decl) ++ " " ++ prettyPrintType sc
     sc <- evalFullType sc
     (vs,qs,typ) <- skolomize sc
     let sc' = (tForAll vs (qs :=> typ))
@@ -868,8 +867,10 @@ tiLit _ = error "Main.tiLit: bad."
 getFunDeclsBg :: TypeEnv -> [HsDecl] -> [BindGroup]
 getFunDeclsBg sigEnv decls = makeProgram sigEnv equationGroups where
    equationGroups :: [[HsDecl]]
-   equationGroups = easySCC bindDecls getDeclName getDeclDeps
+   equationGroups = map f $ getBindGroups bindDecls getDeclNames getDeclDeps
    bindDecls = collectBindDecls decls
+   f (Left xs) = xs
+   f (Right xss) = concat xss
 
 -- | make a program from a set of binding groups
 makeProgram :: TypeEnv -> [[HsDecl]] -> [BindGroup]
@@ -881,9 +882,12 @@ makeBindGroup :: TypeEnv -> [HsDecl] -> BindGroup
 makeBindGroup sigEnv decls = (exps, f impls) where
     (exps, impls) = makeBindGroup' sigEnv decls
     enames = map (getDeclName . snd) exps
-    f xs = map g $ stronglyConnComp [ (x, getDeclName x,[ d | d <- getDeclDeps x, d `notElem` enames]) |  x <- xs]
-    g (AcyclicSCC x) = Left x
-    g (CyclicSCC xs) = Right xs
+    f xs = map g $ getBindGroups xs getDeclNames  (\x -> [ d | d <- getDeclDeps x, d `notElem` enames])
+    g (Left [x]) = Left x
+    g (Right xss) = Right $ concat xss
+--    f xs = map g $ stronglyConnComp [ (x, getDeclName x,[ d | d <- getDeclDeps x, d `notElem` enames]) |  x <- xs]
+--    g (AcyclicSCC x) = Left x
+--    g (CyclicSCC xs) = Right xs
 
 makeBindGroup' _ [] = ([], [])
 makeBindGroup' sigEnv (d:ds) = case Map.lookup funName sigEnv of

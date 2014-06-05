@@ -1,6 +1,5 @@
-module FrontEnd.DependAnalysis (getDeclDeps,  debugDeclBindGroups) where
+module FrontEnd.DependAnalysis (debugDeclBindGroups) where
 
-import Control.Monad.Writer
 import Data.List (nub,intercalate)
 import FrontEnd.HsSyn
 import FrontEnd.Rename(unRename)
@@ -83,9 +82,3 @@ searchHistory name ((bgnum, bgnames):history) = if elem name bgnames then bgnum
 debugDeclBindGroups :: [[HsDecl]] -> String
 debugDeclBindGroups groups = debugBindGroups groups
     (show . unRename . getDeclName) getDeclName getDeclDeps
-
--- HsDecl getDeps function
-getDeclDeps :: HsDecl -> [HsName]
-getDeclDeps = execWriter . traverseHsExp_ f where
-    f (HsVar name) = tell [name]
-    f e = traverseHsExp_ f e
