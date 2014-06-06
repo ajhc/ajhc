@@ -212,7 +212,6 @@ instance TraverseHsOps HsPat where
         f (HsPIrrPat a1)         = HsPIrrPat <$> fn a1
         f (HsPBangPat a1)        = HsPBangPat <$> fn a1
         f (HsPRec d1 a1)         = HsPRec d1 <$> fn a1
-        f (HsPatExp e)           = HsPatExp <$> fn e
         f (HsPatWords ws)        = HsPatWords <$> fn ws
         f (HsPatBackTick ws)     = HsPatBackTick <$> fn ws
 

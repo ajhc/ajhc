@@ -275,13 +275,13 @@ ppHsDecl (HsClassAliasDecl pos name args context classes declList) =
 
 -- m{spacing=False}
 -- special case for empty instance declaration
-ppHsDecl (HsInstDecl pos qualType []) =
+ppHsDecl HsInstDecl { hsDeclDecls = [], .. } =
 	   --blankline $
-	   mySep [text "instance", ppClassHead qualType]
-ppHsDecl (HsInstDecl pos qualType declList) =
+	   mySep [text "instance", ppClassHead hsDeclClassHead]
+ppHsDecl HsInstDecl { .. } =
 	   --blankline $
-	   mySep [text "instance", ppClassHead qualType, text "where"]
-	   $$$ body classIndent (map ppHsDecl declList)
+	   mySep [text "instance", ppClassHead hsDeclClassHead, text "where"]
+	   $$$ body classIndent (map ppHsDecl hsDeclDecls)
 
 ppHsDecl (HsDefaultDecl pos htype) =
 	   --blankline $
@@ -455,12 +455,12 @@ ppHsExp (HsInfixApp a op b) = myFsep[mpifx a, ppInfix op, mpifx b]
 	ppInfix (HsVar n) = ppHsQNameInfix n
 	ppInfix (HsCon n) = ppHsQNameInfix n
 	ppInfix n = error $ "illegal infix expression: " ++ show n
-ppHsExp (HsNegApp e) = myFsep [char '-', ppHsExp e]
-ppHsExp (HsApp a b) = myFsep [ppHsExp a, ppHsExp b]
+ppHsExp (HsNegApp e) = myFsep [char '-', parenEPrec e]
+ppHsExp (HsApp a b) = myFsep [ppHsExp a, parenEPrec b]
 ppHsExp HsError { hsExpString = msg } = text $ "<error:" ++ msg ++ ">"
 -- ppHsExp (HsLambda expList body) = myFsep $
 ppHsExp (HsLambda _srcLoc expList body) = myFsep $              -- srcLoc added by Bernie
-	(((char '\\' ):) . map ppHsPat $ expList)
+	(((char '\\' ):) . map parenPrec $ expList)
 	++ [text "->", ppHsExp body]
 -- keywords
 ppHsExp (HsLet expList letBody) =
@@ -481,14 +481,14 @@ ppHsExp (HsUnboxedTuple expList) = parenListzh . map ppHsExp $ expList
 ppHsExp (HsParen exp) = parens . ppHsExp $ exp
 -- TODO arguments swapped
 ppHsExp (HsLeftSection v exp)   | (HsVar name) <- dropAs v =
-	parens (ppHsExp exp <+> ppHsQNameInfix name)
+	parens (parenEPrec exp <+> ppHsQNameInfix name)
 ppHsExp (HsLeftSection v exp)   | (HsCon name) <- dropAs v =
-	parens (ppHsExp exp <+> ppHsQNameInfix name)
+	parens (parenEPrec exp <+> ppHsQNameInfix name)
 --ppHsExp (HsLeftSection _ _) = error "illegal left section"
 ppHsExp (HsRightSection exp v) | (HsVar name) <- dropAs v =
-	parens (ppHsQNameInfix name <+> ppHsExp exp)
+	parens (ppHsQNameInfix name <+> parenEPrec exp)
 ppHsExp (HsRightSection exp v) | (HsCon name) <- dropAs v =
-	parens (ppHsQNameInfix name <+> ppHsExp exp)
+	parens (ppHsQNameInfix name <+> parenEPrec exp)
 --ppHsExp (HsRightSection _ _) = error "illegal right section"
 ppHsExp (HsRecConstr c fieldList) =
 	ppHsQName c
@@ -549,7 +549,6 @@ ppHsPat	(HsPAsPat name pat) = hcat[ppHsName name,char '@',parenPrec pat]
 ppHsPat	HsPWildCard = char '_'
 ppHsPat	(HsPIrrPat (Located _ pat)) = char '~' <> parenPrec pat
 ppHsPat	(HsPBangPat (Located _ pat)) = char '!' <> parenPrec pat
-ppHsPat	(HsPatExp e) = ppHsExp e
 ppHsPat (HsPTypeSig _ p qt) = parens $ ppHsPat p <+> text "::" <+> ppHsQualType qt
 ppHsPat (HsPatWords ws) = char '«' <> hsep (map parenPrec ws) <> char '»'
 ppHsPat (HsPatBackTick bt) = char '`' <> ppHsPat bt <> char '`'
@@ -565,6 +564,18 @@ parenPrec p = if f p then char '‹' <> ppHsPat p <> char '›' else ppHsPat p w
     f HsPLit {}          = False
     f (HsPApp _ [])      = False
     f HsPTuple {}        = False
+    f _                  = True
+
+parenEPrec p = if f p then char '‹' <> ppHsExp p <> char '›' else ppHsExp p where
+    f HsParen {}        = False
+    f HsUnboxedTuple {} = False
+    f HsList {}         = False
+    f HsWords {}      = False
+    f HsWildCard {}     = False
+    f HsVar {}          = False
+    f HsLit {}          = False
+    f HsCon {}      = False
+    f HsTuple {}        = False
     f _                  = True
 
 ppHsPatField (HsField name pat) = myFsep[ppHsQName name, equals, ppHsPat pat]
@@ -598,7 +609,6 @@ ppHsQName :: HsName -> Doc
 ppHsQName n
     | Just m <- getModule n, m `elem` [mod_JhcPrimPrim,mod_JhcTypeBasic,mod_JhcBasics] = tshow $ toUnqualified n
     | otherwise = text $ show n
-
 
 ppHsName = ppHsQName
 

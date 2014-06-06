@@ -95,6 +95,11 @@ Floating	Jhc.Float.Floating
 RealFrac	Jhc.Float.RealFrac
 RealFloat	Jhc.Float.RealFloat
 
+Typeable        Data.Typeable.Typeable
+Typeable1       Data.Typeable.Typeable1
+Typeable2       Data.Typeable.Typeable2
+Typeable3       Data.Typeable.Typeable3
+
 RawType:rt:
 
 bits8         bits8
@@ -248,6 +253,7 @@ kind         kind
 qualified    qualified
 instance     instance
 import       import
+placeholder  placeholder
 
 Quoted:q:
 dc_Cons

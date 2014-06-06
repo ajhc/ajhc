@@ -187,9 +187,10 @@ renameModule opt fls ns m = runRename go opt (hsModuleName m) fls (ns ++ driftRe
           let renDesugared = renameDecls . desugarHsModule
           rmod <- renDesugared mod
           (nds,lds) <- derivingDerive rmod
-          dd <- driftDerive rmod lds
-          inst <- hsModuleDecls `fmap` renDesugared mod{hsModuleDecls = dd}
-          return (hsModuleDecls_u (++ (inst ++ nds)) rmod,inst ++ nds)
+          --dd <- driftDerive rmod lds
+          --inst <- hsModuleDecls `fmap` renDesugared mod{hsModuleDecls = dd}
+          --return (hsModuleDecls_u (++ (inst ++ nds)) rmod,inst ++ nds ++ dd)
+          return (hsModuleDecls_u (++ nds) rmod,nds)
 
 {-# NOINLINE renameStatement #-}
 renameStatement :: MonadWarn m => FieldMap -> [(Name,[Name])] ->  Module -> HsStmt -> m HsStmt
@@ -326,11 +327,11 @@ renameHsDecl d = f d where
         hsClasses' <- rename hsClasses
         hsDecls' <- rename hsDecls
         return (HsClassAliasDecl srcLoc name' args' hsContext' hsClasses' hsDecls')
-    f (HsInstDecl srcLoc classHead hsDecls) = do
-        updateWithN TypeVal (hsClassHeadArgs classHead) $ do
-        classHead' <- rename classHead
-        hsDecls' <- mapM (qualifyInstMethod (getTypeClassModule classHead')) hsDecls
-        return (HsInstDecl srcLoc classHead' hsDecls')
+    f HsInstDecl { .. } = do
+        updateWithN TypeVal (hsClassHeadArgs hsDeclClassHead) $ do
+        hsDeclClassHead <- rename hsDeclClassHead
+        hsDeclDecls <- mapM (qualifyInstMethod (getTypeClassModule hsDeclClassHead)) hsDeclDecls
+        return HsInstDecl { .. }
     f (HsInfixDecl srcLoc assoc int hsNames) = do
         hsNames' <- mapM renameName hsNames
         return $ HsInfixDecl srcLoc assoc int hsNames'
@@ -501,7 +502,6 @@ instance Rename HsPat where
         buildRecPat fls hsName' hsPatFields'
     rename (HsPAsPat hsName hsPat) = HsPAsPat <$> renameName hsName <*> rename hsPat
     rename (HsPTypeSig sl hsPat qt)  = HsPTypeSig sl <$> rename hsPat <*> rename qt
-    rename (HsPatExp e) = HsPatExp <$> rename e
     rename p = traverseHsPat rename p
 
 instance Rename HsPatField where
@@ -515,8 +515,11 @@ instance Rename HsRhs where
     rename (HsGuardedRhss rs) = HsGuardedRhss <$> rename rs
 
 instance Rename HsComp where
-    rename (HsComp srcLoc e1 e2) = withSrcLoc srcLoc $
-        HsComp srcLoc <$> rename e1 <*> rename e2
+    rename (HsComp srcLoc e1 e2) = withSrcLoc srcLoc $ do
+        (e1,e2) <- renameHsStmts e1 (rename e2)
+        return $ HsComp srcLoc e1 e2
+    --rename (HsComp srcLoc e1 e2) = withSrcLoc srcLoc $
+    --    HsComp srcLoc <$> rename e1 <*> rename e2
 
 f_fromRational = HsVar (toUnqualified v_fromRational)
 
@@ -737,8 +740,14 @@ renameName hsName = do
             addWarn (AmbiguousName hsName (x:xs)) (ambig hsName $ x:xs)
             return hsName
         Nothing -> do
-            addWarn (UndefinedName hsName) $ "Unknown name: " ++ show hsName
+            addWarn (UndefinedName hsName) $ "Unknown " ++ typedName hsName ++ ": " ++ show hsName
             return hsName
+
+typedName n = case nameType n of
+    ClassName -> "class"
+    TypeConstructor -> "type name"
+    DataConstructor -> "constructor name"
+    _ -> "name"
 
 clobberedName :: Name -> RM Name
 clobberedName hsName = do

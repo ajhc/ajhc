@@ -213,16 +213,16 @@ addInstanceToHierarchy inst@Inst { instHead = cntxt :=> ~(IsIn className _) } (C
 -- Kind inference has already been done so we don't need to check for kind
 -- errors here.
 hsInstDeclToInst :: Monad m => KindEnv -> HsDecl -> m [Inst]
-hsInstDeclToInst kt (HsInstDecl sloc qType decls)
-    = return [emptyInstance { instSrcLoc = sloc, instDerived = False,
+hsInstDeclToInst kt HsInstDecl { .. }
+    = return [emptyInstance { instSrcLoc = hsDeclSrcLoc, instDerived = hsDeclIsDerived,
         instHead = cntxt :=> IsIn className convertedArgType, instAssocs = assocs }]
    where
-   (cntxt, (className, [convertedArgType])) = chToClassHead kt qType
-   assocs = [ (tc,as,bs,s) | (tc,as,bs,~(Just s)) <- createInstAssocs kt decls ]
---hsInstDeclToInst kt (HsDeclDeriving sloc qType)
---        = return [emptyInstance { instSrcLoc = sloc, instDerived = True,
---        instHead = cntxt :=> IsIn className convertedArgType }]
---   where (cntxt, (className, [convertedArgType])) = chToClassHead kt qType
+   (cntxt, (className, [convertedArgType])) = chToClassHead kt hsDeclClassHead
+   assocs = [ (tc,as,bs,s) | (tc,as,bs,~(Just s)) <- createInstAssocs kt hsDeclDecls ]
+hsInstDeclToInst kt (HsDeclDeriving sloc qType)
+        = return [emptyInstance { instSrcLoc = sloc, instDerived = True,
+        instHead = cntxt :=> IsIn className convertedArgType }]
+   where (cntxt, (className, [convertedArgType])) = chToClassHead kt qType
 hsInstDeclToInst _ _ = return []
 
 vtrace s v | False && verbose = trace s v
@@ -256,18 +256,18 @@ fromHsTypeApp t = f t [] where
     f t rs = (t,rs)
 
 instanceToTopDecls :: KindEnv -> ClassHierarchy -> HsDecl -> (([HsDecl],[Assump]))
-instanceToTopDecls kt ch@(CH classHierarchy _) (HsInstDecl _ qualType methods)
-    = unzip $ concatMap (methodToTopDecls kt [] crecord qualType) $ methodGroups where
-    methodGroups = groupEquations (filter (not . isHsPragmaProps) methods)
-    (_,(className,_)) = chToClassHead kt qualType
+instanceToTopDecls kt ch@(CH classHierarchy _) HsInstDecl { .. }
+    = unzip $ concatMap (methodToTopDecls kt [] crecord hsDeclClassHead) $ methodGroups where
+    methodGroups = groupEquations (filter (not . isHsPragmaProps) hsDeclDecls)
+    (_,(className,_)) = chToClassHead kt hsDeclClassHead
     crecord = case Map.lookup className classHierarchy  of
         Nothing -> error $ "instanceToTopDecls: could not find class " ++ show className ++ "in class hierarchy"
         Just crecord -> crecord
-instanceToTopDecls kt ch@(CH classHierarchy _) (HsClassDecl _ chead methods)
-   = unzip $ map (defaultMethodToTopDecls kt methodSigs chead) $ methodGroups where
-   className = hsClassHead chead
+instanceToTopDecls kt ch@(CH classHierarchy _) HsClassDecl { .. }
+   = unzip $ map (defaultMethodToTopDecls kt methodSigs hsDeclClassHead) $ methodGroups where
+   className = hsClassHead hsDeclClassHead
    --HsQualType _ (HsTyApp (HsTyCon className) _) = qualType
-   methodGroups = groupEquations (filter (\x -> isHsPatBind x || isHsFunBind x)  methods)
+   methodGroups = groupEquations (filter (\x -> isHsPatBind x || isHsFunBind x)  hsDeclDecls)
    methodSigs = case Map.lookup (toName ClassName className) classHierarchy  of
            Nothing -> error $ "defaultInstanceToTopDecls: could not find class " ++ show className ++ "in class hierarchy"
            Just sigs -> classAssumps sigs

@@ -110,6 +110,7 @@ data HsDecl
     | HsInstDecl    {
         hsDeclSrcLoc    :: SrcLoc,
         hsDeclClassHead :: HsClassHead,
+        hsDeclIsDerived :: !Bool,
         hsDeclDecls     :: [HsDecl]
         }
     | HsDefaultDecl {
@@ -355,7 +356,6 @@ data HsPat
     -- | scoped type variable extension
     | HsPTypeSig SrcLoc HsPat HsQualType
     -- | advanced patterns need to be parsed as expressions
-    | HsPatExp HsExp
     | HsPatBackTick HsPat
     | HsPatWords [HsPat]
  deriving(Eq,Ord,Show)

@@ -155,7 +155,7 @@ decl :: { HsDecl }
             hsDeclSrcLoc = $1, hsDeclContext = cs,
             hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $6,
             hsDeclCons = [$5], hsDeclCTYPE = $2 } }
-    | 'instance' classhead optwhere { HsInstDecl $1 $2 $3 }
+    | 'instance' classhead optwhere { HsInstDecl { hsDeclSrcLoc = $1, hsDeclClassHead = $2, hsDeclDecls = $3, hsDeclIsDerived = False } }
     | 'class' classhead optwhere { HsClassDecl $1 $2 $3 }
     | 'foreign' 'import' ewl_var mstring '::' qualtype
                     {% doForeign $1 (vu_import:$3) $4 $6  }

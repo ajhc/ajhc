@@ -275,6 +275,11 @@ tiExpr expr@(HsLambda sloc ps e) typ = do
             doCoerce (ctAbs ts) e
     lam ps e typ []
 
+--tiExpr (HsList HsComp { .. } typ = deNameContext Nothing "in the list comprehension" expr $ do
+--        e <- tcExpr e typ
+--        addPreds [IsIn class_Num typ]
+--        return (HsNegApp e)
+
 tiExpr (HsIf e e1 e2) typ = do
     dn <- getDeName
     withContext (simpleMsg $ "in the if expression\n   if " ++ render (ppHsExp (dn e)) ++ "...") $ do

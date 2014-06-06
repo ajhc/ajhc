@@ -52,12 +52,12 @@ desugarDecl HsPatBind { .. } = do
     newBinds <- concat <$> mapM desugarDecl newBinds
     let newTopDeclForRhs = HsPatBind { hsDeclPat = HsPVar newRhsName, .. }
     return (newTopDeclForRhs : newBinds)
-desugarDecl (HsClassDecl sloc qualtype decls) = do
-    newDecls <- mapM desugarDecl decls
-    return [HsClassDecl sloc qualtype (concat newDecls)]
-desugarDecl (HsInstDecl sloc qualtype decls) = do
-    newDecls <- mapM desugarDecl decls
-    return [HsInstDecl sloc qualtype (concat newDecls)]
+desugarDecl HsInstDecl { .. } = do
+    hsDeclDecls <- concat <$> mapM desugarDecl hsDeclDecls
+    return [HsInstDecl { .. }]
+desugarDecl HsClassDecl { .. } = do
+    hsDeclDecls <- concat <$> mapM desugarDecl hsDeclDecls
+    return [HsClassDecl { .. }]
 -- XXX we currently discard instance specializations
 desugarDecl HsPragmaSpecialize { hsDeclName = n } | n == u_instance = return []
 desugarDecl anyOtherDecl = return [anyOtherDecl]
