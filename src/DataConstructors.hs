@@ -455,7 +455,9 @@ deriveClasses cmap dt@(DataTable mp) ctd = concatMap f ctd where
     f _ = []
     g is c cl = h cl where
         lupvar v = EVar (combHead comb) where
-            Just comb = mlookup (toId v) cmap
+            comb = case mlookup (toId v) cmap of
+                Just n -> n
+                Nothing -> error $ "deriveClasses: " ++ show (v)
         typ = conExpr c
         DataNormal [con] = conChildren c
         Just conr = getConstructor con (DataTable mp)

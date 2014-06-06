@@ -293,6 +293,7 @@ instance HasTyLevel Name where
             | n == s_HashHash = Just $ succ kindLevel
             | n == s_StarStar = Just $ succ kindLevel
             | otherwise = Just kindLevel
+        f QuotedName     = getTyLevel $ fromJust (fromQuotedName n)
         f _ = Nothing
 
 isConstructor :: Name -> Bool

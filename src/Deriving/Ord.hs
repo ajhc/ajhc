@@ -17,7 +17,7 @@ deriveEq hsMatchSrcLoc mod d@D{ .. } = do
             let hsMatchRhs
                     | null types = HsUnGuardedRhs t
                     | otherwise = HsUnGuardedRhs $
-                        foldr1 (app2 (HsVar qv_and)) (zipWith (\x -> HsParen . app2 (HsVar qv_equals) x) (snd pa) (snd pb))
+                        foldr1 (app2 (HsVar v_and)) (zipWith (\x -> HsParen . app2 (HsVar v_equals) x) (snd pa) (snd pb))
             return HsMatch { hsMatchPats = [fst pa,fst pb], .. }
         hsMatchName = v_equals
         hsMatchDecls = []
@@ -35,17 +35,18 @@ deriveOrd hsMatchSrcLoc mod d@D{ .. } = do
             let hsMatchRhs
                     | null types = HsUnGuardedRhs eq
                     | otherwise = HsUnGuardedRhs $
-                        foldr1 compCase (zipWith (\x -> HsParen . app2 (HsVar qv_compare) x) (snd pa) (snd pb))
-                compCase e c = HsCase e [hsAlt (pcon qdc_LT) (HsCon qdc_LT),hsAlt (pcon qdc_GT) (HsCon qdc_GT), hsAlt (pcon qdc_EQ) c]
+                        foldr1 compCase (zipWith (\x -> HsParen . app2 (HsVar v_compare) x) (snd pa) (snd pb))
+                compCase e c = HsCase e [hsAlt (pcon dc_LT) (HsCon dc_LT),hsAlt (pcon dc_GT) (HsCon dc_GT), hsAlt (pcon dc_EQ) c]
 
-                eq = HsCon qdc_EQ
+                eq = HsCon dc_EQ
                 pcon v = HsPApp v []
                 hsAlt p e = HsAlt hsMatchSrcLoc p (HsUnGuardedRhs e) []
             return HsMatch { hsMatchPats = [fst pa,fst pb], .. }
-        mkMatch (nx,bx) (ny,by) = return $ HsMatch { hsMatchPats = [pa,pb],.. } where
-            hsMatchRhs = HsUnGuardedRhs $ if nx < ny then HsCon qdc_LT else HsCon qdc_GT
-            pa = HsPRec (constructor bx) []
-            pb = HsPRec (constructor by) []
+        mkMatch (nx,bx) (ny,by) = do
+                (pa,_) <- mkPat mod bx
+                (pb,_) <- mkPat mod by
+                return $ HsMatch { hsMatchPats = [pa,pb],.. } where
+                hsMatchRhs = HsUnGuardedRhs $ if nx < ny then HsCon dc_LT else HsCon dc_GT
         hsMatchName = v_compare
         hsMatchDecls = []
     eqfn <- HsFunBind <$> sequence [ mkMatch x y  | x <- zip [ 0 .. ] body, y <- zip [ 0 :: Int .. ] body ]

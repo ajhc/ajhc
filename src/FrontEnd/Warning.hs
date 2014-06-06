@@ -178,3 +178,6 @@ instance MonadWarn (Writer (Seq.Seq Warning)) where
 instance MonadWarn Identity
 instance MonadWarn m => MonadWarn (ReaderT a m) where
     addWarning w = lift $ addWarning w
+
+instance (Applicative (t m),Monad m, Monad (t m), MonadTrans t, MonadWarn m) => MonadWarn (t m) where
+    addWarning x = lift (addWarning x)

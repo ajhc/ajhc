@@ -158,6 +158,7 @@ readParen            Jhc.Text.Read.readParen
 lex                  Jhc.Text.Read.lex
 range                Data.Ix.range
 index                Data.Ix.index
+unsafeIndex          Data.Ix.unsafeIndex
 inRange              Data.Ix.inRange
 runExpr              Prelude.IO.runExpr
 runRaw               Jhc.Prim.Wrapper.runRaw

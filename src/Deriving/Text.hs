@@ -5,7 +5,6 @@ import Deriving.Util
 import FrontEnd.HsSyn
 import FrontEnd.Syn.Q
 import Name.Names
-import Util.Std
 
 deriveRead :: SrcLoc -> Module -> Data -> Q HsDecl
 deriveRead hsDeclSrcLoc m d@D { .. } = do
@@ -23,21 +22,21 @@ deriveShow hsMatchSrcLoc mod d@D{ .. } = do
                     | isOpLike constructor = gshowParen ne $ foldr1  gcomp (gshowString ("(" ++ gid ++ ")"):(map gshowsPrec es))
                     | null types = gshowString gid
                     | otherwise = gshowParen ne $ foldr1  gcomp (gshowString gid:(map gshowsPrec es))
-                df lab e = gshowString (getIdent lab ++ " = ") `gdot` gshows e 
+                df lab e = gshowString (getIdent lab ++ " = ") `gdot` gshows e
             return HsMatch { hsMatchPats = [np,pa], .. }
         hsMatchName = v_showsPrec
         hsMatchDecls = []
     bs <- mapM mkMatch body
     mkInst hsMatchSrcLoc mod d class_Show [HsFunBind bs]
 
-gsc c = HsLeftSection (HsCon qdc_Cons)  (HsLit $ HsChar c) 
-gcomp a b =  app2 (HsVar qv_Dot) a (app2 (HsVar qv_Dot) (gsc ' ') b)
-gpar a b =  app2 (HsVar qv_Dot) a (app2 (HsVar qv_Dot) (gshowString ", ") b)
-gdot a b =  app2 (HsVar qv_Dot) a b
-gshowString t = HsApp (HsVar qv_showString) (HsLit $ HsString t)
-gshowParen n e = app2 (HsVar qv_showParen) (hsParen $ app2 (HsVar qv_geq) n (HsLit $ HsInt 10)) e
-gshowsPrec n = HsApp (HsApp (HsVar qv_showsPrec) (HsLit $ HsInt 10)) n
-gshows n = HsApp (HsApp (HsVar qv_showsPrec) (HsLit $ HsInt 0)) n
+gsc c = HsLeftSection (HsCon dc_Cons)  (HsLit $ HsChar c)
+gcomp a b =  app2 (HsVar v_Dot) a (app2 (HsVar v_Dot) (gsc ' ') b)
+gpar a b =  app2 (HsVar v_Dot) a (app2 (HsVar v_Dot) (gshowString ", ") b)
+gdot a b =  app2 (HsVar v_Dot) a b
+gshowString t = HsApp (HsVar v_showString) (HsLit $ HsString t)
+gshowParen n e = app2 (HsVar v_showParen) (hsParen $ app2 (HsVar v_geq) n (HsLit $ HsInt 10)) e
+gshowsPrec n = HsApp (HsApp (HsVar v_showsPrec) (HsLit $ HsInt 10)) n
+gshows n = HsApp (HsApp (HsVar v_showsPrec) (HsLit $ HsInt 0)) n
 
     {-
 deriveShow :: SrcLoc -> Module -> Data -> Q HsDecl

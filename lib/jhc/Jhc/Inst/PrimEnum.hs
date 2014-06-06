@@ -3,7 +3,17 @@
 -- | helper routines for deriving(Enum) instances
 -- these routines help out the compiler when
 -- deriving enums.
-module Jhc.Inst.PrimEnum(enum_succ,enum_pred,enum_fromTo,enum_fromThen,enum_fromThenTo,enum_toEnum,enum_from) where
+module Jhc.Inst.PrimEnum(
+    enum_succ,
+    enum_pred,
+    enum_fromTo,
+    enum_fromThen,
+    enum_fromThenTo,
+    enum_toEnum,
+    enum_from
+    ,ix_range
+    ,ix_index
+    ) where
 
 import Jhc.Basics
 import Jhc.Int

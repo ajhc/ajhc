@@ -19,6 +19,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 
 import Data.Word
+import Deriving.Derive
 import DerivingDrift.Drift
 import Doc.DocLike(tupled)
 import FrontEnd.Desugar (desugarHsModule)
@@ -185,9 +186,10 @@ renameModule opt fls ns m = runRename go opt (hsModuleName m) fls (ns ++ driftRe
   where go mod = do
           let renDesugared = renameDecls . desugarHsModule
           rmod <- renDesugared mod
-          dd <- driftDerive rmod
+          (nds,lds) <- derivingDerive rmod
+          dd <- driftDerive rmod lds
           inst <- hsModuleDecls `fmap` renDesugared mod{hsModuleDecls = dd}
-          return (hsModuleDecls_u (++ inst) rmod,inst)
+          return (hsModuleDecls_u (++ (inst ++ nds)) rmod,inst ++ nds)
 
 {-# NOINLINE renameStatement #-}
 renameStatement :: MonadWarn m => FieldMap -> [(Name,[Name])] ->  Module -> HsStmt -> m HsStmt

@@ -1,5 +1,5 @@
 {-# OPTIONS_JHC -fno-prelude -fm4 #-}
-module Data.Ix ( Ix(range, index, inRange, rangeSize) ) where
+module Data.Ix ( Ix(..) ) where
 
 import Jhc.Int
 import Jhc.Enum
@@ -12,19 +12,25 @@ import Data.Word
 import Data.Int
 
 class  Ord a => Ix a  where
-    range     :: (a,a) -> [a]
-    index     :: (a,a) -> a -> Int
-    inRange   :: (a,a) -> a -> Bool
-    rangeSize :: (a,a) -> Int
+    range       :: (a,a) -> [a]
+    index       :: (a,a) -> a -> Int
+    inRange     :: (a,a) -> a -> Bool
+    rangeSize   :: (a,a) -> Int
 
-    rangeSize b@(l,h) = case range b of
-        [] -> zero
-        _  -> index b h `plus` one
-	-- NB: replacing "null (range b)" by  "not (l <= h)"
-	-- fails if the bounds are tuples.  For example,
-	-- 	(1,2) <= (2,1)
-	-- but the range is nevertheless empty
-	--	range ((1,2),(2,1)) = []
+    index b i | inRange b i = unsafeIndex b i
+              | otherwise   = error "array index is out of bounds"
+    rangeSize b@(_l,h) | inRange b h = unsafeIndex b h `plus` one
+                       | otherwise   = zero
+        -- This case is only here to
+        -- check for an empty range
+        -- NB: replacing (inRange b h) by (l <= h) fails for
+        --     tuples.  E.g.  (1,2) <= (2,1) but the range is empty
+
+    unsafeIndex     :: (a,a) -> a -> Int
+    unsafeRangeSize :: (a,a) -> Int
+
+    unsafeIndex b i = index b i
+    unsafeRangeSize b@(_l,h) = unsafeIndex b h `plus` one
 
 instance  Ix Char  where
     range (m,n)		= [m..n]

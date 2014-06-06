@@ -168,7 +168,7 @@ graphGrin grin = mkDotGraph' nodes edges [] fnode fedge  where
     nodes = zip [0..] (grinFuncs grin)
     nodeMap = Map.fromList [ (y,x) | (x,(y,_)) <- nodes]
     --gr :: Gr (Atom,Lam) CallType
-    --gr =   mkGraph nodes 
+    --gr =   mkGraph nodes
     edges = [ (n,n2,tc) | (n,(_,_ :-> l)) <- nodes, (tc,fv) <- Set.toList (freeVars l), n2 <- maybeToList $ Map.lookup fv nodeMap ]
     fnode :: (Atom,Lam) -> [(String,String)]
     fnode (x,_ :-> e) = [("label",show x)]

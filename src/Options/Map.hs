@@ -91,7 +91,7 @@ alwaysOn = Set.fromList
 
 {-# NOINLINE generateJhcParams #-}
 generateJhcParams :: BS8.ByteString
-generateJhcParams = BS8.pack $ unlines $ ["#ifndef _JHC_EXT_DEFS" ,"#define _JHC_EXT_DEFS"] 
+generateJhcParams = BS8.pack $ unlines $ ["#ifndef _JHC_EXT_DEFS" ,"#define _JHC_EXT_DEFS"]
     ++ map f (sort $ Set.toList alwaysOn ++  Map.keys langMap) ++ ["#endif"] where
         f x = "#define HS_EXT_" ++ show x ++ " 1"
         g (x,_) = f x

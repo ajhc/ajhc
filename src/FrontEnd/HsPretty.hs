@@ -595,10 +595,10 @@ ppHsFieldUpdate (HsField name exp) =
 
 ------------------------- Names -------------------------
 ppHsQName :: HsName -> Doc
-ppHsQName n = text $ show n
---ppHsQName (UnQual name)			= ppHsIdentifier name
---ppHsQName z@(Qual m@(Module mod) name)
---	 | otherwise = text mod <> char '.' <> ppHsIdentifier name
+ppHsQName n
+    | Just m <- getModule n, m `elem` [mod_JhcPrimPrim,mod_JhcTypeBasic,mod_JhcBasics] = tshow $ toUnqualified n
+    | otherwise = text $ show n
+
 
 ppHsName = ppHsQName
 
