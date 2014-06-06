@@ -14,7 +14,6 @@ import qualified Data.ByteString.Lazy.UTF8 as LBSU
 import qualified Data.Map as Map
 
 import FrontEnd.HsSyn
-import FrontEnd.SrcLoc
 import FrontEnd.Syn.Options
 import FrontEnd.Unlit
 import FrontEnd.Warning

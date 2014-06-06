@@ -2,7 +2,6 @@ module FrontEnd.Tc.Main (tiExpr, tiProgram, makeProgram, isTypePlaceholder ) whe
 
 import Control.Monad.Reader
 import Control.Monad.Writer
-import Data.Graph(stronglyConnComp, SCC(..))
 import System.IO(hPutStr,stderr)
 import Text.Printf
 import qualified Data.Map as Map
@@ -16,7 +15,6 @@ import FrontEnd.Diagnostic
 import FrontEnd.HsPretty
 import FrontEnd.HsSyn
 import FrontEnd.KindInfer
-import FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse
 import FrontEnd.Tc.Class
 import FrontEnd.Tc.Kind
@@ -883,7 +881,7 @@ makeBindGroup sigEnv decls = (exps, f impls) where
     (exps, impls) = makeBindGroup' sigEnv decls
     enames = map (getDeclName . snd) exps
     f xs = map g $ getBindGroups xs getDeclNames  (\x -> [ d | d <- getDeclDeps x, d `notElem` enames])
-    g (Left [x]) = Left x
+    g (Left ~[x]) = Left x
     g (Right xss) = Right $ concat xss
 --    f xs = map g $ stronglyConnComp [ (x, getDeclName x,[ d | d <- getDeclDeps x, d `notElem` enames]) |  x <- xs]
 --    g (AcyclicSCC x) = Left x

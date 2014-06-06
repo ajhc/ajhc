@@ -219,10 +219,10 @@ hsInstDeclToInst kt (HsInstDecl sloc qType decls)
    where
    (cntxt, (className, [convertedArgType])) = chToClassHead kt qType
    assocs = [ (tc,as,bs,s) | (tc,as,bs,~(Just s)) <- createInstAssocs kt decls ]
-hsInstDeclToInst kt (HsDeclDeriving sloc qType)
-        = return [emptyInstance { instSrcLoc = sloc, instDerived = True,
-        instHead = cntxt :=> IsIn className convertedArgType }]
-   where (cntxt, (className, [convertedArgType])) = chToClassHead kt qType
+--hsInstDeclToInst kt (HsDeclDeriving sloc qType)
+--        = return [emptyInstance { instSrcLoc = sloc, instDerived = True,
+--        instHead = cntxt :=> IsIn className convertedArgType }]
+--   where (cntxt, (className, [convertedArgType])) = chToClassHead kt qType
 hsInstDeclToInst _ _ = return []
 
 vtrace s v | False && verbose = trace s v

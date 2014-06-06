@@ -26,6 +26,7 @@ import Options
 import PackedString
 import StringTable.Atom
 import Util.Gen
+import qualified Util.Seq as Seq
 
 data Warning = Warning {
     warnSrcLoc  :: !SrcLoc,
@@ -172,6 +173,8 @@ instance MonadWarn IO where
     addWarning w = modifyIORef ioWarnings (w:)
 instance MonadWarn (Writer [Warning]) where
     addWarning w = tell [w]
+instance MonadWarn (Writer (Seq.Seq Warning)) where
+    addWarning w = tell $ Seq.singleton w
 instance MonadWarn Identity
 instance MonadWarn m => MonadWarn (ReaderT a m) where
     addWarning w = lift $ addWarning w

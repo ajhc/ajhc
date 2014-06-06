@@ -8,7 +8,6 @@ import qualified Data.Map as Map
 
 import FrontEnd.HsSyn
 import FrontEnd.Lex.ParseMonad
-import FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse
 import Name.Names
 import Support.MapBinaryInstance

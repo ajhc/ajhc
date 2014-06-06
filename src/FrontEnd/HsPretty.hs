@@ -230,7 +230,7 @@ ppClassHead (HsClassHead c n ts) = ans c where
 
 ppHsDecl :: HsDecl -> Doc
 ppHsDecl (HsActionDecl _ p e) = ppHsPat p <+> text "<-" <+> ppHsExp e
-ppHsDecl (HsDeclDeriving _ e) = text "derive instance" <+> ppClassHead e
+ppHsDecl (HsDeclDeriving _ e) = text "deriving instance" <+> ppClassHead e
 ppHsDecl (HsPragmaRules rs@(HsRule { hsRuleIsMeta = False }:_)) = text "{-# RULES" $$ nest 4 (myVcat (map ppHsRule rs)) $$ text "#-}"
 ppHsDecl (HsPragmaRules rs@(HsRule { hsRuleIsMeta = True }:_)) = text "{-# METARULES" $$ nest 4 (myVcat (map ppHsRule rs)) $$ text "#-}"
 --ppHsDecl prules@HsPragmaRules {} = text ("{-# RULES " ++ show (hsDeclString prules)) <+> text "forall" <+> vars <+> text "." $$ nest 4 rest $$ text "#-}" where
