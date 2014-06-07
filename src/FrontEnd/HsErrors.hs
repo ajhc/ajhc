@@ -48,7 +48,7 @@ hsDecl cntx decl = withSrcLoc (srcLoc decl) $ f cntx decl where
     f TopLevel HsActionDecl {} = do
         wDecl "top level actions not supported"
     f TopLevel HsDataDecl { .. } = do
-        checkDeriving False hsDeclDerives
+        --checkDeriving False hsDeclDerives
         when (hasRepeatUnder hsConDeclName hsDeclCons) $ do
             wDecl "repeated constructor name is not allowed"
 

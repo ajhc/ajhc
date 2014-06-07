@@ -52,7 +52,8 @@ HSFILES= \
     src/Util/UnionSolve.hs src/Util/UniqueMonad.hs src/Util/Util.hs src/Util/VarName.hs \
     src/Util/YAML.hs src/Version/Config.hs src/Version/Version.hs src/Util/DocLike.hs \
     src/Util/UnionFindST.hs src/FrontEnd/Syn/Q.hs src/Deriving/Ix.hs src/Deriving/Text.hs src/Deriving/Ord.hs \
-    src/Deriving/Derive.hs src/Deriving/Type.hs
+    src/Deriving/Derive.hs src/Deriving/Type.hs src/Deriving/Util.hs src/Deriving/Typeable.hs \
+    src/Deriving/Traverse.hs
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
 GHCPROFOPTS= -prof -fprof-auto -rtsopts -auto-all -odir @builddir@/obj/prof -hidir @builddir@/obj/prof

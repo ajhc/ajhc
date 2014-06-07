@@ -4,6 +4,7 @@ import Util.Std
 import FrontEnd.Syn.Q(runQ)
 import Deriving.Ix
 import Deriving.Ord
+import Deriving.Traverse
 import Deriving.Typeable
 import Deriving.Text
 import Deriving.Type as D
@@ -39,11 +40,17 @@ collectDerives xs = f xs (Map.empty) where
         deriveData = Nothing
         standAlone = True
         deriveHead = hsDeclClassHead
-        [fst . fromHsTypeApp -> HsTyCon theType] = hsClassHeadArgs deriveHead
+        theType = case hsClassHeadArgs deriveHead of
+            [fst . fromHsTypeApp -> theType] -> theType
+            _ -> error $ "deriving.derive: " ++ show x
     f (_:xs) om = f xs om
     fromHsTypeApp t = f t [] where
         f (HsTyApp a b) rs = f a (b:rs)
-        f t rs = (t,rs)
+        f (HsTyTuple xs) rs = (name_TupleConstructor typeLevel (length xs),rs)
+        f (HsTyUnboxedTuple xs) rs = (name_UnboxedTupleConstructor typeLevel (length xs),rs)
+        f (HsTyFun a y) rs =  (tc_Arrow,(a:y:rs))
+        f (HsTyCon t) rs = (t,rs)
+        f _ _ = (u_placeholder,[])  -- invalid type, will be caught by type checker and given appropriate error message.
     postproc xsys = ff $ case [ d | Derive { deriveData = Just d } <- xsys ] of
         (d:_) -> map (deriveData_u (const $ Just d)) xsys
         [] -> xsys
@@ -59,15 +66,15 @@ derivingDerive HsModule { .. } = mconcat <$> runQ (mapM g derives) where
     f d@Derive { .. }
         | Just fn <- lookup ch normClasses = g False fn
         | Just fn <- lookup ch enumClasses = g True fn where
-        Just dat@D { .. } = deriveData
+        ~(Just dat@D { .. }) = deriveData
         ch = hsClassHead deriveHead
         isEnum = length body > 1 && all null (map types body)
-        g True fn | isEnum  = return ([],[d])
         g _ _ | deriveData == Nothing = do
             warn deriveSrcLoc ParseInfo $ "Cannot derive class without definition " ++ show (hsClassHead deriveHead)
             return ([],[d])
+        g True fn | isEnum  = return ([],[d])
         g _ fn = do
-            nds <- fn deriveSrcLoc hsModuleName dat
+            nds <- fn d hsModuleName dat
             return ([nds],[])
     f d = do
         warn (deriveSrcLoc d) InvalidDecl $ "No rule to derive class " ++ show (hsClassHead $ deriveHead d)
@@ -82,6 +89,9 @@ derivingDerive HsModule { .. } = mconcat <$> runQ (mapM g derives) where
         [(class_Bounded, deriveBounded)
         ,(class_Show, deriveShow)
         ,(class_Read, deriveRead)
+        ,(class_Functor, deriveFunctor)
+        ,(class_Foldable, deriveFoldable)
+        ,(class_Traversable, deriveTraversable)
         ,(class_Typeable, deriveTypeable  0 class_Typeable)
         ,(class_Typeable1, deriveTypeable 1 class_Typeable1)
         ,(class_Typeable2, deriveTypeable 2 class_Typeable2)

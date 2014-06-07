@@ -11,15 +11,17 @@ import Util.Std
 fsts = map fst
 snds = map snd
 
-deriveRead :: SrcLoc -> Module -> Data -> Q HsDecl
-deriveRead sloc mod d@D { body = [] } = do
-    mkInst sloc mod d class_Read [funBind sloc v_readsPrec [HsPWildCard, HsPWildCard] (HsList [])]
-deriveRead sloc mod d@D { .. } = do
+deriveRead :: Derive -> Module -> Data -> Q HsDecl
+deriveRead der mod d@D { body = [] } = do
+    let sloc = deriveSrcLoc der
+    mkInst der mod d class_Read [funBind sloc v_readsPrec [HsPWildCard, HsPWildCard] (HsList [])]
+deriveRead der mod d@D { .. } = do
     let newv n = newVarN n Nothing
         gen a b = HsGenerator sloc (HsPTuple [a,b])
         hsCompSrcLoc = sloc
         con n = HsString $ getIdent n
         fst' (x,y :: HsExp) = x
+        sloc = deriveSrcLoc der
     (HsVar -> de,dp) <- newv "prec"
     (HsVar -> inpute,inputp) <- newv "input"
     let f Body { types = [], .. } = do
@@ -42,7 +44,7 @@ deriveRead sloc mod d@D { .. } = do
             return $ greadParen de (HsLambda sloc [inp] e) inpute
     bodies <- mapM f body
     let readsPrec = funBind sloc v_readsPrec [dp, inputp] $ foldr1 gpp bodies
-    mkInst sloc mod d class_Read [readsPrec]
+    mkInst der mod d class_Read [readsPrec]
 
 pair a b = HsTuple [a,b]
 
@@ -51,11 +53,11 @@ greadParen n e i = app3 (HsVar v_readParen) (hsParen $ app2 (HsVar v_gt) n (HsLi
 greadsPrec n = HsApp (HsApp (HsVar v_readsPrec) (HsLit $ HsInt 10)) n
 gpp a b =  app2 (HsVar v_cat) a b
 
-deriveShow :: SrcLoc -> Module -> Data -> Q HsDecl
-deriveShow sloc mod d@D{ body = [] } = do
-    warn sloc InvalidDecl "Cannot derive Show for nullary datatype"
-    mkInst sloc mod d class_Show []
-deriveShow hsMatchSrcLoc mod d@D{ .. } = do
+deriveShow :: Derive -> Module -> Data -> Q HsDecl
+deriveShow der@Derive{..} mod d@D{ body = [] } = do
+    warn deriveSrcLoc InvalidDecl "Cannot derive Show for nullary datatype"
+    mkInst der mod d class_Show []
+deriveShow der@Derive{deriveSrcLoc = hsMatchSrcLoc} mod d@D{ .. } = do
     let mkMatch b@Body { .. } = do
             (pa,es) <- mkPat mod b
             (HsVar -> ne,np) <- newVar (Just mod)
@@ -65,13 +67,13 @@ deriveShow hsMatchSrcLoc mod d@D{ .. } = do
                     | isOpLike constructor, [e1,e2] <- es = gshowParen ne $ gshowsPrec e1 `gcomp` (gshowString gid) `gcomp` gshowsPrec e2
                     | isOpLike constructor = gshowParen ne $ foldr1  gcomp (gshowString ("(" ++ gid ++ ")"):(map gshowsPrec es))
                     | null types = gshowString gid
-                    | otherwise = gshowParen ne $ foldr1  gcomp (gshowString gid:(map gshowsPrec es))
+                    | otherwise = gshowParen ne $ (gshowString $ gid ++ " ") `gdot` foldr1  gcomp (map gshowsPrec es)
                 df lab e = gshowString (getIdent lab ++ " = ") `gdot` gshows e
             return HsMatch { hsMatchPats = [np,pa], .. }
         hsMatchName = v_showsPrec
         hsMatchDecls = []
     bs <- mapM mkMatch body
-    mkInst hsMatchSrcLoc mod d class_Show [HsFunBind bs]
+    mkInst der mod d class_Show [HsFunBind bs]
 
 gsc c = HsLeftSection (HsCon dc_Cons)  (HsLit $ HsChar c)
 gcomp a b =  app2 (HsVar v_Dot) a (app2 (HsVar v_Dot) (gsc ' ') b)

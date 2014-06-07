@@ -16,6 +16,7 @@ module FrontEnd.Class(
     derivableClasses,
     emptyInstance,
     enumDerivableClasses,
+    typeableClasses,
     findClassInsts,
     findClassRecord,
     instanceName,
@@ -529,6 +530,13 @@ enumDerivableClasses = [
     class_Ix
     ]
 
+typeableClasses :: [Name]
+typeableClasses =
+    [class_Typeable
+    ,class_Typeable1
+    ,class_Typeable2
+    ]
+
 -- classes that cannot be derived by the generalized
 -- newtype deriving mechanism.
 noNewtypeDerivable :: [Name]
@@ -536,15 +544,3 @@ noNewtypeDerivable = [
     class_Show,
     class_Read
     ]
-
--- classes that behave identically to their component when they have a single
--- unary constructor but are not newtypes
-{-
-unaryPassDerivable :: [Name]
-unaryPassDerivable = [
-    class_Ix,
-    class_Eq,
-    class_Ord,
-    class_Bounded
-    ]
--}

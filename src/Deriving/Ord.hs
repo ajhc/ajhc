@@ -7,8 +7,8 @@ import FrontEnd.Syn.Q
 import Name.Names
 import Util.Std
 
-deriveEq :: SrcLoc -> Module -> Data -> Q HsDecl
-deriveEq hsMatchSrcLoc mod d@D{ .. } = do
+deriveEq :: Derive -> Module -> Data -> Q HsDecl
+deriveEq der@Derive { deriveSrcLoc = hsMatchSrcLoc } mod d@D{ .. } = do
     t <- lift True
     f <- lift False
     let mkMatch b@Body { .. } = do
@@ -24,10 +24,10 @@ deriveEq hsMatchSrcLoc mod d@D{ .. } = do
         dfalse = HsMatch { hsMatchPats = [HsPWildCard, HsPWildCard], hsMatchRhs = HsUnGuardedRhs f, .. }
     bs <- mapM mkMatch body
     let eqfn = HsFunBind $  bs ++ if length body <= 1 then [] else [dfalse]
-    mkInst hsMatchSrcLoc mod d class_Eq [eqfn]
+    mkInst der mod d class_Eq [eqfn]
 
-deriveOrd :: SrcLoc -> Module -> Data -> Q HsDecl
-deriveOrd hsMatchSrcLoc mod d@D{ .. } = do
+deriveOrd :: Derive -> Module -> Data -> Q HsDecl
+deriveOrd der@Derive { deriveSrcLoc = hsMatchSrcLoc } mod d@D{ .. } = do
     let mkMatch (nx,b@Body { .. }) (ny,b2) | nx == ny = do
             pa <- mkPat mod b
             pb <- mkPat mod b
@@ -50,10 +50,10 @@ deriveOrd hsMatchSrcLoc mod d@D{ .. } = do
         hsMatchName = v_compare
         hsMatchDecls = []
     eqfn <- HsFunBind <$> sequence [ mkMatch x y  | x <- zip [ 0 .. ] body, y <- zip [ 0 :: Int .. ] body ]
-    mkInst hsMatchSrcLoc mod d class_Ord [eqfn]
+    mkInst der mod d class_Ord [eqfn]
 
-deriveBounded :: SrcLoc -> Module -> Data -> Q HsDecl
-deriveBounded hsDeclSrcLoc mod d@D{ .. } = do
+deriveBounded :: Derive -> Module -> Data -> Q HsDecl
+deriveBounded der@Derive{deriveSrcLoc = hsDeclSrcLoc} mod d@D{ .. } = do
     if null body then fail "cannot create bounded for nullary type" else do
     let lowb = head body
         highb = last body
@@ -62,4 +62,4 @@ deriveBounded hsDeclSrcLoc mod d@D{ .. } = do
             hsDeclDecls = []
             hsDeclRhs = HsUnGuardedRhs $
                 foldl HsApp (HsCon constructor) (map (const $ HsVar n) types)
-    mkInst hsDeclSrcLoc mod d class_Bounded [mm highb v_maxBound,mm lowb v_minBound]
+    mkInst der mod d class_Bounded [mm highb v_maxBound,mm lowb v_minBound]

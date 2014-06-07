@@ -27,7 +27,7 @@ extensions:
   - Rank2Types
 extra-source-files: include/Typeable.h
 ghc-options: -O2
-options: ["-fcpp", "-I-", "-Isrc/data"]
+options: ["-I-", "-Isrc/data"]
 include-dirs: include
 license: BSD3
 license-file: LICENSE

@@ -22,6 +22,7 @@ import Data.Word
 import Deriving.Derive
 import DerivingDrift.Drift
 import Doc.DocLike(tupled)
+import FrontEnd.Class
 import FrontEnd.Desugar (desugarHsModule)
 import FrontEnd.HsSyn
 import FrontEnd.Syn.Traverse
@@ -329,9 +330,14 @@ renameHsDecl d = f d where
         return (HsClassAliasDecl srcLoc name' args' hsContext' hsClasses' hsDecls')
     f HsInstDecl { .. } = do
         updateWithN TypeVal (hsClassHeadArgs hsDeclClassHead) $ do
-        hsDeclClassHead <- rename hsDeclClassHead
-        hsDeclDecls <- mapM (qualifyInstMethod (getTypeClassModule hsDeclClassHead)) hsDeclDecls
-        return HsInstDecl { .. }
+        hsDeclClassHead@HsClassHead { .. } <- rename hsDeclClassHead
+        if hsClassHead `elem` typeableClasses
+        then do
+            addWarn ParseInfo "Dropping explicit Typeable instance for built in derived version"
+            return HsDeclDeriving { .. }
+        else do
+            hsDeclDecls <- mapM (qualifyInstMethod (getTypeClassModule hsDeclClassHead)) hsDeclDecls
+            return HsInstDecl { .. }
     f (HsInfixDecl srcLoc assoc int hsNames) = do
         hsNames' <- mapM renameName hsNames
         return $ HsInfixDecl srcLoc assoc int hsNames'

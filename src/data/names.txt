@@ -100,6 +100,10 @@ Typeable1       Data.Typeable.Typeable1
 Typeable2       Data.Typeable.Typeable2
 Typeable3       Data.Typeable.Typeable3
 
+Foldable        Data.Foldable.Foldable
+Monoid          Data.Monoid.Monoid
+Traversable     Data.Traversable.Traversable
+
 RawType:rt:
 
 bits8         bits8
@@ -121,6 +125,8 @@ eqString         Jhc.String.eqString
 eqUnpackedString Jhc.String.eqUnpackedString
 error            Jhc.IO.error
 map              Jhc.Basics.map
+fmap             Jhc.Monad.fmap
+fmap_const       Jhc.Monad.<$
 and              Jhc.Order.&&
 foldr            Jhc.Basics.foldr
 foldl            Jhc.Basics.foldl
@@ -169,6 +175,15 @@ runExpr              Prelude.IO.runExpr
 runRaw               Jhc.Prim.Wrapper.runRaw
 runMain              Jhc.IO.runMain
 runNoWrapper         Jhc.Prim.Wrapper.runNoWrapper
+
+foldMap              Data.Foldable.foldMap
+fold                 Data.Foldable.fold
+mempty               Data.Monoid.mempty
+mappend              Data.Monoid.mappend
+traverse             Data.Traversable.traverse
+sequenceA            Data.Traversable.sequenceA
+lstar                Control.Applicative.<*>
+pure                 Control.Applicative.pure
 
 enum_succ            Jhc.Inst.PrimEnum.enum_succ
 enum_pred            Jhc.Inst.PrimEnum.enum_pred
