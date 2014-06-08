@@ -406,7 +406,7 @@ aexp :: { HsExp }
     | conop             { HsBackTick (HsCon $1) }
     | lit               { HsLit $1 }
     -- atomic after layout processing
-    | 'do' '{' stmts  '}'    { HsDo $3 }
+    | 'do' '{' stmts  '}'    { espan $1 $4 $ HsDo $3 }
     | aexp '{' ecl_fbind '}' {% mkRecConstrOrUpdate $1 $3 }
 
 m_comma :: { () } : ',' { () } |  { () }

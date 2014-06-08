@@ -85,13 +85,13 @@ located ss x = Located (srcSpan ss) x
 -- srcloc monad classes
 -----------------------
 
-class Monad m => MonadSrcLoc m where
+class (Applicative m,Monad m) => MonadSrcLoc m where
     getSrcLoc  :: m SrcLoc
     getSrcSpan :: m SrcSpan
     getSrcSpan = liftM srcSpan getSrcLoc
     getSrcLoc = liftM srcLoc getSrcSpan
 
-class Applicative m => MonadSetSrcLoc m where
+class (MonadSrcLoc m,Applicative m) => MonadSetSrcLoc m where
     withSrcLoc' :: SrcLoc -> m a -> m a
     withSrcSpan' :: SrcSpan -> m a -> m a
     withSrcLoc' sl a = withSrcSpan (srcSpan sl) a
@@ -149,7 +149,9 @@ runSLM (SLM t) = runReaderT t bogusSrcSpan
 instance (Applicative m,Monad m) => MonadSetSrcLoc (SLM m) where
     withSrcSpan' ss (SLM a) = SLM $ local (const ss) a
 
-instance Monad m => MonadSrcLoc (SLM m) where
+instance (Applicative m,Monad m) => MonadSrcLoc (SLM m) where
     getSrcSpan = SLM ask
 instance MonadSetSrcLoc IO where
     withSrcLoc' sl a = a
+instance MonadSrcLoc IO where
+    getSrcSpan = return bogusSrcSpan

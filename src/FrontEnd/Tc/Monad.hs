@@ -67,6 +67,7 @@ import FrontEnd.Class
 import FrontEnd.Diagnostic
 import FrontEnd.KindInfer
 import FrontEnd.Rename(DeNameable(..))
+import FrontEnd.SrcLoc
 import FrontEnd.Tc.Kind
 import FrontEnd.Tc.Type
 import FrontEnd.Warning
@@ -87,6 +88,7 @@ type TypeEnv = Map.Map Name Sigma
 data TcEnv = TcEnv {
     tcInfo            :: TcInfo,
     tcDiagnostics     :: [Diagnostic],   -- list of information that might help diagnosis
+    tcSrcSpan         :: SrcSpan,
     tcVarnum          :: {-# UNPACK #-} !(IORef Int),
     tcCollectedEnv    :: {-# UNPACK #-} !(IORef (Map.Map Name Sigma)),
     tcCollectedCoerce :: {-# UNPACK #-} !(IORef (Map.Map Name CoerceTerm)),
@@ -177,6 +179,7 @@ runTc tcInfo  (Tc tim) = do
     ce <- newIORef mempty
     cc <- newIORef mempty
     (a,out) <- runWriterT $ runReaderT tim TcEnv {
+        tcSrcSpan         = bogusSrcSpan,
         tcCollectedEnv    = ce,
         tcCollectedCoerce = cc,
         tcConcreteEnv     = tcInfoEnv tcInfo `mappend` tcInfoSigEnv tcInfo,
@@ -201,8 +204,13 @@ instance OptionMonad Tc where
 --   stack
 
 withContext :: Diagnostic -> Tc a -> Tc a
-withContext diagnostic comp = do
-    local (tcDiagnostics_u (diagnostic:)) comp
+withContext diagnostic@(Msg (Just sl) _) comp = do
+    withSrcLoc sl $ local (tcDiagnostics_u (diagnostic:)) comp
+withContext diagnostic@(Msg Nothing msg) comp = do
+    sl <- getSrcLoc
+    let diag | sl /= bogusASrcLoc = Msg (Just sl) msg
+             | otherwise = diagnostic
+    local (tcDiagnostics_u (diag:)) comp
 
 addRule :: Rule -> Tc ()
 addRule r = tell mempty { checkedRules = Seq.singleton r }
@@ -547,11 +555,9 @@ instance MonadWarn Tc where
     addWarning w = tell mempty { tcWarnings = Seq.singleton w }
 
 instance MonadSrcLoc Tc where
-    getSrcLoc = do
-        xs <- asks tcDiagnostics
-        case xs of
-            (Msg (Just sl) _:_) -> return sl
-            _ -> return bogusASrcLoc
+    getSrcSpan = asks tcSrcSpan
+instance MonadSetSrcLoc Tc where
+    withSrcSpan' ss = local (\e -> e { tcSrcSpan = ss })
 
 instance UniqueProducer Tc where
     newUniq = do

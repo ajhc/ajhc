@@ -162,6 +162,16 @@ boxyMatch s1 s2 = do
         boxyMatch s2 a2
         return False
 
+    bm t@(TArrow s1 s2) (TAp a1 a2) = do
+        printRule "AF1-arrow"
+        (tAp tArrow s1) `boxyMatch` a1
+        s2 `boxyMatch` a2
+        return False
+--        tArrow `boxyMatch` arr
+--        boxyMatch s1 a1
+--        boxyMatch s2 a2
+--        return False
+
     -- CEQ1
 
     bm a (TMetaVar mv) | (TCon ca,as) <- fromTAp a = do

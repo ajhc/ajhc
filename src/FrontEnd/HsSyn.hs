@@ -290,6 +290,7 @@ data HsErrorType
     | HsErrorSource
     | HsErrorUnderscore
     | HsErrorUninitializedField
+    | HsErrorInvalidExp
  deriving(Eq,Show,Ord)
 
 data HsExp

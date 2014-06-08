@@ -112,11 +112,11 @@ hasDuplicates xs = any ((> 1) . length) $ group (sort xs)
 --fetchQtArgs sl HsQualType { hsQualTypeType = t } | (HsTyCon {},args@(_:_)) <- fromHsTypeApp t = return args
 --fetchQtArgs sl _ = warn sl InvalidDecl "invalid head in class or instance decl" >> return []
 
-checkDeriving _ xs | all (`elem` derivableClasses) xs = return ()
-checkDeriving False xs
-  = let nonDerivable = filter (`notElem` derivableClasses) xs
-    in addWarn (UnknownDeriving nonDerivable) ("attempt to derive from a non-derivable class: " ++ unwords (map show nonDerivable))
-checkDeriving True _ = addWarn InvalidDecl "generalized newtype deriving not implemented."
+-- checkDeriving _ xs | all (`elem` derivableClasses) xs = return ()
+-- checkDeriving False xs
+--   = let nonDerivable = filter (`notElem` derivableClasses) xs
+--     in addWarn (UnknownDeriving nonDerivable) ("attempt to derive from a non-derivable class: " ++ unwords (map show nonDerivable))
+-- checkDeriving True _ = addWarn InvalidDecl "generalized newtype deriving not implemented."
 
 --fromHsTypeApp t = f t [] where
 --    f (HsTyApp a b) rs = f a (b:rs)

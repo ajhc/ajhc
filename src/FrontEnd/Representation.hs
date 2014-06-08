@@ -281,6 +281,7 @@ instance Show MetaVar where
     show mv = pprint mv
 
 fromTAp t = f t [] where
+    f (TArrow a b) rs = f (TAp (TAp tArrow a) b) rs
     f (TAp a b) rs = f a (b:rs)
     f t rs = (t,rs)
 

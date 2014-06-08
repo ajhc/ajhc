@@ -11,6 +11,7 @@ import qualified Text.PrettyPrint.HughesPJ as P
 import Doc.DocLike
 import Doc.PPrint as PPrint
 import FrontEnd.Class
+import FrontEnd.Desugar
 import FrontEnd.Diagnostic
 import FrontEnd.HsPretty
 import FrontEnd.HsSyn
@@ -340,8 +341,6 @@ tiExpr expr@(HsList exps@(_:_)) typ = deNameContext Nothing "in the list " expr 
         (TAp tList v) `subsumes` typ
         wrapInAsPatEnv (HsList exps') typ
 
-tiExpr (HsParen e) typ = tcExpr e typ
-
 tiExpr expr@(HsLet decls e) typ = deNameContext Nothing "in the let binding" expr $ do
     sigEnv <- getSigEnv
     let bgs = getFunDeclsBg sigEnv decls
@@ -353,7 +352,64 @@ tiExpr expr@(HsLet decls e) typ = deNameContext Nothing "in the let binding" exp
             return (HsLet rs e')
     f bgs []
 
-tiExpr (HsLocatedExp (Located sl e)) typ = tiExpr e typ
+tiExpr (HsDo ss) typ = do
+    comp@HsComp { .. } <- doToComp ss
+    case typ of
+        TAp mon _ -> do
+            addPreds [IsIn class_Monad mon]
+        TArrow a b -> do
+            addPreds  [IsIn class_Monad (tAp tArrow a)]
+        _ -> do
+            m <- newBox (kindStar `Kfun` kindStar)
+            a <- newBox kindStar
+            addPreds [IsIn class_Monad m]
+            tAp m a `subsumes` typ
+            return ()
+    tcExpr (doCompToExp v_bind v_bind_ v_fail comp) typ
+
+{-
+tiExpr (HsDo ss) typ = do
+    HsComp { .. } <- doToComp ss
+    let f mt (HsQualifier e:qs) rs = do
+            box <- newBox kindStar
+            e <- tcExpr e (TAp mt box)
+            unBox box -- this is to simulate what a _ binding would do.
+            e <- wrapInAsPatEnv e (TAp mt box)
+            f mt qs (HsQualifier e:rs)
+        f mt (HsLetStmt decls:qs) rs = do
+            let g (bg:bgs) rrs = do
+                    (ds,env) <- tcBindGroup bg
+                    localEnv env $ g bgs (ds ++ rrs)
+                g [] rrs = do
+                    f mt qs (HsLetStmt rrs:rs)
+            sigEnv <- getSigEnv
+            g (getFunDeclsBg sigEnv decls) []
+        f mt (HsGenerator sl pat exp:qs) rs = withSrcLoc sl $ do
+            withSrcLoc sl $ do
+            box <- newBox kindStar
+            exp <- tcExpr exp (TAp mt box)
+            (pat,env) <- tcPat pat box
+            localEnv env $ f mt qs (HsGenerator sl pat exp:rs)
+        f mt [] rs = do
+            hsCompBody <- tcExpr hsCompBody typ
+            return $ doCompToExp v_bind v_bind_ v_fail HsComp { hsCompStmts = reverse rs,.. }
+--            return $ HsDo (reverse $ HsQualifier hsCompBody:rs)
+    case typ of
+        TAp mon _ -> do
+            addPreds [IsIn class_Monad mon]
+            f mon hsCompStmts []
+        --TArrow a b ->
+        _ -> do
+            m <- newBox (kindStar `Kfun` kindStar)
+            a <- newBox kindStar
+            addPreds [IsIn class_Monad m]
+            tAp m a `subsumes` typ
+            f m hsCompStmts []
+        -- _ -> fail $ "Expected do expression to be of shape Monad m => m a but found: " ++ prettyPrintType typ
+-}
+
+tiExpr (HsLocatedExp (Located sl e)) typ = withSrcSpan sl $ tiExpr e typ
+tiExpr (HsParen e) typ = tcExpr e typ
 
 tiExpr e typ = fail $ "tiExpr: not implemented for: " ++ show (e,typ)
 
@@ -918,6 +974,10 @@ collectBindDecls = filter isBindDecl where
     isBindDecl HsPatBind {} = True
     isBindDecl HsFunBind {} = True
     isBindDecl _ = False
+
+fromTAp (TArrow a b) = Just (tAp tArrow a,b)
+fromTAp (TAp a b) = Just (a,b)
+fromTAp _ = Nothing
 
 from2Ty (TArrow a b) = Just (tArrow,a,b)
 from2Ty (TAp (TAp mv a) b) = Just (mv,a,b)

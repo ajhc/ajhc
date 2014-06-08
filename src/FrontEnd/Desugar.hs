@@ -5,9 +5,13 @@
 -- into 'simple' pattern bindings, and adds failure cases to lambda
 -- expressions which have failable patterns
 
-module FrontEnd.Desugar (desugarHsModule, desugarHsStmt,listCompToExp, doToExp) where
+module FrontEnd.Desugar (
+    desugarHsModule, desugarHsStmt,listCompToExp, doToExp
+    ,doToComp
+    ,doCompToExp) where
 
 import FrontEnd.Syn.Traverse
+import FrontEnd.Warning
 import Name.Names
 import Ty.Level
 import Util.Std
@@ -182,26 +186,6 @@ listCompToExp newName exp ss = hsParen `liftM` f ss where
             kase = HsLCase [a1]
             a1 =  HsAlt srcLoc pat (HsUnGuardedRhs exp') []
         return $ hsParen $ HsVar v_map `app` kase `app` e
-    -- f ((HsGenerator srcLoc pat e):HsQualifier q:ss) | isFailablePat pat || Nothing == g ss = do
-    --     npvar <- newName
-    --     ss' <- f ss
-    --     let kase = HsCase (HsVar npvar) [a1, a2 ]
-    --         a1 =  HsAlt srcLoc pat (HsGuardedRhss [HsComp srcLoc [HsQualifier q] ss']) []
-    --         a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs $ HsList []) []
-    --     return $ hsParen $ HsVar v_concatMap `app`  HsLambda srcLoc [HsPVar npvar] kase `app`  e
-    -- f ((HsGenerator srcLoc pat e):ss) | isFailablePat pat || Nothing == g ss = do
-    --     npvar <- newName
-    --     ss' <- f ss
-    --     let kase = HsCase (HsVar npvar) [a1, a2 ]
-    --         a1 =  HsAlt srcLoc pat (HsUnGuardedRhs ss') []
-    --         a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs $ HsList []) []
-    --     return $ hsParen $ HsVar v_concatMap `app` HsLambda srcLoc [HsPVar npvar] kase `app` e
-    -- f ((HsGenerator srcLoc pat e):ss) = do
-    --     npvar <- newName
-    --     let Just exp' = g ss
-    --         kase = HsCase (HsVar npvar) [a1 ]
-    --         a1 =  HsAlt srcLoc pat (HsUnGuardedRhs exp') []
-    --     return $ hsParen $ HsVar v_map `app` HsLambda srcLoc [HsPVar npvar] kase `app` e
     g [] = return exp
     g (HsLetStmt ds:ss) = do
         e <- g ss
@@ -247,7 +231,28 @@ openPat p = p
 hsApp e es = hsParen $ foldl HsApp (hsParen e) (map hsParen es)
 hsIf e a b = hsParen $ HsIf e a b
 
-doToExp :: Monad m
+hsExpError :: (MonadWarn m,MonadSrcLoc m) => String -> m HsExp
+hsExpError hsExpString = do
+    addWarn InvalidExp hsExpString
+    hsExpSrcLoc <- getSrcLoc
+    return HsError { hsExpErrorType = HsErrorInvalidExp, .. }
+
+doToComp :: (MonadWarn m,MonadSetSrcLoc m) => [HsStmt] ->  m HsComp
+doToComp ss = f (reverse ss) where
+    bad s = do
+        hsCompBody <- hsExpError s
+        hsCompSrcLoc <- getSrcLoc
+        return $ HsComp { hsCompStmts = [], .. }
+    f [] = bad "A 'do' block must not be empty."
+    f (HsGenerator srcLoc _ _:_) = withSrcLoc srcLoc $ bad "The last statement in a 'do' block must be an expression."
+    f (HsLetStmt {}:_) = bad "The last statement in a 'do' block must be an expression."
+    f (HsQualifier e:rs) = g e rs
+    g e (HsLetStmt ds:rs) = g (HsLet ds e) rs
+    g hsCompBody rs = do
+        hsCompSrcLoc <- getSrcLoc
+        return HsComp { hsCompStmts = reverse rs, .. }
+
+doToExp :: MonadWarn m
     => m HsName    -- ^ name generator
     -> HsName      -- ^ bind (>>=) to use
     -> HsName      -- ^ bind_ (>>) to use
@@ -257,7 +262,8 @@ doToExp :: Monad m
 doToExp newName f_bind f_bind_ f_fail ss = hsParen `liftM` f ss where
     f [] = fail "doToExp: empty statements in do notation"
     f [HsQualifier e] = return e
-    f [gen@(HsGenerator srcLoc _pat _e)] = fail $ "doToExp: last expression n do notation is a generator (srcLoc):" ++ show srcLoc
+    f [gen@(HsGenerator srcLoc _pat _e)] = fail $
+        "doToExp: last expression n do notation is a generator (srcLoc):" ++ show srcLoc
     f [letst@(HsLetStmt _decls)] = fail $ "doToExp: last expression n do notation is a let statement"
     f (HsQualifier e:ss) = do
         ss <- f ss
@@ -274,3 +280,21 @@ doToExp newName f_bind f_bind_ f_fail ss = hsParen `liftM` f ss where
     f (HsLetStmt decls:ss) = do
         ss <- f ss
         return $ HsLet decls ss
+
+doCompToExp
+    :: Name      -- ^ bind  (>>=) to use
+    -> Name      -- ^ bind_ (>>) to use
+    -> Name      -- ^ fail to use
+    -> HsComp
+    -> HsExp
+doCompToExp f_bind f_bind_ f_fail HsComp { .. } = f hsCompStmts where
+    f [] = hsCompBody
+    f (HsQualifier e:ss) = HsInfixApp (hsParen e) (HsVar f_bind_) (f ss)
+    f ((HsGenerator srcLoc pat e):ss) | isSimplePat pat =
+        HsInfixApp (hsParen e) (HsVar f_bind) (HsLambda srcLoc [pat] (f ss))
+    f ((HsGenerator srcLoc pat e):ss) =
+        let kase = HsLCase [a1, a2 ]
+            a1 =  HsAlt srcLoc pat (HsUnGuardedRhs (f ss)) []
+            a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs (HsApp (HsVar f_fail) (HsLit $ HsString $ show srcLoc ++ " pattern match failure in do block"))) []
+        in HsInfixApp (hsParen e) (HsVar f_bind) kase  where
+    f (HsLetStmt decls:ss) = HsLet decls (f ss)

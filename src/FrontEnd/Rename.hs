@@ -22,7 +22,7 @@ import Data.Word
 import Deriving.Derive
 import Doc.DocLike(tupled)
 import FrontEnd.Class
-import FrontEnd.Desugar (desugarHsModule,listCompToExp,doToExp)
+import FrontEnd.Desugar
 import FrontEnd.HsSyn
 import FrontEnd.Syn.Traverse
 import FrontEnd.Warning
@@ -567,7 +567,10 @@ instance Rename HsExp where
         (ss,()) <- renameHsStmts hsStmts (return ())
         sugar <- flagOpt FO.Sugar
         if sugar
-        then doToExp newVar (v_bind) (v_bind_) (v_fail) ss
+        then do
+            doComp <- doToComp ss
+            return $ doCompToExp v_bind v_bind_ v_fail doComp
+            --return $ HsDo ss
         else do eWarn "do desugaring disabled by -fno-sugar"
                 return $ HsDo ss
     rename (HsRecConstr hsName hsFieldUpdates) = do
@@ -579,13 +582,11 @@ instance Rename HsExp where
         hsExp' <- rename hsExp
         hsFieldUpdates' <- rename hsFieldUpdates
         fls <- asks envFieldLabels
-        buildRecUpdate fls hsExp' hsFieldUpdates' -- HsRecConstr hsName' hsFieldUpdates')
-        --return (HsRecUpdate hsExp' hsFieldUpdates')
+        buildRecUpdate fls hsExp' hsFieldUpdates'
     rename (HsEnumFrom hsExp) = desugarEnum vu_enumFrom [hsExp]
     rename (HsEnumFromTo hsExp1 hsExp2) = desugarEnum vu_enumFromTo [hsExp1, hsExp2]
     rename (HsEnumFromThen hsExp1 hsExp2) = desugarEnum vu_enumFromThen [hsExp1, hsExp2]
     rename (HsEnumFromThenTo hsExp1 hsExp2 hsExp3) = desugarEnum vu_enumFromThenTo [hsExp1, hsExp2, hsExp3]
-   -- rename (HsList []) = return $ HsCon dc_EmptyList
     rename orig@(HsListComp (HsComp sl hsStmts hsExp)) = withSrcLoc sl $ do
         (ss,e) <- renameHsStmts hsStmts (rename hsExp)
         sugar <- flagOpt FO.Sugar
