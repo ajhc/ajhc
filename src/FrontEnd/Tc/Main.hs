@@ -151,6 +151,17 @@ tiExpr (HsVar v) typ = do
       else do
         doCoerce f (HsVar v)
 
+tiExpr (HsLCase alts) typ = do
+    withContext (simpleMsg $ "in a \\case expression") $ do
+    case typ of
+        (from2Ty -> Just (mv,s1,s2)) -> do
+            boxyMatch mv tArrow
+            alts' <- mapM (tcAlt s1 s2) alts
+            wrapInAsPatEnv (HsLCase alts') typ
+        TMetaVar mv -> withMetaVars mv [kindArg,kindFunRet] (\ [a,b] -> a `fn` b) $ \ [s1,s2] -> do
+            alts' <- mapM (tcAlt s1 s2) alts
+            wrapInAsPatEnv (HsLCase alts') typ
+
 tiExpr (HsCase e alts) typ = do
     dn <- getDeName
     withContext (simpleMsg $ "in the case expression\n   case " ++ render (ppHsExp $ dn e) ++ " of ...") $ do
@@ -907,3 +918,7 @@ collectBindDecls = filter isBindDecl where
     isBindDecl HsPatBind {} = True
     isBindDecl HsFunBind {} = True
     isBindDecl _ = False
+
+from2Ty (TArrow a b) = Just (tArrow,a,b)
+from2Ty (TAp (TAp mv a) b) = Just (mv,a,b)
+from2Ty _ = Nothing

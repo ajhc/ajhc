@@ -471,7 +471,9 @@ ppHsExp (HsIf cond thenexp elsexp) =
 	      text "then", ppHsExp thenexp,
 	      text "else", ppHsExp elsexp]
 ppHsExp (HsCase cond altList) = myFsep[text "case", ppHsExp cond, text "of"]
-			        $$$ body caseIndent (map ppHsAlt altList)
+			        $$ body caseIndent (map ppHsAlt altList)
+ppHsExp (HsLCase altList) = myFsep[text "\\case"]
+			        $$ body caseIndent (map ppHsAlt altList)
 ppHsExp (HsDo stmtList) = text "do" $$$ body doIndent (map ppHsStmt stmtList)
 -- Constructors & Vars
 ppHsExp (HsVar name ) = ppHsQNameParen name

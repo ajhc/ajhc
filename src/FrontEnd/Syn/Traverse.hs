@@ -247,6 +247,7 @@ instance TraverseHsOps HsExp where
         fn x = applyHsOps hops x
         g e = withSrcLoc (srcLoc e) $ f e
         f (HsCase e as)                      = HsCase <$> fn e <*> fn as
+        f (HsLCase as)                       = HsLCase <$> fn as
         f (HsDo hsStmts)                     = HsDo <$> fn hsStmts
         f (HsExpTypeSig srcLoc e hsQualType) = HsExpTypeSig srcLoc <$> fn e <*> fn hsQualType
         f (HsLambda srcLoc hsPats e)         = HsLambda srcLoc <$> fn hsPats <*> fn e

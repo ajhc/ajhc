@@ -300,7 +300,8 @@ data HsExp
     | HsLambda SrcLoc [HsPat] HsExp
     | HsLet [HsDecl] HsExp
     | HsIf HsExp HsExp HsExp
-    | HsCase HsExp [HsAlt]
+    | HsCase { hsExpExp :: HsExp, hsExpAlts :: [HsAlt] }
+    | HsLCase { hsExpAlts :: [HsAlt] }
     | HsTuple [HsExp]
     | HsUnboxedTuple [HsExp]
     | HsList [HsExp]

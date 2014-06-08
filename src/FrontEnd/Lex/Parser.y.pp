@@ -33,6 +33,7 @@ import qualified Data.Map as Map
 #def pragma qq[    '$a' { L _ LPragmaStart \$\$@"$a" }\n]
 
 #map {pragma($_)} qw/NOINLINE CATALYST SPECIALIZE MULTISPECIALIZE SUPERSPECIALIZE RULE NOETA SUPERINLINE CTYPE INLINE SRCLOC_ANNOTATE HOT COLD/
+ 'lcase' { L $$ LSpecial "\\case" }
  '.' { L $$ LVarSym "." }
  'as' { L $$ LVarId "as" }
  FORALL { L $$ LVarId "forall" }   -- used inside of rules when -fno-forall is in effect
@@ -377,6 +378,7 @@ exp1 :: { HsExp }
     | '\\' pats '->' exp { HsLambda $1 $2 $4 }
     | 'let' '{' decls '}' 'in' exp { HsLet (fixupHsDecls $3) $6 }
     | 'case' exp 'of' '{' alts '}'  { espan $1 $6 $ HsCase (espan $1 $3 $2) $5 }
+    | 'lcase' '{' alts '}'  { espan $1 $4 $ HsLCase $3 }
     | aexp  { $1 }
 
 stmt :: { HsStmt }

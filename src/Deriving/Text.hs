@@ -100,26 +100,43 @@ listCompToExp newName exp ss = hsParen `liftM` f ss where
     f ((HsGenerator srcLoc pat e):ss) | isLazyPat pat = do
         ss' <- f ss
         return $ hsParen $ HsVar v_concatMap `app`  HsLambda srcLoc [pat] ss' `app` e
+    -- f ((HsGenerator srcLoc pat e):HsQualifier q:ss) | isFailablePat pat || Nothing == g ss = do
+    --     npvar <- newName
+    --     ss' <- f ss
+    --     let kase = HsCase (HsVar npvar) [a1, a2 ]
+    --         a1 =  HsAlt srcLoc pat (HsGuardedRhss [HsComp srcLoc [HsQualifier q] ss']) []
+    --         a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs $ HsList []) []
+    --     return $ hsParen $ HsVar v_concatMap `app`  HsLambda srcLoc [HsPVar npvar] kase `app`  e
+    -- f ((HsGenerator srcLoc pat e):ss) | isFailablePat pat || Nothing == g ss = do
+    --     npvar <- newName
+    --     ss' <- f ss
+    --     let kase = HsCase (HsVar npvar) [a1, a2 ]
+    --         a1 =  HsAlt srcLoc pat (HsUnGuardedRhs ss') []
+    --         a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs $ HsList []) []
+    --     return $ hsParen $ HsVar v_concatMap `app` HsLambda srcLoc [HsPVar npvar] kase `app` e
+    -- f ((HsGenerator srcLoc pat e):ss) = do
+    --     npvar <- newName
+    --     let Just exp' = g ss
+    --         kase = HsCase (HsVar npvar) [a1 ]
+    --         a1 =  HsAlt srcLoc pat (HsUnGuardedRhs exp') []
+    --     return $ hsParen $ HsVar v_map `app` HsLambda srcLoc [HsPVar npvar] kase `app` e
     f ((HsGenerator srcLoc pat e):HsQualifier q:ss) | isFailablePat pat || Nothing == g ss = do
-        npvar <- newName
         ss' <- f ss
-        let kase = HsCase (HsVar npvar) [a1, a2 ]
+        let kase = HsLCase  [a1, a2 ]
             a1 =  HsAlt srcLoc pat (HsGuardedRhss [HsComp srcLoc [HsQualifier q] ss']) []
             a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs $ HsList []) []
-        return $ hsParen $ HsVar v_concatMap `app`  HsLambda srcLoc [HsPVar npvar] kase `app`  e
+        return $ hsParen $ HsVar v_concatMap `app` kase `app`  e
     f ((HsGenerator srcLoc pat e):ss) | isFailablePat pat || Nothing == g ss = do
-        npvar <- newName
         ss' <- f ss
-        let kase = HsCase (HsVar npvar) [a1, a2 ]
+        let kase = HsLCase [a1, a2 ]
             a1 =  HsAlt srcLoc pat (HsUnGuardedRhs ss') []
             a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs $ HsList []) []
-        return $ hsParen $ HsVar v_concatMap `app` HsLambda srcLoc [HsPVar npvar] kase `app` e
+        return $ hsParen $ HsVar v_concatMap `app` kase `app` e
     f ((HsGenerator srcLoc pat e):ss) = do
-        npvar <- newName
         let Just exp' = g ss
-            kase = HsCase (HsVar npvar) [a1 ]
+            kase = HsLCase [a1]
             a1 =  HsAlt srcLoc pat (HsUnGuardedRhs exp') []
-        return $ hsParen $ HsVar v_map `app` HsLambda srcLoc [HsPVar npvar] kase `app` e
+        return $ hsParen $ HsVar v_map `app` kase `app` e
     g [] = return exp
     g (HsLetStmt ds:ss) = do
         e <- g ss

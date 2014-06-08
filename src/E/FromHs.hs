@@ -663,6 +663,11 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = res where
         ty <- convertTyp (toName Name.Val n)
         scrut <- cExpr e
         cMatchs [scrut] (altConv alts) (EError ("No Match in Case expression at " ++ show (srcLoc hs))  ty)
+    cExpr (HsAsPat n hs@(HsLCase alts)) = do
+        EPi tvr ty <- convertTyp (toName Name.Val n)
+        [v] <- newVars [tvrType tvr]
+        e <- cMatchs [EVar v] (altConv alts) (EError ("No Match in Case expression at " ++ show (srcLoc hs))  ty)
+        return $ ELam v e
     cExpr (HsTuple es) = liftM eTuple (mapM cExpr es)
     cExpr (HsUnboxedTuple es) = liftM eTuple' (mapM cExpr es)
     cExpr (HsAsPat n (HsList xs)) = do

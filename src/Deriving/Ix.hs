@@ -44,4 +44,3 @@ deriveEnum der mod d@D { .. }
         let toEnum = funBind sloc v_toEnum [HsPLit (HsInt 0)] (HsCon constructor)
             fromEnum = funBind sloc v_fromEnum [pa] (HsLit (HsInt 0))
         mkInst der mod d class_Enum [toEnum,fromEnum]
-

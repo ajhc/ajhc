@@ -51,6 +51,7 @@ preprocessLexemes opt fn xs = toplevel xs where
         f n (L sl LSpecial s:rs) | Just flag <- Map.lookup s reservedMap, not (fopts' opt flag) = f n (L sl LVarId s:rs)
         f n (L sl LReservedId s:rs) | Just flag <- Map.lookup s reservedMap, not (fopts' opt flag) = f n (L sl LVarId s:rs)
         f n (L sl LSpecial [c]:rs) | Just (lc,v) <- IM.lookup (ord c) uniMap = f n (L sl lc v:rs)
+        f n (L sl _ "\\":L _ _ "case":rs) = f n (L sl LSpecial "\\case":rs)
         f n (L sl _ "(":L _ LVarSym z:L _ _ ")":rs) = f n (L sl LVarId z:rs)
         f n (L sl _ "(":L _ LConSym z:L _ _ ")":rs) = f n (L sl LConId z:rs)
         f n (L sl _ "`":L _ LVarId z:L _ _ "`":rs) = f n (L sl LVarSym z:rs)
@@ -228,7 +229,7 @@ dropLayouts cs = g cs where
     f n (NoLayout b e:ls) = (n,Just (b,e),ls)
     f n (Layout {}:ls) = f (n + 1) ls
 
-layoutStarters   = ["where","let","of","do"]
+layoutStarters   = ["where","let","of","do", "\\case"]
 
 -- these symbols will never close a layout.
 -- layoutContinuers = ["|","->","=",";",","]
