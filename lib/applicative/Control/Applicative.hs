@@ -75,18 +75,37 @@ infixl 4 <*>, <*, *>, <**>
 -- If @f@ is also a 'Monad', define @'pure' = 'return'@ and @('<*>') = 'ap'@.
 
 class Functor f => Applicative f where
-        -- | Lift a value.
-        pure :: a -> f a
+    -- | Lift a value.
+    pure :: a -> f a
 
-        -- | Sequential application.
-        (<*>) :: f (a -> b) -> f a -> f b
+    -- | Sequential application.
+    (<*>) :: f (a -> b) -> f a -> f b
+
+    -- | Sequence actions, discarding the value of the first argument.
+    (*>) :: Applicative f => f a -> f b -> f b
+
+    -- | Sequence actions, discarding the value of the second argument.
+    (<*) :: Applicative f => f a -> f b -> f a
+
+    (*>) = liftA2 (const id)
+    (<*) = liftA2 const
 
 -- | A monoid on applicative functors.
 class Applicative f => Alternative f where
-        -- | The identity of '<|>'
-        empty :: f a
-        -- | An associative binary operation
-        (<|>) :: f a -> f a -> f a
+    -- | The identity of '<|>'
+    empty :: f a
+    -- | An associative binary operation
+    (<|>) :: f a -> f a -> f a
+    -- | One or more.
+    some :: Alternative f => f a -> f [a]
+    some v = some_v where
+        many_v = some_v <|> pure []
+        some_v = (:) <$> v <*> many_v
+    -- | Zero or more.
+    many :: Alternative f => f a -> f [a]
+    many v = many_v where
+        many_v = some_v <|> pure []
+        some_v = (:) <$> v <*> many_v
 
 -- instances for Prelude types
 
@@ -179,14 +198,6 @@ instance Applicative ZipList where
 --(<$) :: Functor f => a -> f b -> f a
 --(<$) = (<$>) . const
 
--- | Sequence actions, discarding the value of the first argument.
-(*>) :: Applicative f => f a -> f b -> f b
-(*>) = liftA2 (const id)
-
--- | Sequence actions, discarding the value of the second argument.
-(<*) :: Applicative f => f a -> f b -> f a
-(<*) = liftA2 const
-
 -- | A variant of '<*>' with the arguments reversed.
 (<**>) :: Applicative f => f a -> f (a -> b) -> f b
 (<**>) = liftA2 (flip ($))
@@ -207,15 +218,3 @@ liftA3 f a b c = f <$> a <*> b <*> c
 -- | One or none.
 optional :: Alternative f => f a -> f (Maybe a)
 optional v = Just <$> v <|> pure Nothing
-
--- | One or more.
-some :: Alternative f => f a -> f [a]
-some v = some_v
-  where many_v = some_v <|> pure []
-        some_v = (:) <$> v <*> many_v
-
--- | Zero or more.
-many :: Alternative f => f a -> f [a]
-many v = many_v
-  where many_v = some_v <|> pure []
-        some_v = (:) <$> v <*> many_v
