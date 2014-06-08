@@ -1,7 +1,6 @@
 module FrontEnd.Syn.Q where
 
 import Control.Monad.Writer hiding(lift)
-import qualified Control.Monad.Writer as M
 import FrontEnd.HsSyn
 import FrontEnd.Warning
 import Name.Names

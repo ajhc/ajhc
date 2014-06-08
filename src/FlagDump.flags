@@ -19,6 +19,7 @@ exports show which names are exported from each module
 scc-modules show strongly connected modules in dependency order
 defs Show all defined names in a module
 fixity show fixity map
+qualified show qualified names in error messages
 
 !Type Checker
 kind        show results of kind inference for each module

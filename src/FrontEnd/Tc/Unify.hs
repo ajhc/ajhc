@@ -7,7 +7,7 @@ module FrontEnd.Tc.Unify(
     ) where
 
 import Control.Monad
-import Control.Monad.Trans
+import Control.Monad.Reader
 import Control.Monad.Writer(Monoid(..))
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -19,6 +19,7 @@ import FrontEnd.Tc.Kind
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
 import Options
+import FrontEnd.Diagnostic
 import Support.CanType
 import Support.FreeVars
 import qualified FlagDump as FD
@@ -102,7 +103,13 @@ subsumes s1 s2 = do
     -- MONO
     sub a b | isTau a && isTau b = unify a b >> return ctId
 
-    sub a b = fail $ "subsumes failure: " <> ppretty a <+> ppretty b
+    sub a b = do
+        a <- evalFullType a >>= denameType
+        b <- evalFullType b >>= denameType
+        diagnosis <- asks tcDiagnostics
+        let msg = typeError (UnexpectedType $ "expected type " ++
+                prettyPrintType a ++ " but got " ++ prettyPrintType b) diagnosis
+        fatalError msg
 
 -- might as well return flattened type
 -- we can skip the occurs check for boxy types

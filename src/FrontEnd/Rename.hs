@@ -3,7 +3,10 @@ module FrontEnd.Rename(
     unRename,
     collectDefsHsModule,
     FieldMap(..),
-    DeNameable(..),
+    mkUnrenameMap,
+    UnrenameMap,
+    unrenameName,
+    unrename,
     renameStatement
     ) where
 
@@ -17,10 +20,11 @@ import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Traversable as T
+import qualified Text.PrettyPrint.HughesPJ as P
 
 import Data.Word
 import Deriving.Derive
-import Doc.DocLike(tupled)
+--import Doc.DocLike(tupled)
 import FrontEnd.Class
 import FrontEnd.Desugar
 import FrontEnd.HsSyn
@@ -30,9 +34,11 @@ import Name.Name as Name
 import Name.Names
 import Options
 import Support.FreeVars
+import Util.DocLike
 import Util.Gen
 import Util.Inst()
 import Util.SetLike
+import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified FrontEnd.HsErrors as HsErrors
 import qualified Name.VConsts as V
@@ -127,8 +133,9 @@ addTopLevels  hsmod action = do
         f r z = let nn = qualifyName mod z in (z,nn):(nn,nn):r
         z ns = mapM mult (filter (\x -> length x > 1) $
             groupBy (\a b -> fst a == fst b) (sort ns))
-        mult xs@(~((n,sl):_)) = warn sl (MultiplyDefined n (snds xs))
-            (show n ++ " is defined multiple times: " ++ show xs)
+        mult xs@(~((n,sl):_)) = warnDoc sl (MultiplyDefined n (snds xs)) $
+            text "Multiple definitions of" <+> tshow (toUnqualified n) $$ P.nest 4 (vcat (map (tshow . snd) xs)) 
+--            (tshow  n ++ " is defined multiple times: " ++ show xs)
     z cdefs
     let amb k x y = if x < y then f x y else f y x where
             f x y | x == y = y
@@ -155,7 +162,7 @@ createSelectors sloc ds = mapM g ns where
             els = HsMatch sloc n [HsPWildCard] (HsUnGuardedRhs HsError { hsExpSrcLoc = sloc, hsExpString = show n, hsExpErrorType = HsErrorFieldSelect } ) []
         return $ HsFunBind (map f cs ++ [els]) where
 
-ambig x ys = "Ambiguous Name: " ++ show x ++ "\nCould refer to: " ++ tupled (map show ys)
+ambig x ys = text "Ambiguous Name" <+> dquotes (tshow x) $$ text "Could refer to:" $$   P.nest 4 (vcat (map tshow ys)) 
 
 data NameEntry
     = NameJust Name
@@ -737,10 +744,10 @@ renameName hsName = do
             tell (Map.singleton x hsName,mempty)
             return x
         Just (NameAmbig xs) -> do
-            addWarn (AmbiguousName hsName xs) (ambig hsName xs)
+            addWarnDoc (AmbiguousName hsName xs) (ambig hsName xs)
             return hsName
         Just (NameBound x xs) -> do
-            addWarn (AmbiguousName hsName (x:xs)) (ambig hsName $ x:xs)
+            addWarnDoc (AmbiguousName hsName (x:xs)) (ambig hsName $ x:xs)
             return hsName
         Nothing -> do
             addWarn (UndefinedName hsName) $ "Unknown " ++ typedName hsName ++ ": " ++ show hsName
@@ -915,47 +922,48 @@ instance MonadSetSrcLoc RM where
 instance OptionMonad RM where
     getOptions = asks envOptions
 
-class DeNameable a where
-    deName :: Module -> a -> a
+--------------------------------------------------------------------
+-- unrename a module, chooses the shorted unambiguous name in scope.
+--------------------------------------------------------------------
 
-instance (Functor f,DeNameable a) => DeNameable (f a) where
-    deName m fx = fmap (deName m) fx
+type UnrenameMap = Map.Map Name Name
+mkUnrenameMap :: [(Name,[Name])] -> UnrenameMap
+mkUnrenameMap importList = rnMap where
+    rnMap = Map.fromListWith (if dump FD.Qualified then keepShortestQualified else keepShortest) [ (gn,ln) | (ln,[gn]) <- importList ]
+    keepShortest a b = if length (show a) < length (show b) then a else b
+    keepShortestQualified a b | isNothing (getModule a) = b
+    keepShortestQualified a b | isNothing (getModule b) = a
+    keepShortestQualified a b = keepShortest a b
 
-instance DeNameable Name where
-    deName mod name = mkComplexName np { nameUniquifier = Nothing, nameModule = fm nameModule } where
-        np@NameParts { .. } = unMkName name
-        fm x = do r <- x; guard (r `notElem` mod:removedMods); return r
-        removedMods = [ mod_Prelude,mod_JhcBasics,mod_JhcPrimIO,mod_JhcTypeWord,mod_JhcTypeBasic, mod_JhcPrimPrim]
+unrenameName rnMap v = case Map.lookup v rnMap of
+    Just n -> n
+    Nothing -> mkComplexName np { nameUniquifier = Nothing, nameModule = fm nameModule } where
+        np@NameParts { .. } = unMkName v
+        fm x = if isJust nameUniquifier then Nothing else x
 
-instance DeNameable HsPat where
-    deName mod p = f p where
-        f (HsPVar v) = HsPVar (deName mod v)
-        f (HsPApp cn pats) = HsPApp (deName mod cn) (deName mod pats)
-        f (HsPAsPat n p) = HsPAsPat (deName mod n) (deName mod p)
-        f p = runIdentity $ traverseHsPat (return . f) p
+unrename :: TraverseHsOps a => UnrenameMap -> a -> a
+unrename rnMap x = runIdentity $ applyHsOps ops x where
+    ops = (hsOpsDefault ops) { opHsExp, opHsPat, opHsDecl, opHsType } where
+            opHsExp (HsVar v) = return $ HsVar $ unname v
+            opHsExp (HsCon v) = return $ HsCon $ unname v
+            opHsExp e = traverseHsOps ops e
+            opHsPat (HsPVar v) = return $ HsPVar (unname v)
+            opHsPat (HsPApp n as) = HsPApp (unname n) <$> (mapM opHsPat as)
+            opHsPat (HsPAsPat n p) = HsPAsPat (unname n) <$> (opHsPat p)
+            opHsPat p = traverseHsOps ops p
+            opHsDecl HsTypeDecl { .. } = traverseHsOps ops HsTypeDecl { hsDeclName = unname hsDeclName, .. }
+            opHsDecl HsTypeFamilyDecl { .. } = traverseHsOps ops HsTypeFamilyDecl { hsDeclName = unname hsDeclName, .. }
+            opHsDecl HsDataDecl { .. } = traverseHsOps ops HsDataDecl { hsDeclName = unname hsDeclName, hsDeclArgs = map unname hsDeclArgs, hsDeclDerives = map unname hsDeclDerives, .. }
 
-instance DeNameable HsAlt where
-    deName mod (HsAlt sl p rhs ds) = HsAlt sl (dn p) (dn rhs) ds where
-        dn x = deName mod x
-
-instance DeNameable HsRhs where
-    deName mod (HsUnGuardedRhs e) = HsUnGuardedRhs (deName mod e)
-    deName mod (HsGuardedRhss es) = HsGuardedRhss (deName mod es)
-instance DeNameable HsComp where
-    deName mod c = runIdentity $ traverseHsExp (return . deName mod) c
-
-instance DeNameable HsExp where
-    deName mod e = f e where
-        dn :: DeNameable b => b -> b
-        dn n = deName mod n
-        f (HsVar hsName) = HsVar (dn hsName)
-        f (HsCon hsName) = HsCon (dn hsName)
-        f (HsLambda srcLoc hsPats hsExp) =
-            HsLambda srcLoc (dn hsPats) (dn hsExp)
-        f (HsCase hsExp hsAlts) =
-            HsCase (dn hsExp) (dn hsAlts)
-        f (HsLCase hsAlts) =
-            HsLCase (dn hsAlts)
-        f p = runIdentity $ traverseHsExp (return . dn) p
+            opHsDecl HsPragmaSpecialize { .. } = traverseHsOps ops HsPragmaSpecialize { hsDeclName = unname hsDeclName, .. }
+            opHsDecl HsForeignDecl { .. } = traverseHsOps ops HsForeignDecl { hsDeclName = unname hsDeclName, .. }
+            opHsDecl HsTypeSig { .. } = traverseHsOps ops HsTypeSig { hsDeclNames = map unname hsDeclNames, .. }
+            opHsDecl (HsFunBind ms) = HsFunBind <$> mapM f ms where
+                f HsMatch { .. } = traverseHsOps ops HsMatch { hsMatchName = unname hsMatchName, .. }
+            opHsDecl d = traverseHsOps ops d
+            opHsType (HsTyVar c) = return $ HsTyVar (unname c)
+            opHsType (HsTyCon c) = return $ HsTyVar (unname c)
+            opHsType t = traverseHsOps ops t
+            unname = unrenameName rnMap
 
 hasDuplicates xs = any ((> 1) . length) $ group (sort xs)

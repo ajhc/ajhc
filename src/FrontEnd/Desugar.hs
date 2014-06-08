@@ -85,7 +85,7 @@ genBindsForPat pat sloc rhs = ans where
 getPatSelFuns :: SrcLoc -> HsPat -> Name -> [(Name, HsExp)]
 getPatSelFuns sloc pat rhsvar = ans where
     ans = [(v, kase (replaceVarNamesInPat v pat)) | v <- getNamesFromHsPat pat, nameType v == Val]
-    kase p =  HsCase (HsVar rhsvar) [a1, a2 ] where
+    kase p =  HsCase (HsVar rhsvar) (if isFailablePat p then [a1, a2 ] else [a1]) where
        a1 =  HsAlt sloc p (HsUnGuardedRhs (HsVar newPatVarName)) []
        a2 =  HsAlt sloc HsPWildCard (HsUnGuardedRhs (HsError { hsExpSrcLoc = sloc, hsExpErrorType = HsErrorPatternFailure, hsExpString = show sloc ++ " failed pattern match" })) []
 
@@ -123,7 +123,7 @@ desugarExp (HsLambda sloc pats e) = do
         e' <- ne e zs
         let a1 =  HsAlt sloc p (HsUnGuardedRhs e') []
             a2 =  HsAlt sloc HsPWildCard (HsUnGuardedRhs (HsError { hsExpSrcLoc = sloc, hsExpErrorType = HsErrorPatternFailure, hsExpString = show sloc ++ " failed pattern match in lambda" })) []
-        return $ HsCase (HsVar n) [a1, a2 ]
+        return $ HsCase (HsVar n) $ if isFailablePat p then [a2, a2] else [a1]
 
     f (HsPVar x) = return (x,[])
     f (HsPAsPat n p) = return (n,[(n,p)])

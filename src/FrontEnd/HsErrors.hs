@@ -8,7 +8,6 @@ module FrontEnd.HsErrors(
     ) where
 
 import Control.Monad.Writer
-import FrontEnd.Class
 import FrontEnd.HsSyn
 import FrontEnd.Syn.Traverse
 import FrontEnd.Warning

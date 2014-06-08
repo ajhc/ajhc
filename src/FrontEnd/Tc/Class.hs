@@ -66,7 +66,8 @@ toHnf :: Monad m => ClassHierarchy -> Pred -> m [Pred]
 toHnf h p
     | inHnf p = return [p]
     | otherwise =  case reducePred h p of
-         Nothing -> fail $ "context reduction, no instance for: "  ++ (pprint  p)
+         Nothing -> do
+            fail $ "No instance for: "  ++ (pprint  p)
          Just ps -> toHnfs h ps
 
 inHnf       :: Pred -> Bool

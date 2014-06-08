@@ -213,6 +213,7 @@ sub run_test {
     my @jhc  = $opt_p ? ("$jhc_dir/jhcp",'+RTS', "-S$rd/$name.jhcp_prof",@opt_rts,'-RTS')  :  ("$jhc_dir/jhc");
     my @cmd = (@jhc,"$cwd/$fn", ($verbose ? ('-v') : ()), ($opt_win ? ('-mwin32') : ()), @libs , @fast, '-o', "$rd/$name", @flags, @opts);
     my $res = join(" ",@cmd) . " > '$rd/$name.jhc_out' 2>&1";
+    #my $res = join(" ",@cmd);
     my ($r,$time) = my_system $res;
     my $result = { name => $name, compile_command => $res, compile_status => $r, compile_results => "$rd/$name.jhc_out", compile_time => $time };
     push @res, $result;

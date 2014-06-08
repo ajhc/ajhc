@@ -8,7 +8,6 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as P
 
-import Doc.DocLike
 import Doc.PPrint as PPrint
 import FrontEnd.Class
 import FrontEnd.Desugar
@@ -28,10 +27,12 @@ import Name.Names
 import Name.VConsts
 import Options
 import Support.FreeVars
-import Util.Progress
+import Util.DocLike
 import Util.Graph
+import Util.Progress
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
+import qualified Text.PrettyPrint.HughesPJ as P
 
 listenPreds = listenSolvePreds
 
@@ -135,11 +136,14 @@ isTypePlaceholder _ = False
 
 tiExpr,tcExpr ::  HsExp -> Type ->  Tc HsExp
 
+expMsg s e = simpleMsg (s ++ "\n" ++ render e)
+
 tcExpr e t = do
-    t <- evalType t
-    e <- tiExpr e t
-    --(_,False,_) <- unbox t
-    return e
+    pe <- prettyName e
+    sl <- getSrcLoc
+    if False && sl /= bogusASrcLoc
+    then withContext (expMsg "in the expression" (ppHsExp pe)) $ evalType t >>= tiExpr e
+    else evalType t >>= tiExpr e
 
 tiExpr (HsVar v) typ = do
     sc <- lookupName (toName Val v)
@@ -162,6 +166,7 @@ tiExpr (HsLCase alts) typ = do
         TMetaVar mv -> withMetaVars mv [kindArg,kindFunRet] (\ [a,b] -> a `fn` b) $ \ [s1,s2] -> do
             alts' <- mapM (tcAlt s1 s2) alts
             wrapInAsPatEnv (HsLCase alts') typ
+        _ -> fail $ "Expected lambda case expression to be of shape (a -> b) but found: " ++ prettyPrintType typ
 
 tiExpr (HsCase e alts) typ = do
     dn <- getDeName
@@ -589,7 +594,12 @@ tiPat (HsPAsPat i pat) typ = do
 tiPat (HsPInfixApp pLeft conName pRight) typ =  tiPat (HsPApp conName [pLeft,pRight]) typ
 
 tiPat (HsPUnboxedTuple ps) typ = tiPat (HsPApp (name_UnboxedTupleConstructor termLevel (length ps)) ps) typ
-tiPat tuple@(HsPTuple pats) typ = tiPat (HsPApp (name_TupleConstructor termLevel (length pats)) pats) typ
+tiPat (HsPTuple pats) typ = do
+    (pt,s) <- tiPat (HsPApp (name_TupleConstructor termLevel (length pats)) pats) typ
+    case pt of
+        (HsPApp _ pats) -> return $ (HsPTuple pats,s)
+        e -> return (e,s)
+
 tiPat (HsPTypeSig _ pat qt)  typ = do
     kt <- getKindEnv
     s <- hsQualTypeToSigma kt qt
@@ -780,15 +790,18 @@ tcRule prule@HsRule { hsRuleUniq = uniq, hsRuleFreeVars = vs, hsRuleLeftExpr = e
             return (tt,env)
 
 tcDecl ::  HsDecl -> Sigma -> Tc (HsDecl,TypeEnv)
+tcDecl decl typ = do
+    dndecl <- prettyName decl
+    withSrcLoc (srcLoc decl) $ withContext (declDiagnostic dndecl) $ tiDecl decl typ
 
-tcDecl decl@(HsActionDecl srcLoc pat@(HsPVar v) exp) typ = withContext (declDiagnostic decl) $ do
+tiDecl decl@(HsActionDecl srcLoc pat@(HsPVar v) exp) typ = do
     typ <- evalType typ
     (pat',env) <- tcPat pat typ
     let tio = TCon (Tycon tc_IO (Kfun kindStar kindStar))
     e' <- tcExpr exp (TAp tio typ)
     return (decl { hsDeclPat = pat', hsDeclExp = e' }, Map.singleton (toName Val v) typ)
 
-tcDecl decl@(HsPatBind sloc (HsPVar v) rhs wheres) typ = withContext (declDiagnostic decl) $ do
+tiDecl (HsPatBind sloc (HsPVar v) rhs wheres) typ = do
     typ <- evalType typ
     mainFunc <- nameOfMainFunc
     when ( v == mainFunc ) $ do
@@ -805,12 +818,12 @@ tcDecl decl@(HsPatBind sloc (HsPVar v) rhs wheres) typ = withContext (declDiagno
             gas <- mapM (tcGuardedRhs typ) as
             return (HsPatBind sloc (HsPVar v) (HsGuardedRhss gas) wheres', Map.singleton (toName Val v) typ)
 
-tcDecl decl@(HsFunBind matches) typ = withContext (declDiagnostic decl) $ do
+tiDecl decl@(HsFunBind matches) typ = do
     typ <- evalType typ
     matches' <- mapM (`tcMatch` typ) matches
     return (HsFunBind matches', Map.singleton (getDeclName decl) typ)
 
-tcDecl _ _ = error "Main.tcDecl: bad."
+tiDecl _ _ = error "Main.tcDecl: bad."
 
 tcMatch ::  HsMatch -> Sigma -> Tc HsMatch
 tcMatch (HsMatch sloc funName pats rhs wheres) typ = withContext (locMsg sloc "in" $ show funName) $ do
@@ -846,7 +859,7 @@ typeOfMainFunc = do
 nameOfMainFunc :: Tc Name
 nameOfMainFunc = fmap (parseName Val . maybe "Main.main" snd . optMainFunc) getOptions
 
-declDiagnostic ::  (HsDecl) -> Diagnostic
+declDiagnostic ::  HsDecl -> Diagnostic
 declDiagnostic decl@(HsPatBind sloc (HsPVar {}) _ _) = locMsg sloc "in the declaration" $ render $ ppHsDecl decl
 declDiagnostic decl@(HsPatBind sloc pat _ _) = locMsg sloc "in the pattern binding" $ render $ ppHsDecl decl
 declDiagnostic decl@(HsFunBind matches) = locMsg (srcLoc decl) "in the function binding" $ render $ ppHsDecl decl
@@ -855,7 +868,9 @@ declDiagnostic _ = error "Main.declDiagnostic: bad."
 tiExpl ::  Expl -> Tc (HsDecl,TypeEnv)
 tiExpl (sc, decl@HsForeignDecl {}) = do return (decl,Map.empty)
 tiExpl (sc, decl@HsForeignExport {}) = do return (decl,Map.empty)
-tiExpl (sc, decl) = withContext (locSimple (srcLoc decl) ("in the explicitly typed " ++  (render $ ppHsDecl decl))) $ do
+tiExpl (sc, decl) = do
+    rndecl <- prettyName decl
+    withContext (locSimple (srcLoc decl) ("in the explicitly typed:\n" ++  (render $ ppHsDecl rndecl))) $ do
     when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "** typing expl: " ++ show (getDeclNames decl) ++ " " ++ prettyPrintType sc
     sc <- evalFullType sc
     (vs,qs,typ) <- skolomize sc
@@ -974,10 +989,6 @@ collectBindDecls = filter isBindDecl where
     isBindDecl HsPatBind {} = True
     isBindDecl HsFunBind {} = True
     isBindDecl _ = False
-
-fromTAp (TArrow a b) = Just (tAp tArrow a,b)
-fromTAp (TAp a b) = Just (a,b)
-fromTAp _ = Nothing
 
 from2Ty (TArrow a b) = Just (tArrow,a,b)
 from2Ty (TAp (TAp mv a) b) = Just (mv,a,b)

@@ -1,6 +1,5 @@
 module Deriving.Traverse(deriveFunctor,deriveFoldable,deriveTraversable) where
 
-import Data.Either
 import Deriving.Type
 import Deriving.Util
 import FrontEnd.HsSyn
@@ -12,9 +11,6 @@ import Support.FreeVars
 import Util.Std
 import qualified Data.Set as Set
 
-fsts = map fst
-snds = map snd
-
 isRight Right {} = True
 isRight _ = False
 
@@ -22,7 +18,6 @@ deriveFunctor :: Derive -> Module -> Data -> Q HsDecl
 deriveFunctor der@Derive {..} mod d@D { vars = [], .. } = do
     warn deriveSrcLoc InvalidDecl "Attempt to derive Functor for type without parameters"
     mkInstN 1 der mod d undefined []
-
 deriveFunctor der@Derive {..} mod d@D { body = [], .. } = do
     (HsVar -> fe,fp) <- newVarN "x" Nothing
     let hsMatchSrcLoc = deriveSrcLoc
@@ -31,8 +26,7 @@ deriveFunctor der@Derive {..} mod d@D { body = [], .. } = do
         f hsMatchName = HsMatch { .. }
         hsMatchDecls = []
     mkInstN 1 der mod d class_Functor [HsFunBind [f v_fmap],HsFunBind [f v_fmap_const]]
-
-deriveFunctor der@Derive {..} mod d@D { vars = reverse -> (fv:_), .. } = do
+deriveFunctor der@Derive {..} mod d@D { vars = reverse -> ~(fv:_), .. } = do
     let mkMatch func b@Body { .. } = do
             (HsVar -> fe,fp) <- newVarN "f" Nothing
             (pa,es) <- mkPat mod b
@@ -68,7 +62,7 @@ deriveFoldable der@Derive {..} mod d@D { body = [], .. } = do
         fun = HsMatch { .. }
         hsMatchDecls = []
     mkInstN 1 der mod d class_Functor [HsFunBind [fun]]
-deriveFoldable der@Derive {..} mod d@D { vars = reverse -> (fv:_), .. } = do
+deriveFoldable der@Derive {..} mod d@D { vars = reverse -> ~(fv:_), .. } = do
     let mkMatch func b@Body { .. } = do
             (HsVar -> fe,fp) <- newVarN "f" Nothing
             (pa,es) <- mkPat mod b

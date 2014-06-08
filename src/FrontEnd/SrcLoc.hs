@@ -104,7 +104,9 @@ instance MonadSetSrcLoc m => WithSrcLoc (m a) where
 class WithSrcLoc a where
     withSrcLoc :: SrcLoc -> a -> a
     withSrcSpan :: SrcSpan -> a -> a
+    withSrcLoc sl a | sl == bogusASrcLoc = a
     withSrcLoc sl a = withSrcSpan (srcSpan sl) a
+    withSrcSpan ss a | ss == bogusSrcSpan = a
     withSrcSpan ss a = withSrcLoc (srcLoc ss) a
 
 withLocation :: (HasLocation l,MonadSetSrcLoc m) => l -> m a -> m a
@@ -147,6 +149,7 @@ runSLM :: SLM m a -> m a
 runSLM (SLM t) = runReaderT t bogusSrcSpan
 
 instance (Applicative m,Monad m) => MonadSetSrcLoc (SLM m) where
+    withSrcSpan' ss a | ss == bogusSrcSpan = a
     withSrcSpan' ss (SLM a) = SLM $ local (const ss) a
 
 instance (Applicative m,Monad m) => MonadSrcLoc (SLM m) where

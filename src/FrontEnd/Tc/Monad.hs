@@ -5,6 +5,7 @@ module FrontEnd.Tc.Monad(
     TcInfo(..),
     TypeEnv(),
     TcEnv(..),
+    fatalError,
     tcRecursiveCalls_u,
     Output(..),
     addCoerce,
@@ -22,6 +23,8 @@ module FrontEnd.Tc.Monad(
     getCollectedEnv,
     getCollectedCoerce,
     getDeName,
+    denameType,
+    prettyName,
     getKindEnv,
     getSigEnv,
     evalFullType,
@@ -57,7 +60,6 @@ import System
 import Util.Std
 import qualified Data.Foldable as T
 import qualified Data.Map as Map
-import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Traversable as T
 
@@ -66,8 +68,9 @@ import Doc.PPrint
 import FrontEnd.Class
 import FrontEnd.Diagnostic
 import FrontEnd.KindInfer
-import FrontEnd.Rename(DeNameable(..))
+import FrontEnd.Rename
 import FrontEnd.SrcLoc
+import FrontEnd.Syn.Traverse
 import FrontEnd.Tc.Kind
 import FrontEnd.Tc.Type
 import FrontEnd.Warning
@@ -79,6 +82,7 @@ import Support.CanType
 import Support.FreeVars
 import Support.Tickle
 import qualified FlagDump as FD
+import qualified Util.Seq as Seq
 import {-# SOURCE #-} FrontEnd.Tc.Class(simplify)
 
 -- data BindingType = RecursiveInfered | Supplied
@@ -87,11 +91,13 @@ type TypeEnv = Map.Map Name Sigma
 -- read only environment, set up before type checking.
 data TcEnv = TcEnv {
     tcInfo            :: TcInfo,
+    tcImports         :: UnrenameMap,
     tcDiagnostics     :: [Diagnostic],   -- list of information that might help diagnosis
     tcSrcSpan         :: SrcSpan,
     tcVarnum          :: {-# UNPACK #-} !(IORef Int),
     tcCollectedEnv    :: {-# UNPACK #-} !(IORef (Map.Map Name Sigma)),
     tcCollectedCoerce :: {-# UNPACK #-} !(IORef (Map.Map Name CoerceTerm)),
+    tcWarningRef      :: {-# UNPACK #-} !(IORef (Seq.Seq Warning)),
     tcConcreteEnv     :: Map.Map Name Sigma,
     tcMutableEnv      :: Map.Map Name Sigma,
     tcCurrentScope    :: Set.Set MetaVar,
@@ -111,27 +117,40 @@ data Output = Output {
     constraints      :: !(Seq.Seq Constraint),
     checkedRules     :: !(Seq.Seq Rule),
     existentialVars  :: [Tyvar],
-    tcWarnings       :: !(Seq.Seq Warning),
     outKnots         :: [(Name,Name)]
     }
    {-! derive: Monoid !-}
 
 newtype Tc a = Tc (ReaderT TcEnv (WriterT Output IO) a)
-    deriving(MonadFix,MonadIO,MonadReader TcEnv,MonadWriter Output,Functor,Applicative)
+    deriving(MonadIO,MonadReader TcEnv,MonadWriter Output,Functor,Applicative)
 
 -- | information that is passed into the type checker.
 data TcInfo = TcInfo {
     tcInfoEnv            :: TypeEnv, -- initial typeenv, data constructors, and previously infered types
     tcInfoSigEnv         :: TypeEnv, -- type signatures used for binding analysis
     tcInfoModName        :: Module,
+    tcInfoImports        :: [(Name,[Name])],  -- used for printing error messages
     tcInfoKindInfo       :: KindEnv,
     tcInfoClassHierarchy :: ClassHierarchy
     }
 
-getDeName :: DeNameable n => Tc (n -> n)
+getDeName :: TraverseHsOps n => Tc (n -> n)
 getDeName = do
-    mn <- asks (tcInfoModName . tcInfo)
-    return (\n -> deName mn n)
+    mn <- asks tcImports
+    return (\n -> unrename mn n)
+
+denameType :: Type -> Tc Type
+denameType ty = do
+    mn <- asks tcImports
+    let f (TVar Tyvar { .. }) = TVar Tyvar { tyvarName  = unrenameName mn tyvarName, .. }
+        f (TCon Tycon { .. }) = TCon Tycon { tyconName  = unrenameName mn tyconName, .. }
+        f ty = tickle f ty
+    return $ f ty
+
+prettyName :: TraverseHsOps n => n -> Tc n
+prettyName n = do
+    mn <- asks tcImports
+    return (unrename mn n)
 
 -- | run a computation with a local environment
 localEnv :: TypeEnv -> Tc a -> Tc a
@@ -172,28 +191,30 @@ getCollectedCoerce = do
     return r
 
 runTc :: (MonadIO m,OptionMonad m) => TcInfo -> Tc a -> m a
-runTc tcInfo  (Tc tim) = do
+runTc tcInfo@TcInfo { .. }  (Tc tim) = do
     opt <- getOptions
     liftIO $ do
-    vn <- newIORef 0
-    ce <- newIORef mempty
-    cc <- newIORef mempty
+    tcVarnum          <- newIORef 0
+    tcCollectedEnv    <- newIORef mempty
+    tcCollectedCoerce <- newIORef mempty
+    tcWarningRef      <- newIORef mempty
     (a,out) <- runWriterT $ runReaderT tim TcEnv {
         tcSrcSpan         = bogusSrcSpan,
-        tcCollectedEnv    = ce,
-        tcCollectedCoerce = cc,
-        tcConcreteEnv     = tcInfoEnv tcInfo `mappend` tcInfoSigEnv tcInfo,
+        tcImports         = mkUnrenameMap tcInfoImports,
+        tcConcreteEnv     = tcInfoEnv `mappend` tcInfoSigEnv,
         tcMutableEnv      = mempty,
-        tcVarnum          = vn,
-        tcDiagnostics     = [Msg Nothing $
-            "Compilation of module: " ++ show (tcInfoModName tcInfo)],
-        tcInfo            = tcInfo,
+        tcDiagnostics     = [ simpleMsg $
+            "Compilation of module: " ++ show tcInfoModName],
         tcRecursiveCalls  = mempty,
-        tcInstanceEnv     = makeInstanceEnv (tcInfoClassHierarchy tcInfo),
+        tcInstanceEnv     = makeInstanceEnv tcInfoClassHierarchy,
         tcCurrentScope    = mempty,
-        tcOptions         = opt
+        tcOptions         = opt,
+        ..
         }
-    liftIO $ processErrors (T.toList $ tcWarnings out)
+    wr <- readIORef tcWarningRef
+    liftIO $ processErrors $ Seq.toList wr
+
+    --liftIO $ processErrors (T.toList $ tcWarnings out)
     return a
 
 instance OptionMonad Tc where
@@ -204,19 +225,16 @@ instance OptionMonad Tc where
 --   stack
 
 withContext :: Diagnostic -> Tc a -> Tc a
-withContext diagnostic@(Msg (Just sl) _) comp = do
+withContext diagnostic@Msg { msgSrcLoc = Just sl } comp = do
     withSrcLoc sl $ local (tcDiagnostics_u (diagnostic:)) comp
-withContext diagnostic@(Msg Nothing msg) comp = do
+withContext msg@Msg { .. }  comp = do
     sl <- getSrcLoc
-    let diag | sl /= bogusASrcLoc = Msg (Just sl) msg
-             | otherwise = diagnostic
+    let diag | sl /= bogusASrcLoc = msg { msgSrcLoc = Just sl }
+             | otherwise = msg
     local (tcDiagnostics_u (diag:)) comp
 
 addRule :: Rule -> Tc ()
 addRule r = tell mempty { checkedRules = Seq.singleton r }
-
-getErrorContext :: Tc [Diagnostic]
-getErrorContext = asks tcDiagnostics
 
 getClassHierarchy  :: Tc ClassHierarchy
 getClassHierarchy = asks (tcInfoClassHierarchy . tcInfo)
@@ -248,14 +266,19 @@ newBox :: Kind -> Tc Type
 newBox k = newMetaVar Sigma k
 
 unificationError t1 t2 = do
-    t1 <- evalFullType t1
-    t2 <- evalFullType t2
-    diagnosis <- getErrorContext
-    let Left msg = typeError (Unification $ "attempted to unify " ++
+    t1 <- evalFullType t1 >>= denameType
+    t2 <- evalFullType t2 >>= denameType
+    diagnosis <- asks tcDiagnostics
+    let msg = typeError (Unification $ "attempted to unify " ++
             prettyPrintType t1 ++ " with " ++ prettyPrintType t2) diagnosis
-    liftIO $ processIOErrors "unification"
-    liftIO $ putErrLn msg
-    liftIO $ exitFailure
+    fatalError msg
+
+fatalError msg = do
+    ref <- asks tcWarningRef >>= liftIO . readIORef
+    liftIO $ do
+        processErrors' False $ Seq.toList ref
+        putErrLn $ "\n--\n" ++ msg
+        exitFailure
 
 lookupName :: Name -> Tc Sigma
 lookupName n = do
@@ -547,16 +570,17 @@ instance Monad Tc where
     Tc a >> Tc b = Tc $ a >> b
     fail s = Tc $ do
         st <- ask
-        liftIO $ processIOErrors "typechecking"
-        Left x <- typeError (Failure s) (tcDiagnostics st)
-        liftIO $ fail x
+        fatalError $ typeError (Failure s) (tcDiagnostics st)
 
 instance MonadWarn Tc where
-    addWarning w = tell mempty { tcWarnings = Seq.singleton w }
+    addWarning w = do
+        ref <- asks tcWarningRef
+        liftIO $ modifyIORef ref (`mappend` Seq.singleton w)
 
 instance MonadSrcLoc Tc where
     getSrcSpan = asks tcSrcSpan
 instance MonadSetSrcLoc Tc where
+    withSrcSpan' ss | ss == bogusSrcSpan = id
     withSrcSpan' ss = local (\e -> e { tcSrcSpan = ss })
 
 instance UniqueProducer Tc where
@@ -570,6 +594,7 @@ instance UniqueProducer Tc where
 
 tcInfoEmpty = TcInfo {
     tcInfoEnv            = mempty,
+    tcInfoImports        = [],
     tcInfoModName        = toModule "(unknown)",
     tcInfoKindInfo       = mempty,
     tcInfoClassHierarchy = mempty,

@@ -792,9 +792,11 @@ tidyPat p b = f p where
         (p',g') <- f p
         v <- convertVar (toName Name.Val n)
         return (p',(if EVar v /= b then eLet v b else id) . g')
+    f (HsPTuple ps) = f (HsPApp (name_TupleConstructor termLevel (length ps)) ps)
+    f (HsPUnboxedTuple ps) = f (HsPApp (name_UnboxedTupleConstructor termLevel (length ps)) ps)
     f pa@(HsPApp n [p]) = do
         dataTable <- getDataTable
-        patCons <- getConstructor (toName DataConstructor n) dataTable
+        patCons <- getConstructor n dataTable
         case conChildren patCons of
             DataAlias ErasedAlias -> f p
             _ -> return (pa,id)

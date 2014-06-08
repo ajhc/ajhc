@@ -27,6 +27,10 @@ class DocLike a where
     vcat :: [a] -> a
     tupled :: [a] -> a
     list :: [a] -> a
+    fsep :: [a] -> a
+    fcat :: [a] -> a
+    sep :: [a] -> a
+    cat :: [a] -> a
     semiBraces :: [a] -> a
     enclose :: a -> a -> a -> a
     encloseSep :: a -> a -> a -> [a] -> a
@@ -39,6 +43,10 @@ class DocLike a where
     hsep xs = foldr1 (<+>) xs
     vcat [] = emptyDoc
     vcat xs = foldr1 (\x y -> x <-> char '\n' <-> y) xs
+    fsep = hsep
+    fcat = hcat
+    sep = hsep
+    cat = hcat
     x <+> y = x <-> char ' ' <-> y
     x $$ y = x <-> char '\n' <-> y
     x $+$ y = x $$ y
@@ -47,7 +55,6 @@ class DocLike a where
     list            = encloseSep lbracket rbracket comma
     tupled          = encloseSep lparen   rparen  comma
     semiBraces      = encloseSep lbrace   rbrace  semi
-
 
 ------------------------
 -- Basic building blocks
@@ -107,6 +114,13 @@ instance (DocLike ShowSDoc) where
     x <-> y = mappend x y
     emptyDoc = mempty
 
+instance (DocLike [Char]) where
+    char c = [c]
+    text s = s
+    x <+> y = x ++ " " ++ y
+    x <-> y = mappend x y
+    emptyDoc = mempty
+
 instance (DocLike a, Applicative m) => DocLike (m a) where
     emptyDoc = pure emptyDoc
     char x = pure (char x)
@@ -138,4 +152,7 @@ instance DocLike P.Doc where
     hsep = P.hsep
     vcat = P.vcat
     oobText = P.zeroWidthText
-
+    fcat = P.fcat
+    fsep = P.fsep
+    cat = P.cat
+    sep = P.sep

@@ -31,6 +31,7 @@ import Name.Name as Name
 import Name.Names
 import Options
 import Util.Gen
+import Util.Std
 import Util.Graph
 import Util.Inst()
 import Util.SetLike
@@ -239,9 +240,11 @@ tiModules htc ms = do
 
     let moduleName = modInfoName tms
         (tms:_) = ms
+        tcInfoImports = Map.toList $ Map.fromListWith (Util.Std.union) (concatMap modInfoImport ms)
     let tcInfo = tcInfoEmpty {
         tcInfoEnv = hoAssumps htc `mappend` localDConsEnv,
         tcInfoSigEnv = sigEnv,
+        tcInfoImports,
         tcInfoModName = moduleName,
         tcInfoKindInfo = kindInfo,
         tcInfoClassHierarchy = cHierarchyWithInstances
@@ -260,7 +263,8 @@ tiModules htc ms = do
 
     when (dump FD.Decls) $ do
         putStrLn " \n ---- typechecked code ---- \n"
-        mapM_ (putStrLn . HsPretty.render . HsPretty.ppHsDecl) tcDs
+        --mapM_ (putStrLn . HsPretty.render . HsPretty.ppHsDecl) tcDs
+        mapM_ (putStrLn . HsPretty.render . HsPretty.ppHsDecl) $ unrename (mkUnrenameMap tcInfoImports) tcDs
 
     when (dump FD.Types) $ do
         putStrLn " ---- the types of identifiers ---- "

@@ -298,5 +298,6 @@ unknown
 Jhc.Type.C
 Jhc.Type.Ptr
 
+Wild@
 Main@   ; The meta-module containing the whole program
 Prim@   ; The synthesized module containing primitives

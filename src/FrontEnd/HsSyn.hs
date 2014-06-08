@@ -314,7 +314,7 @@ data HsExp
     | HsWildCard SrcLoc
     | HsIrrPat { hsExpLExp :: LHsExp }
     | HsBangPat { hsExpLExp :: LHsExp }
-    | HsLocatedExp LHsExp
+    | HsLocatedExp { hsExpLExp :: LHsExp }
     -- desugared away
     | HsEnumFrom HsExp
     | HsEnumFromTo HsExp HsExp
@@ -394,9 +394,15 @@ instance HasLocation HsConDecl where
     srcLoc d = hsConDeclSrcLoc d
 
 instance HasLocation HsExp where
+    srcSpan HsLocatedExp { .. } = srcSpan hsExpLExp
+    srcSpan HsIrrPat { .. } = srcSpan hsExpLExp
+    srcSpan HsBangPat { .. } = srcSpan hsExpLExp
+    srcSpan x = srcSpan (srcLoc x)
+
     srcLoc (HsCase _ xs) = srcLoc xs
     srcLoc (HsExpTypeSig sl _ _) = sl
     srcLoc (HsLambda sl _ _) = sl
+    srcLoc (HsWildCard sl) = sl
     srcLoc HsError { hsExpSrcLoc = sl } = sl
     srcLoc _ = bogusASrcLoc
 

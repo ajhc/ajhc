@@ -4,9 +4,13 @@ module FrontEnd.Warning(
     WarnType(..),
     warnIsFatal,
     processErrors,
+    processErrors',
     warn,
-    err,
+    warnDoc,
+    mkWarn,
+    mkWarnD,
     addWarn,
+    addWarnDoc,
     module FrontEnd.SrcLoc,
     -- IO monad
     processIOErrors,
@@ -19,6 +23,7 @@ import Data.IORef
 import System.IO
 import System.IO.Unsafe
 import Util.Std
+import qualified Text.PrettyPrint.HughesPJ as P
 
 import FrontEnd.SrcLoc(SrcSpan(..),WithSrcLoc(..),MonadSetSrcLoc(..),SrcLoc(..),MonadSrcLoc(..),bogusASrcLoc,SLM(..))
 import Name.Name
@@ -26,13 +31,14 @@ import Options
 import PackedString
 import StringTable.Atom
 import Util.Gen
+import Util.DocLike
 import qualified Util.Seq as Seq
 
 data Warning = Warning {
     warnSrcLoc  :: !SrcLoc,
     warnType    :: WarnType,
-    warnMessage :: String
-    } deriving(Eq,Ord)
+    warnMessage :: P.Doc
+    }
 
 class (Applicative m,Monad m) => MonadWarn m where
     addWarning :: Warning -> m ()
@@ -43,11 +49,21 @@ addWarn t m = do
     sl <- getSrcLoc
     warn sl t m
 
-warn :: MonadWarn m => SrcLoc -> WarnType -> String -> m ()
-warn warnSrcLoc warnType warnMessage = addWarning Warning { .. }
+addWarnDoc :: (MonadWarn m, MonadSrcLoc m) => WarnType -> P.Doc -> m ()
+addWarnDoc t m = do
+    sl <- getSrcLoc
+    warnDoc sl t m
 
-err :: MonadWarn m => WarnType -> String -> m ()
-err t m = warn bogusASrcLoc t m
+warn :: MonadWarn m => SrcLoc -> WarnType -> String -> m ()
+warn warnSrcLoc warnType msg = addWarning Warning { warnMessage = text msg, .. }
+
+warnDoc :: MonadWarn m => SrcLoc -> WarnType -> P.Doc -> m ()
+warnDoc warnSrcLoc warnType msg = addWarning Warning { warnMessage = msg, .. }
+
+mkWarn :: SrcLoc -> WarnType -> String -> Warning
+mkWarn warnSrcLoc warnType msg = Warning { warnMessage = text msg, .. }
+mkWarnD :: SrcLoc -> WarnType -> P.Doc -> Warning
+mkWarnD warnSrcLoc warnType msg = Warning { warnMessage = msg, .. }
 
 pad n s = case length s of
     x | x >= n -> s
@@ -59,7 +75,7 @@ processIOErrors s = do
     unless (null ws || null s) $ do
         hFlush stdout
         hFlush stderr
-        putErrLn $ "\nDiagnostic from " ++ s
+        putErrLn $ "Diagnostics from " ++ s
     processErrors' True ws
     writeIORef ioWarnings []
 
@@ -76,13 +92,19 @@ processErrors ws = processErrors' True ws >> return ()
 
 processErrors' :: Bool -> [Warning] -> IO Bool
 processErrors' _ [] = return False
-processErrors' doDie ws = putErrLn "" >> mapM_ s (snub ws) >> when (die && doDie) exitFailure >> return die where
+processErrors' doDie ws = do
+    putErrLn "\n--"
+--    mapM_ s (nub ws)
+    mapM_ s ws
+    when (die && doDie) exitFailure
+    return die
+    where
     s Warning { warnSrcLoc = srcLoc@SrcLoc { .. }, .. }
         | srcLoc == bogusASrcLoc = putErrLn $ msg warnType warnMessage
-        | srcLocLine == -1 = putErrLn (unpackPS srcLocFileName ++ ": " ++ msg warnType warnMessage)
-        | otherwise = putErrLn (unpackPS srcLocFileName ++ ":" ++ pad 3 (show srcLocLine) ++  " - "  ++ msg warnType warnMessage)
+        | srcLocLine == -1 = putErrLn $ P.render $ (text (unpackPS srcLocFileName) <> colon $$ (P.nest 4 warnMessage))
+        | otherwise = putErrLn $ P.render $  (text (unpackPS srcLocFileName) <> colon <> (tshow srcLocLine) <>  colon  $$ P.nest 4 warnMessage)
     die = (any warnIsFatal (map warnType ws)) && not (optKeepGoing options)
-    --ws' = filter ((`notElem` ignore) . warnType ) $ snub ws
+    msg t m = P.render m -- (if warnIsFatal t then "Error: " else "Warning: ") ++ m
 
 data WarnType
     = AmbiguousExport Module [Name]
@@ -138,8 +160,8 @@ instance Show Warning where
         | sl == bogusASrcLoc =  msg t m
     show  Warning { warnSrcLoc = SrcLoc { srcLocFileName = fn, srcLocLine = l },
                                           warnType = t ,warnMessage = m } =
-         (unpackPS fn ++ ":" ++ pad 3 (show l) ++  " - "  ++ msg t m)
-msg t m = (if warnIsFatal t then "Error: " else "Warning: ") ++ m
+         (unpackPS fn ++ ":" ++ (show l) ++  ":"  ++ msg t m)
+msg t m = P.render m -- (if warnIsFatal t then "Error: " else "Warning: ") ++ m
 
 _warnings = [
     ("deprecations"         ,"warn about uses of functions & types that are deprecated")        ,

@@ -14,8 +14,9 @@ import Data.Binary
 import Data.List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import qualified Text.PrettyPrint.HughesPJ as P
 
-import Doc.DocLike
+import Util.DocLike
 import FrontEnd.Syn.Traverse
 import FrontEnd.Warning
 import GenUtil
@@ -61,7 +62,7 @@ declsToTypeSynonyms :: (Applicative m,MonadWarn m) => TypeSynonyms -> [HsDecl] -
 declsToTypeSynonyms tsin ds = f tsin gr [] where
     gr = G.scc $ G.newGraph [ (toName TypeConstructor name,( args , quantifyHsType args (HsQualType [] t) , sl)) | (HsTypeDecl sl name args' t) <- ds, let args = [ n | ~(HsTyVar n) <- args'] ] fst (Set.toList . freeVars . (\ (_,(_,t,_)) -> t))
     f tsin (Right ns:xs) rs = do
-            warn (head [ sl | (_,(_,_,sl)) <- ns]) TypeSynonymRecursive ("Recursive type synonyms:" <+> show (fsts ns))
+            warnDoc (head [ sl | (_,(_,_,sl)) <- ns]) TypeSynonymRecursive (text "Recursive type synonyms:" $$ P.nest 4 (vcat [ tshow sl <> text ":" <+> tshow n| (n,(_,_,sl)) <- ns]))
             f tsin xs rs
     f tsin (Left (n,(as,body,sl)):xs) rs = do
         body' <- evalTypeSyms sl tsin body
