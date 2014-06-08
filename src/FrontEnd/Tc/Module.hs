@@ -8,7 +8,6 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import DataConstructors
-import DerivingDrift.Drift
 import Doc.PPrint
 import Doc.PPrint as PPrint
 import FrontEnd.Class
@@ -83,9 +82,10 @@ processModule defs m = do
     wdump FD.Renamed $ do
         putStrLn " \n ---- renamed code ---- \n"
         putStrLn $ HsPretty.render $ HsPretty.ppHsModule $  mod'
-    return (m { modInfoReverseMap = rmap,
-                modInfoImport = imp ++ driftResolvedNames,
-                modInfoHsModule = mod' }, errs)
+    return (m {
+        modInfoReverseMap = rmap,
+        modInfoImport     = imp,
+        modInfoHsModule   = mod' }, errs)
 
 -- type check a set of mutually recursive modules.
 -- assume all dependencies are met in the

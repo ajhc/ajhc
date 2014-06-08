@@ -12,8 +12,7 @@ MY_CFLAGS= $(MY_CINCLUDES) -optc-std=c99 -optc-O2 -optc-Wall
 CC = $(HC)
 
 HSFILES= \
-    src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/DataP.hs \
-    src/DerivingDrift/Drift.hs src/DerivingDrift/RuleUtils.hs src/DerivingDrift/StandardRules.hs \
+    src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs  \
     src/Doc/Attr.hs src/Doc/Chars.hs src/Doc/DocLike.hs src/Doc/PPrint.hs src/Doc/Pretty.hs \
     src/E/Annotate.hs src/E/Binary.hs src/E/Diff.hs src/E/E.hs src/E/Eta.hs src/E/Eval.hs \
     src/E/FreeVars.hs src/E/FromHs.hs src/E/Inline.hs src/E/LambdaLift.hs src/E/LetFloat.hs \
