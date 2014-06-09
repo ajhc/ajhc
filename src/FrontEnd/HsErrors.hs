@@ -47,13 +47,8 @@ hsDecl cntx decl = withSrcLoc (srcLoc decl) $ f cntx decl where
     f TopLevel HsActionDecl {} = do
         wDecl "top level actions not supported"
     f TopLevel HsDataDecl { .. } = do
-        --checkDeriving False hsDeclDerives
         when (hasRepeatUnder hsConDeclName hsDeclCons) $ do
             wDecl "repeated constructor name is not allowed"
-
---        let isEnum = all (\x ->  null (hsConDeclArgs x)) cs
---        when (not isEnum && class_Enum `elem` ds) $ warn sl "derive-enum" "Cannot derive enum from non enumeration type"
---        when (not isEnum && length cs /= 1 && class_Bounded `elem` ds) $ warn sl "derive-bounded" "Cannot derive bounded from non enumeration or unary type"
         return ()
     f TopLevel HsTypeDecl { hsDeclTArgs = as } = do
         when (any (not . isHsTyVar) as) $ do
@@ -63,6 +58,8 @@ hsDecl cntx decl = withSrcLoc (srcLoc decl) $ f cntx decl where
             wDecl "arguments to associated type must match instance head"
         | any (not . isHsTyVar) (drop (length ts) as) =
             wDecl "extra complex type arguments not allowed to type family"
+    f InInstance {} decl@HsPatBind { hsDeclPat = p } | not $ isHsPVar p  =
+            wDecl "Instance methods may not be bound by a pattern match."
     f InInstance {} HsTypeSig {} = wDecl "type signatures not allowed in instance declaration"
     f (InClass ts) HsTypeSig { .. } = do
         let HsQualType { .. } = hsDeclQualType
@@ -101,22 +98,4 @@ preTypecheckChecks x = traverseHsOps ops x where
             opHsPat p = traverseHsOps ops p
     wExp = addWarn InvalidExp
 
---    f context@(InClass ts) decl@HsTypeDecl { hsDeclTArgs = as }
-
 hasDuplicates xs = any ((> 1) . length) $ group (sort xs)
-
---    f context decl@HsNewTypeDecl {} = warn (srcLoc decl) InvalidDecl $ "newtype declaration not allowed " ++ show context
---    f TopLevel decl@HsClassDecl { hsDeclQualType = qt, hsDeclDecls = decls } = do args <- fetchQtArgs (srcLoc decl) qt; mapM_ (f (InClass args)) decls
-
---fetchQtArgs sl HsQualType { hsQualTypeType = t } | (HsTyCon {},args@(_:_)) <- fromHsTypeApp t = return args
---fetchQtArgs sl _ = warn sl InvalidDecl "invalid head in class or instance decl" >> return []
-
--- checkDeriving _ xs | all (`elem` derivableClasses) xs = return ()
--- checkDeriving False xs
---   = let nonDerivable = filter (`notElem` derivableClasses) xs
---     in addWarn (UnknownDeriving nonDerivable) ("attempt to derive from a non-derivable class: " ++ unwords (map show nonDerivable))
--- checkDeriving True _ = addWarn InvalidDecl "generalized newtype deriving not implemented."
-
---fromHsTypeApp t = f t [] where
---    f (HsTyApp a b) rs = f a (b:rs)
---    f t rs = (t,rs)

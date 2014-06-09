@@ -176,7 +176,6 @@ getArguments = do
     as <- System.getArgs
     return (eas ++ as)
 
-
 {-# NOINLINE processOptions #-}
 -- | Parse commandline options.
 processOptions :: IO Opt
@@ -255,7 +254,6 @@ findHoCache = do
         _  -> return Nothing
 
 doShowConfig opt@Opt { .. } = do
-    ls <- initialLibIncludes
     let (==>) :: ToNode b => String -> b -> (String,Node)
         a ==> b = (a,toNode b)
     putStrLn $ showYAML $ toNode [
@@ -396,6 +394,7 @@ initialLibIncludes = do
     return $ if "." `elem` lpath then lpath else ".":lpath
 
 data LibDesc = LibDesc (Map.Map String [String]) (Map.Map String String)
+    deriving(Show)
 
 readDescFile :: Opt -> FilePath -> IO LibDesc
 readDescFile origOpt fp = do
@@ -408,6 +407,7 @@ readDescFile origOpt fp = do
             when (optVerbose origOpt > 1) $ do
                 yaml <- emitYaml desc
                 putStrLn yaml
+            print $ procYaml desc
             return $ procYaml desc
     case FP.splitExtension fp of
         (_,".yaml") -> doYaml origOpt
@@ -428,9 +428,9 @@ readYamlOpts origOpt@Opt { .. } fp = do
         putErrLn $ fp ++ ":Unrecognized extensions" ++  show errs
     optIncdirs <- return $ map dd (mfield "hs-source-dirs") ++ optIncdirs
     optIncs <- return $ map dd (mfield "include-dirs") ++ optIncs
-    optHls <- return $ mfield "build-depends" ++ optHls
+    optHls <- return $ optHls ++ reverse (mfield "build-depends")
     let nopt = Opt { .. }
-        fileOpts = fileOptions nopt (mfield "options")
+    let fileOpts = fileOptions nopt (mfield "options")
     bopt <- case fileOpts of
         Left errs -> do
             putErrLn $ "---"
@@ -459,9 +459,9 @@ m4Prelude = fileInTempDir "prelude.m4" $ \fp -> do putStrLn $ "Writing stuff:" +
 procYaml :: YamlNode -> LibDesc
 procYaml MkNode { n_elem = EMap ms } = f ms mempty mempty where
     f [] dlm dsm = LibDesc (combineAliases dlm) dsm
-    f ((n_elem -> EStr (map toLower . unpackBuf -> x),y):rs) dlm dsm = if x `Set.member` list_fields then dlist y else dsing y where
-        dlist (n_elem -> EStr y)  = f rs (Map.insert x [unpackBuf y] dlm) dsm
-        dlist (n_elem -> ESeq ss) = f rs (Map.insert x [unpackBuf y | (n_elem -> EStr y) <- ss ] dlm) dsm
+    f ((n_elem -> EStr (map toLower . unpackBuf -> x),y):rs) dlm dsm = if x `Set.member` list_fields then dlist (n_elem y) else dsing y where
+        dlist (EStr (unpackBuf -> y)) | y /= ""  = f rs (Map.insert x [y] dlm) dsm
+        dlist (ESeq ss) = f rs (Map.insert x [unpackBuf y | (n_elem -> EStr y) <- ss ] dlm) dsm
         dlist _ = f rs dlm dsm
         dsing (n_elem -> EStr y) = f rs dlm (Map.insert x (unpackBuf y) dsm)
         dsing _ = f rs dlm dsm
@@ -493,5 +493,9 @@ combineAliases mp = f alias_fields mp where
 
 optionLibs :: Opt -> [String]
 optionLibs options = nub $ if optNoAuto options
-    then optHls options
-    else optAutoLoads options ++ optHls options
+    then proc [] $ optHls options
+    else proc [] $ optHls options ++ optAutoLoads options where
+        proc rs ("-":xs) = rs
+        proc rs ("_auto_":xs) = proc (optAutoLoads options ++ rs) xs
+        proc rs (x:xs) = proc (x:rs) xs
+        proc rs [] = rs

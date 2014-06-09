@@ -2,7 +2,8 @@ Name: haskell-extras
 Version: __JHC_VERSION__
 Hs-Source-Dir: .
 Extensions: ForeignFunctionInterface
-build-depends: jhc
+# TODO this should not have to depend on jhc-prim directly.
+build-depends: [jhc, jhc-prim]
 Options: [ --noauto ]
 Exposed-Modules:
         - Control.Exception

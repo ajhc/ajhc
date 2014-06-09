@@ -52,7 +52,7 @@ theoptions =
 --  ,Option ['e'] []                  (ReqArg (\d -> optStmts_u ( d:)) "<statement>")  "run given statement as if on jhci prompt"
     ,Option []    ["show-ho"]         (ReqArg (optMode_s . ShowHo) "file.ho") "Show contents of ho or hl file. Use -dflag to determine what information to show."
     ,Option []    ["noauto"]          (NoArg  (optNoAuto_s True))           "Do not automatically depend on primitive libraries. Used to build jhc-prim. Use -p- to clear the visible package list."
-    ,Option ['p'] ["package"]         (ReqArg (optHls_u . idu) "package")   "Load given haskell library package. Use -p- to remove all current entries from the list."
+    ,Option ['p'] ["package"]         (ReqArg (optHls_u . (:)) "package")   "Load given haskell library package. Use -p- to remove all current entries from the list."
     ,Option ['L'] []                  (ReqArg (optHlPath_u . idu) "path")   "Look for haskell libraries in the given directory. Use -L- to clear the search path."
     ,Option []    ["build-hl"]        (ReqArg (optMode_s . BuildHl) "desc.yaml") "Build hakell library from given library description file"
     ,Option []    ["annotate-source"] (ReqArg (optAnnotate_s . Just) "<dir>") "Write preprocessed and annotated source code to the directory specified"
@@ -181,7 +181,8 @@ stop s = StopError s
 fileOptions :: Monad m => Opt -> [String] -> m Opt
 fileOptions options xs = case getOpt Permute theoptions xs of
     (os,[],[]) -> postProcessFD (foldl (flip ($)) options os) >>= postProcessFO
-    (_,_,errs) -> fail (concat errs)
+    (_,as,errs) -> fail (unlines $ map f as ++ errs) where
+        f x = "fileOptions: Unexpected argument " ++ show x
 
 postProcessFD :: Monad m => Opt -> m Opt
 postProcessFD o = case FD.process (optDumpSet o) (optDump o ++ vv) of

@@ -36,7 +36,7 @@ import FrontEnd.Class
 import FrontEnd.FrontEnd
 import FrontEnd.HsSyn
 import FrontEnd.Infix
-import FrontEnd.Warning(warn,processIOErrors,WarnType(..))
+import FrontEnd.Warning
 import Ho.Binary
 import Ho.Collected()
 import Ho.Library
@@ -150,7 +150,7 @@ fetchSource modOpt done_ref fs mm = do
     let killMod = case mm of
             Nothing -> fail $ "Could not load file: " ++ show fs
             Just (m,sloc) -> do
-                warn sloc (MissingModule m) $ printf "Module '%s' not found." (show m)
+                warn sloc (MissingModule m Nothing) $ printf "Module '%s' not found." (show m)
                 modifyIORef done_ref (modEncountered_u $ Map.insert m ModNotFound) >> return m
     onErr killMod (findFirstFile fs) $ \ (lbs,fn) -> do
     let hash = MD5.md5lazy $ (LBSU.fromString version) `mappend` lbs
@@ -187,7 +187,7 @@ resolveDeps :: Opt -> IORef Done -> (Module,SrcLoc) -> IO ()
 resolveDeps modOpt done_ref (m,sloc) = do
     done <- readIORef done_ref
     case m `mlookup` modEncountered done of
-        Just (ModLibrary False _ lib) | not ("jhc-prim-" `isPrefixOf` libName lib) -> putErrDie $ printf  "ERROR: Attempt to import module '%s' which is a member of the library '%s'.\nPerhaps you need to add '-p%s' to the command line?" (show m) (libName lib) (libName lib)
+        Just (ModLibrary False _ lib) | sloc /= bogusASrcLoc -> warn sloc (MissingModule m (Just $ libName lib)) (printf  "ERROR: Attempt to import module '%s' which is a member of the library '%s'.\nPerhaps you need to add '-p%s' to the command line?" (show m) (libName lib) (libName lib))
         Just _ -> return ()
         Nothing -> fetchSource modOpt done_ref (map fst $ searchPaths modOpt (show m)) (Just (m,sloc)) >> return ()
 
@@ -385,23 +385,20 @@ toCompUnitGraph done roots = do
 parseFiles
     :: Opt                                                  -- ^ Options to use when parsing files
     -> [FilePath]                                           -- ^ Targets we are building, used when dumping dependencies
-    -> [String]                                             -- ^ Extra libraries to load
     -> [Either Module FilePath]                             -- ^ Either a module or filename to find
     -> (CollectedHo -> Ho -> IO CollectedHo)                -- ^ Process initial ho loaded from file
     -> (CollectedHo -> Ho -> TiData -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
     -> IO (CompNode,CollectedHo)                            -- ^ Final accumulated ho
-parseFiles options targets elibs need ifunc func = do
+parseFiles options targets need ifunc func = do
     putProgressLn "Finding Dependencies..."
-    (ksm,chash,cug) <- loadModules options targets (snub $
-        if optNoAuto options then optHls options ++ elibs else
-            optAutoLoads options ++ optHls options ++ elibs) bogusASrcLoc need
+    (ksm,chash,cug) <- loadModules options targets (optionLibs options) bogusASrcLoc need
     cnode <- processCug cug chash
     when (optStop options == StopParse) exitSuccess
     performGC
     putProgressLn "Typechecking..."
     typeCheckGraph options cnode
     if isJust (optAnnotate options) then exitSuccess else do
-    when (optStop options  == StopTypeCheck) exitSuccess
+    when (optStop options == StopTypeCheck) exitSuccess
     performGC
     putProgressLn "Compiling..."
     cho <- compileCompNode ifunc func ksm cnode
@@ -428,7 +425,7 @@ loadModules modOpt targets libs sloc need = do
         hosEncountered = Map.empty,
         modEncountered = Map.empty
         }
-    (es,is) <- collectLibraries libs
+    (es,is,allLibraries) <- collectLibraries libs
     let combModMap es = Map.unions [ Map.map ((,) l) (hoModuleMap $ libHoLib l) | l <- es]
         explicitModMap = combModMap es
         implicitModMap = combModMap is
@@ -452,12 +449,33 @@ loadModules modOpt targets libs sloc need = do
     ms1 <- forM (rights need) $ \fn -> do
         fetchSource modOpt done_ref [fn] Nothing
     forM_ (map (,sloc) $ lefts need) $ resolveDeps modOpt done_ref
-    processIOErrors "module loading"
+    ws <- getIOErrors
+    let (missingModuleErrors,otherErrors) = partition isMissingModule ws
+        f (Warning { warnType = MissingModule m ml, warnSrcLoc }:ws) mp = f ws $ Map.insertWith comb m (maybeToList ml,[warnSrcLoc]) mp
+        f (_:ws) mp = f ws mp
+        f [] mp = mp
+        comb (ma,wsa) (mb,wsb) = (ma ++ mb,wsa ++ wsb)
+        mmmap = f missingModuleErrors Map.empty
+    unless (Map.null mmmap) $ do
+        forM_ (Map.toList mmmap) $ \ (mod,(ml,wss)) -> do
+            mapM_ (putErrLn . (++ ":") . show) (snub wss)
+            putErrLn $ printf "    Attempt to import unknown module '%s'" (show mod)
+            case snub ml of
+                xs@(_:_) -> forM_ xs $ \x -> putErrLn $ printf "    It is exported by '%s', perhaps you need -p%s on the command line." x x
+                [] -> forM_ (concat [ take 1 [ z | z <- l, let hl = libHoLib z,
+                    mod `Map.member` hoModuleMap hl || mod `Map.member` hoReexports hl] | l <- Map.elems allLibraries]) $ \l -> do
+                                              putErrLn $ printf "    It is exported by '%s', perhaps you need -p%s on the command line." (libName l) (unpackPS $ libBaseName l)
+        processErrors otherErrors
+        exitFailure
+    processErrors otherErrors
     done <- readIORef done_ref
     let needed = (ms1 ++ lefts need)
     (chash,cug) <- toCompUnitGraph done needed
     dumpDeps targets (modEncountered done) cug
     return (Map.filterWithKey (\k _ -> k `Set.member` validSources done) (knownSourceMap done),chash,cug)
+
+isMissingModule Warning { warnType = MissingModule {}  } = True
+isMissingModule _ = False
 
 -- turn the list of CompUnits into a true mutable graph.
 processCug :: CompUnitGraph -> HoHash -> IO CompNode
@@ -634,9 +652,9 @@ hsModuleRequires x = snub ((mod_JhcPrimPrim,bogusASrcLoc):ans) where
 
 searchPaths :: Opt -> String -> [(String,String)]
 searchPaths modOpt m = ans where
-    f m | (xs,'.':ys) <- span (/= '.') m = let n = (xs ++ "/" ++ ys) in m:f n
+    f m | (xs,'.':ys) <- span (/= '.') m = let n = (xs FP.</> ys) in m:f n
         | otherwise = [m]
-    ans = [ (root ++ suf,root ++ ".ho") | i <- optIncdirs modOpt, n <- f m, suf <- [".hs",".lhs",".hsc"], let root = i ++ "/" ++ n]
+    ans = [ (root ++ suf,root ++ ".ho") | i <- optIncdirs modOpt, n <- f m, suf <- [".hs",".lhs",".hsc"], let root = FP.normalise $ i FP.</> n]
 
 mapHoBodies  :: (E -> E) -> Ho -> Ho
 mapHoBodies sm ho = ho { hoBuild = g (hoBuild ho) } where
@@ -666,7 +684,7 @@ buildLibrary ifunc func fp = do
             Nothing -> name ++ "-" ++ showVersion vers ++ ".hl"
             Just fn -> fn
     -- TODO - must check we depend only on libraries
-    (rnode@(CompNode lhash _ _),cho) <- parseFiles modOpts [outName] [] (map Left $ Set.toList allMods) ifunc func
+    (rnode@(CompNode lhash _ _),cho) <- parseFiles modOpts [outName] (map Left $ Set.toList allMods) ifunc func
     (_,(mmap,mdeps,prvds,lcor,ldef)) <- let
         f (CompNode hs cd ref) = do
             cl <- readIORef ref

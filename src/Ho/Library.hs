@@ -116,7 +116,8 @@ splitVersion s = ans where
         (vrs:bs@(_:_)) | Just vrs <- runReadP parseVersion vrs -> (intercalate "-" (reverse bs),vrs)
         _ -> (s,Data.Version.Version [] [])
 
-collectLibraries :: [String] -> IO ([Library],[Library])
+-- returns (explicitly imported libraries, implicitly imported libraries, full library map)
+collectLibraries :: [String] -> IO ([Library],[Library],Map.Map PackedString [Library])
 collectLibraries libs = ans where
     ans = do
         (bynames,byhashes) <- fetchAllLibraries
@@ -137,8 +138,8 @@ collectLibraries libs = ans where
             putErrLn "Libraries not found:"
             forM_ bad $ \b -> putErrLn ("    " ++ b)
             exitFailure
-
         checkForModuleConficts es
+
         let f lmap _ [] = return lmap
             f lmap lset ((ei,l):ls)
                 | libHash l `Set.member` lset = f lmap lset ls
@@ -152,7 +153,7 @@ collectLibraries libs = ans where
         when verbose $ forM_ (Map.toList finalmap) $ \ (n,(e,l)) ->
             printf "-- Base: %s Exported: %s Hash: %s Name: %s\n" (unpackPS n) (show e) (show $ libHash l) (libName l)
 
-        return ([ l | (True,l) <- Map.elems finalmap ],[ l | (False,l) <- Map.elems finalmap ])
+        return ([ l | (True,l) <- Map.elems finalmap ],[ l | (False,l) <- Map.elems finalmap ],bynames)
 
     checkForModuleConficts ms = do
         let mbad = Map.toList $ Map.filter (\c -> case c of [_] -> False; _ -> True)  $ Map.fromListWith (++) [ (m,[l]) | l <- ms, m <- fst $ libModules l]

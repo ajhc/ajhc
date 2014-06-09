@@ -1,6 +1,6 @@
 name: 	haskell98
 version: 1.0
-options:        --noauto
-build-depends: [ haskell2010, haskell-extras ]
+options:
+build-depends: [ -, haskell2010, haskell-extras ]
 hs-source-dir: .
 exposed-modules: [ Prelude, Numeric, Array, CPUTime, Char, Complex, Directory, IO, Ix, List, Locale, Maybe, Monad, Random, Ratio, System, Time ]

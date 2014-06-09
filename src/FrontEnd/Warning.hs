@@ -13,6 +13,7 @@ module FrontEnd.Warning(
     addWarnDoc,
     module FrontEnd.SrcLoc,
     -- IO monad
+    getIOErrors,
     processIOErrors,
     printIOErrors
     ) where
@@ -69,6 +70,12 @@ pad n s = case length s of
     x | x >= n -> s
     x -> s ++ replicate (n - x) ' '
 
+getIOErrors :: IO [Warning]
+getIOErrors = do
+    ws <- readIORef ioWarnings
+    writeIORef ioWarnings []
+    return ws
+
 processIOErrors :: String -> IO ()
 processIOErrors s = do
     ws <- readIORef ioWarnings
@@ -114,8 +121,7 @@ data WarnType
     | InvalidExp
     | InvalidFFIType
     | LexError
-    | MissingDep String
-    | MissingModule Module
+    | MissingModule Module (Maybe String)
     | MultiplyDefined Name [SrcLoc]
     | ParseError
     | ParseInfo
@@ -143,7 +149,6 @@ warnIsFatal w = f w where
     f InvalidExp {} = True
     f InvalidFFIType {} = True
     f DuplicateInstances {} = True
-    f MissingDep {} = True
     f MissingModule {} = True
     f WarnFailure {} = True
     f MultiplyDefined {} = True

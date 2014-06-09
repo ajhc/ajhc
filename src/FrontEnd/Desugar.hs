@@ -46,7 +46,10 @@ desugarDecl HsPatBind { hsDeclPat = hsDeclPat@HsPVar {}, .. } = do
     hsDeclRhs <- desugarRhs hsDeclRhs
     hsDeclDecls <- concat <$> mapM desugarDecl hsDeclDecls
     return [HsPatBind { .. }]
---desugarDecl (HsPatBind sloc pat rhs wheres) = do
+-- desugarDecl HsPatBind { .. } = do
+--     hsDeclRhs <- desugarRhs hsDeclRhs
+--     hsDeclDecls <- concat <$> mapM desugarDecl hsDeclDecls
+--     return [HsPatBind { .. }]
 desugarDecl HsPatBind { .. } = do
     hsDeclRhs <- desugarRhs hsDeclRhs
     hsDeclDecls <- concat <$> mapM desugarDecl hsDeclDecls
