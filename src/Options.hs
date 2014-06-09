@@ -27,6 +27,7 @@ module Options(
     withOptionsT,
     getArgString,
     outputName,
+    optionLibs,
     OptM(),
     OptT(),
     OptionMonad(..),
@@ -175,23 +176,6 @@ getArguments = do
     as <- System.getArgs
     return (eas ++ as)
 
-pfill ::
-    Int            -- ^ maximum width
-    -> (a -> Int)  -- ^ find width of any element
-    -> [a]         -- ^ input elements
-    -> [[a]]       -- ^ output element
-pfill maxn length xs = f maxn xs [] [] where
-    f n (x:xs) ws ls | lx < n = f (n - lx) xs (x:ws) ls where
-        lx = length x
-    f _ (x:xs) [] ls = f (maxn - length x) xs [x] ls
-    f _ (x:xs) ws ls = f (maxn - length x) xs [x] (ws:ls)
-    f _ [] [] ls = reverse (map reverse ls)
-    f _ [] ws ls = reverse (map reverse (ws:ls))
-
-helpUsage = usageInfo header theoptions ++ trailer where
-    header = "Usage: jhc [OPTION...] Main.hs"
-    trailer = "\n" ++ mkoptlist "-d" FD.helpFlags ++ "\n" ++ mkoptlist "-f" FO.helpFlags
-    mkoptlist d os = "valid " ++ d ++ " arguments: 'help' for more info\n    " ++ intercalate "\n    " (map (intercalate ", ") $ pfill 100 ((2 +) . length) os) ++ "\n"
 
 {-# NOINLINE processOptions #-}
 -- | Parse commandline options.
@@ -270,7 +254,7 @@ findHoCache = do
             return (Just cd)
         _  -> return Nothing
 
-doShowConfig Opt { .. } = do
+doShowConfig opt@Opt { .. } = do
     ls <- initialLibIncludes
     let (==>) :: ToNode b => String -> b -> (String,Node)
         a ==> b = (a,toNode b)
@@ -284,7 +268,7 @@ doShowConfig Opt { .. } = do
         "jhclibpath" ==> optHlPath,
         "hs-source-dirs" ==> optIncdirs,
         "include-dirs" ==> optIncs,
-        "build-depends" ==> optHls,
+        "build-depends" ==> optionLibs opt,
         "flags-option"  ==> optFOptsSet,
         "flags-dump"    ==> optDumpSet
         ]
@@ -506,3 +490,8 @@ combineAliases mp = f alias_fields mp where
     f ((x,y):rs) mp = case Map.lookup x mp of
         Nothing -> f rs mp
         Just ys -> f rs $ Map.delete x $ Map.insertWith (++) y ys mp
+
+optionLibs :: Opt -> [String]
+optionLibs options = nub $ if optNoAuto options
+    then optHls options
+    else optAutoLoads options ++ optHls options
