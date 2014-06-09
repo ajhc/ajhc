@@ -626,7 +626,8 @@ createError et s = do
 
 failRename s = do
     sl <- getSrcLoc
-    fail (show sl ++ ": " ++ s)
+    warnDoc sl WarnFailure (text s)
+--    fail (show sl ++ ": " ++ s)
 
 eWarn = addWarn InvalidExp
 
@@ -638,13 +639,17 @@ getRecInfo (FieldMap amp fls) constructorName fields = do
         failRename "Wildcard pattern not yet supported"
     let f (HsField n _) | n == u_DotDot = return []
         f (HsField fieldName e) = case mlookup fieldName fls of
-            Nothing -> failRename $ "Field Label does not exist: " ++ show fieldName
+            Nothing -> do
+                failRename $ "Field Label does not exist: " ++ show fieldName
+                return []
             Just cs -> return [ (x,(fromIntegral y,(fieldName,e))) | (x,y) <- cs, maybe True (x ==) constructorName]
     fm <- concat <$> mapM f fields
     let fm' = sortGroupUnderFG fst snd fm -- $ maybe fm (\t -> (t,[]):fm) constructorName
         fm'' =  maybe fm' (\t -> if t `elem` fsts fm' then fm' else (t,[]):fm') constructorName
     T.forM fm'' $ \ (t,v) -> case Map.lookup t amp of
-        Nothing -> failRename $ "Unknown Constructor: " ++ show t
+        Nothing -> do
+            failRename $ "Unknown Constructor: " ++ show t
+            return (t,(0,v))
         Just arity -> return (t,(fromIntegral arity,v))
     where
     (dotDotList,fieldLabels) = partition (u_DotDot ==) [ n | HsField n _ <- fields ]

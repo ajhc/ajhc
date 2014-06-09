@@ -45,7 +45,6 @@ module FrontEnd.Tc.Monad(
     toSigma,
     unBox,
     evalType,
-    unificationError,
     varBind,
     zonkKind,
     withContext,
@@ -138,6 +137,10 @@ getDeName :: TraverseHsOps n => Tc (n -> n)
 getDeName = do
     mn <- asks tcImports
     return (\n -> unrename mn n)
+
+--prettyTypes :: [Type] -> Tc [Type]
+--prettyTypes ts = mapM f ts
+--    f (
 
 denameType :: Type -> Tc Type
 denameType ty = do
@@ -264,14 +267,6 @@ dConScheme conName = do
 
 newBox :: Kind -> Tc Type
 newBox k = newMetaVar Sigma k
-
-unificationError t1 t2 = do
-    t1 <- evalFullType t1 >>= denameType
-    t2 <- evalFullType t2 >>= denameType
-    diagnosis <- asks tcDiagnostics
-    let msg = typeError (Unification $ "attempted to unify " ++
-            prettyPrintType t1 ++ " with " ++ prettyPrintType t2) diagnosis
-    fatalError msg
 
 fatalError msg = do
     ref <- asks tcWarningRef >>= liftIO . readIORef
@@ -517,7 +512,10 @@ varBind u t
         when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "varBind: " ++ pprint u <+>
             text ":=" <+> prettyPrintType tt
         when (u `Set.member` freeMetaVars tt) $ do
-            unificationError (TMetaVar u) tt -- occurs check
+            t1 <- evalFullType (TMetaVar u) >>= denameType
+            t2 <- evalFullType tt >>= denameType
+            diagnosis <- asks tcDiagnostics
+            fatalError =<< typeError OccursCheck ("cannot make recursive type" <+> pprint t1 <+> "=" <+> pprint t2) diagnosis
         let r = metaRef u
         x <- liftIO $ readIORef r
         case x of
@@ -568,9 +566,10 @@ instance Monad Tc where
     return a = Tc $ return a
     Tc comp >>= fun = Tc $ do x <- comp; case fun x of Tc m -> m
     Tc a >> Tc b = Tc $ a >> b
-    fail s = Tc $ do
-        st <- ask
-        fatalError $ typeError (Failure s) (tcDiagnostics st)
+    fail s = do
+        st <- asks tcDiagnostics
+        msg <- typeError WarnFailure s st
+        fatalError msg
 
 instance MonadWarn Tc where
     addWarning w = do

@@ -430,9 +430,9 @@ tcWheres decls = do
 
 deNameContext :: Maybe SrcLoc -> String -> HsExp -> Tc a -> Tc a
 deNameContext sl desc e action = do
-    dn <- getDeName
-    let mm = maybe makeMsg locMsg  sl
-    withContext (mm desc (render $ ppHsExp (dn e))) action
+    dn <- prettyName e
+    sl <- getSrcLoc
+    withContext (locMsg sl desc (render $ ppHsExp dn)) action
 
 -----------------------------------------------------------------------------
 
@@ -471,12 +471,15 @@ tcGuardedRhs typ gAlt@(HsGuardedRhs sloc eGuard e) = withContext (locMsg sloc "i
     -}
 
 -- Typing Patterns
+--
 
 tiPat,tcPat :: HsPat -> Type -> Tc (HsPat, Map.Map Name Sigma)
 
-tcPat p typ = withContext (makeMsg "in the pattern: " $ render $ ppHsPat p) $ do
-    typ <- evalType typ
-    tiPat p typ
+tcPat p typ = do
+    pn <- prettyName p
+    withContext (makeMsg "in the pattern:" (pprint pn)) $ do
+        typ <- evalType typ
+        tiPat p typ
 
 tiPat (HsPVar i) typ = do
         --v <- newMetaVar Tau Star

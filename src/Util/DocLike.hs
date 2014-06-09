@@ -6,6 +6,7 @@ import Control.Applicative
 import Data.Monoid(Monoid(..),(<>))
 import Data.Traversable as T
 import qualified Text.PrettyPrint.HughesPJ as P
+import qualified Text.PrettyPrint.Leijen as L
 
 --infixr 5 <$> -- ,<//>,<$>,<$$>
 infixr 6 <+>, <->
@@ -156,3 +157,26 @@ instance DocLike P.Doc where
     fsep = P.fsep
     cat = P.cat
     sep = P.sep
+
+instance DocLike L.Doc where
+    emptyDoc = mempty
+    text = L.text
+    char = L.char
+    (<->) = (L.<>)
+    (<+>) = (L.<+>)
+    ($$) = (L.</>)
+    ($+$) = (L.<$>)
+    hsep = L.hsep
+    vcat = L.vcat
+    fcat = L.fillCat
+    fsep = L.fillSep
+    cat = L.cat
+    sep = L.sep
+
+instance Monoid L.Doc where
+    mempty = L.empty
+    mappend = (L.<>)
+    mconcat = L.hcat
+
+
+

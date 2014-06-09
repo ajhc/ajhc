@@ -1,3 +1,4 @@
+-- FrontEnd.Tc.Type should be imported instead of this.
 module FrontEnd.Representation(
     Type(..),
     Tyvar(..),

@@ -5,26 +5,32 @@ module FrontEnd.Diagnostic (
        locSimple,
        simpleMsg,
        typeError,
-       TypeError (..),
+       WarnType(..)
        ) where
 
-import Util.Std
-import FrontEnd.SrcLoc
+import FrontEnd.Warning
 import PackedString
 import Util.DocLike
+import Util.Std
 import qualified Text.PrettyPrint.HughesPJ as P
 
-data TypeError = Unification String | Failure String | UnexpectedType String
+type ErrorType = WarnType
 
-typeError :: TypeError -> [Diagnostic] -> String
-typeError err ds =
-             "What:  " ++ whatStr ++ "\n" ++
-             "Why:   " ++ whyStr ++ "\n" ++
-             "Where: " ++ dumpDiagnostic 3 ds where
-   (whatStr, whyStr) = case err of
-           Unification s -> ("type unification error", s)
-           Failure s ->  ("failure", s)
-           UnexpectedType s -> ("unexpected type", s)
+typeError :: MonadSrcLoc m => ErrorType -> String -> [Diagnostic] -> m String
+typeError err whyStr ds = do
+    sl <- getSrcLoc
+    let doc = tshow sl <> colon <+> whatStr $$
+            P.nest 4 (text whyStr $$ P.text (dumpDiagnostic 10 ds))
+    return $ P.render doc
+    where
+    whatStr = text $ case err of
+           UnificationError -> "type unification error"
+           WarnFailure ->  "failure"
+           UnexpectedType -> "unexpected type"
+           OccursCheck -> "occurs check"
+           _ -> "type error"
+
+--contextMsg :: MonadSrcLoc m => String -> P.Doc -> m Diagnostic
 
 data Diagnostic = Msg { msgSrcLoc :: Maybe SrcLoc, msgString :: String, msgFull :: Bool}
    deriving Show
@@ -37,8 +43,8 @@ simpleMsg msgString = diagEmpty { msgString}
 
 {- given a description and some data to be shown make a diagnostic -}
 -- makeMsg :: PrettyShow a => Description -> a -> Diagnostic
-makeMsg :: String -> String -> Diagnostic
-makeMsg description val = simpleMsg (description ++ "\n   " ++ val)
+makeMsg :: String -> P.Doc -> Diagnostic
+makeMsg description val = simpleMsg $ P.render (text description $$ P.nest 4 val)
 
 {- given a srcloc and a description, make a diagnostic -}
 locSimple :: SrcLoc -> String -> Diagnostic

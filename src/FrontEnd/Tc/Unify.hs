@@ -107,9 +107,17 @@ subsumes s1 s2 = do
         a <- evalFullType a >>= denameType
         b <- evalFullType b >>= denameType
         diagnosis <- asks tcDiagnostics
-        let msg = typeError (UnexpectedType $ "expected type " ++
+        msg <- typeError UnexpectedType  ("expected type " ++
                 prettyPrintType a ++ " but got " ++ prettyPrintType b) diagnosis
         fatalError msg
+
+unificationError t1 t2 = do
+    t1 <- evalFullType t1 >>= denameType
+    t2 <- evalFullType t2 >>= denameType
+    diagnosis <- asks tcDiagnostics
+    msg <- typeError UnificationError ("attempted to unify " ++
+            pprint t1 ++ " with " ++ pprint t2) diagnosis
+    fatalError msg
 
 -- might as well return flattened type
 -- we can skip the occurs check for boxy types

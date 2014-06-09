@@ -114,11 +114,9 @@ data WarnType
     | InvalidExp
     | InvalidFFIType
     | LexError
-    | WarnFailure
     | MissingDep String
     | MissingModule Module
     | MultiplyDefined Name [SrcLoc]
-    | OccursCheck
     | ParseError
     | ParseInfo
     | PrimitiveBadType
@@ -126,11 +124,16 @@ data WarnType
     | TypeSynonymPartialAp
     | TypeSynonymRecursive
     | UndefinedName Name
-    | UnificationError
     | UnknownDeriving [Class]
     | UnknownOption
     | UnknownPragma PackedString
     | UnsupportedFeature
+    -- failure via 'fail' monad method
+    | WarnFailure
+    -- type system errors
+    | OccursCheck
+    | UnificationError
+    | UnexpectedType
     deriving(Eq,Ord)
 
 warnIsFatal w = f w where

@@ -12,22 +12,23 @@ module FrontEnd.Tc.Class(
     Preds
     )where
 
-import Control.Monad.Trans
+import Control.Monad.Reader
 import Data.Monoid
-import List
-import Monad
+import Util.Std
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Doc.DocLike
 import Doc.PPrint
 import FrontEnd.Class
+import FrontEnd.Diagnostic
+import FrontEnd.Rename
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
 import Name.Name
 import Name.Names
 import Options
 import Support.CanType
+import Util.DocLike
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 
@@ -161,7 +162,7 @@ splitReduce fs gs ps = do
         wdump FD.BoxySteps $ liftIO $ putStrLn msg
         --addWarn "type-defaults" msg
     sequence_ [ varBind x y | (x,y) <- nub sub]
-    return (Set.toList gs List.\\ map fst sub, ds, rs')
+    return (Set.toList gs Util.Std.\\ map fst sub, ds, rs')
 
 -- | Return retained predicates and a defaulting substitution
 genDefaults :: ClassHierarchy
@@ -189,8 +190,18 @@ assertEntailment qs ps = do
 --    liftIO $ putStrLn $ "Asserting entailment: " ++ pprint (qs,ps)
     ch <- getClassHierarchy
     let ns = [ p  | p <- ps, not $ entails ch qs p ]
-    if null ns then return () else
-        fail $ "Signature too Weak: " ++ pprint qs ++ " does not imply " ++ pprint ns
+    if null ns then return () else do
+        let f (IsIn c ty) = do
+                ty <- denameType ty
+                nm <- asks tcImports
+                return $ IsIn (unrenameName nm c) ty
+            f (IsEq ty1 ty2) = IsEq <$> denameType ty1 <*> denameType ty2
+
+        qs <- mapM f qs
+        ns <- mapM f ns
+        diagnosis <- asks tcDiagnostics
+        fatalError =<< typeError WarnFailure
+            (text "Class signature is too weak." <+> (tupled $ map pprint qs) <+> text "does not imply" <+> (tupled $ map pprint ns)) diagnosis
 
 assertEquivalant :: Preds -> Preds -> Tc ()
 assertEquivalant qs ps = do
