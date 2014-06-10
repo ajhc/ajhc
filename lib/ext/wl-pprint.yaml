@@ -1,0 +1,21 @@
+---
+author: Daan Leijen
+build-depends: []
+build-suggestions:
+  - base
+build-type: Simple
+category: Text
+description: |-
+  This is a pretty printing library based on Wadler's paper "A Prettier
+  Printer".  See the haddocks for full info.  This version allows the
+  library user to declare overlapping instances of the 'Pretty' class.
+exposed-modules:
+  - Text.PrettyPrint.Leijen
+extensions:
+  - OverlappingInstances
+license: BSD3
+license-file: LICENSE
+maintainer: otakar.smrz cmu.edu
+name: wl-pprint
+synopsis: The Wadler/Leijen Pretty Printer
+version: 1.1
