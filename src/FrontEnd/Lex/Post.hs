@@ -129,6 +129,8 @@ checkValDef srcloc lhs rhs whereBinds = withSrcLoc srcloc $ do
                 return (HsFunBind [HsMatch srcloc v es rhs whereBinds])
             _ -> do
                 lhs <- tryP $ checkPattern lhs
+                when (isFullyConst lhs) $ do
+                    parseErrorK "Pattern binding cannot be fully constant."
                 return (HsPatBind srcloc lhs rhs whereBinds)
 
 -- when we have a sequence of patterns we don't allow top level binary
@@ -302,3 +304,12 @@ mkRecConstrOrUpdate e fs = f e fs where
     g (x,Nothing) | x == u_DotDot = HsField u_DotDot (HsVar u_DotDot)
     g (x,Nothing) = HsField x (HsVar $ toName Val x)
     fs' = map g fs
+
+isFullyConst p = f p where
+    f (HsPApp _ as) = all f as
+    f (HsPList as) = all f as
+    f (HsPTuple as) = all f as
+    f (HsPParen a) = f a
+    f (HsPatWords es) = all f es
+    f HsPLit {} = True
+    f _ = False

@@ -9,6 +9,8 @@ tests:
      skip: not error in jhc
    tcfail107:
         skip: not error in jhc
+   tcfail120:
+        skip: not error in jhc
    tcfail129:
         skip: not error in jhc
    tcfail144:

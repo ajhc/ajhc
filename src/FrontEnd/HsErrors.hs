@@ -37,55 +37,63 @@ typeVars t = execWriter $ f t where
 
 hsDecl :: (MonadSetSrcLoc m,MonadSrcLoc m, MonadWarn m) => Context -> HsDecl -> m ()
 hsDecl cntx decl = withSrcLoc (srcLoc decl) $ f cntx decl where
-    f _ d@HsTypeFamilyDecl { hsDeclFamily = True } = do
-        warn (srcLoc d) UnsupportedFeature "Type families currently not supported"
-    f TopLevel d@HsTypeFamilyDecl { hsDeclFamily = False, hsDeclHasKind = Nothing } = do
-        warn (srcLoc d) UnsupportedFeature "Type families currently not supported"
-    f l d@HsTypeDecl { } | l /= TopLevel= do
-        warn (srcLoc d) UnsupportedFeature "Type families currently not supported"
-    f TopLevel HsForeignDecl {} = return ()
-    f TopLevel HsActionDecl {} = do
-        wDecl "top level actions not supported"
-    f TopLevel HsDataDecl { .. } = do
-        when (hasRepeatUnder hsConDeclName hsDeclCons) $ do
-            wDecl "repeated constructor name is not allowed"
-        return ()
-    f TopLevel HsTypeDecl { hsDeclTArgs = as } = do
-        when (any (not . isHsTyVar) as) $ do
-            wDecl "complex type arguments not allowed for type synonym"
-    f (InInstance ts) decl@HsTypeDecl { hsDeclTArgs = as }
-        | length as < length ts || or (zipWith (/=) as ts) =
-            wDecl "arguments to associated type must match instance head"
-        | any (not . isHsTyVar) (drop (length ts) as) =
-            wDecl "extra complex type arguments not allowed to type family"
-    f InInstance {} decl@HsPatBind { hsDeclPat = p } | not $ isHsPVar p  =
-            wDecl "Instance methods may not be bound by a pattern match."
-    f InInstance {} HsTypeSig {} = wDecl "type signatures not allowed in instance declaration"
+    f (InInstance ts) decl = g decl where
+        g decl@HsTypeDecl { hsDeclTArgs = as }
+            | length as < length ts || or (zipWith (/=) as ts) =
+                wDecl "arguments to associated type must match instance head"
+            | any (not . isHsTyVar) (drop (length ts) as) =
+                wDecl "extra complex type arguments not allowed to type family"
+
+        g decl@HsPatBind { hsDeclPat = p } | not $ isHsPVar p  =
+                wDecl "Instance methods may not be bound by a pattern match."
+        g HsTypeSig {} = wDecl "type signatures not allowed in instance declaration"
+        g decl = do simpleDecl decl
+    f TopLevel decl = g decl where
+        g  d@HsTypeFamilyDecl { hsDeclFamily = False, hsDeclHasKind = Nothing } = do
+            warn (srcLoc d) UnsupportedFeature "Type families currently not supported"
+        g  HsForeignDecl {} = return ()
+        g  HsActionDecl {} = do
+            wDecl "top level actions not supported"
+        g  HsDataDecl { .. } = do
+            when (hasRepeatUnder hsConDeclName hsDeclCons) $ do
+                wDecl "repeated constructor name is not allowed"
+            when (hsDeclDeclType == DeclTypeNewtype && any (not . null. hsConDeclExists) hsDeclCons) $ do
+                wDecl "existential constructors not allowed on newtypes."
+            return ()
+        g  HsTypeDecl { hsDeclTArgs = as } = do
+            when (any (not . isHsTyVar) as) $ do
+                wDecl "complex type arguments not allowed for type synonym"
+        g HsClassDecl { .. } = do
+            let HsClassHead { .. } = hsDeclClassHead
+            mapM_ (f (InClass hsClassHeadArgs)) hsDeclDecls
+            when (any (not . isHsTyVar) hsClassHeadArgs) $ do
+                wDecl $ "Class arguments must be plain variables"
+        g HsInstDecl { .. } = do
+            let HsClassHead { .. } = hsDeclClassHead
+            mapM_ (f (InInstance hsClassHeadArgs)) hsDeclDecls
+            when (hasDuplicates . catMaybes $ map maybeGetDeclName hsDeclDecls) $ do
+                wDecl "multiple definitions for the same method"
+            let vs = concatMap typeVars hsClassHeadArgs
+            when (hasDuplicates vs) $ do
+                wDecl "type variables cannot be duplicated in instance head"
+        g decl = allDecls decl
     f (InClass ts) HsTypeSig { .. } = do
         let HsQualType { .. } = hsDeclQualType
         when (null $ intersect (map removeUniquifier $ typeVars hsQualTypeType) [ removeUniquifier v | HsTyVar v <- ts]) $ do
             wDecl "types of class methods must have class variables"
-    f TopLevel HsClassDecl { .. } = do
-        let HsClassHead { .. } = hsDeclClassHead
-        mapM_ (f (InClass hsClassHeadArgs)) hsDeclDecls
-        when (any (not . isHsTyVar) hsClassHeadArgs) $ do
-            wDecl $ "Class arguments must be plain variables"
+    f InClass {} decl = simpleDecl decl
+    f _ decl = simpleDecl decl
+    simpleDecl  HsClassDecl {} = wDecl $ "class declaration not allowed " ++ show cntx
+    simpleDecl  HsInstDecl {} = wDecl $ "instance declaration not allowed " ++ show cntx
+    simpleDecl  HsDataDecl {} = wDecl $ "data declaration not allowed " ++ show cntx
+    simpleDecl  HsForeignDecl {} = wDecl $ "foreign declaration not allowed " ++ show cntx
+    simpleDecl  HsActionDecl {} = wDecl $ "action declaration not allowed " ++ show cntx
+    simpleDecl d@HsTypeDecl {} = warn (srcLoc d) UnsupportedFeature "Type families currently not supported"
+    simpleDecl decl = allDecls decl
 
-    f TopLevel HsInstDecl { .. } = do
-        let HsClassHead { .. } = hsDeclClassHead
-        mapM_ (f (InInstance hsClassHeadArgs)) hsDeclDecls
-        when (hasDuplicates . catMaybes $ map maybeGetDeclName hsDeclDecls) $ do
-            wDecl "multiple definitions for the same method"
-        let vs = concatMap typeVars hsClassHeadArgs
-        when (hasDuplicates vs) $ do
-            wDecl "type variables cannot be duplicated in instance head"
-
-    f context HsClassDecl {} = wDecl $ "class declaration not allowed " ++ show context
-    f context HsInstDecl {} = wDecl $ "instance declaration not allowed " ++ show context
-    f context HsDataDecl {} = wDecl $ "data declaration not allowed " ++ show context
-    f context HsForeignDecl {} = wDecl $ "foreign declaration not allowed " ++ show context
-    f context HsActionDecl {} = wDecl $ "action declaration not allowed " ++ show context
-    f _ d = return ()
+    allDecls d@HsTypeFamilyDecl { hsDeclFamily = True } = do
+        warn (srcLoc d) UnsupportedFeature "Type families currently not supported"
+    allDecls _ = return ()
     wDecl = addWarn InvalidDecl
 
 preTypecheckChecks :: (MonadWarn m,MonadSrcLoc m,MonadSetSrcLoc m,Applicative m,TraverseHsOps a) => a -> m a
