@@ -580,14 +580,11 @@ instance Rename HsExp where
     rename (HsCase hsExp hsAlts) = do HsCase <$> rename hsExp <*> rename hsAlts
     rename orig@(HsDo hsStmts) = do
         (ss,()) <- renameHsStmts hsStmts (return ())
+        doToComp ss
         sugar <- flagOpt FO.Sugar
-        if sugar
-        then do
-            doComp <- doToComp ss
-            return $ doCompToExp v_bind v_bind_ v_fail doComp
-            --return $ HsDo ss
-        else do eWarn "do desugaring disabled by -fno-sugar"
-                return $ HsDo ss
+        unless sugar $ do
+            eWarn "do desugaring disabled by -fno-sugar"
+        return $ HsDo ss
     rename (HsRecConstr hsName hsFieldUpdates) = do
         hsName' <- renameName hsName
         hsFieldUpdates' <- rename hsFieldUpdates
@@ -606,7 +603,7 @@ instance Rename HsExp where
         (ss,e) <- renameHsStmts hsStmts (rename hsExp)
         sugar <- flagOpt FO.Sugar
         if sugar
-        then listCompToExp newVar e ss
+        then do return $ HsListComp (HsComp sl ss e)
         else do eWarn "list comprehension desugaring disabled by -fno-sugar"
                 return $ HsListComp $ HsComp sl ss e
     rename (HsExpTypeSig srcLoc hsExp hsQualType) = do

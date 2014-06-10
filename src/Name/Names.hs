@@ -15,6 +15,7 @@ import Char(isDigit)
 import Name.Name
 import Name.Prim
 import Name.VConsts
+import StringTable.Atom
 import Ty.Level
 
 instance TypeNames Name where
@@ -76,12 +77,10 @@ name_UnboxedTupleConstructor l n = mkName l True Nothing ("(#" ++ show n ++ "#)"
 fromName_Tuple :: Name -> Maybe (Bool,TyLevel,Int)
 fromName_Tuple n | n == dc_Unit = Just (True,termLevel,0)
 fromName_Tuple n | n == tc_Unit = Just (True,typeLevel,0)
-fromName_Tuple n = f (getTyLevel n, deconstructName n) where
-    f (Just tl,(False,Just m,Nothing,uq,Nothing)) |
-        m == mod_JhcPrimPrim,
-        Just n <- fromTupname (show uq)= Just (True,tl,n)
-    f (Just tl,(False,Nothing,Nothing,uq,Nothing)) |
-        Just n <- fromUnboxedNameTuple uq = Just (False,tl,n)
+fromName_Tuple n = f (unMkName n) where
+    f NameParts { nameQuoted = False, nameConstructor = True, nameOuter = [], nameUniquifier = Nothing,  .. }
+        | nameModule == Just mod_JhcPrimPrim, Just n <- fromTupname nameIdent = Just (True,nameLevel,n)
+        | Just n <- fromUnboxedNameTuple (toAtom nameIdent) = Just (False,nameLevel,n)
     f _ = Nothing
 
 fromName_UnboxedTupleConstructor :: Name -> Maybe (TyLevel,Int)

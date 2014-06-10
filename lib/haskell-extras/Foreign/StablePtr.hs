@@ -28,13 +28,11 @@ freeStablePtr p = c_freeStablePtr (toBang_ p)
 -- compatible with FFI calling conventions, if this is an issue, you can put an
 -- extra box around it.
 newStablePtr :: a -> IO (StablePtr a)
-newStablePtr x = do
-    fromUIO $ \w -> case c_newStablePtr (toBang_ x) w of
+newStablePtr x = fromUIO $ \w -> case c_newStablePtr (toBang_ x) w of
         (# w', s #) -> (# w', fromBang_ s #)
 
 deRefStablePtr :: StablePtr a -> IO a
-deRefStablePtr x = do
-    fromUIO $ \w -> case c_derefStablePtr (toBang_ x) w of
+deRefStablePtr x = fromUIO $ \w -> case c_derefStablePtr (toBang_ x) w of
         (# w', s #) -> (# w', fromBang_ s #)
 
 foreign import ccall unsafe "rts/stableptr.c c_freeStablePtr"  c_freeStablePtr   :: Bang_ (StablePtr a) -> IO ()

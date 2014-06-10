@@ -27,6 +27,7 @@ module Name.Name(
     toModule,
     FieldName,
     ClassName,
+    combineName,
     toUnqualified,
     removeUniquifier,
     -- new interface
@@ -47,15 +48,16 @@ module Name.Name(
 
 import Data.Char
 import Util.Std
+import GHC.Base(unsafeChr)
 
 import C.FFI
 import Doc.DocLike
 import Doc.PPrint
 import GenUtil
 import Name.Internals
+import Name.Prim
 import StringTable.Atom
 import Ty.Level
-import Name.Prim
 
 isTypeNamespace TypeConstructor = True
 isTypeNamespace ClassName = True
@@ -89,11 +91,17 @@ fromValishHsName name
 createName :: NameType -> Module -> String -> Name
 createName _ (Module "") i = error $ "createName: empty module " ++ i
 createName _ m "" = error $ "createName: empty ident " ++ show m
-createName t m i = Name $ toAtom $ (chr $ ord '1' + fromEnum t):show m ++ ";" ++ i
+createName t m i = Name $ toAtom $ encodeNameType t:show m ++ ";" ++ i
+
+encodeNameType :: NameType -> Char
+encodeNameType t = unsafeChr $ ord '1' + fromEnum t
+
+decodeNameType :: Char -> NameType
+decodeNameType c = toEnum $ ord c - ord '1'
 
 createUName :: NameType -> String -> Name
 createUName _ "" = error $ "createUName: empty ident"
-createUName t i =  Name $ toAtom $ (chr $ fromEnum t + ord '1'):";" ++ i
+createUName t i =  Name $ toAtom $ encodeNameType t:";" ++ i
 
 class ToName a where
     toName :: NameType -> a -> Name
@@ -216,38 +224,52 @@ toModule s = Module $ toAtom s
 mkName :: TyLevel -> Bool -> Maybe Module -> String -> Name
 mkName l b mm s = toName (mkNameType l b) (mm,s)
 
+-- the left name effectively becomes the module.
+combineName :: Name -> Name -> Name
+combineName (Name a1) n2@(Name a2) = Name $ toAtom (encodeNameType (nameType n2) : "{" ++ show a1 ++ "}") `mappend` a2
+
 data NameParts = NameParts {
     nameLevel       :: TyLevel,
     nameQuoted      :: Bool,
     nameConstructor :: Bool,
     nameModule      :: Maybe Module,
-    nameOuter       :: Maybe Name,
+    nameOuter       :: [Name],
     nameUniquifier  :: Maybe Int,
     nameIdent       :: String
-    }
+    } deriving(Show)
 
 emptyNameParts = NameParts {
     nameLevel       = termLevel,
     nameQuoted      = False,
     nameConstructor = False,
     nameModule      = Nothing,
-    nameOuter       = Nothing,
+    nameOuter       = [],
     nameUniquifier  = Nothing,
     nameIdent       = "(empty)"
     }
 
 mkComplexName :: NameParts -> Name
-mkComplexName NameParts { .. } = qn $ toName (mkNameType nameLevel nameConstructor) (nameModule,ident) where
+mkComplexName NameParts { .. } = qn $ on nameOuter $ toName (mkNameType nameLevel nameConstructor) (nameModule,ident) where
     ident = maybe id (\c s -> show c ++ "_" ++ s) nameUniquifier nameIdent
     qn = if nameQuoted then quoteName else id
+    on xs n = case xs of
+        (x:xs) -> combineName x (on xs n)
+        [] -> n
 
 unMkName :: Name -> NameParts
-unMkName name = NameParts { .. } where
+unMkName nm@(Name a1) = NameParts { .. } where
+    (nameOuter,name) = g (show a1) [] where
+        g (_:'{':rs) zs = f (0::Int) rs [] where
+            f 0 ('}':xs) rs = g xs (Name (toAtom $ reverse rs):zs)
+            f n ('{':xs) rs = f (n + 1) xs ('{':rs)
+            f n ('}':xs) rs = f (n - 1) xs ('}':rs)
+            f n (x:xs) rs = f n xs (x:rs)
+            f n _ rs = error $ "unMkName: invalid outer " ++ show a1
+        g rs zs = (reverse zs,Name $ toAtom rs)
     (nameQuoted,nameModule,_,uqn,nameUniquifier) = deconstructName name
     (_,_,nameIdent) = nameParts uqn
     nameConstructor = isConstructor name
     nameLevel = tyLevelOf name
-    nameOuter = Nothing
 
 -- internal
 mkNameType :: TyLevel -> Bool -> NameType
@@ -273,8 +295,8 @@ deconstructName name = f nt where
     f _ = (False,mod,Nothing,toName nt id',mi)
 
 originalUnqualifiedName :: Name -> Name
-originalUnqualifiedName n = case deconstructName n of
-    (_,_,_,n,_) -> n
+originalUnqualifiedName n = case unMkName n of
+    NameParts { .. } -> toName (nameType n) nameIdent
 
 --constructName :: Maybe Module -> Maybe UnqualifiedName -> UnqualifiedName -> Maybe Int -> Name
 --constructName mm
