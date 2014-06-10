@@ -1,6 +1,6 @@
 Name: jhc-prim
 Version: 1.0
-Extensions: [ ForeignFunctionInterface, NoImplicitPrelude, UnboxedTuples, UnboxedValues ]
+Extensions: [ ForeignFunctionInterface, NoImplicitPrelude, UnboxedTuples, UnboxedValues, RankNTypes ]
 Options: [--noauto, -fno-sugar]
 Hs-Source-Dir: .
 Exposed-Modules:
@@ -11,4 +11,5 @@ Exposed-Modules:
         - Jhc.Prim.Rts
         - Jhc.Prim.Wrapper
         - Jhc.Prim.Options
+        - Jhc.Prim.Basics
         - Jhc.Prim.List

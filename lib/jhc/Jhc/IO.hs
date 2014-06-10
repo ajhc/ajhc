@@ -31,6 +31,7 @@ module Jhc.IO(
 
 import Jhc.Basics
 import Jhc.Prim
+import Jhc.Prim.Basics
 import Jhc.Type.Handle
 import qualified Jhc.Options
 

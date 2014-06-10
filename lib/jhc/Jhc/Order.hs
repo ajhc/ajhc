@@ -11,6 +11,7 @@ module Jhc.Order(
     otherwise
 ) where
 
+import Jhc.Prim.Basics
 import Jhc.Class.Ord
 import Jhc.Basics
 
@@ -72,6 +73,3 @@ False || x       =  x
 
 not              :: Bool -> Bool
 not x = if x then False else True
-
-otherwise        :: Bool
-otherwise        =  True

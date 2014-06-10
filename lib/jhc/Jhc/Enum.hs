@@ -8,8 +8,6 @@ import Jhc.Int
 
 m4_include(Jhc/Enum.m4)
 
-otherwise = True
-
 class  Enum a  where
     succ, pred       :: a -> a
     toEnum           :: Int -> a

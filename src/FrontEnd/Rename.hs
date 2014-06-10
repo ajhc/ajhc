@@ -548,7 +548,15 @@ noDesugar s = do
     unless sugar $ eWarn s
 
 instance Rename HsExp where
-    rename (HsVar hsName) = HsVar <$> renameName hsName
+    rename (HsVar hsName) = do
+        nn <- renameName hsName
+        if nn == v_undefined
+            then do
+                hsExpSrcLoc <- getSrcLoc
+                let hsExpErrorType = HsErrorUnderscore
+                let hsExpString = show hsExpSrcLoc ++ ":undefined"
+                return $ HsError {.. }
+            else return $ HsVar nn
     rename (HsCon hsName) = HsCon <$> renameName hsName
     rename i@(HsLit HsInt {}) = do
         noDesugar "int desugaring disabled by -fno-sugar"

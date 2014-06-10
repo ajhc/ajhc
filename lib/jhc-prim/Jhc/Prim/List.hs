@@ -1,6 +1,8 @@
+{-# OPTIONS_JHC -fno-prelude -fno-sugar -fforall #-}
 module Jhc.Prim.List where
 
 import Jhc.Prim.Prim
+import Jhc.Prim.Basics
 
 -- Basic list routines used by desugaring and fusion
 infixr 5  ++
@@ -34,3 +36,23 @@ map f xs = go xs where
 (++) :: [a] -> [a] -> [a]
 []     ++ ys = ys
 (x:xs) ++ ys = x : (xs ++ ys)
+
+build :: (forall b . (a -> b -> b) -> b -> b) -> [a]
+build g = g (:) []
+
+augment :: forall a. (forall b. (a->b->b) -> b -> b) -> [a] -> [a]
+augment g xs = g (:) xs
+
+{-# RULES "foldr/nil" forall k z.   foldr k z []  = z  #-}
+{-# RULES "foldr/single"  forall k z x . foldr k z [x] = k x z #-}
+{-# RULES "foldr/id"      foldr (:) [] = \x -> x  #-}
+{-# RULES "foldr/build" forall k z (g :: forall b . (a -> b -> b) -> b -> b) . foldr k z (build g) = g k z #-}
+{-# RULES "foldr/augment" forall k z xs (g::forall b. (a->b->b) -> b -> b) .  foldr k z (augment g xs) = g k (foldr k z xs) #-}
+
+{-# RULES "augment/build" forall (g::forall b. (a->b->b) -> b -> b)
+		       (h::forall b. (a->b->b) -> b -> b) .
+		       augment g (build h) = build (\c n -> g c (h c n)) #-}
+{-# RULES "augment/nil"   forall (g::forall b. (a->b->b) -> b -> b) .  augment g [] = build g #-}
+
+{-# CATALYST "concatMap/foldr" forall f . concatMap f = foldr ((++) . f) [] #-}
+{-# CATALYST "concat/foldr" forall . concat = foldr (++) [] #-}

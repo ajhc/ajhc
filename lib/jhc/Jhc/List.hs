@@ -6,29 +6,13 @@ import Jhc.IO(error)
 import Jhc.Int
 import Jhc.Order
 import Jhc.String
+import Jhc.Prim.List
 
 -- | our fusion routines
 
-build :: (forall b . (a -> b -> b) -> b -> b) -> [a]
-build g = g (:) []
-
-augment :: forall a. (forall b. (a->b->b) -> b -> b) -> [a] -> [a]
-augment g xs = g (:) xs
-
-{-# RULES "foldr/nil" forall k z.   foldr k z []  = z  #-}
-{-# RULES "foldr/single"  forall k z x . foldr k z [x] = k x z #-}
 {-# RULES "foldr/double"  forall k z x y . foldr k z [x,y] = k x (k y z) #-}
 {-# RULES "foldr/triple"  forall k z a b c . foldr k z [a,b,c] = k a (k b (k c z)) #-}
-{-# RULES "foldr/id"      foldr (:) [] = \x -> x  #-}
 {- "foldr/app"    	[1] forall ys. foldr (:) ys = \xs -> xs ++ ys -}
-
-{-# RULES "foldr/build" forall k z (g :: forall b . (a -> b -> b) -> b -> b) . foldr k z (build g) = g k z #-}
-{-# RULES "foldr/augment" forall k z xs (g::forall b. (a->b->b) -> b -> b) .  foldr k z (augment g xs) = g k (foldr k z xs) #-}
-{-# RULES "foldr/single" forall k z x. foldr k z [x] = k x z #-}
-{-# RULES "augment/build" forall (g::forall b. (a->b->b) -> b -> b)
-		       (h::forall b. (a->b->b) -> b -> b) .
-		       augment g (build h) = build (\c n -> g c (h c n)) #-}
-{-# RULES "augment/nil"   forall (g::forall b. (a->b->b) -> b -> b) .  augment g [] = build g #-}
 
 {-# RULES "foldr/unpackString"  forall k z (addr::BitsPtr_) . foldr k z (unpackString addr) = unpackStringFoldr addr k z  #-}
 

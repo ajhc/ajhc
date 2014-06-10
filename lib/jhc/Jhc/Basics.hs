@@ -1,27 +1,22 @@
 {-# OPTIONS_JHC -fno-prelude -fffi #-}
-module Jhc.Basics(module Jhc.Basics, module Jhc.Prim.Prim, module Jhc.Type.Basic, IO(), module Jhc.Prim.List) where
+module Jhc.Basics(
+    module Jhc.Basics,
+    module Jhc.Prim.Prim,
+    module Jhc.Type.Basic,
+    module Jhc.Prim.Basics,
+    IO(),
+    module Jhc.Prim.List) where
 
-import Jhc.Type.Basic
-import Jhc.Prim.Prim
-import Jhc.Prim.IO
 import Jhc.Int
+import Jhc.Prim.Basics
+import Jhc.Prim.IO
 import Jhc.Prim.List
+import Jhc.Prim.Prim
+import Jhc.Type.Basic
 
 ------------------------
 -- the basic combinators
 ------------------------
-
-{-# SUPERINLINE id, const, (.), ($), ($!), flip #-}
-
-infixr 9  .
-infixr 0  $, $!, `seq`
-
-id x = x
-const x _ = x
-f . g = \x -> f (g x)
-f $ x = f x
-f $! x = x `seq` f x
-flip f x y = f y x
 
 -- asTypeOf is a type-restricted version of const.  It is usually used
 -- as an infix operator, and its typing forces its first argument
@@ -30,9 +25,6 @@ flip f x y = f y x
 {-# SUPERINLINE asTypeOf #-}
 asTypeOf         :: a -> a -> a
 asTypeOf         =  const
-
-{-# INLINE seq #-}
-foreign import primitive seq :: a -> b -> b
 
 --------------------
 -- some tuple things
@@ -100,8 +92,6 @@ drop n xs = f n xs where
     f n (_:xs) = f (n `minus` one) xs
 
 foreign import primitive "Lte" leq :: Int -> Int -> Bool
-
-foreign import primitive "error.Prelude.undefined" undefined :: a
 
 unsafeChr :: Int -> Char
 unsafeChr = chr

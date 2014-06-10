@@ -3,6 +3,7 @@ module Data.Typeable(TypeRep(),Typeable(..),Typeable1(..),Typeable2(..)) where
 
 import Jhc.Prim
 import Jhc.String
+import Jhc.Prim.Basics
 
 type String_ = BitsPtr_
 

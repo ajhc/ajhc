@@ -121,6 +121,12 @@ bits_ptr_     bits<ptr>
 
 Val:v:
 
+error_           Jhc.Prim.Basics.error_
+undefined        Jhc.Prim.Basics.undefined
+cat              Jhc.Prim.List.++
+compose          Jhc.Prim.Basics..
+Dot              Jhc.Prim.Basics..
+
 eqString         Jhc.String.eqString
 eqUnpackedString Jhc.String.eqUnpackedString
 error            Jhc.IO.error
@@ -129,9 +135,6 @@ fmap_const       Jhc.Monad.<$
 and              Jhc.Order.&&
 foldl            Jhc.Basics.foldl
 drop             Jhc.List.drop
-cat              Jhc.Prim.List.++
-compose          Jhc.Basics..
-Dot              Jhc.Basics..
 
 ; list primitives used for comprehension desugaring.
 concat           Jhc.Prim.List.concat

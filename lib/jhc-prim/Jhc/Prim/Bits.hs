@@ -38,3 +38,5 @@ newtype {-# CTYPE "wchar_t" #-}  Char_    = Char_ Bits32_
 -- convey intent to someone reading the code.
 type Word_ = Bits32_
 type Int_  = Bits32_
+
+type AddrLen_ = (# Addr_,  Word_ #)
