@@ -712,7 +712,9 @@ tcMiscDecl d = withContext (locMsg (srcLoc d) "in the declaration" "") $ f d whe
 	forM_ hsDeclDecls $ \d -> do
 	    case maybeGetDeclName d of
 		Just n -> when (n `notElem` fsts as) $ do
-		    addWarn InvalidDecl $ printf "Cannot declare '%s' in instance because it is not a method of class '%s'" (show n) (show $ hsClassHead hsDeclClassHead)
+                    chn <- prettyNameName $ hsClassHead hsDeclClassHead
+                    n <- prettyNameName n
+		    addWarn InvalidDecl $ printf "Cannot declare '%s' in instance because it is not a method of class '%s'" (show n) (show chn)
 		Nothing -> return ()
 	return []
 

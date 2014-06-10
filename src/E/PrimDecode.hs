@@ -176,7 +176,7 @@ processPrim dataTable srcLoc pName args rType req = ans where
     primInfo c cr wh = checkType' (hash +> hash) $ return
        (ePrim (PrimTypeInfo c cr wh) [] rType)
     primUnknown = do
-        warn srcLoc (PrimitiveUnknown pName) $
+        warn srcLoc CodeWarning $
                     printf "Unknown primitive '%s'" (fromAtom pName :: String)
         return passThrough
     doBinOp op = do
@@ -197,7 +197,7 @@ processPrim dataTable srcLoc pName args rType req = ans where
         case pairWith match tas (map getType args) of
             Just cs | and cs, match trt rType -> onPass
             _ -> do
-                warn srcLoc PrimitiveBadType $
+                warn srcLoc CodeWarning $
                     printf "Primitive type mismatch. expected '%s' but found '%s -> %s'"
                         (show (tas :-> trt)) (show $ map (getType . getType) args) (show $ getType rType)
                 onFail

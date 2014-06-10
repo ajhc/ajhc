@@ -467,7 +467,7 @@ checkForDuplicateInstaces iCh (CH ch is) = mapM_ f (Map.toList is) >> return (CH
         mapM_ g sgu
     g (_,[_]) = return ()
     g (_,sls) | all instDerived sls = return ()
-    g ((ch,th),sls) = warn (instSrcLoc $ head sls) DuplicateInstances $
+    g ((ch,th),sls) = warn (instSrcLoc $ head sls) InvalidDecl $
         printf "instance (%s (%s ..)) defined multiple times: %s"
             (show ch) (show th) (show $ map instSrcLoc sls)
 

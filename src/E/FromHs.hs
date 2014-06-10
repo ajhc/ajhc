@@ -1006,7 +1006,7 @@ ffiTypeInfo bad t cont = do
         Just r -> cont r
         Nothing -> do
             sl <- getSrcLoc
-            liftIO $ warn sl InvalidFFIType $ printf "Type '%s' cannot be used in a foreign declaration" (pprint t :: String)
+            liftIO $ warn sl InvalidDecl $ printf "Type '%s' cannot be used in a foreign declaration" (pprint t :: String)
             return bad
 
 unboxedVersion t = do

@@ -9,6 +9,7 @@ import qualified Data.Map as Map
 import FrontEnd.HsSyn
 import FrontEnd.Lex.ParseMonad
 import FrontEnd.Syn.Traverse
+import FrontEnd.Warning
 import Name.Names
 import Support.MapBinaryInstance
 import Util.HasSize
@@ -117,19 +118,19 @@ infixHsModule (FixityMap ism) m =  domod m where
         opHsExp (HsParen (HsWords es)) = F.shunt pexpShuntSpec es >>= applyHsOps ops
         opHsExp (HsWords es) = F.shunt expShuntSpec es >>= applyHsOps ops
         opHsExp e@(HsApp HsTuple {} _) = do
-                parseErrorK $ "Attempt to apply a tuple like a function in expression"
+                addWarn UnexpectedType $ "Attempt to apply a tuple like a function in expression"
                 traverseHsOps ops e
         opHsExp e@(HsApp HsUnboxedTuple {} _) = do
-                parseErrorK $ "Attempt to apply an unboxed tuple like a function in expression"
+                addWarn UnexpectedType $ "Attempt to apply an unboxed tuple like a function in expression"
                 traverseHsOps ops e
         opHsExp e@(HsApp HsList {} _) = do
-                parseErrorK $ "Attempt to apply literal list like a function in expression"
+                addWarn UnexpectedType $ "Attempt to apply literal list like a function in expression"
                 traverseHsOps ops e
         opHsExp op@HsApp {} | (ce,ps) <- fromHsApp op = do
             let cont = do
                     ps <- mapM opHsExp (ce:ps)
                     return $ foldl1 HsApp ps
-                err s = parseErrorK s >> cont
+                err s = addWarn UnexpectedType s >> cont
             case ce of
                 HsCon c | Just (isBoxed,level,n) <- fromName_Tuple c, level == termLevel -> case length ps of
                     lps | lps > n -> err "Attempt to apply a tuple like a function in expression"
@@ -145,10 +146,10 @@ infixHsModule (FixityMap ism) m =  domod m where
         opHsPat (HsPatWords ws) = F.shunt patShuntSpec ws >>= opHsPat
         opHsPat op@(HsPApp n ps) | Just (isBoxed,level,n) <- fromName_Tuple n, level == termLevel = case length ps of
             lps | lps > n -> do
-                parseErrorK $ "Applying tuple to too many arguments in pattern"
+                addWarn UnexpectedType $ "Applying tuple to too many arguments in pattern"
                 traverseHsOps ops op
                 | lps < n -> do
-                parseErrorK $ "Applying tuple constructor to not enough arguments in pattern"
+                addWarn UnexpectedType $ "Applying tuple constructor to not enough arguments in pattern"
                 traverseHsOps ops op
                 | otherwise -> opHsPat $ if isBoxed then HsPTuple ps else HsPUnboxedTuple ps
         opHsPat p = traverseHsOps ops p

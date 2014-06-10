@@ -1,11 +1,11 @@
 module FrontEnd.Lex.ParseMonad where
 
-import Control.Applicative
 import Control.Monad.Reader
 import Control.Monad.Writer
 import FrontEnd.SrcLoc
 import FrontEnd.Warning
 import Options
+import Util.Std
 import qualified Util.Seq as Seq
 
 -- monad/applicative functor with warning, failure and environment. unlinke
@@ -92,5 +92,5 @@ runP (P fn) opt = case fn PEnv { envOptions = opt, envSrcSpan = bogusSrcSpan } o
 tryP :: P a -> P a
 tryP (P fa) = P $ \e -> case fa e of
     (w,Nothing) -> (w,Nothing)
-    (w,Just v) | any (warnIsFatal . warnType) (Seq.toList w) -> (w,Nothing)
+    (w,Just v) | any (isJust . warnIsFatal . warnType) (Seq.toList w) -> (w,Nothing)
                | otherwise -> (w,Just v)

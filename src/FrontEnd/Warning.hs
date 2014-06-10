@@ -23,6 +23,7 @@ import Control.Monad.Writer
 import Data.IORef
 import System.IO
 import System.IO.Unsafe
+import Support.Exit
 import Util.Std
 import qualified Text.PrettyPrint.HughesPJ as P
 
@@ -30,7 +31,6 @@ import FrontEnd.SrcLoc(SrcSpan(..),WithSrcLoc(..),MonadSetSrcLoc(..),SrcLoc(..),
 import Name.Name
 import Options
 import PackedString
-import StringTable.Atom
 import Util.Gen
 import Util.DocLike
 import qualified Util.Seq as Seq
@@ -99,30 +99,32 @@ processErrors' doDie ws = do
     putErrLn "\n--"
 --    mapM_ s (nub ws)
     mapM_ s ws
-    when (die && doDie) exitFailure
+    when (die && doDie) (exitWith exitCode)
     return die
     where
     s Warning { warnSrcLoc = srcLoc@SrcLoc { .. }, .. }
         | srcLoc == bogusASrcLoc = putErrLn $ msg warnType warnMessage
         | srcLocLine == -1 = putErrLn $ P.render $ (text (unpackPS srcLocFileName) <> colon $$ (P.nest 4 warnMessage))
         | otherwise = putErrLn $ P.render $  (text (unpackPS srcLocFileName) <> colon <> (tshow srcLocLine) <>  colon  $$ P.nest 4 warnMessage)
-    die = (any warnIsFatal (map warnType ws)) && not (optKeepGoing options)
+    die =  not (optKeepGoing options) && exitCode /= ExitSuccess
+    exitCode = maximum (ExitSuccess:concatMap (maybeToList . warnIsFatal . warnType) ws)
     msg t m = P.render m -- (if warnIsFatal t then "Error: " else "Warning: ") ++ m
 
 data WarnType
     = AmbiguousExport Module [Name]
     | AmbiguousName Name [Name]
-    | DuplicateInstances
-    | InvalidDecl
-    | InvalidExp
-    | InvalidFFIType
+
     | LexError
-    | MissingModule Module (Maybe String)
-    | MultiplyDefined Name [SrcLoc]
     | ParseError
     | ParseInfo
-    | PrimitiveBadType
-    | PrimitiveUnknown Atom
+
+    | InvalidDecl
+    | InvalidExp
+    | CodeWarning
+
+    | MissingModule Module (Maybe String)
+    | MultiplyDefined Name [SrcLoc]
+
     | TypeSynonymPartialAp
     | TypeSynonymRecursive
     | UndefinedName Name
@@ -139,25 +141,26 @@ data WarnType
     deriving(Eq,Ord)
 
 warnIsFatal w = f w where
-    f AmbiguousExport {} = True
-    f AmbiguousName {} = True
-    f InvalidDecl {} = True
-    f InvalidExp {} = True
-    f InvalidFFIType {} = True
-    f DuplicateInstances {} = True
-    f MissingModule {} = True
-    f WarnFailure {} = True
-    f MultiplyDefined {} = True
-    f OccursCheck {} = True
-    f TypeSynonymPartialAp {} = True
-    f TypeSynonymRecursive {} = True
-    f UndefinedName {} = True
-    f UnificationError {} = True
-    f UnknownDeriving {} = True
-    f UnsupportedFeature {} = True
-    f ParseError {} = True
-    f LexError {} = True
-    f _ = False
+    f AmbiguousExport {} = Just exitCodeCodeError
+    f AmbiguousName {} =  Just exitCodeCodeError
+    f InvalidDecl {} =  Just exitCodeCodeError
+    f InvalidExp {} =  Just exitCodeCodeError
+    f MissingModule {} =  Just exitCodeCodeError
+    f WarnFailure {} =  Just exitCodeFailure
+    f MultiplyDefined {} = Just exitCodeCodeError
+    f TypeSynonymPartialAp {} = Just exitCodeCodeError
+    f TypeSynonymRecursive {} = Just exitCodeCodeError
+    f UndefinedName {} = Just exitCodeCodeError
+    f UnknownDeriving {} = Just exitCodeCodeError
+    f UnsupportedFeature {} = Just exitCodeCodeError
+
+    f LexError {} = Just exitCodeLexError
+    f ParseError {} = Just exitCodeParseError
+
+    f OccursCheck {} = Just exitCodeTypeError
+    f UnificationError {} = Just exitCodeTypeError
+    f UnexpectedType {} = Just exitCodeTypeError
+    f _ = Nothing
 
 instance Show Warning where
     show  Warning { warnSrcLoc = sl, warnType = t, warnMessage = m }

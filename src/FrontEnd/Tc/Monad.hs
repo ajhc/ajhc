@@ -25,6 +25,7 @@ module FrontEnd.Tc.Monad(
     getDeName,
     denameType,
     prettyName,
+    prettyNameName,
     getKindEnv,
     getSigEnv,
     evalFullType,
@@ -55,7 +56,6 @@ import Control.Monad.Error
 import Control.Monad.Reader
 import Control.Monad.Writer.Strict
 import Data.IORef
-import System
 import Util.Std
 import qualified Data.Foldable as T
 import qualified Data.Map as Map
@@ -78,6 +78,7 @@ import Name.Name
 import Name.Names
 import Options
 import Support.CanType
+import Support.Exit
 import Support.FreeVars
 import Support.Tickle
 import qualified FlagDump as FD
@@ -154,6 +155,10 @@ prettyName :: TraverseHsOps n => n -> Tc n
 prettyName n = do
     mn <- asks tcImports
     return (unrename mn n)
+prettyNameName :: Name -> Tc Name
+prettyNameName n = do
+    mn <- asks tcImports
+    return (unrenameName mn n)
 
 -- | run a computation with a local environment
 localEnv :: TypeEnv -> Tc a -> Tc a
@@ -273,7 +278,7 @@ fatalError msg = do
     liftIO $ do
         processErrors' False $ Seq.toList ref
         putErrLn $ "\n--\n" ++ msg
-        exitFailure
+        exitWith exitCodeTypeError
 
 lookupName :: Name -> Tc Sigma
 lookupName n = do
