@@ -13,7 +13,7 @@ ffi support foreign function declarations
 cpp pass haskell source through c preprocessor
 m4 pass haskell source through m4 preprocessor
 prelude implicitly import Prelude
-sugar  disable all desugarings, only unboxed literals allowed.
+sugar  disable/enable all desugarings, only unboxed literals allowed.
 type-families type/data family support
 user-kinds user defined kinds
 forall forall keyword for rank-n types and explicit quantification
@@ -21,6 +21,7 @@ exists exists keyword for existential types recognized
 bang-patterns - bang patterns
 
 !Typechecking
+mono-local-binds make local bindings monomorphic
 monomorphism-restriction enforce monomorphism restriction
 defaulting perform defaulting of ambiguous types
 

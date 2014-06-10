@@ -71,7 +71,7 @@ checkSconType' xs = ans where
     sconShuntSpec = F.shuntSpec { F.lookupToken, F.application, F.operator } where
         lookupToken (Left t) | t == vu_Bang = return (Right (F.Prefix,11))
         lookupToken (Left t) | t == tc_Arrow = return (Right (F.R,0))
-        lookupToken (Left t) = return (Right (F.L,9))
+        lookupToken (Left t) = return (Right defaultPrec)
         lookupToken (Right t) = return (Left (SconType False t))
         application e1 e2 = return $ app e1 e2
 --        operator (Left t) [SconType False ta,SconType False tb] | t == tc_Arrow = return $ SconType False (HsTyFun ta tb)
@@ -88,50 +88,47 @@ checkAssertion t =  f [] t where
     tast (a,[HsTyVar n]) = return (HsAsst a [n]) -- (a,n)
     tast x = parseErrorK $ "Invalid Class. multiparameter classes not yet supported:" ++ show x
 
+getPatPrec bangPatterns v = ans where
+    ans | bangPatterns && v == vu_Bang = Just (F.Prefix,11)
+        | v == vu_Twiddle = Just (F.Prefix,11)
+        | v == vu_At = Just (F.R,12)
+        | otherwise = Nothing
+defaultPrec = (F.L,9)
+
 checkValDef :: SrcLoc -> HsExp -> HsRhs -> [HsDecl] -> P HsDecl
 checkValDef srcloc lhs rhs whereBinds = withSrcLoc srcloc $ do
         bangPatterns <- flip fopts' FO.BangPatterns <$> getOptions
-        --parseWarn $ show lhs
-
-            -- The top level pattern parsing to determine whether it is a function
-            -- or pattern definition is done without knowledge of precedence.
+        -- The top level pattern parsing to determine whether it is a function
+        -- or pattern definition is done without knowledge of precedence.
+        -- Once it is determined to be a pattern the whole thing is sent as is
+        -- for parsing after precedence assignment. We need to figure this out
+        -- early to know what values the declaration defines. a function binding
+        -- defines a single value, a pattern binding defines all free variables
+        -- in the pattern.
         let patShuntSpec = F.shuntSpec { F.lookupToken, F.application, F.operator } where
-                lookupToken (HsBackTick (HsVar v)) | bangPatterns && v == vu_Bang = return (Right (F.Prefix,11))
-                lookupToken (HsBackTick (HsVar v)) | v == vu_Twiddle = return (Right (F.Prefix,11))
-                lookupToken (HsBackTick (HsVar v)) | v == vu_At = return (Right (F.R,12))
-                lookupToken (HsBackTick t) = return (Right (F.L,9))
+                lookupToken (HsBackTick (HsVar v)) | Just p <- getPatPrec bangPatterns v = return (Right p)
+                lookupToken (HsBackTick t) = return (Right defaultPrec)
                 lookupToken t = return (Left t)
                 application e1 e2 = return $ HsApp e1 e2
                 operator ~(HsBackTick t) as = f t as where
-                    f (HsVar v) [e] | v == vu_Bang && bangPatterns = do sl <- getSrcSpan; return $ HsBangPat (Located sl e)
+                    f (HsVar v) [e] | v == vu_Bang = do sl <- getSrcSpan; return $ HsBangPat (Located sl e)
                     f (HsVar v) [e] | v == vu_Twiddle = do sl <- getSrcSpan; return $ HsIrrPat (Located sl e)
                     f (HsVar v) [HsVar ap, e] | v == vu_At = do sl <- getSrcSpan; return $ HsAsPat ap e
                     f (HsVar v) [HsWildCard {}, e] | v == vu_At = do sl <- getSrcSpan; return e
                     f t as = return $ foldl HsApp t as
-            isFullyConst p = f p where
-                f (HsPApp _ as) = all f as
-                f (HsPList as) = all f as
-                f (HsPTuple as) = all f as
-                f (HsPParen a) = f a
-                f HsPLit {} = True
-                f _ = False
-        let f HsInfixApp {} = parseErrorK "Unexpected Infix application"
-            f HsApp {}  = parseErrorK "Unexpected application"
-            f HsBackTick {} = parseErrorK "Did not expect operator binding"
-            f (HsLocatedExp (Located sl e)) = withSrcSpan sl $ f e
-            f HsWords { .. } = F.shunt patShuntSpec hsExpExps >>= g []
-            f _ = return Nothing
-            g es (HsApp f e) = g (e:es) f
-            g es@(_:_) (HsVar v) = return $ Just (v,es)
-            g _ _ = return Nothing
-        f lhs >>= \x -> case x of
-            Just (f,es) -> do
+        let h _ HsInfixApp {} = parseErrorK "Unexpected Infix application"
+            h _ HsBackTick {} = parseErrorK "Did not expect operator binding"
+            h es (HsLocatedExp (Located sl e)) = withSrcSpan sl $ h es e
+            h es HsWords { .. } = F.shunt patShuntSpec hsExpExps >>= h es
+            h es (HsParen e) = h es e
+            h es (HsApp f e) = h (e:es) f
+            h es e = return (e,es)
+        h [] lhs >>= \x -> case x of
+            (HsVar v,es@(_:_)) -> do
                 es <- mapM checkPattern es
-                return (HsFunBind [HsMatch srcloc f es rhs whereBinds])
-            Nothing -> do
+                return (HsFunBind [HsMatch srcloc v es rhs whereBinds])
+            _ -> do
                 lhs <- tryP $ checkPattern lhs
-                when (isFullyConst lhs) $
-                    parseErrorK "pattern binding cannot be fully const"
                 return (HsPatBind srcloc lhs rhs whereBinds)
 
 -- when we have a sequence of patterns we don't allow top level binary
@@ -141,9 +138,7 @@ checkPatterns :: HsExp -> P [HsPat]
 checkPatterns HsWords { .. } = do
     bangPatterns <- flip fopts' FO.BangPatterns <$> getOptions
     let patShuntSpec = F.shuntSpec { F.lookupToken, F.application, F.operator } where
-            lookupToken (HsBackTick (HsVar v)) | bangPatterns && v == vu_Bang = return (Right (F.Prefix,11))
-            lookupToken (HsBackTick (HsVar v)) | v == vu_Twiddle = return (Right (F.Prefix,11))
-            lookupToken (HsBackTick (HsVar v)) | v == vu_At = return (Right (F.R,12))
+            lookupToken (HsBackTick (HsVar v)) | Just p <- getPatPrec bangPatterns v = return (Right p)
             lookupToken HsBackTick {} = fail "sequence of pattern bindings can't have top level operators."
             lookupToken t = do
                 p <- checkPattern t
@@ -165,8 +160,6 @@ checkPatterns e = (:[]) <$> checkPattern e
 checkPattern :: HsExp -> P HsPat
 checkPattern be = do
     bangPatterns <- flip fopts' FO.BangPatterns <$> getOptions
-    let checkPatField :: HsFieldUpdate -> P HsPatField
-        checkPatField (HsField n e) = HsField n <$> checkPattern e
     case be of
         HsInfixApp {} -> parseErrorK "unexpected infix application"
         HsLocatedExp (Located sl e) -> withSrcSpan sl $ checkPattern e
@@ -195,37 +188,21 @@ checkPattern be = do
         HsIrrPat e  -> HsPIrrPat <$> T.traverse checkPattern e
         HsBangPat e -> HsPBangPat <$> T.traverse checkPattern e
         HsWords es -> HsPatWords <$> mapM checkPattern es
-        HsRecConstr c fs -> HsPRec c <$> mapM checkPatField fs
+        HsRecConstr c fs -> HsPRec c <$> mapM (T.traverse checkPattern) fs
         HsNegApp e -> HsPNeg <$> checkPattern e
         HsExpTypeSig sl e t -> HsPTypeSig sl <$> checkPattern e <*> return t
-        HsLambda {} -> parseErrorK "Lambda not allowed in pattern."
-        HsLet {} -> parseErrorK "let not allowed in pattern."
-        HsDo {} -> parseErrorK "do not allowed in pattern."
-        HsIf {} -> parseErrorK "if not allowed in pattern."
-        HsCase {} -> parseErrorK "case not allowed in pattern."
-        e -> parseErrorK ("pattern error " ++  show e)
+        e -> parseErrorK ("expression not allowed in pattern")
 
+-- collect adjacent FunBinds that define the same name into one
 fixupHsDecls :: [HsDecl] -> [HsDecl]
 fixupHsDecls ds = f ds where
-    f (d@(HsFunBind matches):ds) =  (HsFunBind newMatches) : f different where
-        funName = matchName $ head matches
-        (same, different) = span (sameFun funName) (d:ds)
-        newMatches =  collectMatches same
+    sameFun name (HsFunBind ~(match:_)) = name == hsMatchName match
+    sameFun _ _ = False
+    f (ds@(HsFunBind ~(match:_):_)) = HsFunBind newMatches:f different where
+        (same, different) = span (sameFun $ hsMatchName match) ds
+        newMatches =  [ m | HsFunBind ms <- same, m <- ms ]
     f (d:ds) =  d : f ds
     f [] = []
-    -- get the variable name bound by a match
-    matchName HsMatch { .. } = hsMatchName
-
-    -- True if the decl is a HsFunBind and binds the same name as the
-    -- first argument, False otherwise
-    sameFun :: Name -> HsDecl -> Bool
-    sameFun name (HsFunBind matches@(_:_)) = name == (matchName $ head matches)
-    sameFun _ _ = False
-    collectMatches :: [HsDecl] -> [HsMatch]
-    collectMatches [] = []
-    collectMatches (d:ds) = case d of
-        (HsFunBind matches) -> matches ++ collectMatches ds
-        _                   -> collectMatches ds
 
 checkDataHeader :: HsQualType -> P (HsContext,Name,[Name])
 checkDataHeader (HsQualType cs t) = do
