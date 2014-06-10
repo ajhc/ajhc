@@ -126,7 +126,7 @@ desugarExp (HsLambda sloc pats e) = do
         e' <- ne e zs
         let a1 =  HsAlt sloc p (HsUnGuardedRhs e') []
             a2 =  HsAlt sloc HsPWildCard (HsUnGuardedRhs (HsError { hsExpSrcLoc = sloc, hsExpErrorType = HsErrorPatternFailure, hsExpString = show sloc ++ " failed pattern match in lambda" })) []
-        return $ HsCase (HsVar n) $ if isFailablePat p then [a2, a2] else [a1]
+        return $ HsCase (HsVar n) $ if isFailablePat p then [a1, a2] else [a1]
 
     f (HsPVar x) = return (x,[])
     f (HsPAsPat n p) = return (n,[(n,p)])

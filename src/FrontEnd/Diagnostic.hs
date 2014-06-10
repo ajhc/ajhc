@@ -30,8 +30,6 @@ typeError err whyStr ds = do
            OccursCheck -> "occurs check"
            _ -> "type error"
 
---contextMsg :: MonadSrcLoc m => String -> P.Doc -> m Diagnostic
-
 data Diagnostic = Msg { msgSrcLoc :: Maybe SrcLoc, msgString :: String, msgFull :: Bool}
    deriving Show
 
@@ -86,9 +84,6 @@ showDiagnostics diags
 --         ++ case maybeLoc of
  --            Just srcloc -> "\t\t{- on line " ++ show (srcLine srcloc) ++ " -}"  -- discreetly display line nums
   --            _ -> ""
-
-srcLine :: SrcLoc -> Int
-srcLine = srcLocLine
 
 withASrcLoc :: SrcLoc -> Diagnostic -> Diagnostic
 withASrcLoc loc x | loc == mempty = x

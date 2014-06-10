@@ -66,10 +66,6 @@ mkWarn warnSrcLoc warnType msg = Warning { warnMessage = text msg, .. }
 mkWarnD :: SrcLoc -> WarnType -> P.Doc -> Warning
 mkWarnD warnSrcLoc warnType msg = Warning { warnMessage = msg, .. }
 
-pad n s = case length s of
-    x | x >= n -> s
-    x -> s ++ replicate (n - x) ' '
-
 getIOErrors :: IO [Warning]
 getIOErrors = do
     ws <- readIORef ioWarnings

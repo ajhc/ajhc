@@ -495,7 +495,7 @@ optionLibs :: Opt -> [String]
 optionLibs options = nub $ if optNoAuto options
     then proc [] $ optHls options
     else proc [] $ optHls options ++ optAutoLoads options where
-        proc rs ("-":xs) = rs
+        proc rs ("-":_) = rs
         proc rs ("_auto_":xs) = proc (optAutoLoads options ++ rs) xs
         proc rs (x:xs) = proc (x:rs) xs
         proc rs [] = rs

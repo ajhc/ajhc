@@ -6,7 +6,6 @@ import System.IO(hPutStr,stderr)
 import Text.Printf
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import qualified Text.PrettyPrint.HughesPJ as P
 
 import Doc.PPrint as PPrint
 import FrontEnd.Class

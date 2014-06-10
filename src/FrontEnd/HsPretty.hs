@@ -399,8 +399,6 @@ ppHsExp e = f (0::Int) e where
     f n (HsLit l) = ppHsLit l
     -- lambda stuff
     f n (HsInfixApp a op b) = gi n $ myFsep[f 10 a, ppInfix op, f 10 b] where
-            mpifx x@HsInfixApp {} = f n $ HsParen x
-            mpifx x = f n x
             ppInfix (HsAsPat as (HsVar n)) | dump FD.Aspats = ppHsName as <> char '@' <> ppHsQNameInfix n
             ppInfix (HsAsPat _ (HsVar n)) = ppHsQNameInfix n
             ppInfix (HsAsPat as (HsCon n)) | dump FD.Aspats = ppHsName as <> char '@' <> ppHsQNameInfix n
