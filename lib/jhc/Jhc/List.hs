@@ -92,11 +92,6 @@ all p xs = f xs where
     f (x:xs) | not (p x) = False
              | otherwise = f xs
 
-filter :: (a -> Bool) -> [a] -> [a]
-filter p []                 = []
-filter p (x:xs) | p x       = x : filter p xs
-                | otherwise = filter p xs
-
 -- elem is the list membership predicate, usually written in infix form,
 -- e.g., x `elem` xs.  notElem is the negation.
 

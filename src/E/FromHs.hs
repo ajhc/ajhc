@@ -157,7 +157,7 @@ getMainFunction dataTable name ds = do
     Just x -> return x
     Nothing -> fail $ "Could not find main function: " ++ show name
   let funcs = runIdentity $ T.mapM (\n -> return . EVar . fst $ runEither (show n) $ monadicLookup' n ds) sFuncNames
-  nameToEntryPoint dataTable (fst mt) (toName Name.Val "theMain") Nothing funcs
+  nameToEntryPoint dataTable (fst mt) (mkName termLevel False Nothing "theMain") Nothing funcs
 
 nameToEntryPoint :: Monad m => DataTable -> TVr -> Name -> Maybe FfiExport -> FuncNames E -> m (TVr,E)
 nameToEntryPoint dataTable main cname ffi ds = ans where

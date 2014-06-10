@@ -217,21 +217,23 @@ mkName :: TyLevel -> Bool -> Maybe Module -> String -> Name
 mkName l b mm s = toName (mkNameType l b) (mm,s)
 
 data NameParts = NameParts {
-    nameLevel :: TyLevel,
-    nameQuoted :: Bool,
+    nameLevel       :: TyLevel,
+    nameQuoted      :: Bool,
     nameConstructor :: Bool,
-    nameModule :: Maybe Module,
-    nameUniquifier :: Maybe Int,
-    nameIdent      :: String
+    nameModule      :: Maybe Module,
+    nameOuter       :: Maybe Name,
+    nameUniquifier  :: Maybe Int,
+    nameIdent       :: String
     }
 
 emptyNameParts = NameParts {
-    nameLevel = termLevel,
-    nameQuoted = False,
+    nameLevel       = termLevel,
+    nameQuoted      = False,
     nameConstructor = False,
-    nameModule = Nothing,
-    nameUniquifier = Nothing,
-    nameIdent = "(empty)"
+    nameModule      = Nothing,
+    nameOuter       = Nothing,
+    nameUniquifier  = Nothing,
+    nameIdent       = "(empty)"
     }
 
 mkComplexName :: NameParts -> Name
@@ -245,6 +247,7 @@ unMkName name = NameParts { .. } where
     (_,_,nameIdent) = nameParts uqn
     nameConstructor = isConstructor name
     nameLevel = tyLevelOf name
+    nameOuter = Nothing
 
 -- internal
 mkNameType :: TyLevel -> Bool -> NameType

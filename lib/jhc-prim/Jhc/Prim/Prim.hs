@@ -7,6 +7,7 @@ module Jhc.Prim.Prim where
 
 import Jhc.Prim.Bits()
 import Jhc.Prim.IO()
+import Jhc.Prim.List()
 
 data (->) :: ?? -> ? -> *
 

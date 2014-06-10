@@ -124,21 +124,25 @@ Val:v:
 eqString         Jhc.String.eqString
 eqUnpackedString Jhc.String.eqUnpackedString
 error            Jhc.IO.error
-map              Jhc.Basics.map
 fmap             Jhc.Monad.fmap
 fmap_const       Jhc.Monad.<$
 and              Jhc.Order.&&
-foldr            Jhc.Basics.foldr
 foldl            Jhc.Basics.foldl
 drop             Jhc.List.drop
-cat              Jhc.Basics.++
+cat              Jhc.Prim.List.++
 compose          Jhc.Basics..
 Dot              Jhc.Basics..
+
+; list primitives used for comprehension desugaring.
+concat           Jhc.Prim.List.concat
+concatMap        Jhc.Prim.List.concatMap
+filter           Jhc.Prim.List.filter
+foldr            Jhc.Prim.List.foldr
+map              Jhc.Prim.List.map
 
 bind                 Jhc.Monad.>>=
 bind_                Jhc.Monad.>>
 fail                 Jhc.Monad.fail
-concatMap            Jhc.Basics.concatMap
 fromInteger          Jhc.Class.Num.fromInteger
 fromInt              Jhc.Class.Num.fromInt
 sub                  Jhc.Class.Num.-

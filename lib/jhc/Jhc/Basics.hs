@@ -1,10 +1,11 @@
 {-# OPTIONS_JHC -fno-prelude -fffi #-}
-module Jhc.Basics(module Jhc.Basics, module Jhc.Prim.Prim, module Jhc.Type.Basic, IO()) where
+module Jhc.Basics(module Jhc.Basics, module Jhc.Prim.Prim, module Jhc.Type.Basic, IO(), module Jhc.Prim.List) where
 
 import Jhc.Type.Basic
 import Jhc.Prim.Prim
 import Jhc.Prim.IO
 import Jhc.Int
+import Jhc.Prim.List
 
 ------------------------
 -- the basic combinators
@@ -59,19 +60,6 @@ iterate f x      =  x : iterate f (f x)
 repeat           :: a -> [a]
 repeat x         =  xs where xs = x:xs
 
--- Map and append
-
-map :: (a -> b) -> [a] -> [b]
-map f xs = go xs where
-    go [] = []
-    go (x:xs) = f x : go xs
-
-infixr 5  ++
-
-(++) :: [a] -> [a] -> [a]
-[]     ++ ys = ys
-(x:xs) ++ ys = x : (xs ++ ys)
-
 foldl            :: (a -> b -> a) -> a -> [b] -> a
 foldl f z []     =  z
 foldl f z (x:xs) =  foldl f (f z x) xs
@@ -104,21 +92,6 @@ zip _      _      = []
 zipWith          :: (a->b->c) -> [a]->[b]->[c]
 zipWith z (a:as) (b:bs) =  z a b : zipWith z as bs
 zipWith _ _ _    =  []
-
-concat :: [[a]] -> [a]
-concat [] = []
-concat (x:xs) = case x of
-    [] -> concat xs
-    (y:ys) -> y:concat (ys:xs)
-
-concatMap :: (a -> [b]) -> [a] -> [b]
-concatMap f xs = g xs where
-    g [] = []
-    g (x:xs) = f x ++ g xs
-
-foldr :: (a -> b -> b) -> b -> [a] -> b
-foldr k z [] = z
-foldr k z (x:xs) = k x (foldr k z xs)
 
 drop :: Int -> [a] -> [a]
 drop n xs = f n xs where

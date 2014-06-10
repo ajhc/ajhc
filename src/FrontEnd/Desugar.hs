@@ -140,42 +140,60 @@ desugarStmt (HsQualifier e) = HsQualifier <$> desugarExp e
 
 listCompToExp :: Monad m => m HsName -> HsExp -> [HsStmt] -> m HsExp
 listCompToExp newName exp ss = hsParen `liftM` f ss where
+    do_map (HsLambda _ [HsPVar v] (HsVar v')) xs | v == v' = xs
+    do_map f xs = HsVar v_map `app` f `app` xs
+    do_concatMap (HsLambda sloc [HsPVar v] (HsIf cond (HsList [HsVar v']) (HsList []))) xs | v == v' = do_filter (HsLambda sloc [HsPVar v] cond) xs
+    do_concatMap (HsLambda _ [HsPVar v] (HsVar v')) xs | v == v' = do_concat xs
+    do_concatMap f xs = HsVar v_concatMap `app` f `app` xs
+    do_concat xs = HsVar v_concat `app` xs
+    do_filter f xs = HsVar v_filter `app` f `app` xs
+
     f [] = return $ HsList [exp]
     f (gen:HsQualifier q1:HsQualifier q2:ss)  = f (gen:HsQualifier (hsApp (HsVar v_and) [q1,q2]):ss)
-    f ((HsLetStmt ds):ss) = do ss' <- f ss; return $ hsParen (HsLet ds ss')
-    f (HsQualifier e:ss) = do ss' <- f ss; return $ hsParen (HsIf e ss' (HsList []))
+    f ((HsLetStmt ds):ss) = do ss' <- f ss; return (HsLet ds ss')
+    f (HsQualifier e:ss) = do ss' <- f ss; return (HsIf e ss' (HsList []))
     f ((HsGenerator srcLoc pat e):ss) | isLazyPat pat, Just exp' <- g ss = do
-        return $ hsParen $ HsVar v_map `app` HsLambda srcLoc [pat] exp' `app` e
-    f ((HsGenerator srcLoc pat e):HsQualifier q:ss) | isLazyPat pat, Just exp' <- g ss = do
-        npvar <- newName
-        return $ hsApp (HsVar v_foldr)  [HsLambda srcLoc [pat,HsPVar npvar] $
-            hsIf q (hsApp (HsCon dc_Cons) [exp',HsVar npvar]) (HsVar npvar), HsList [],e]
-    f ((HsGenerator srcLoc pat e):ss) | isLazyPat pat = do
-        ss' <- f ss
-        return $ hsParen $ HsVar v_concatMap `app`  HsLambda srcLoc [pat] ss' `app` e
+        return $ do_map (HsLambda srcLoc [pat] exp') e
+    -- f ((HsGenerator srcLoc pat e):HsQualifier q:ss) | isLazyPat pat, Just exp' <- g ss = do
+    --     return $ hsApp (HsVar v_foldr)  [HsLambda srcLoc [pat,HsPVar npvar] $
+    --         hsIf q (hsApp (HsCon dc_Cons) [exp',HsVar npvar]) (HsVar npvar), HsList [],e]
+    -- f ((HsGenerator srcLoc pat e):HsQualifier q:ss) | isLazyPat pat, Just exp' <- g ss = do
+    --     npvar <- newName
+    --     return $ hsApp (HsVar v_foldr)  [HsLambda srcLoc [pat,HsPVar npvar] $
+    --         hsIf q (hsApp (HsCon dc_Cons) [exp',HsVar npvar]) (HsVar npvar), HsList [],e]
     f ((HsGenerator srcLoc pat e):HsQualifier q:ss) | isFailablePat pat || Nothing == g ss = do
         ss' <- f ss
         let kase = HsLCase  [a1, a2 ]
             a1 =  HsAlt srcLoc pat (HsGuardedRhss [HsComp srcLoc [HsQualifier q] ss']) []
             a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs $ HsList []) []
-        return $ hsParen $ HsVar v_concatMap `app` kase `app`  e
+        return $ do_concatMap kase e
+
+    f ((HsGenerator srcLoc pat e):ss) | isLazyPat pat = do
+        ss' <- f ss
+        return $ do_concatMap (HsLambda srcLoc [pat] ss') e
+    f ((HsGenerator srcLoc pat e):HsQualifier q:ss) | Just exp <- g ss = do
+        let kase = HsLCase  [a1, a2 ]
+            a1 =  HsAlt srcLoc pat (HsGuardedRhss [HsComp srcLoc [HsQualifier q] (HsList [exp])]) []
+            a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs $ HsList []) []
+        return $ do_concatMap kase e
+
     f ((HsGenerator srcLoc pat e):ss) | isFailablePat pat || Nothing == g ss = do
         ss' <- f ss
         let kase = HsLCase [a1, a2 ]
             a1 =  HsAlt srcLoc pat (HsUnGuardedRhs ss') []
             a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs $ HsList []) []
-        return $ hsParen $ HsVar v_concatMap `app` kase `app` e
+        return $ do_concatMap kase e
     f ((HsGenerator srcLoc pat e):ss) = do
         let Just exp' = g ss
             kase = HsLCase [a1]
             a1 =  HsAlt srcLoc pat (HsUnGuardedRhs exp') []
-        return $ hsParen $ HsVar v_map `app` kase `app` e
+        return $ do_map kase e
     g [] = return exp
     g (HsLetStmt ds:ss) = do
         e <- g ss
-        return (hsParen (HsLet ds e))
+        return ((HsLet ds e))
     g _ = Nothing
-    app x y = HsApp x (hsParen y)
+    app x y = HsApp x y
 
 -- patterns are
 -- failable - strict and may fail to match

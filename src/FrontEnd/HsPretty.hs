@@ -410,8 +410,7 @@ ppHsExp e = f (0::Int) e where
     f n (HsApp (HsApp x a) b) | Just True <- fmap isOpLike (fromN x) = f n (HsInfixApp a x b)
     f n (HsApp a b) = gf n $ myFsep [f 10 a, f 11 b]
     f n HsError { hsExpString = msg } = text $ "<error:" ++ msg ++ ">"
-    -- f n (HsLambda expList body) = myFsep $
-    f n (HsLambda _ expList body) = myFsep $              -- srcLoc added by Bernie
+    f n (HsLambda _ expList body) = gi n $ myFsep $
             (((char '\\' ):) . map parenPrec $ expList)
             ++ [text "->", f 0 body]
     -- keywords

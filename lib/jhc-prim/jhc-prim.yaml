@@ -11,3 +11,4 @@ Exposed-Modules:
         - Jhc.Prim.Rts
         - Jhc.Prim.Wrapper
         - Jhc.Prim.Options
+        - Jhc.Prim.List
