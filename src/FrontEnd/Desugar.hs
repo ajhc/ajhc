@@ -6,7 +6,11 @@
 -- expressions which have failable patterns
 
 module FrontEnd.Desugar (
-    desugarHsModule, desugarHsStmt,listCompToExp, doToExp
+    desugarHsModule
+    ,desugarHsStmt
+    ,listCompToExp
+    ,isSimplePat
+    ,isFailablePat
     ,doToComp
     ,doCompToExp) where
 
@@ -111,29 +115,6 @@ desugarRhs :: HsRhs -> PatSM HsRhs
 desugarRhs  = traverseHsExp desugarExp
 
 desugarExp :: HsExp -> PatSM HsExp
-desugarExp (HsLambda sloc pats e)
-    | all isSimplePat pats  = do
-        newE <- desugarExp e
-        return (HsLambda sloc pats newE)
-desugarExp (HsLambda sloc pats e) = do
-        ps <- mapM f pats
-        let (xs,zs) = unzip ps
-        e' <- (ne e $ concat zs)
-        return (HsLambda sloc (map HsPVar xs) e')
-    where
-    ne e [] = desugarExp e
-    ne e ((n,p):zs) =  do
-        e' <- ne e zs
-        let a1 =  HsAlt sloc p (HsUnGuardedRhs e') []
-            a2 =  HsAlt sloc HsPWildCard (HsUnGuardedRhs (HsError { hsExpSrcLoc = sloc, hsExpErrorType = HsErrorPatternFailure, hsExpString = show sloc ++ " failed pattern match in lambda" })) []
-        return $ HsCase (HsVar n) $ if isFailablePat p then [a1, a2] else [a1]
-
-    f (HsPVar x) = return (x,[])
-    f (HsPAsPat n p) = return (n,[(n,p)])
-    f p = do
-        unique <- newUniq
-        let n = toName Val ("lambind@" ++ show unique)
-        return (n,[(n,p)])
 desugarExp (HsLet decls e) = do
     newDecls <- mapM desugarDecl decls
     HsLet (concat newDecls) <$> desugarExp e
@@ -254,35 +235,6 @@ doToComp ss = f (reverse ss) where
     g hsCompBody rs = do
         hsCompSrcLoc <- getSrcLoc
         return HsComp { hsCompStmts = reverse rs, .. }
-
-doToExp :: MonadWarn m
-    => m HsName    -- ^ name generator
-    -> HsName      -- ^ bind (>>=) to use
-    -> HsName      -- ^ bind_ (>>) to use
-    -> HsName      -- ^ fail to use
-    -> [HsStmt]
-    -> m HsExp
-doToExp newName f_bind f_bind_ f_fail ss = hsParen `liftM` f ss where
-    f [] = fail "doToExp: empty statements in do notation"
-    f [HsQualifier e] = return e
-    f [gen@(HsGenerator srcLoc _pat _e)] = fail $
-        "doToExp: last expression n do notation is a generator (srcLoc):" ++ show srcLoc
-    f [letst@(HsLetStmt _decls)] = fail $ "doToExp: last expression n do notation is a let statement"
-    f (HsQualifier e:ss) = do
-        ss <- f ss
-        return $ HsInfixApp (hsParen e) (HsVar f_bind_) (hsParen ss)
-    f ((HsGenerator _srcLoc pat e):ss) | isSimplePat pat = do
-        ss <- f ss
-        return $ HsInfixApp (hsParen e) (HsVar f_bind) (HsLambda _srcLoc [pat] ss)
-    f ((HsGenerator srcLoc pat e):ss) = do
-        ss <- f ss
-        let kase = HsLCase [a1, a2 ]
-            a1 =  HsAlt srcLoc pat (HsUnGuardedRhs ss) []
-            a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs (HsApp (HsVar f_fail) (HsLit $ HsString $ show srcLoc ++ " failed pattern match in do"))) []
-        return $ HsInfixApp (hsParen e) (HsVar f_bind) kase  where
-    f (HsLetStmt decls:ss) = do
-        ss <- f ss
-        return $ HsLet decls ss
 
 doCompToExp
     :: Name      -- ^ bind  (>>=) to use

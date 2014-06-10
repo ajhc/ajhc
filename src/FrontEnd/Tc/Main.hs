@@ -261,35 +261,20 @@ tiExpr expr@(HsNegApp e) typ = deNameContext Nothing "in the negative expression
         return (HsNegApp e)
 
 -- ABS1
-tiExpr expr@(HsLambda sloc ps e) typ = do
+tiExpr (HsLambda sloc ps e) typ = do
+    withSrcLoc sloc $ do
     dn <- getDeName
     withContext (locSimple sloc $ "in the lambda expression\n   \\" ++ show (pprint (dn ps):: P.Doc) ++ " -> ...") $ do
-    let lam (p:ps) e (TMetaVar mv) rs = do -- ABS2
-            withMetaVars mv [kindArg,kindFunRet] (\ [a,b] -> a `fn` b) $ \ [a,b] -> lam (p:ps) e (a `fn` b) rs
-        lam (p:ps) e (TArrow s1' s2') rs = do -- ABS1
-            --box <- newBox Star
-            --s1' `boxyMatch` box
-            (p',env) <- tcPat p s1'
-            localEnv env $ do
-                s2' <- evalType s2'
-                lamPoly ps e s2' (p':rs)  -- TODO poly
-        lam (p:ps) e t@(TAp (TAp (TMetaVar mv) s1') s2') rs = do
-            boxyMatch (TMetaVar mv) tArrow
-            (p',env) <- tcPat p s1'
-            localEnv env $ do
-                s2' <- evalType s2'
-                lamPoly ps e s2' (p':rs)  -- TODO poly
-        lam [] e typ rs = do
-            e' <- tcExpr e typ
-            return (HsLambda sloc (reverse rs) e')
-        lam _ _ t _ = do
-            t <- flattenType t
-            fail $ "expected a -> b, found: " ++ prettyPrintType t
-        lamPoly ps e s rs = do
-            (ts,_,s) <- skolomize s
-            e <- lam ps e s rs
-            doCoerce (ctAbs ts) e
-    lam ps e typ []
+    let f (p:ps) rs | isSimplePat p = f ps (p:rs)
+        f (p:ps) rs  = do
+            lvar <- newHsVar "Lam"
+            (e,rs) <- f ps (HsPVar lvar:rs)
+            let a1 =  HsAlt sloc p (HsUnGuardedRhs e) []
+                a2 =  HsAlt sloc HsPWildCard (HsUnGuardedRhs (HsError { hsExpSrcLoc = sloc, hsExpErrorType = HsErrorPatternFailure, hsExpString = show sloc ++ " failed pattern match in lambda" })) []
+            return $ (HsCase (HsVar lvar) $ if isFailablePat p then [a1, a2] else [a1],rs)
+        f [] rs = return (e,reverse rs)
+    (ne,nps) <-  f ps []
+    tiLambda sloc nps ne typ
 
 --tiExpr (HsList HsComp { .. } typ = deNameContext Nothing "in the list comprehension" expr $ do
 --        e <- tcExpr e typ
@@ -942,6 +927,34 @@ tiLit (HsFrac _) = do
 tiLit (HsStringPrim _)  = return (TCon (Tycon tc_BitsPtr kindHash))
 tiLit (HsString _)  = return tString
 tiLit _ = error "Main.tiLit: bad."
+
+tiLambda sloc ps e typ  = do
+    let lam (p:ps) e (TMetaVar mv) rs = do -- ABS2
+            withMetaVars mv [kindArg,kindFunRet] (\ [a,b] -> a `fn` b) $ \ [a,b] -> lam (p:ps) e (a `fn` b) rs
+        lam (p:ps) e (TArrow s1' s2') rs = do -- ABS1
+            --box <- newBox Star
+            --s1' `boxyMatch` box
+            (p',env) <- tcPat p s1'
+            localEnv env $ do
+                s2' <- evalType s2'
+                lamPoly ps e s2' (p':rs)  -- TODO poly
+        lam (p:ps) e t@(TAp (TAp (TMetaVar mv) s1') s2') rs = do
+            boxyMatch (TMetaVar mv) tArrow
+            (p',env) <- tcPat p s1'
+            localEnv env $ do
+                s2' <- evalType s2'
+                lamPoly ps e s2' (p':rs)  -- TODO poly
+        lam [] e typ rs = do
+            e' <- tcExpr e typ
+            return (HsLambda sloc (reverse rs) e')
+        lam _ _ t _ = do
+            t <- flattenType t
+            fail $ "expected a -> b, found: " ++ prettyPrintType t
+        lamPoly ps e s rs = do
+            (ts,_,s) <- skolomize s
+            e <- lam ps e s rs
+            doCoerce (ctAbs ts) e
+    lam ps e typ []
 
 ------------------------------------------
 -- Binding analysis and program generation

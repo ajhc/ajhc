@@ -59,7 +59,6 @@ infixHsModule (FixityMap ism) m =  domod m where
         backtick bt = f bt where
             f (HsVar v) = g v
             f ~(HsCon v) = g v
-            --f (HsAsPat _ v) = backtick v
             g v = return $ case Map.lookup v ism of
                 Just (n,HsAssocLeft) -> Right (F.L,n)
                 Just (n,HsAssocRight) -> Right (F.R,n)
@@ -117,19 +116,52 @@ infixHsModule (FixityMap ism) m =  domod m where
     ops = (hsOpsDefault ops) { opHsExp, opHsPat } where
         opHsExp (HsParen (HsWords es)) = F.shunt pexpShuntSpec es >>= applyHsOps ops
         opHsExp (HsWords es) = F.shunt expShuntSpec es >>= applyHsOps ops
+        opHsExp e@(HsApp HsTuple {} _) = do
+                parseErrorK $ "Attempt to apply a tuple like a function in expression"
+                traverseHsOps ops e
+        opHsExp e@(HsApp HsUnboxedTuple {} _) = do
+                parseErrorK $ "Attempt to apply an unboxed tuple like a function in expression"
+                traverseHsOps ops e
+        opHsExp e@(HsApp HsList {} _) = do
+                parseErrorK $ "Attempt to apply literal list like a function in expression"
+                traverseHsOps ops e
+        opHsExp op@HsApp {} | (ce,ps) <- fromHsApp op = do
+            let cont = do
+                    ps <- mapM opHsExp (ce:ps)
+                    return $ foldl1 HsApp ps
+                err s = parseErrorK s >> cont
+            case ce of
+                HsCon c | Just (isBoxed,level,n) <- fromName_Tuple c, level == termLevel -> case length ps of
+                    lps | lps > n -> err "Attempt to apply a tuple like a function in expression"
+                        | lps < n -> cont
+                        | otherwise -> opHsExp $ if isBoxed then HsTuple ps else HsUnboxedTuple ps
+                HsList {} -> err "Attempt to apply literal list like a function in expression"
+                HsTuple {} -> err "Attempt to apply a tuple like a function in expression"
+                HsUnboxedTuple {} -> err "Attempt to apply an unboxed tuple like a function in expression"
+                _ -> cont
         opHsExp (HsBackTick t) = parseErrorK "unexpected binary operator."
         opHsExp e = traverseHsOps ops e
-        opHsPat (HsPatWords ws) = F.shunt patShuntSpec ws >>= applyHsOps ops
+
+        opHsPat (HsPatWords ws) = F.shunt patShuntSpec ws >>= opHsPat
+        opHsPat op@(HsPApp n ps) | Just (isBoxed,level,n) <- fromName_Tuple n, level == termLevel = case length ps of
+            lps | lps > n -> do
+                parseErrorK $ "Applying tuple to too many arguments in pattern"
+                traverseHsOps ops op
+                | lps < n -> do
+                parseErrorK $ "Applying tuple constructor to not enough arguments in pattern"
+                traverseHsOps ops op
+                | otherwise -> opHsPat $ if isBoxed then HsPTuple ps else HsPUnboxedTuple ps
         opHsPat p = traverseHsOps ops p
+
+fromHsApp t = f t [] where
+    f (HsApp a b) rs = f a (b:rs)
+    f t rs = (t,rs)
 
 buildFixityMap :: [HsDecl] -> FixityMap
 buildFixityMap ds = FixityMap (Map.fromList $ concatMap f ds)  where
         f (HsInfixDecl _ assoc strength names) = zip (map make_key names) $ repeat (strength,assoc)
         f _ = []
         make_key = fromValishHsName
-        --make_key a_name = case a_name of
-        --    (Qual a_module name)   -> (a_module, name)
-        --    (UnQual name)          -> (unqualModule, name)
 
 -- TODO: interactive
 infixStatement :: FixityMap -> HsStmt -> HsStmt

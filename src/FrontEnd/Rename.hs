@@ -134,7 +134,7 @@ addTopLevels  hsmod action = do
         z ns = mapM mult (filter (\x -> length x > 1) $
             groupBy (\a b -> fst a == fst b) (sort ns))
         mult xs@(~((n,sl):_)) = warnDoc sl (MultiplyDefined n (snds xs)) $
-            text "Multiple definitions of" <+> tshow (toUnqualified n) $$ P.nest 4 (vcat (map (tshow . snd) xs)) 
+            text "Multiple definitions of" <+> tshow (toUnqualified n) $$ P.nest 4 (vcat (map (tshow . snd) xs))
 --            (tshow  n ++ " is defined multiple times: " ++ show xs)
     z cdefs
     let amb k x y = if x < y then f x y else f y x where
@@ -162,7 +162,7 @@ createSelectors sloc ds = mapM g ns where
             els = HsMatch sloc n [HsPWildCard] (HsUnGuardedRhs HsError { hsExpSrcLoc = sloc, hsExpString = show n, hsExpErrorType = HsErrorFieldSelect } ) []
         return $ HsFunBind (map f cs ++ [els]) where
 
-ambig x ys = text "Ambiguous Name" <+> dquotes (tshow x) $$ text "Could refer to:" $$   P.nest 4 (vcat (map tshow ys)) 
+ambig x ys = text "Ambiguous Name" <+> dquotes (tshow x) $$ text "Could refer to:" $$   P.nest 4 (vcat (map tshow ys))
 
 data NameEntry
     = NameJust Name
@@ -267,9 +267,9 @@ renameHsDecl d = f d where
     f (HsPatBind srcLoc hsPat hsRhs {-where-} hsDecls) = do
         hsPat'    <- local (envInPattern_s True) $ rename hsPat
         updateWithN Val hsDecls $ do
-        hsDecls'  <- rename hsDecls
-        hsRhs'    <- rename hsRhs
-        return (HsPatBind srcLoc hsPat' hsRhs' {-where-} hsDecls')
+            hsDecls'  <- rename hsDecls
+            hsRhs'    <- rename hsRhs
+            return (HsPatBind srcLoc hsPat' hsRhs' {-where-} hsDecls')
     f (HsForeignExport a b n t) = do
         n <- local (envInPattern_s True) $ renameName n
         updateWith t $ do
@@ -493,12 +493,12 @@ instance Rename HsMatch where
         withSrcLoc srcLoc $ do
         hsName' <- local (envInPattern_s True) $ renameName hsName
         updateWithN Val hsPats  $ do
-        hsPats' <- local (envInPattern_s True) $ rename hsPats
-        updateWithN Val hsDecls $ do
-        hsDecls' <- rename (expandTypeSigs hsDecls)
-        mapM_ HsErrors.hsDeclLocal hsDecls'
-        hsRhs' <- rename hsRhs
-        return (HsMatch srcLoc hsName' hsPats' hsRhs' {-where-} hsDecls')
+            hsPats' <- local (envInPattern_s True) $ rename hsPats
+            updateWithN Val hsDecls $ do
+                hsDecls' <- rename (expandTypeSigs hsDecls)
+                mapM_ HsErrors.hsDeclLocal hsDecls'
+                hsRhs' <- rename hsRhs
+                return (HsMatch srcLoc hsName' hsPats' hsRhs' {-where-} hsDecls')
 
 instance Rename HsPat where
     rename (HsPVar hsName) = HsPVar `fmap` renameName hsName
@@ -560,15 +560,15 @@ instance Rename HsExp where
     rename (HsLambda srcLoc hsPats hsExp) = do
         withSrcLoc srcLoc $ do
         updateWithN Val hsPats $ do
-        hsPats' <- rename hsPats
-        hsExp' <- rename hsExp
-        return (HsLambda srcLoc hsPats' hsExp')
+            hsPats' <- rename hsPats
+            hsExp' <- rename hsExp
+            return (HsLambda srcLoc hsPats' hsExp')
     rename (HsLet hsDecls hsExp) = do
         updateWithN Val hsDecls $ do
-        hsDecls' <- rename (expandTypeSigs hsDecls)
-        mapM_ HsErrors.hsDeclLocal hsDecls'
-        hsExp' <- rename hsExp
-        return (HsLet hsDecls' hsExp')
+            hsDecls' <- rename (expandTypeSigs hsDecls)
+            mapM_ HsErrors.hsDeclLocal hsDecls'
+            hsExp' <- rename hsExp
+            return (HsLet hsDecls' hsExp')
     rename (HsCase hsExp hsAlts) = do HsCase <$> rename hsExp <*> rename hsAlts
     rename orig@(HsDo hsStmts) = do
         (ss,()) <- renameHsStmts hsStmts (return ())
@@ -689,12 +689,12 @@ buildRecUpdate fm n us = do
 instance Rename HsAlt where
     rename (HsAlt srcLoc hsPat hsGuardedAlts {-where-} hsDecls) = withSrcLoc srcLoc $ do
         updateWithN Val hsPat $ do
-        hsPat' <- rename hsPat
-        updateWithN Val hsDecls $ do
-        hsDecls' <- rename (expandTypeSigs hsDecls)
-        mapM_ HsErrors.hsDeclLocal hsDecls'
-        hsGuardedAlts' <- rename hsGuardedAlts
-        return (HsAlt srcLoc hsPat' hsGuardedAlts' hsDecls')
+            hsPat' <- rename hsPat
+            updateWithN Val hsDecls $ do
+                hsDecls' <- rename (expandTypeSigs hsDecls)
+                mapM_ HsErrors.hsDeclLocal hsDecls'
+                hsGuardedAlts' <- rename hsGuardedAlts
+                return (HsAlt srcLoc hsPat' hsGuardedAlts' hsDecls')
 
 renameHsStmts :: [HsStmt] -> RM a  -> RM ([HsStmt],a)
 renameHsStmts ss fe = f ss [] where
@@ -791,11 +791,19 @@ unRenameString s = (dropUnderscore . dropDigits) s where
     dropDigits = dropWhile isDigit
 
 updateWithN nt x action = getUpdatesN nt x >>= flip withSubTable action
-getUpdatesN nt x = unions `fmap` mapM clobberName [ n | n <- getNames x, nameType n == nt, n /= vu_sub]
---getUpdatesN nt x = unions `fmap` mapM clobberName (map (toName nt) $ getNames x)
+getUpdatesN nt x = do
+    checkRepeats x
+    unions `fmap` mapM clobberName [ n | n <- getNames x, nameType n == nt, n /= vu_sub]
+
+repeatsUnder f xs = map head $ filter (not . null . tail) $ sortGroupUnder f xs
+
+checkRepeats x = do
+    let rs = repeatsUnder id $ [ n | n <- getNames x, nameType n == Val]
+    unless (null rs) $ do
+        addWarn InvalidExp $ "Cannot bind same name more than once in same bindgroup:" <+> tshow rs
 
 updateWith x action = getUpdates x >>= flip withSubTable action
-getUpdates x = unions `fmap` mapM clobberName (getNames x)
+getUpdates x = do unions `fmap` mapM clobberName (getNames x)
 
 class UpdateTable a where
     getNames :: a -> [Name]
