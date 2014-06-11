@@ -1,9 +1,34 @@
-module Name.Internals(NameType(..),Module(..),Name(..),QualifiedName,UnqualifiedName,ClassName,FieldName,QuotedName,UnQuotedName,forgeName,nameCompare,quoteName) where
+module Name.Internals
+    (NameType(..)
+    ,Module(..)
+    ,Name()
+    ,QualifiedName
+    ,UnqualifiedName
+    ,ClassName
+    ,FieldName
+    ,QuotedName
+    ,UnQuotedName
+    ,forgeName
+    ,nameParts
+    ,nameCompare
+    ,encodeNameType
+    ,decodeNameType
+    ,quoteName
+    ,fromQuotedName
+    ,unsafeWord32ToName
+    ,unsafeNameToWord32
+    ,unsafeWord8ToNameType
+    ,unsafeNameTypeToWord8
+    ,nameToBits
+    ,bitsToName) where
 
-import StringTable.Atom
 import Data.Binary
+import Data.Bits
 import Data.Char
 import Data.Data
+import GHC.Base
+import StringTable.Atom
+import Util.Std
 
 {-
  - TODO:
@@ -23,8 +48,35 @@ import Data.Data
 -- Name types
 -------------
 --
-newtype Name = Name Atom
-    deriving(Ord,Eq,Typeable,Binary,Data,ToAtom,FromAtom)
+--newtype Name = Name Atom
+
+newtype Name = Name Word32
+    deriving(Ord,Eq,Typeable,Data)
+{-# INLINE nameToBits #-}
+nameToBits :: Name -> (Atom,NameType)
+nameToBits (Name n) = (unsafeWord32ToAtom (n `unsafeShiftR` 8), toEnum $ fromIntegral (n .&. 0xff))
+
+{-# INLINE bitsToName #-}
+bitsToName ::  Atom -> NameType -> Name
+bitsToName a w = Name $ (unsafeAtomToWord32 a `unsafeShiftL` 8) .|. fromIntegral (fromEnum w)
+
+-- takes up 31 bits
+-- 23 bits of atom, 8 bits of tag
+-- only 4 bits of tag may be used
+-- due to current binary implementation
+-- in Id
+
+{-# INLINE unsafeNameToWord32 #-}
+unsafeNameToWord32 :: Name -> Word32
+unsafeNameToWord32 (Name w) = w
+
+{-# INLINE unsafeWord32ToName #-}
+unsafeWord32ToName :: Word32 -> Name
+unsafeWord32ToName w = Name w
+
+--instance Show Name where
+--    showsPrec p n = case nameToBits n of
+--        (a,_) -> showsPrec p a
 
 -- Used for documentation
 type QualifiedName   = Name
@@ -45,7 +97,7 @@ data NameType
     | RawType
     | UnknownType
     | QuotedName
-    deriving(Ord,Eq,Enum,Read,Show)
+    deriving(Ord,Eq,Enum,Read,Show,Bounded)
 
 newtype Module = Module Atom
   deriving(Eq,Data,Typeable,ToAtom,FromAtom)
@@ -57,11 +109,52 @@ instance Show Module where
     showsPrec _ (Module n) = shows n
 
 forgeName :: NameType -> Maybe Module -> String -> Name
-forgeName t Nothing  i = Name $ toAtom $ (chr $ fromEnum t + ord '1'):";" ++ i
-forgeName t (Just m) i = Name $ toAtom $ (chr $ ord '1' + fromEnum t):show m ++ ";" ++ i
+forgeName t Nothing  i = bitsToName (toAtom $ ';':i) t
+forgeName t (Just (Module m)) i = bitsToName (m `mappend` toAtom (';':i)) t
 
 quoteName :: Name -> Name
-quoteName (Name n) = forgeName QuotedName Nothing (fromAtom n)
+quoteName name = bitsToName (toAtom $ encodeNameType nt:fromAtom atom) QuotedName where
+    (atom,nt) = nameToBits name
+
+fromQuotedName :: Name -> Maybe Name
+fromQuotedName n = case nameToBits n of
+    (a,QuotedName) -> case fromAtom a of
+        nt:rest -> Just $ bitsToName (toAtom rest) (decodeNameType nt)
+        [] -> error $ "invalid quoted name: " ++ show (a,QuotedName)
+    _ -> Nothing
+
+nameParts :: Name -> (NameType,Maybe Module,String)
+nameParts (nameToBits -> (atom,nt)) = (nt,a,b) where
+    ~(a,b) = f (fromAtom atom)
+    f (';':xs) = (Nothing,xs)
+    f xs = (Just $ Module (toAtom a),b) where
+        (a,_:b) = span (/= ';') xs
+
+encodeNameType :: NameType -> Char
+encodeNameType t = unsafeChr $ ord '0' + fromEnum t
+
+decodeNameType :: Char -> NameType
+decodeNameType c = case ord c - ord '0' of
+    n | n < 0 || n > fromEnum (maxBound::NameType) -> error $ "decodeNameType: out of range " ++ show (c,n)
+    n -> toEnum n
+
+unsafeNameTypeToWord8 :: NameType -> Word8
+unsafeNameTypeToWord8 nt = fromIntegral $ fromEnum nt
+
+unsafeWord8ToNameType :: Word8 -> NameType
+unsafeWord8ToNameType w8 = toEnum $ fromIntegral w8
 
 -- lexigraphic comparison
-Name x `nameCompare` Name y = x `atomCompare` y
+(nameToBits -> (a,ant)) `nameCompare` (nameToBits -> (b,bnt)) = case compare ant bnt of
+    EQ -> a `atomCompare` b
+    x -> x
+
+instance Binary Name where
+    put x = case nameToBits x of
+        (a,nt) -> do
+            putWord8 (unsafeNameTypeToWord8 nt)
+            put a
+    get = do
+        x <- getWord8
+        a <- get
+        return $ bitsToName a (unsafeWord8ToNameType x)

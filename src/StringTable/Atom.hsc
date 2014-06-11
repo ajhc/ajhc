@@ -7,6 +7,8 @@ module StringTable.Atom(
     HasHash(..),
     unsafeIntToAtom,
     unsafeAtomToInt,
+    unsafeWord32ToAtom,
+    unsafeAtomToWord32,
     atomCompare,
     unsafeByteIndex,
     dumpTable,
@@ -128,10 +130,19 @@ instance Show Atom where
 instance Read Atom where
     readsPrec _ s = [ (toAtom s,"") ]
 
+{-# INLINE unsafeIntToAtom #-}
 unsafeIntToAtom :: Int -> Atom
 unsafeIntToAtom x = Atom (fromIntegral x)
+{-# INLINE unsafeAtomToInt #-}
 unsafeAtomToInt :: Atom -> Int
 unsafeAtomToInt (Atom x) = fromIntegral x
+
+{-# INLINE unsafeWord32ToAtom #-}
+unsafeWord32ToAtom :: Word32 -> Atom
+unsafeWord32ToAtom x = Atom x
+{-# INLINE unsafeAtomToWord32 #-}
+unsafeAtomToWord32 :: Atom -> Word32
+unsafeAtomToWord32 (Atom x) = x
 
 unsafeByteIndex :: Atom -> Int -> Word8
 unsafeByteIndex atom off = fromIntegral (unsafePerformIO $ peek (stPtr atom `advancePtr` off))

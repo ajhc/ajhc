@@ -48,7 +48,6 @@ import Doc.DocLike
 import Doc.PPrint
 import Name.Name
 import Name.Internals
-import StringTable.Atom
 import Util.HasSize
 import Util.Inst()
 import Util.NameMonad
@@ -279,15 +278,15 @@ candidateIds !seed = f (2 + (mask $ hashInt seed)) where
     --mask x = trace ("candidate " ++ show seed) $ Id $ x .&. 0x0FFFFFFE
 
 -- deconstruct Id stle atom
-intToAtom :: Int -> Maybe Atom
-intToAtom i = if odd i then Just (unsafeIntToAtom $  i `unsafeShiftR` 1) else Nothing
+intToName :: Int -> Maybe Name
+intToName i = if odd i then Just (unsafeWord32ToName $  (fromIntegral i) `unsafeShiftR` 1) else Nothing
 
 toId :: Name -> Id
-toId (Name x) = Id $ (unsafeAtomToInt x `unsafeShiftL` 1) .|. 1
+toId x = Id . fromIntegral $ (unsafeNameToWord32 x `unsafeShiftL` 1) .|. 1
 
 fromId :: Monad m => Id -> m Name
-fromId (Id i) = case intToAtom i of
-    Just a -> return $ fromAtom a
+fromId (Id i) = case intToName i of
+    Just a -> return a
     Nothing -> fail $ "Name.fromId: not a name " ++ show (Id i)
 
 instance DocLike d => PPrint d Id where
@@ -297,19 +296,20 @@ instance GenName Id where
     genNames = candidateIds
 
 instance B.Binary Id where
-    put (Id x) = case intToAtom x of
-        Just a -> do B.putWord8 128 >> B.put a
-        Nothing | x >= 0 && x < 128 -> B.putWord8 (fromIntegral x)
+    put (Id x) = case intToName x of
+        Just (nameToBits -> (a,nt)) -> do B.putWord8 (239 + unsafeNameTypeToWord8 nt) >> B.put a
+        Nothing | x2 >= 0 && x2 < 238 -> B.putWord8 (fromIntegral x2)
                 | otherwise -> do
-                    B.putWord8 129
-                    B.put (fromIntegral x :: Int32)
+                    B.putWord8 238
+                    B.put (fromIntegral x2 :: Int32)
+        where !x2 = x `unsafeShiftR` 1
     get = do
         x <- B.getWord8
         case x of
-            128 -> do
+            _ | x > 238 -> do
                 a <- B.get
-                return (toId $ fromAtom a)
-            129 -> do
+                return (toId $ bitsToName a (unsafeWord8ToNameType $ x - 239))
+            238 -> do
                 v <- B.get
-                return (Id $ fromIntegral (v :: Int32))
-            _ -> return (Id $ fromIntegral x)
+                return (Id $ fromIntegral ((v :: Int32) `unsafeShiftL` 1))
+            _ -> return (Id $ (fromIntegral x) `unsafeShiftL` 1)

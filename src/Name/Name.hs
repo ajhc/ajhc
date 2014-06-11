@@ -46,11 +46,8 @@ module Name.Name(
     deconstructName
     ) where
 
-import Data.Char
-import Util.Std
-import GHC.Base(unsafeChr)
-
 import C.FFI
+import Data.Char
 import Doc.DocLike
 import Doc.PPrint
 import GenUtil
@@ -58,6 +55,7 @@ import Name.Internals
 import Name.Prim
 import StringTable.Atom
 import Ty.Level
+import Util.Std
 
 isTypeNamespace TypeConstructor = True
 isTypeNamespace ClassName = True
@@ -91,17 +89,11 @@ fromValishHsName name
 createName :: NameType -> Module -> String -> Name
 createName _ (Module "") i = error $ "createName: empty module " ++ i
 createName _ m "" = error $ "createName: empty ident " ++ show m
-createName t m i = Name $ toAtom $ encodeNameType t:show m ++ ";" ++ i
-
-encodeNameType :: NameType -> Char
-encodeNameType t = unsafeChr $ ord '1' + fromEnum t
-
-decodeNameType :: Char -> NameType
-decodeNameType c = toEnum $ ord c - ord '1'
+createName t m i = forgeName t (Just m) i
 
 createUName :: NameType -> String -> Name
 createUName _ "" = error $ "createUName: empty ident"
-createUName t i =  Name $ toAtom $ encodeNameType t:";" ++ i
+createUName t i =  forgeName t Nothing i
 
 class ToName a where
     toName :: NameType -> a -> Name
@@ -168,14 +160,7 @@ parseName t name = toName t (intercalate "." ms, intercalate "." (ns ++ [last sn
     validMod _ = False
 
 nameType :: Name -> NameType
-nameType (Name a) = toEnum $ fromIntegral ( a `unsafeByteIndex` 0) - ord '1'
-
-nameParts :: Name -> (NameType,Maybe Module,String)
-nameParts n@(Name atom) = (nameType n,a,b) where
-    (a,b) = f $ tail (fromAtom atom)
-    f (';':xs) = (Nothing,xs)
-    f xs = (Just $ Module (toAtom a),b) where
-        (a,_:b) = span (/= ';') xs
+nameType name = snd $ nameToBits name
 
 instance Show Name where
     showsPrec _ n = f n where
@@ -200,20 +185,9 @@ ffiExportName :: FfiExport -> Name
 ffiExportName (FfiExport cn _ cc _ _) = toName Val (Module "FE@", show cc ++ "." ++ cn)
 type Class = Name
 
--------------
--- Quoting
--------------
-
---quoteName :: Name -> Name
---quoteName (Name n) = createUName QuotedName (fromAtom n)
-fromQuotedName :: Name -> Maybe Name
-fromQuotedName n = case nameParts n of
-    (QuotedName,Nothing,s) -> Just $ Name (toAtom s)
-    _ -> Nothing
-
---------------
+----------
 -- Modules
---------------
+----------
 
 toModule :: String -> Module
 toModule s = Module $ toAtom s
@@ -226,7 +200,7 @@ mkName l b mm s = toName (mkNameType l b) (mm,s)
 
 -- the left name effectively becomes the module.
 combineName :: Name -> Name -> Name
-combineName (Name a1) n2@(Name a2) = Name $ toAtom (encodeNameType (nameType n2) : "{" ++ show a1 ++ "}") `mappend` a2
+combineName (nameToBits -> (a1,nt1)) (nameToBits -> (a2,nt2)) = bitsToName  ((toAtom $ "{" ++ encodeNameType nt1:show a1 ++ "}") `mappend` a2) nt2
 
 data NameParts = NameParts {
     nameLevel       :: TyLevel,
@@ -257,19 +231,21 @@ mkComplexName NameParts { .. } = qn $ on nameOuter $ toName (mkNameType nameLeve
         [] -> n
 
 unMkName :: Name -> NameParts
-unMkName nm@(Name a1) = NameParts { .. } where
-    (nameOuter,name) = g (show a1) [] where
-        g (_:'{':rs) zs = f (0::Int) rs [] where
-            f 0 ('}':xs) rs = g xs (Name (toAtom $ reverse rs):zs)
-            f n ('{':xs) rs = f (n + 1) xs ('{':rs)
-            f n ('}':xs) rs = f (n - 1) xs ('}':rs)
-            f n (x:xs) rs = f n xs (x:rs)
-            f n _ rs = error $ "unMkName: invalid outer " ++ show a1
-        g rs zs = (reverse zs,Name $ toAtom rs)
+unMkName nm@(nameToBits -> (a1,nt1)) = NameParts { .. } where
+    (nameOuter,name) = h (show a1) where
+        h xs@('{':_) = g xs []
+        h _ = ([],nm)
+        g ('{':nt:rs) zs = f (0::Int) rs (decodeNameType nt) [] where
+            f 0 ('}':xs) nt rs = g xs (bitsToName (toAtom $ reverse rs) nt:zs)
+            f n ('{':xs) nt rs = f (n + 1) xs nt ('{':rs)
+            f n ('}':xs) nt rs = f (n - 1) xs nt ('}':rs)
+            f n (x:xs) nt rs = f n xs nt (x:rs)
+            f n _ _ rs = error $ "unMkName: invalid outer " ++ show a1
+        g rs zs = (reverse zs,bitsToName (toAtom rs) nt1)
     (nameQuoted,nameModule,_,uqn,nameUniquifier) = deconstructName name
     (_,_,nameIdent) = nameParts uqn
-    nameConstructor = isConstructor name
-    nameLevel = tyLevelOf name
+    nameConstructor = isConstructor nm
+    nameLevel = tyLevelOf nm
 
 -- internal
 mkNameType :: TyLevel -> Bool -> NameType
