@@ -4,16 +4,17 @@ import FrontEnd.Lex.Lexer
 import FrontEnd.SrcLoc
 import FrontEnd.Lex.Layout
 import qualified Data.Map as Map
+import Util.DocLike
 
 data Context
     = LO String Loc Int
     | NL String
-
+        deriving(Show)
 data R = R
     {is :: [Token Lexeme]
     ,os :: [Lexeme]
     ,ctx :: [Context]
-    }
+    }  deriving(Show)
 
 data Loc
     = InHead
@@ -26,7 +27,7 @@ data Loc
     | InCaseRhs
     | InDo
     | InIgnore
-    deriving(Eq,Ord)
+    deriving(Eq,Ord,Show)
 
 data Action
     = NewLoc Loc
@@ -87,27 +88,27 @@ layout ls = f R { is = ls, ctx = [], os = [] } where
 
         | Token m@(L _ _ ms):is' <- is, Just opener <- lookup ms closingBrackets = case ctx of
             (NL opened:ctx) | opener == opened -> f R { os = m:os, is = is',..}
-                            | otherwise -> f R { os = err ("found "++  ms++  " but expected " ++ opened):m:os, is = is',.. }
+                            | otherwise -> err ("found" <+> squotes ms <+> "but expected" <+> squotes opened)
             LO {}:ctx -> f R { os = rbrace:os, .. }
-            [] -> f R { os = err ("found " ++ ms ++ " without matching " ++ opener):os, .. }
+            [] -> err ("found" <+> squotes ms <+> "without matching" <+> squotes opener)
 
-        | Token m@(L _ _ ident):is <- is, LO open loc n:ctx' <- ctx,
+        | Token m@(L _ _ ident):is <- is, LO open loc n:ctx <- ctx,
             Just action <- Map.lookup (loc,ident) actionMap = case action of
-                RBrace ->  f R { os = m:rbrace:os, ctx = ctx',.. }
-                (NewLoc loc') -> f R { os = m:os, ctx = LO open loc' n:ctx',.. }
-        | Token (L sl nt "let#"):is' <- is = f R { is = is', os = (L sl nt "let":os), ..}
+                RBrace ->  f R { os = m:rbrace:os, .. }
+                (NewLoc loc') -> f R { os = m:os, ctx = LO open loc' n:ctx,.. }
+        | Token (L sl nt "let#"):is <- is = f R { os = (L sl nt "let":os), ..}
 
         | Token m:ms <- is = f R  { is = ms, os = m:os, .. }
-        | [] <- is, NL s:ctx <- ctx = f R { os = err ("expected " ++ s):os, .. }
+        | [] <- is, NL s:ctx <- ctx = err ("expected" <+> squotes s)
         | [] <- is, LO {}:ctx <- ctx = f R { os = rbrace:os, .. }
         | [] <- is = reverse os
-        | otherwise = f R { os = err "internal error":os, .. }
+        | otherwise =  err ("internal error: " ++ show R { .. })
         where
+        err s =  reverse $ L sloc LLexError s:os
         (sloc:_) = [ sl | L sl _ _ <- os] ++ [bogusASrcLoc]
         semi = L sloc LSpecial ";"
         rbrace = L sloc LSpecial "}"
         lbrace = L sloc LSpecial "{"
-        err = L sloc LLexError
         sl "do" = InDo
         sl "of" = InCaseHead
         sl _ = InHead
