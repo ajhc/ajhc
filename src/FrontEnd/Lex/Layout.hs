@@ -31,7 +31,7 @@ doLayout opt fn ts = layout $ preprocessLexemes opt fn ts
 -- turn reserved ids into regular ids if the associated extension is disabled
 
 preprocessLexemes :: Opt -> FilePath -> [Lexeme] -> [Token Lexeme]
-preprocessLexemes opt fn xs = toplevel xs where
+preprocessLexemes opt fn xs = fixupLets $ toplevel xs where
     defaultSrcLoc = SrcLoc { srcLocFileName = packString fn, srcLocColumn = 0, srcLocLine = 0 }
     toplevel ls = case skipComments ls of
         (L _ LReservedId "module":_) -> g defaultSrcLoc defaultSrcLoc 0 ls
@@ -98,6 +98,15 @@ preprocessLexemes opt fn xs = toplevel xs where
             ,["MULTISPECIALIZE", "MULTISPECIALISE"]
             ,["SUPERSPECIALIZE", "SUPERSPECIALISE"]
             ,["RULE","RULES", "JHC_RULE", "JHC_RULES", "RULES_JHC"]]
+
+fixupLets :: [Token Lexeme] -> [Token Lexeme]
+fixupLets xs = f 0 (reverse xs) [] where
+    f 0 (Token (L sl nt "let"):xs) rs =  f 0 xs (Token (L sl nt "let#"):rs)
+    f n (x@(Token (L _ _ "let")):xs) rs =  f (n - 1) xs (x:rs)
+    f n (x@(Token (L _ _ "in")):xs) rs =  f (n + 1) xs (x:rs)
+    f n (x:xs) rs = f n xs (x:rs)
+    f n [] rs = rs
+
 
 uniMap = IM.fromList $ [
  f '→' LReservedOp "->",

@@ -11,8 +11,6 @@ import qualified Data.Bits
 import qualified FlagOpts as FO
 }
 
--- %wrapper "monadUserState"
-
 $unispace  = [\xa0]
 $whitechar = [ \t\n\r\f\v]
 $spaces    = [ \t\xa0]
@@ -41,20 +39,27 @@ $symchar   = [$symbol \:]
 $nl        = [\n\r]
 $ws        = [$unispace $white]
 
+-- These always have special meaning and cannot act as VarIds
 @reservedid =
 	case|class|data|default|deriving|do|else|if|
 	import|in|infix|infixl|infixr|instance|let|module|newtype|
 	of|then|type|where|_
 
--- reserved when certain extensions enabled
+-- Reserved when certain extensions enabled
+--
+-- We treat them as reserved here and degrade them to VarIds in postprocessing
+-- if the appropriate flag isn't enabled.
 @extreservedid =  foreign|forall|exists|kind|alias|prefixx|prefixy|family|closed
 
--- sometimes
+-- sometimes special, we don't need to treat them as interesting by the lexer
+-- but categorized here
 @specialid = as|hiding|qualified
 
 @reservedop =
 	".." | "::" | "=" | \\ | "|" | "<-" | "->" | "=>"
-     --   ".." | ":" | "::" | "=" | \\ | "|" | "<-" | "->" | "@" | "~" | "=>"
+-- these are reserved ops in the report but we don't have to treat them as
+-- reserved as infix parsing takes care of them
+-- | ":" | "@" | "~"
 
 @varid  = $small $idchar* $trailing*
 @conid  = $large $idchar* $trailing*
@@ -224,17 +229,6 @@ nested_comment _ _ = do
 		    Just (c,input)   -> go n input
 	    	c -> go n input
         err input = do alexSetInput input; lexError "error in nested comment"
-
-{-
-alexGetChar' :: AlexInput -> Maybe (Char,AlexInput)
-alexGetChar' (AI loc s)
-  | atEnd s   = Nothing
-  | otherwise = c `seq` loc' `seq` s' `seq`
-                --trace (show (ord c)) $
-                Just (c, (AI loc' s'))
-  where (c,s') = nextChar s
-        loc'   = advanceSrcLoc loc c
-        -}
 
 lexError :: String -> Alex a
 lexError s = do

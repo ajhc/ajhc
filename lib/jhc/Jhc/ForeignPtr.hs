@@ -10,9 +10,10 @@ module Jhc.ForeignPtr(
     ) where
 
 import Jhc.Addr
-import Jhc.IO
-import Jhc.Prim.Rts
 import Jhc.Basics
+import Jhc.IO
+import Jhc.Order
+import Jhc.Prim.Rts
 
 type FinalizerPtr  a = FunPtr (Ptr a -> IO ())
 
@@ -73,9 +74,26 @@ unsafeForeignPtrToPtr (FP x) = Ptr (Addr_ x)
 touchForeignPtr :: ForeignPtr a -> IO ()
 touchForeignPtr x = fromUIO_ (touch_ x)
 
+-- we don't want to unbox the FP here because that would alloc a new block.
 castForeignPtr :: ForeignPtr a -> ForeignPtr b
 castForeignPtr x = unsafeCoerce x
 
 foreign import primitive touch_ :: ForeignPtr a -> UIO_
 foreign import primitive "B2B" int2word :: Int -> Word
 foreign import primitive unsafeCoerce :: a -> b
+
+instance Eq (ForeignPtr a) where
+     FP x ==  FP y =  (equalsBitsPtr_ x y)
+
+instance Ord (ForeignPtr a) where
+     FP x <  FP y =  (ltBitsPtr_ x y)
+     FP x >  FP y =  (gtBitsPtr_ x y)
+     FP x <=  FP y =  (lteBitsPtr_ x y)
+     FP x >=  FP y =  (gteBitsPtr_ x y)
+
+foreign import primitive "Lt" ltBitsPtr_   :: BitsPtr_ -> BitsPtr_ -> Bool
+foreign import primitive "Lte" lteBitsPtr_ :: BitsPtr_ -> BitsPtr_ -> Bool
+foreign import primitive "Gt" gtBitsPtr_   :: BitsPtr_ -> BitsPtr_ -> Bool
+foreign import primitive "Gte" gteBitsPtr_ :: BitsPtr_ -> BitsPtr_ -> Bool
+foreign import primitive "Eq" equalsBitsPtr_ :: BitsPtr_ -> BitsPtr_ -> Bool
+foreign import primitive "NEq" nequalsBitsPtr_ :: BitsPtr_ -> BitsPtr_ -> Bool
