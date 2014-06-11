@@ -30,7 +30,6 @@ import Data.Binary
 import Doc.DocLike
 import Doc.PPrint
 import FrontEnd.Tc.Kind
-import Name.Name
 import Name.Names
 import Name.VConsts
 import Support.CanType

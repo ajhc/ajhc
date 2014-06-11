@@ -18,8 +18,7 @@ runQ (Q x) = do
     return a
 
 class FromName a where
-    newFromNameS :: Name -> a  -- set name parameters as appropriate for the type
-    newFromName  :: Name -> a  -- use name exactly
+    newFromName  :: Name -> (Name,a)  -- use name exactly
 
 newVarN :: FromName a => String -> Maybe Module -> Q (Name,a)
 newVarN s m = do
@@ -29,28 +28,31 @@ newVarN s m = do
         nameIdent = s ++ show u,
         nameUniquifier = Nothing
         }
-    return $! n `seq` (n,newFromNameS n)
+    return $! n `seq` newFromName n
 
 newVar :: FromName a => Maybe Module -> Q (Name,a)
 newVar = newVarN "q"
 
 instance FromName HsExp where
-    newFromNameS n = newFromName (nameTyLevel_s termLevel n)
     newFromName n
-        | isConstructor n = HsCon (nameTyLevel_s termLevel n)
-        | otherwise  = HsVar (nameTyLevel_s termLevel n)
+        | isConstructor n = np $ HsCon n'
+        | otherwise  = np $ HsVar n'
+        where n' = nameTyLevel_s termLevel n
+              np = (,) n'
 
 instance FromName HsType where
-    newFromNameS n = newFromName (nameTyLevel_s typeLevel n)
     newFromName n
-        | isConstructor n = HsTyCon (nameTyLevel_s typeLevel n)
-        | otherwise  = HsTyVar (nameTyLevel_s termLevel n)
+        | isConstructor n = np $ HsTyCon n'
+        | otherwise  = np $ HsTyVar n'
+        where n' = nameTyLevel_s typeLevel n
+              np = (,) n'
 
 instance FromName HsPat where
-    newFromNameS n = newFromName (nameTyLevel_s typeLevel n)
     newFromName n
-        | isConstructor n = HsPApp (nameTyLevel_s typeLevel n) []
-        | otherwise  = HsPVar (nameTyLevel_s termLevel n)
+        | isConstructor n = np $ HsPApp n' []
+        | otherwise  = np $ HsPVar n'
+        where n' = nameTyLevel_s termLevel n
+              np = (,) n'
 
 type Exp = HsExp
 

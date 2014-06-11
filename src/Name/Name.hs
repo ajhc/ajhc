@@ -5,12 +5,12 @@ module Name.Name(
     Class,
     NameType(..),
     ToName(..),
+    fromName,
     ffiExportName,
     fromTypishHsName,
     fromValishHsName,
     getIdent,
     getModule,
-    isConstructorLike,
     isConstructor,
     isTypeNamespace,
     isValNamespace,
@@ -97,36 +97,37 @@ createUName t i =  forgeName t Nothing i
 
 class ToName a where
     toName :: NameType -> a -> Name
-    fromName :: Name -> (NameType, a)
+    fromName' :: Name -> a
+
+fromName :: ToName a => Name -> (NameType, a)
+fromName n = (nameType n,fromName' n)
 
 instance ToName (String,String) where
     toName nt (m,i) = createName nt (Module $ toAtom m) i
-    fromName n = case nameParts n of
-            (nt,Just (Module m),i) -> (nt,(show m,i))
-            (nt,Nothing,i) -> (nt,("",i))
+    fromName' n = case fromName' n of
+            (Just (Module m),i) -> (show m,i)
+            (Nothing,i) -> ("",i)
 
 instance ToName (Module,String) where
     toName nt (m,i) = createName nt m i
-    fromName n = case nameParts n of
-            (nt,Just m,i) -> (nt,(m,i))
-            (nt,Nothing,i) -> (nt,(Module "",i))
+    fromName' n = case fromName' n of
+            (Just m,i) -> (m,i)
+            (Nothing,i) -> (Module "",i)
 
 instance ToName (Maybe Module,String) where
     toName nt (Just m,i) = createName nt m i
     toName nt (Nothing,i) = createUName nt i
-    fromName n = case nameParts n of
-        (nt,a,b) -> (nt,(a,b))
+    fromName' n = case nameParts n of
+        (_,a,b) -> (a,b)
 
 instance ToName Name where
-    toName nt i | nt == ct = i
-                | otherwise = toName nt (x,y) where
-        (ct,x,y) = nameParts i
-    fromName n = (nameType n,n)
+    toName nt i = case nameToBits i of
+        (a,_) -> bitsToName a nt
+    fromName' n = n
 
 instance ToName String where
     toName nt i = createUName nt i
-    fromName n = (nameType n, mi ) where
-        mi = case snd $ fromName n of
+    fromName' n = case fromName' n of
             (Just (Module m),i) -> show m ++ "." ++ i
             (Nothing,i) -> i
 
@@ -150,7 +151,8 @@ qualifyName m n = case nameParts n of
     _ -> n
 
 setModule :: Module -> Name -> Name
-setModule m n = qualifyName m  $ toUnqualified n
+setModule m n = toName nt (m,i) where
+    (nt,_,i) = nameParts n
 
 parseName :: NameType -> String -> Name
 parseName t name = toName t (intercalate "." ms, intercalate "." (ns ++ [last sn])) where

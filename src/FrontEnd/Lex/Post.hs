@@ -85,7 +85,7 @@ checkAssertion t =  f [] t where
     f ts (HsTyCon c) =  tast (c,ts)
     f ts (HsTyApp a t) = f (t:ts) a
     f _ _ = parseErrorK "malformed class assertion"
-    tast (a,[HsTyVar n]) = return (HsAsst a [n]) -- (a,n)
+    tast (a,[HsTyVar n]) = return (HsAsst (toName ClassName a) [n]) -- (a,n)
     tast x = parseErrorK $ "Invalid Class. multiparameter classes not yet supported:" ++ show x
 
 getPatPrec bangPatterns v = ans where

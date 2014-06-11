@@ -574,12 +574,16 @@ aHsQualTypeToQualType :: KindEnv -> HsQualType -> Qual Type
 aHsQualTypeToQualType kt (HsQualType cntxt t) = map (hsAsstToPred kt) cntxt :=> aHsTypeToType kt t
 
 hsAsstToPred :: KindEnv -> HsAsst -> Pred
-hsAsstToPred kt (HsAsst className [varName])
+hsAsstToPred = hsAsstToPred' "norm"
+hsAsstToPred' ss kt a@(HsAsst className [varName])
    -- = IsIn className (TVar $ Tyvar varName (kindOf varName kt))
-   | isConstructorLike varName = IsIn  (toName ClassName className) (TCon (Tycon (toName TypeConstructor varName) (head $ kindOfClass (toName ClassName className) kt)))
-   | otherwise = IsIn (toName ClassName className) (TVar $ tyvar (toName TypeVal varName) (head $ kindOfClass (toName ClassName className) kt))
-hsAsstToPred kt (HsAsstEq t1 t2) = IsEq (runIdentity $ hsTypeToType' kt t1) (runIdentity $ hsTypeToType' kt t2)
-hsAsstToPred _ _ = error "KindInfer.hsAsstToPred: bad."
+--   | isConstructorLike varName && nameType varName /= TypeConstructor = error $ "weirdA: " ++ show (ss,a)
+--   | nameType className /= ClassName =   error $ "weirdB: " ++ show (ss,a)
+--   | nameType varName /= TypeVal =error $ "weirdC: " ++ show (ss,a)
+   | isConstructor varName = IsIn  className (TCon (Tycon varName (head $ kindOfClass className kt)))
+   | otherwise = IsIn className (TVar $ tyvar varName (head $ kindOfClass className kt))
+hsAsstToPred' _ kt (HsAsstEq t1 t2) = IsEq (runIdentity $ hsTypeToType' kt t1) (runIdentity $ hsTypeToType' kt t2)
+hsAsstToPred' _ _ _ = error "KindInfer.hsAsstToPred: bad."
 
 hsQualTypeToSigma kt qualType = hsQualTypeToType kt (Just []) qualType
 
@@ -603,7 +607,7 @@ hsQualTypeToType kindEnv qs qualType = return $ hoistType $ tForAll quantOver ( 
    --newEnv = kindEnv
    Just t' = hsTypeToType' newEnv (hsQualTypeType qualType)
    ps = hsQualTypeContext qualType
-   ps' = map (hsAsstToPred newEnv) ps
+   ps' = map (hsAsstToPred' (show qualType) newEnv) ps
    quantOver = nub $ freeVars ps' ++ fvs
    fvs = case qs of
        Nothing -> []

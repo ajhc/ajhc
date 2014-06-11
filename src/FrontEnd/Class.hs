@@ -30,8 +30,7 @@ module FrontEnd.Class(
     ) where
 
 import Control.Monad.Identity
-import Control.Monad.Writer(Monoid(..))
-import Data.Generics(mkQ,something)
+import Control.Monad.Writer  hiding ((<>))
 import Data.List(nub)
 import Data.Maybe
 import Debug.Trace
@@ -149,15 +148,15 @@ showInst :: Inst -> String
 showInst = PPrint.render . pprint
 
 aHsTypeSigToAssumps :: KindEnv -> HsDecl -> [(Name,Type)]
-aHsTypeSigToAssumps kt ~sig@(HsTypeSig _ names qualType) = [ (toName Val n,typ) | n <- names] where
+aHsTypeSigToAssumps kt ~sig@(HsTypeSig _ names qualType) = [ (n,typ) | n <- names] where
     Identity typ = hsQualTypeToSigma kt qualType
 
 qualifyMethod :: [HsAsst] -> HsDecl -> HsDecl
-qualifyMethod ~[HsAsst c [n]] ~(HsTypeSig sloc names (HsQualType oc t))
+qualifyMethod ~[HsAsst c [n]] ~ts@(HsTypeSig sloc names (HsQualType oc t))
     = HsTypeSig sloc names (HsQualType (HsAsst c [n']:oc) t) where
-        Just n' = (something (mkQ mzero f)) t
-        f (HsTyVar n') | removeUniquifier n' == removeUniquifier n = return n'
-        f _ = mzero
+        (n':_) = execWriter (f t)
+        f (HsTyVar v) | removeUniquifier n == removeUniquifier v = tell [v]
+        f t = traverseHsType_ f t
 
 printClassSummary :: ClassHierarchy -> IO ()
 printClassSummary (CH h is) = mapM_ f (Map.toList h) where
