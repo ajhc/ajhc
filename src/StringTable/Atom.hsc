@@ -102,7 +102,7 @@ instance ToAtom BS.ByteString where
     toAtomIO bs = BS.unsafeUseAsCStringLen bs toAtomIO
 
 instance FromAtom CStringLen where
-    fromAtom a@(Atom v) = (stPtr a,fromIntegral $ (v .&. (#const ATOM_LEN_MASK)))
+    fromAtom a@(Atom v) = (stPtr a,atom_len a)
 
 instance FromAtom Word where
     fromAtom (Atom i) = fromIntegral i
@@ -136,15 +136,15 @@ unsafeAtomToInt (Atom x) = fromIntegral x
 unsafeByteIndex :: Atom -> Int -> Word8
 unsafeByteIndex atom off = fromIntegral (unsafePerformIO $ peek (stPtr atom `advancePtr` off))
 
+foreign import ccall unsafe "atom_append" atomAppend :: Atom -> Atom -> IO Atom
+foreign import ccall unsafe "dump_table" dumpTable :: IO ()
+foreign import ccall unsafe "dump_to_file" dumpToFile :: IO ()
+foreign import ccall unsafe "lexigraphic_compare" c_atomCompare :: Atom -> Atom -> CInt
 foreign import ccall unsafe "stringtable_lookup" addrToAtom_ :: Addr## -> Int## -> IO Atom
-
 foreign import ccall unsafe "stringtable_lookup" stAdd :: CString -> CInt -> IO Atom
 foreign import ccall unsafe "stringtable_ptr" stPtr :: Atom -> CString
 foreign import ccall unsafe "stringtable_stats" dumpStringTableStats :: IO ()
-foreign import ccall unsafe "dump_table" dumpTable :: IO ()
-foreign import ccall unsafe "atom_append" atomAppend :: Atom -> Atom -> IO Atom
-foreign import ccall unsafe "lexigraphic_compare" c_atomCompare :: Atom -> Atom -> CInt
-foreign import ccall unsafe "dump_to_file" dumpToFile :: IO ()
+foreign import ccall unsafe atom_len :: Atom -> Int
 foreign import ccall unsafe hashlittle  :: CString -> CSize -> Word32 -> IO Word32
 
 hash2 :: Word32 -> CString -> Int -> IO Word32

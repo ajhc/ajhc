@@ -10,17 +10,12 @@
 #define USE_THREADS 0
 
 #if USE_THREADS
-
 #include <pthread.h>
-
 static pthread_mutex_t mutex_hash = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t mutex_string = PTHREAD_MUTEX_INITIALIZER;
-
 #else
-
 #define pthread_mutex_lock(x) ;
 #define pthread_mutex_unlock(x) ;
-
 #endif
 
 #include "StringTable_cbits.h"
@@ -35,12 +30,11 @@ static void print_quoted(FILE *file,unsigned char *s,int len);
 #define NUM_CHUNKS 256
 #define CHUNK_SIZE 16384
 
-#define ATOM_LEN(c)     (((atom_t)(c)) & ATOM_LEN_MASK)
-#define CHUNK_INDEX(c)  (((atom_t)(c) >> 8)&0xFF)
-#define CHUNK_OFFSET(c) (((atom_t)(c) >> 16) & 0x3FFF)
+#define CHUNK_INDEX(c)  (((atom_t)(c))&0xFF)
+#define CHUNK_OFFSET(c) (((atom_t)(c) >> 8) & 0x3FFF)
 
-#define MAKE_ATOM(ci,co,len) (((((atom_t)len) & ATOM_LEN_MASK) | ((((atom_t)ci) & 0xff) << 8) | (((atom_t)co & 0x3FFF) << 16)))
-
+#define MAKE_ATOM(ci,co) (((atom_t)ci & 0xff) | (((atom_t)co & 0x3FFF) << 8))
+#define ATOM_LEN(c) ((unsigned)ATOM_PTR(c)[0])
 #define ATOM_PTR(c) ((unsigned char *)&(stringtable_chunks[CHUNK_INDEX(c)][CHUNK_OFFSET(c)]))
 
 #define ATOM_VALID(a) !!(a)
@@ -59,7 +53,7 @@ add_string(unsigned char *cs, int len)
     pthread_mutex_lock(&mutex_string);
         //printf("add_string(%c,%c,%i)\n",cs[0],cs[1],len);
     assert(len >= 0);
-    assert(len < MAX_ENTRY_SIZE);
+    assert(len + 1 < MAX_ENTRY_SIZE);
     assert(next_free_offset < CHUNK_SIZE);
     if(next_free_offset + 1 > CHUNK_SIZE - MAX_ENTRY_SIZE) {
         dieif(current_chunk >= NUM_CHUNKS - 1, "No more chunks");
@@ -69,13 +63,14 @@ add_string(unsigned char *cs, int len)
         dieif(!stringtable_chunks[current_chunk], "error alocating memory");
         next_free_offset = 0;
     }
-    memcpy(stringtable_chunks[current_chunk] + next_free_offset, cs, len);
-    atom_t r = MAKE_ATOM(current_chunk, next_free_offset, len);
+    stringtable_chunks[current_chunk][next_free_offset] = len;
+    memcpy(stringtable_chunks[current_chunk] + next_free_offset + 1, cs, len);
+    atom_t r = MAKE_ATOM(current_chunk, next_free_offset);
     assert(CHUNK_INDEX(r) == current_chunk);
     assert(CHUNK_OFFSET(r) == next_free_offset);
     assert(ATOM_PTR(r) == stringtable_chunks[current_chunk] + next_free_offset);
     assert(ATOM_LEN(r) == len);
-    next_free_offset += len;
+    next_free_offset += len + 1;
     assert(next_free_offset < CHUNK_SIZE);
     assert(current_chunk < NUM_CHUNKS);
     pthread_mutex_unlock(&mutex_string);
@@ -95,7 +90,8 @@ struct hentry {
 #if KEEP_HASH
         hash_t hashes[CUCKOO_HASHES];
 #endif
-        atom_t atom;
+        atom_t atom : 24;
+        unsigned len : 8;
 };
 
 #define INIT_SIZE 2
@@ -133,8 +129,9 @@ static bool
 item_exists(unsigned char *cs, int len) {
         for(int i = 0; i < HASHSIZE*CUCKOO_HASHES; i++) {
                 atom_t a = htable[i].atom;
+                unsigned al = htable[i].len;
                 if(ATOM_VALID(a)) {
-                    if(len == ATOM_LEN(a) && !memcmp(ATOM_PTR(a),cs,len))
+                    if(len == al && !memcmp(ATOM_PTR(a) + 1,cs,len))
                         return true;
                 }
         }
@@ -148,9 +145,10 @@ dump_to_file(void) {
         FILE *file = fopen("atom.dump","w");
         for(int i = 0; i < HASHSIZE*CUCKOO_HASHES; i++) {
                 atom_t a = htable[i].atom;
+                unsigned al = htable[i].len;
                 if(ATOM_VALID(a)) {
-                        fprintf(file,"%u:",ATOM_LEN(a));
-                        print_quoted(file, ATOM_PTR(a),ATOM_LEN(a));
+                        fprintf(file,"%u:",al);
+                        print_quoted(file, ATOM_PTR(a) + 1,al);
                         fwrite("\n",1,1,file);
                 }
         }
@@ -162,7 +160,7 @@ dump_table(void) {
                 atom_t a = htable[i].atom;
                 if(ATOM_VALID(a)) {
                         printf("%p %u: ",ATOM_PTR(a),ATOM_LEN(a));
-                        fwrite(ATOM_PTR(a),1,ATOM_LEN(a),stdout);
+                        fwrite(ATOM_PTR(a) + 1,1,ATOM_LEN(a),stdout);
                         fwrite("\n",1,1,stdout);
                 }
         }
@@ -177,7 +175,7 @@ grow_table(void) {
 
         for(int i = 0; i < os; i++) {
                 if(ATOM_VALID(ot[i].atom))
-                        fast_insert(0,0,ot[i]);
+                        hash_insert(ot[i]);
         }
         if(ot != init_htable) free(ot);
 //    fprintf(stderr,"]]]\n");
@@ -255,7 +253,7 @@ stringtable_lookup(unsigned char *cs, int len)
                 return ATOM_EMPTY;
         pthread_mutex_lock(&mutex_hash);
         assert(len >= 0);
-        assert(len < MAX_ENTRY_SIZE);
+        assert(len + 1 < MAX_ENTRY_SIZE);
         hash_t h[CUCKOO_HASHES];
         for(uint32_t i = 0; i < CUCKOO_HASHES; i++) {
                 h[i] = hashlittle(cs,len,i);
@@ -265,12 +263,12 @@ stringtable_lookup(unsigned char *cs, int len)
                         //struct hentry *b = &htable[HASH_BUCKET(e,j)];
                         struct hentry *b = &htable[HASH_INDEX(i,h[i] + j)];
 #if KEEP_HASH
-                        if (ATOM_VALID(b->atom) && h[i] == b->hashes[i] && len == ATOM_LEN(b->atom) &&  !memcmp(ATOM_PTR(b->atom),cs,len)) {
+                        if (ATOM_VALID(b->atom) && h[i] == b->hashes[i] && len == b->len &&  !memcmp(ATOM_PTR(b->atom) + 1,cs,len)) {
                             pthread_mutex_unlock(&mutex_hash);
                             return b->atom;
                         }
 #else
-                        if (ATOM_VALID(b->atom) && len == ATOM_LEN(b->atom) && !memcmp(ATOM_PTR(b->atom),cs,len)) {
+                        if (ATOM_VALID(b->atom) && len == b->len && !memcmp(ATOM_PTR(b->atom) + 1,cs,len)) {
                             pthread_mutex_unlock(&mutex_hash);
                             return b->atom;
                         }
@@ -280,6 +278,7 @@ stringtable_lookup(unsigned char *cs, int len)
         atom_t na = add_string(cs,len);
         struct hentry hb;
         hb.atom = na;
+        hb.len = len;
 #if KEEP_HASH
         memcpy(hb.hashes,h,sizeof hb.hashes);
 #endif
@@ -291,10 +290,10 @@ stringtable_lookup(unsigned char *cs, int len)
 int
 lexigraphic_compare(atom_t x, atom_t y)
 {
-    int xl = ATOM_LEN(x);
-    int yl = ATOM_LEN(y);
-    int ret = memcmp(ATOM_PTR(x),ATOM_PTR(y),xl < yl ? xl : yl);
-    return ret ? ret : xl - yl;
+        int xl = ATOM_LEN(x);
+        int yl = ATOM_LEN(y);
+        int ret = memcmp(ATOM_PTR(x)+1,ATOM_PTR(y)+1,xl < yl ? xl : yl);
+        return ret ? ret : xl - yl;
 }
 
 atom_t
@@ -321,14 +320,14 @@ unsigned char *
 stringtable_ptr(atom_t cl)
 {
         assert(ATOM_VALID(cl));
-        return ATOM_PTR(cl);
+        return ATOM_PTR(cl) + 1;
 }
 
 int
 stringtable_get(atom_t cl, char buf[MAX_ENTRY_SIZE])
 {
         assert(ATOM_VALID(cl));
-        memcpy(buf,ATOM_PTR(cl),ATOM_LEN(cl));
+        memcpy(buf,ATOM_PTR(cl) + 1,ATOM_LEN(cl));
         return ATOM_LEN(cl);
 }
 
@@ -336,8 +335,14 @@ int
 stringtable_find(atom_t cl, unsigned char **res)
 {
         assert(ATOM_VALID(cl));
-        *res = ATOM_PTR(cl);
+        *res = ATOM_PTR(cl) + 1;
         return ATOM_LEN(cl);
+}
+
+int
+atom_len(atom_t c)
+{
+        return ATOM_LEN(c);
 }
 
 void
@@ -380,8 +385,9 @@ dieif(bool w,char *str)
     }
 }
 
+#if 0
+
 // hash functions
-/*
 uint32_t
 hash2(uint32_t salt, unsigned char *key, int key_len)
 {
@@ -406,9 +412,8 @@ main(int argc, char *argv[])
         unsigned len = strlen((char *)buf);
         if(!len) continue;
         if(buf[len - 1] == '\n') buf[--len] = '\0';
-        stringtable_lookup(buf,len);
-        //printf("%x: %s\n", a, buf);
-
+        atom_t a = stringtable_lookup(buf,len);
+        printf("%x: %s\n", a, buf);
     }
 
     dump_table();
@@ -428,4 +433,4 @@ hash3(uint32_t salt, unsigned char* str, size_t len)
         }
         return hash;
 }
-*/
+#endif

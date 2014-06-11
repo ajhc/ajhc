@@ -50,7 +50,7 @@ testAtom = do
         prop_atomneq' xs ys = (xs `compare` ys) == (fromAtom a1 `compare` (fromAtom a2 :: BS.ByteString)) where
             a1 = toAtom xs
             a2 = toAtom (ys :: String)
-        prop_atomint xs = an > 0 && odd an where
+        prop_atomint xs = null xs || an > 0  where
             an = fromAtom $ toAtom (xs :: String) :: Int
         -- prop_atomii xs = Just xs == fromAtom `fmap` (intToAtom an) where
         --     an = fromAtom $ toAtom (xs :: String) :: Int
