@@ -42,7 +42,8 @@ foreach (@ARGV) {
     push @targets, @{$y->{Target}};
     for (sort @{$y->{Target}}) {
         print "$_:";
-        pdeps(sort @deps);
+        my ($ld,@rest) = @deps;
+        pdeps($ld, sort @rest);
         print "\tperl utils/build_extlibs.prl \$<\n" if $opt_e;
         print "\t./jhc \$(LIB_OPTIONS) --build-hl \$< -o \$@\n" if !$opt_e;
     }

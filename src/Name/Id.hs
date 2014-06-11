@@ -47,6 +47,7 @@ import qualified Data.IntSet as IS
 import Doc.DocLike
 import Doc.PPrint
 import Name.Name
+import Name.Internals
 import StringTable.Atom
 import Util.HasSize
 import Util.Inst()
@@ -277,11 +278,12 @@ candidateIds !seed = f (2 + (mask $ hashInt seed)) where
     f !x = Id x:f (x + 2)
     --mask x = trace ("candidate " ++ show seed) $ Id $ x .&. 0x0FFFFFFE
 
-toId :: Name -> Id
-toId x = Id $ fromAtom (toAtom x)
+-- deconstruct Id stle atom
+intToAtom :: Int -> Maybe Atom
+intToAtom i = if odd i then Just (unsafeIntToAtom $  i `unsafeShiftR` 1) else Nothing
 
-instance FromAtom Id where
-    fromAtom x = Id $ fromAtom x
+toId :: Name -> Id
+toId (Name x) = Id $ (unsafeAtomToInt x `unsafeShiftL` 1) .|. 1
 
 fromId :: Monad m => Id -> m Name
 fromId (Id i) = case intToAtom i of

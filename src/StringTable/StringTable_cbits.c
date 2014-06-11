@@ -24,8 +24,7 @@ static pthread_mutex_t mutex_string = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
 #include "StringTable_cbits.h"
-// 23 bits of chunk space to leave one bit for 'valid' flag.
-// valid flag must be set to 1 for it to be a valid atom
+// an atom is always a unique number that fits in 23 bits.
 
 static void dieif(bool,char *);
 uint32_t hash2(uint32_t salt,unsigned char *key, int key_len);
@@ -36,23 +35,23 @@ static void print_quoted(FILE *file,unsigned char *s,int len);
 #define NUM_CHUNKS 256
 #define CHUNK_SIZE 16384
 
-#define ATOM_LEN(c)     (((atom_t)(c) >> ATOM_LEN_SHIFT) & ATOM_LEN_MASK)
-#define CHUNK_INDEX(c)  (((atom_t)(c) >> 9)&0xFF)
-#define CHUNK_OFFSET(c) (((atom_t)(c) >> 17) & 0x3FFF)
+#define ATOM_LEN(c)     (((atom_t)(c)) & ATOM_LEN_MASK)
+#define CHUNK_INDEX(c)  (((atom_t)(c) >> 8)&0xFF)
+#define CHUNK_OFFSET(c) (((atom_t)(c) >> 16) & 0x3FFF)
 
-#define MAKE_ATOM(ci,co,len) ((((((atom_t)len) & ATOM_LEN_MASK) << ATOM_LEN_SHIFT) | ((((atom_t)ci) & 0xff) << 9) | (((atom_t)co & 0x3FFF) << 17)) | VALID_BITMASK)
+#define MAKE_ATOM(ci,co,len) (((((atom_t)len) & ATOM_LEN_MASK) | ((((atom_t)ci) & 0xff) << 8) | (((atom_t)co & 0x3FFF) << 16)))
 
 #define ATOM_PTR(c) ((unsigned char *)&(stringtable_chunks[CHUNK_INDEX(c)][CHUNK_OFFSET(c)]))
 
-#define ATOM_VALID(a) (a)
-
-// ((a) & VALID_BITMASK)
+#define ATOM_VALID(a) !!(a)
 
 static unsigned char first_chunk[CHUNK_SIZE];
 static unsigned char *stringtable_chunks[NUM_CHUNKS] = { first_chunk };
 
+// Initialize to one so zero can be used as the
+// empty atom.
+static uint16_t next_free_offset = 1;
 static uint16_t current_chunk = 0;
-static uint16_t next_free_offset = 0;
 
 static atom_t
 add_string(unsigned char *cs, int len)
@@ -251,6 +250,9 @@ stringtable_lookup(unsigned char *cs, int len)
 //        fprintf(file,"stringtable_lookup(");
 //        print_quoted(file,cs,len);
 //        fprintf(file,")\n");
+
+        if(!len)
+                return ATOM_EMPTY;
         pthread_mutex_lock(&mutex_hash);
         assert(len >= 0);
         assert(len < MAX_ENTRY_SIZE);
@@ -298,18 +300,21 @@ lexigraphic_compare(atom_t x, atom_t y)
 atom_t
 atom_append(atom_t x,atom_t y)
 {
-    unsigned char *xs,*ys;
-    int xl,yl;
+        if(x == ATOM_EMPTY)
+                return y;
+        else if (y == ATOM_EMPTY)
+                return x;
 
-    xl = stringtable_find(x,&xs);
-    yl = stringtable_find(y,&ys);
+        unsigned char *xs,*ys;
+        int xl = stringtable_find(x,&xs);
+        int yl = stringtable_find(y,&ys);
 
-    unsigned char buf[MAX_ENTRY_SIZE];
+        unsigned char buf[MAX_ENTRY_SIZE];
 
-    memcpy(buf,xs,xl);
-    memcpy(buf + xl,ys,yl);
+        memcpy(buf,xs,xl);
+        memcpy(buf + xl,ys,yl);
 
-    return stringtable_lookup(buf,xl + yl);
+        return stringtable_lookup(buf,xl + yl);
 }
 
 unsigned char *

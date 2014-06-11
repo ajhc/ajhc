@@ -34,6 +34,10 @@ testAtom = do
     print atomraw
     when (show atomraw /= "hello") $
         fail "atomRaw"
+    when (show (mempty :: Atom) /= "") $
+        fail "atomEmpty"
+    when (mempty /= toAtom "") $
+        fail "atomEmpty2"
 
     let prop_atomneq xs ys = (xs /= ys) == (a1 /= a2) where
             a1 = toAtom xs
@@ -41,25 +45,25 @@ testAtom = do
         prop_atomcompare xs ys = (xs `compare` ys) == (a1 `atomCompare` a2) where
             a1 = toAtom xs
             a2 = toAtom (ys :: String)
-        prop_atomIndex (xs :: String) = intToAtom (fromAtom a) == Just a where
-            a = toAtom xs
+        -- prop_atomIndex (xs :: String) = intToAtom (fromAtom a) == Just a where
+        --     a = toAtom xs
         prop_atomneq' xs ys = (xs `compare` ys) == (fromAtom a1 `compare` (fromAtom a2 :: BS.ByteString)) where
             a1 = toAtom xs
             a2 = toAtom (ys :: String)
         prop_atomint xs = an > 0 && odd an where
             an = fromAtom $ toAtom (xs :: String) :: Int
-        prop_atomii xs = Just xs == fromAtom `fmap` (intToAtom an) where
-            an = fromAtom $ toAtom (xs :: String) :: Int
+        -- prop_atomii xs = Just xs == fromAtom `fmap` (intToAtom an) where
+        --     an = fromAtom $ toAtom (xs :: String) :: Int
         prop_aappend (xs,ys) = (toAtom xs `mappend` toAtom ys) == toAtom ((xs::String) ++ ys)
         prop_aappend' (xs,ys) = fromAtom (toAtom xs `mappend` toAtom ys) == ((xs::String) ++ ys)
     qc "atom.id" $ \xs -> fromAtom (toAtom xs) == (xs::String)
     qc "atom.eq" $ \xs -> (toAtom xs) == toAtom (xs::String)
-    qc "atom.index" prop_atomIndex
+--    qc "atom.index" prop_atomIndex
     qc "atom.neq" prop_atomneq
     qc "atom.compare" prop_atomcompare
     qc "atom.eq'" prop_atomneq'
     qc "atom.int" prop_atomint
-    qc "atom.ii" prop_atomii
+ --   qc "atom.ii" prop_atomii
     qc "atom.aapend" prop_aappend
 
 --strings = [ "foo", "foobar", "baz", "", "bob"]

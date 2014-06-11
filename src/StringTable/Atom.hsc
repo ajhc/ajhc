@@ -5,9 +5,8 @@ module StringTable.Atom(
     ToAtom(..),
     FromAtom(..),
     HasHash(..),
-    intToAtom,
-    isValidAtom,
     unsafeIntToAtom,
+    unsafeAtomToInt,
     atomCompare,
     unsafeByteIndex,
     dumpTable,
@@ -24,11 +23,11 @@ import Data.Binary.Put
 import Data.Bits
 import Data.Data
 import Data.Monoid
-import System.IO.Unsafe (unsafePerformIO)
+import Foreign.C
 import Foreign.Marshal
 import Foreign.Storable
-import Foreign.C
 import GHC.Exts
+import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.UTF8 as BS(fromString,toString)
@@ -103,8 +102,7 @@ instance ToAtom BS.ByteString where
     toAtomIO bs = BS.unsafeUseAsCStringLen bs toAtomIO
 
 instance FromAtom CStringLen where
-    fromAtom a@(Atom v) = (stPtr a,fromIntegral $
-        (v `shiftR` (#const ATOM_LEN_SHIFT)) .&. (#const ATOM_LEN_MASK))
+    fromAtom a@(Atom v) = (stPtr a,fromIntegral $ (v .&. (#const ATOM_LEN_MASK)))
 
 instance FromAtom Word where
     fromAtom (Atom i) = fromIntegral i
@@ -118,7 +116,7 @@ instance FromAtom BS.ByteString where
         BS.unsafePackCStringLen sl
 
 instance Monoid Atom where
-    mempty = toAtom BS.empty
+    mempty = Atom (#const ATOM_EMPTY)
     mappend x y = unsafePerformIO $ atomAppend x y
 
 instance IsString Atom where
@@ -130,15 +128,10 @@ instance Show Atom where
 instance Read Atom where
     readsPrec _ s = [ (toAtom s,"") ]
 
-intToAtom :: Monad m => Int -> m Atom
-intToAtom i = if isValidAtom i then return (Atom $ fromIntegral i) else
-    fail $ "intToAtom: " ++ show i
-
-isValidAtom :: Int -> Bool
-isValidAtom i = odd i
-
 unsafeIntToAtom :: Int -> Atom
 unsafeIntToAtom x = Atom (fromIntegral x)
+unsafeAtomToInt :: Atom -> Int
+unsafeAtomToInt (Atom x) = fromIntegral x
 
 unsafeByteIndex :: Atom -> Int -> Word8
 unsafeByteIndex atom off = fromIntegral (unsafePerformIO $ peek (stPtr atom `advancePtr` off))

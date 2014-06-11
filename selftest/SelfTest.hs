@@ -25,7 +25,7 @@ import AtomName
 {-# NOINLINE main #-}
 main :: IO ()
 main = do
-    optionsTest
+--    optionsTest
     testAtomName
     testProperties
     testHasSize
