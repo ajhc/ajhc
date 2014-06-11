@@ -89,6 +89,7 @@ layout ls = f R { is = ls, ctx = [], os = [] } where
             (NL opened:ctx) | opener == opened -> f R { os = m:os, is = is',..}
                             | otherwise -> f R { os = err ("found "++  ms++  " but expected " ++ opened):m:os, is = is',.. }
             LO {}:ctx -> f R { os = rbrace:os, .. }
+            [] -> f R { os = err ("found " ++ ms ++ " without matching " ++ opener):os, .. }
 
         | Token m@(L _ _ ident):is <- is, LO open loc n:ctx' <- ctx,
             Just action <- Map.lookup (loc,ident) actionMap = case action of
@@ -100,26 +101,16 @@ layout ls = f R { is = ls, ctx = [], os = [] } where
         | [] <- is, NL s:ctx <- ctx = f R { os = err ("expected " ++ s):os, .. }
         | [] <- is, LO {}:ctx <- ctx = f R { os = rbrace:os, .. }
         | [] <- is = reverse os
+        | otherwise = f R { os = err "internal error":os, .. }
         where
         (sloc:_) = [ sl | L sl _ _ <- os] ++ [bogusASrcLoc]
         semi = L sloc LSpecial ";"
         rbrace = L sloc LSpecial "}"
         lbrace = L sloc LSpecial "{"
         err = L sloc LLexError
-        nl :: Char -> Int -> [Lexeme]
-        nl _ _ = []
-        nl t m = [L sloc LLexError ("\n" ++ replicate m ' ')]
-        nl t m = [L sloc LLexError ("\t(" ++ [t] ++ ")\n" ++ replicate m ' ')]
-
         sl "do" = InDo
         sl "of" = InCaseHead
         sl _ = InHead
-        -- sl s = f s where
-        --     f "do" = LocDo
-        --     f "of" = bl { locCase = True }
-        --     f "\\case" = bl { locCase = True }
-        --     f _ = bl
-        --     bl = Loc { locRhs = False, locGuard = False, locCase = False }
 
 layoutBrackets =
     [("case","of")

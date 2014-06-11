@@ -30,6 +30,7 @@ parse opt fp s = case scanner opt s of
     Left s -> fail s
     Right s -> do
         let pp = preprocessLexemes opt fp s
+            laidOut = L2.layout pp
         wdump FD.Tokens $ do
             putStrLn "-- scanned"
             putStrLn $ unwords [ s | L _ _ s <- s ]
@@ -38,26 +39,17 @@ parse opt fp s = case scanner opt s of
                 Token (L _ _ s) -> putStr s >> putStr " "
                 TokenNL n -> putStr ('\n':replicate (n - 1) ' ')
                 TokenVLCurly _ i -> putStr $ "{" ++ show (i - 1) ++ " "
-            putStrLn ""
-        laidOut <- doLayout opt fp s
-        wdump FD.Tokens $ do
-            putStrLn "-- after layout"
+            putStrLn "-- after layout2"
             putStrLn $ unwords [ s | L _ _ s <- laidOut ]
 
-            putStrLn "-- after layout2"
-            let --f n (L _ _ "{":xs) = putStr (" {\n" ++ replicate n ' ') >> f (n + 2) xs
-                --f n (L _ _ ";":xs) = putStr (" ;\n" ++ replicate n ' ') >> f n xs
-                --f n (L _ _ "}":xs) = putStr (" }\n" ++ replicate (n - 2) ' ') >> f (n - 2) xs
-                f n (L _ _ s:xs) = putStr (' ':s) >> f n xs
-                f n [] = return ()
-            f (0::Int) (L2.layout pp)
---            putStrLn $ unwords [ s | L _ _ s <- L2.layout pp ]
-
-        case runP (withSrcLoc bogusASrcLoc { srcLocFileName = packString fp } $ P.parseModule (L2.layout pp)) opt of
+        case runP (withSrcLoc bogusASrcLoc { srcLocFileName = packString fp } $ P.parseModule laidOut) opt of
         --case runP (withSrcLoc bogusASrcLoc { srcLocFileName = packString fp } $ P.parseModule laidOut) opt of
             (ws, ~(Just p)) -> do
                 processErrors ws
                 return p { hsModuleOpt = opt }
+
+doLayout opt fp s = do
+    return $ L2.layout $ preprocessLexemes opt fp s
 
 parseStmt :: (Applicative m,MonadWarn m) => Opt -> FilePath -> String -> m HsStmt
 parseStmt opt fp s = case scanner opt s of

@@ -40,12 +40,12 @@ foreach (@ARGV) {
         push @deps, $patch if $patch =~ s/\.yaml(.m4)?$/.patch/ and -e $patch;
     }
     push @targets, @{$y->{Target}};
-    for (@{$y->{Target}}) {
+    for (sort @{$y->{Target}}) {
         print "$_:";
-        pdeps(@deps);
+        pdeps(sort @deps);
         print "\tperl utils/build_extlibs.prl \$<\n" if $opt_e;
         print "\t./jhc \$(LIB_OPTIONS) --build-hl \$< -o \$@\n" if !$opt_e;
     }
 }
 print ($opt_e ? "JHC_EXT_LIBS =" : "JHC_LIBS =") if @targets;
-pdeps(@targets) if @targets;
+pdeps(sort @targets) if @targets;
