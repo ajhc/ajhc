@@ -21,7 +21,6 @@ import Util.Std
 import Control.Monad.Writer
 import Control.Monad.Reader
 import Data.Binary
-import Data.Generics(Typeable, everything, mkQ)
 import Data.IORef
 import System.IO.Unsafe
 import Util.Inst()
@@ -48,7 +47,7 @@ data KindEnv = KindEnv {
     kindEnv :: Map.Map Name Kind,
     kindEnvAssocs :: Map.Map Name (Int,Int),
     kindEnvClasses :: Map.Map Name [Kind]
-    } deriving(Typeable,Show)
+    } deriving(Show)
         {-!derive: Monoid !-}
 
 instance Binary KindEnv where
@@ -239,7 +238,7 @@ extendEnv newEnv = do
     liftIO $ modifyIORef ref (mappend newEnv) -- (\ (KindEnv env x) -> KindEnv (env `Map.union` newEnv) (nx `mappend` x))
 
 getConstructorKinds :: KindEnv -> Map.Map Name Kind
-getConstructorKinds ke = kindEnv ke -- Map.fromList [ (toName TypeConstructor x,y) | (x,y)<- Map.toList m]
+getConstructorKinds ke = kindEnv ke
 
 --------------------------------------------------------------------------------
 
@@ -296,10 +295,10 @@ kiType k (HsTyApp a b) = do
     kiType  (KVar kv `Kfun` k) a
     kiType' (KVar kv) b
 kiType k (HsTyVar v) = do
-    kv <- lookupKind KindAny (toName TypeVal v)
+    kv <- lookupKind KindAny v
     unify k kv
 kiType k (HsTyCon v) = do
-    kv <- lookupKind KindAny (toName TypeConstructor v)
+    kv <- lookupKind KindAny v
     unify k kv
 kiType k HsTyAssoc = do
     constrain KindSimple k
@@ -329,7 +328,6 @@ hsKindToKind a | a == hsKindStar       = kindStar
                | a == hsKindQuest      = kindFunRet
                | a == hsKindQuestQuest = kindArg
 hsKindToKind (HsKind n) = KBase (KNamed n)
--- hsKindToKind (HsKind n) = toName SortName n
 
 kiApps :: Kind -> [HsType] -> Kind -> Ki ()
 kiApps ca args fk = f ca args fk where
@@ -437,12 +435,10 @@ kiDecl d = withSrcLoc (srcLoc d) (f d) where
             [fromHsTyVar -> Just classArg] = hsClassHeadArgs
         zipWithM_ kiType' ks hsClassHeadArgs
         mapM_ kiPred hsClassHeadContext
-        let rn = Seq.toList $ everything (<>) (mkQ mempty g) newClassBodies
-            newClassBodies = map typeFromSig $ filter isHsTypeSig sigsAndDefaults
-            typeFromSig (HsTypeSig _sloc _names qualType) = qualType
-            typeFromSig _ = error "KindInfer.typeFromSig: bad."
-            g (HsTyVar n') | removeUniquifier n' == removeUniquifier classArg = Seq.singleton n'
-            g _ = mempty
+        let rn = Seq.toList $ execWriter (mapM_ (traverseHsType_ f) newClassBodies)
+            newClassBodies = [  hsQualTypeType qt | HsTypeSig { hsDeclQualType = qt } <- sigsAndDefaults]
+            f (HsTyVar n') | removeUniquifier n' == removeUniquifier classArg = tell $ Seq.singleton n'
+            f x = traverseHsType_ f x
         carg <- lookupKind KindSimple classArg
         mapM_ (\n -> lookupKind KindSimple n >>= unify carg ) rn
         local (\e -> e { kiWhere = InClass }) $ mapM_ kiDecl sigsAndDefaults
@@ -481,8 +477,8 @@ fromHsTypeApp t = f t [] where
     f t rs = (t,rs)
 
 kiAlias context tyconName args condecl = do
-    args <- mapM (lookupKind KindSimple . toName TypeVal) args
-    kc <- lookupKind KindAny (toName TypeConstructor tyconName)
+    args <- mapM (lookupKind KindSimple) args
+    kc <- lookupKind KindAny tyconName
     let [a] = hsConDeclArgs condecl
     va <- newKindVar KindQuestQuest
     kiApps' kc args (KVar va)
@@ -490,8 +486,8 @@ kiAlias context tyconName args condecl = do
     mapM_ kiPred context
 
 kiData context tyconName args condecls = do
-    args <- mapM (lookupKind KindSimple . toName TypeVal) args
-    kc <- lookupKind KindSimple (toName TypeConstructor tyconName)
+    args <- mapM (lookupKind KindSimple) args
+    kc <- lookupKind KindSimple tyconName
     kiApps' kc args kindStar
     mapM_ kiPred context
     flip mapM_  (concatMap (map hsBangType . hsConDeclArgs) condecls) $ \t -> do
@@ -501,7 +497,7 @@ kiData context tyconName args condecls = do
 kiDataKind tyconName condecls = do
     unless (nameType tyconName == SortName) $ fail "tycon isn't sort"
     flip mapM_  condecls $ \ HsConDecl { .. } -> do
-        kc <- lookupKind KindAny (toName TypeConstructor hsConDeclName)
+        kc <- lookupKind KindAny hsConDeclName
         let args = [ KBase (KNamed t) | HsTyCon t <- map hsBangType hsConDeclConArg ]
         kiApps' kc args (KBase (KNamed tyconName))
 
@@ -537,9 +533,9 @@ fromTyApp t = f t [] where
     f t rs = (t,rs)
 
 aHsTypeToType :: KindEnv -> HsType -> Type
-aHsTypeToType kt@KindEnv { kindEnvAssocs = at } t | (HsTyCon con,xs) <- fromTyApp t, let nn = toName TypeConstructor con, Just (n1,n2) <- Map.lookup nn at =
+aHsTypeToType kt@KindEnv { kindEnvAssocs = at } t | (HsTyCon con,xs) <- fromTyApp t, Just (n1,n2) <- Map.lookup con at =
     TAssoc {
-        typeCon = Tycon nn (kindOf nn kt),
+        typeCon = Tycon con (kindOf con kt),
         typeClassArgs = map (aHsTypeToType kt) (take n1 xs),
         typeExtraArgs = map (aHsTypeToType kt) (take n2 $ drop n1 xs)
     }
@@ -559,16 +555,14 @@ aHsTypeToType kt (HsTyVar name) = TVar $ toTyvar kt name --  tyvar  name (kindOf
 -- here we also qualify the type constructor if it is
 -- currently unqualified
 
-aHsTypeToType kt (HsTyCon name) = TCon $ Tycon nn (kindOf nn kt)  where
-    nn =  (toName TypeConstructor name)
+aHsTypeToType kt (HsTyCon name) = TCon $ Tycon name (kindOf name kt)
 
 aHsTypeToType kt (HsTyForall vs qt) = TForAll (map (toTyvar kt . hsTyVarBindName) vs) (aHsQualTypeToQualType kt qt)
 aHsTypeToType kt (HsTyExists vs qt) = TExists (map (toTyvar kt . hsTyVarBindName) vs) (aHsQualTypeToQualType kt qt)
 
 aHsTypeToType _ t = error $ "aHsTypeToType: " ++ show t
 
-toTyvar kt name =  tyvar  nn (kindOf nn kt) where
-    nn = toName TypeVal name
+toTyvar kt name =  tyvar  name (kindOf name kt)
 
 aHsQualTypeToQualType :: KindEnv -> HsQualType -> Qual Type
 aHsQualTypeToQualType kt (HsQualType cntxt t) = map (hsAsstToPred kt) cntxt :=> aHsTypeToType kt t

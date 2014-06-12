@@ -302,7 +302,7 @@ renameHsDecl d = f d where
         return HsDataDecl { .. }
     f HsDataDecl { .. } = do
         hsDeclName <- renameName hsDeclName
-        updateWith (map fromTypishHsName hsDeclArgs) $ do
+        updateWith hsDeclArgs $ do
             hsDeclContext <- rename hsDeclContext
             hsDeclArgs <- mapM renameName hsDeclArgs
             hsDeclCons <- rename hsDeclCons
@@ -376,7 +376,7 @@ instance Rename HsClassHead where
 instance Rename HsRule where
     rename prules@HsRule { hsRuleSrcLoc = srcLoc, hsRuleFreeVars = fvs, hsRuleLeftExpr = e1, hsRuleRightExpr = e2 } = do
         withSrcLoc srcLoc $ do
-        updateWith (map fromValishHsName $ fsts fvs) $ do
+        updateWith (fsts fvs) $ do
         subTable'' <- getUpdates (catMaybes $ snds fvs)
         fvs' <- sequence [ liftM2 (,) (renameName x) (withSubTable subTable'' $ rename y)| (x,y) <- fvs]
         e1' <- rename e1
@@ -833,7 +833,7 @@ instance UpdateTable HsQualType where
     getNames (HsQualType _hsContext hsType) = getNames hsType
 instance UpdateTable HsType where
     getNames t = execWriter (getNamesFromType t)  where
-        getNamesFromType (HsTyVar hsName) = tell [fromTypishHsName hsName]
+        getNamesFromType (HsTyVar hsName) = tell [hsName]
         getNamesFromType t = traverseHsType_ getNamesFromType t
 
 getNamesAndASrcLocsFromHsDecl :: HsDecl -> [(Name, SrcLoc)]

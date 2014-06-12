@@ -31,6 +31,16 @@ traverseHsExp fn e = traverseHsOps ops e where
             opHsPat p = return p
             opHsType t = return t
 
+traverseHsDecl_ :: (Monad m,Applicative m,MonadSetSrcLoc m,TraverseHsOps e) => (HsDecl -> m ()) -> e -> m ()
+traverseHsDecl_ fn e = traverseHsDecl (traverse_ fn) e *> pure ()
+
+traverseHsDecl :: (Monad m,MonadSetSrcLoc m,TraverseHsOps e) => (HsDecl -> m HsDecl) -> e -> m e
+traverseHsDecl fn e = traverseHsOps ops e where
+    ops = (hsOpsDefault ops) { opHsDecl, opHsPat, opHsType } where
+            opHsDecl e = fn e
+            opHsPat p = return p
+            opHsType t = return t
+
 traverseHsType_ :: Applicative m => (HsType -> m b) -> HsType -> m ()
 traverseHsType_ fn p = traverseHsType (traverse_ fn) p *> pure ()
 

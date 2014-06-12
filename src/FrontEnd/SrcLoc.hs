@@ -4,7 +4,6 @@ import Util.Std
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Data.Binary
-import Data.Generics
 
 import PackedString
 
@@ -13,11 +12,11 @@ data SrcLoc = SrcLoc {
         srcLocLine :: {-# UNPACK #-} !Int,
         srcLocColumn :: {-# UNPACK #-} !Int
         }
-    deriving(Data,Typeable,Eq,Ord)
+    deriving(Eq,Ord)
     {-! derive: update, Binary !-}
 
 data SrcSpan = SrcSpan { srcSpanBegin :: !SrcLoc, srcSpanEnd :: !SrcLoc }
-    deriving(Data,Typeable,Eq,Ord)
+    deriving(Eq,Ord)
     {-! derive: update, Binary !-}
 
 -- Useful bogus file names used to indicate where non file based errors are.
@@ -70,7 +69,7 @@ instance HasLocation (Located a) where
     srcSpan (Located x _) = x
 
 data Located x = Located SrcSpan x
-    deriving(Ord,Data,Typeable,Eq,Functor,Foldable,Traversable)
+    deriving(Ord,Eq,Functor,Foldable,Traversable)
     {-! derive: Binary !-}
 
 instance Show a => Show (Located a) where

@@ -28,7 +28,6 @@ import Data.Char
 import Data.Data
 import GHC.Base
 import StringTable.Atom
-import Util.Std
 
 {-
  - TODO:
@@ -110,7 +109,7 @@ instance Show Module where
 
 forgeName :: NameType -> Maybe Module -> String -> Name
 forgeName t Nothing  i = bitsToName (toAtom $ ';':i) t
-forgeName t (Just (Module m)) i = bitsToName (m `mappend` toAtom (';':i)) t
+forgeName t (Just (Module m)) i = bitsToName (toAtom $ show m ++ (';':i)) t
 
 quoteName :: Name -> Name
 quoteName name = bitsToName (toAtom $ encodeNameType nt:fromAtom atom) QuotedName where

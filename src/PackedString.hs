@@ -7,7 +7,6 @@ module PackedString (
     ) where
 
 import Data.Binary
-import Data.Generics
 import Data.Monoid
 import GHC.Exts
 import System.IO.Unsafe
@@ -16,7 +15,7 @@ import qualified Data.ByteString.UTF8 as BSU
 import qualified Data.ByteString.Unsafe as BS
 
 newtype PackedString = PS BS.ByteString
-    deriving(Typeable,Binary,Eq,Ord,Monoid,Data)
+    deriving(Binary,Eq,Ord,Monoid)
 
 instance Show PackedString where
     showsPrec p ps r = showsPrec p (unpackPS ps) r

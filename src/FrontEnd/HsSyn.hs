@@ -1,7 +1,6 @@
 module FrontEnd.HsSyn(module FrontEnd.HsSyn, module FrontEnd.SrcLoc) where
 
 import Data.Binary
-import Data.Generics
 
 import C.FFI
 import Data.Foldable(Foldable)
@@ -221,7 +220,7 @@ data HsRhs = HsUnGuardedRhs HsExp | HsGuardedRhss [HsComp]
 data HsQualType = HsQualType {
     hsQualTypeContext :: HsContext,
     hsQualTypeType :: HsType
-    } deriving(Data,Typeable,Eq,Ord,Show)
+    } deriving(Eq,Ord,Show)
   {-! derive: Binary !-}
 
 data HsType
@@ -247,14 +246,14 @@ data HsType
     -- the following is used internally
     | HsTyAssoc
     | HsTyEq HsType HsType
-  deriving(Data,Typeable,Eq,Ord,Show)
+  deriving(Eq,Ord,Show)
   {-! derive: Binary, is !-}
 
 data HsTyVarBind = HsTyVarBind {
     hsTyVarBindSrcLoc :: SrcLoc,
     hsTyVarBindName   :: Name,
     hsTyVarBindKind   :: Maybe HsKind
-    } deriving(Data,Typeable,Eq,Ord,Show)
+    } deriving(Eq,Ord,Show)
   {-! derive: Binary, update !-}
 
 hsTyVarBind = HsTyVarBind {
@@ -264,7 +263,7 @@ hsTyVarBind = HsTyVarBind {
     }
 
 data HsAsst = HsAsst Name [Name] | HsAsstEq HsType HsType
-  deriving(Data,Typeable,Eq,Ord, Show)
+  deriving(Eq,Ord, Show)
     {-! derive: Binary !-}
 
 data HsLiteral
@@ -382,7 +381,7 @@ data HsAlt = HsAlt SrcLoc HsPat HsRhs [HsDecl]
   deriving(Eq,Show,Ord)
 
 data HsKind = HsKind Name | HsKindFn HsKind HsKind
-  deriving(Data,Typeable,Eq,Ord,Show)
+  deriving(Eq,Ord,Show)
   {-! derive: Binary !-}
 
 -- instances

@@ -22,7 +22,6 @@ module StringTable.Atom(
 import Data.Binary
 import Data.Binary.Get
 import Data.Binary.Put
-import Data.Bits
 import Data.Data
 import Data.Monoid
 import Foreign.C

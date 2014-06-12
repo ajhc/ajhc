@@ -231,7 +231,6 @@ openPat (HsPInfixApp a n b) = HsPApp n [a,b]
 openPat p = p
 
 hsApp e es = hsParen $ foldl HsApp (hsParen e) (map hsParen es)
-hsIf e a b = hsParen $ HsIf e a b
 
 hsExpError :: (MonadWarn m,MonadSrcLoc m) => String -> m HsExp
 hsExpError hsExpString = do

@@ -7,8 +7,6 @@ module Name.Name(
     ToName(..),
     fromName,
     ffiExportName,
-    fromTypishHsName,
-    fromValishHsName,
     getIdent,
     getModule,
     isConstructor,
@@ -70,21 +68,10 @@ isValNamespace _ = False
 -- name definiton
 -----------------
 
-isConstructorLike n =  isUpper x || x `elem` ":("  || xs == "->" || xs == "[]" where
-    (_,_,xs@(x:_)) = nameParts n
-
+-- should only be used for printing, the parser should know when things are in
+-- operator position or not.
 isOpLike n  = x `elem` "!#$%&*+./<=>?@\\^-~:|" where
     (_,_,(x:_)) = nameParts n
-
-fromTypishHsName, fromValishHsName :: Name -> Name
-fromTypishHsName name
-    | nameType name == QuotedName = name
-    | isConstructorLike name = toName TypeConstructor name
-    | otherwise = toName TypeVal name
-fromValishHsName name
-    | nameType name == QuotedName = name
-    | isConstructorLike name = toName DataConstructor name
-    | otherwise = toName Val name
 
 createName :: NameType -> Module -> String -> Name
 createName _ (Module "") i = error $ "createName: empty module " ++ i
@@ -276,14 +263,9 @@ originalUnqualifiedName :: Name -> Name
 originalUnqualifiedName n = case unMkName n of
     NameParts { .. } -> toName (nameType n) nameIdent
 
---constructName :: Maybe Module -> Maybe UnqualifiedName -> UnqualifiedName -> Maybe Int -> Name
---constructName mm
-
 ----------------
 -- Parameterized
 ----------------
-
--- Goal, get rid of hardcoded NameType, move pertinent info into cache byte
 
 instance HasTyLevel Name where
     getTyLevel n = f (nameType n) where

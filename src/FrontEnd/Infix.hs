@@ -159,10 +159,9 @@ fromHsApp t = f t [] where
     f t rs = (t,rs)
 
 buildFixityMap :: [HsDecl] -> FixityMap
-buildFixityMap ds = FixityMap (Map.fromList $ concatMap f ds)  where
-        f (HsInfixDecl _ assoc strength names) = zip (map make_key names) $ repeat (strength,assoc)
-        f _ = []
-        make_key = fromValishHsName
+buildFixityMap ds = FixityMap (Map.unions $ map f ds)  where
+        f (HsInfixDecl _ assoc strength names) = Map.fromList $ zip names $ repeat (strength,assoc)
+        f _ = Map.empty
 
 -- TODO: interactive
 infixStatement :: FixityMap -> HsStmt -> HsStmt
