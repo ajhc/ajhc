@@ -29,6 +29,7 @@ foreach (@ARGV) {
     my @deps;
     @deps = values %{$y->{ModuleSource}} if !$opt_e;
     push @deps, values %{$y->{LibraryDeps}} if exists $y->{LibraryDeps};
+    push @deps, values %{$y->{LibraryDepsUnused}} if exists $y->{LibraryDepsUnused};
     if (exists $y->{LibraryDesc}) {
         my @ld = @{$y->{LibraryDesc}};
         map { s/^tmp\/build\/[^\/]*/lib\/ext/ } @ld;

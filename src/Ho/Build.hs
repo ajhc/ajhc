@@ -210,14 +210,16 @@ instance MapKey Module where
 instance MapKey MD5.Hash where
     showMapKey = show
 
-dumpDeps targets memap cug = case optDeps options of
+dumpDeps targets done cug = case optDeps options of
     Nothing -> return ()
     Just fp -> do
+        let memap = modEncountered done
         let (sfps,sdps,ls) = collectDeps memap cug
         let yaml = Map.fromList [
                 ("Target",toNode targets),
                 ("LibraryDesc",toNode [ fp | BuildHl fp  <- [optMode options]]),
                 ("LibraryDeps",toNode ls),
+                ("LibraryDepsUnused", toNode [ (libHash l,libFileName l)  | l <- Map.elems (loadedLibraries done), libHash l `Map.notMember` ls ]),
                 ("ModuleSource",toNode sfps),
                 ("ModuleDeps",toNode sdps)
                 ]
@@ -471,7 +473,7 @@ loadModules modOpt targets libs sloc need = do
     done <- readIORef done_ref
     let needed = (ms1 ++ lefts need)
     (chash,cug) <- toCompUnitGraph done needed
-    dumpDeps targets (modEncountered done) cug
+    dumpDeps targets done cug
     return (Map.filterWithKey (\k _ -> k `Set.member` validSources done) (knownSourceMap done),chash,cug)
 
 isMissingModule Warning { warnType = MissingModule {}  } = True
