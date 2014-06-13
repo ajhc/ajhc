@@ -196,6 +196,8 @@ processOptions = do
     case optStop o of
         StopError s -> putErrLn "bad option passed to --stop should be one of parse, deps, typecheck, or c" >> exitWith exitCodeUsage
         _ -> return ()
+    -- set temporary directory
+    maybeDo $ do x <- optWorkDir o; return $ setTempDir x
     let readYaml o fp = do
             when (dopts' o FD.Progress) $ putStrLn $ "Reading " ++ fp
             snd <$> readYamlOpts o fp

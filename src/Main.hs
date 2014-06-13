@@ -35,8 +35,6 @@ main = wrapMain $ do
     when (dump FD.Atom) $ do
         addAtExit dumpStringTableStats
         addAtExit dumpToFile
-    -- set temporary directory
-    maybeDo $ do x <- optWorkDir options; return $ setTempDir x
     let darg = progressM $ do
         (argstring,_) <- getArgString
         return (argstring ++ "\n" ++ versionSimple)

@@ -17,6 +17,7 @@ import Data.IORef
 import Data.List
 import Data.Maybe
 import Foreign.C
+import GenUtil (iocatch)
 import System.Directory
 import System.Exit
 import System.FilePath as FP
@@ -25,14 +26,13 @@ import System.IO.Unsafe
 import System.Posix.Signals
 import Text.Printf
 import qualified Data.Set as Set
-import GenUtil (iocatch)
 
 data TempDir = TempDir {
-    tempDirClean   :: Bool,  -- ^ whether to delete the directory afterwords.
-    tempDirDump    :: Bool,
-    tempDirPath    :: Maybe String,
-    tempDirAtExit  :: [IO ()],
-    tempDirCleanup :: Set.Set FilePath
+    tempDirAtExit  :: !(IO ()),
+    tempDirClean   :: !Bool,  -- ^ whether to delete the directory afterwords.
+    tempDirCleanup :: Set.Set FilePath,
+    tempDirDump    :: !Bool,
+    tempDirPath    :: Maybe String
     }
 
 putLog :: String -> IO ()
@@ -67,7 +67,7 @@ getTempDir = do
 addAtExit :: IO () -> IO ()
 addAtExit action = do
     td <- readIORef tdRef
-    writeIORef tdRef td { tempDirAtExit = action:tempDirAtExit td }
+    writeIORef tdRef td { tempDirAtExit = action >> tempDirAtExit td }
 
 createTempFile :: FilePath -> IO (FilePath, Handle)
 createTempFile (FP.normalise -> fp) = do
@@ -107,10 +107,11 @@ fileInTempDir (FP.normalise -> fp) action = do
     when b $ action nfp
     return nfp
 
+-- |
 cleanUp :: IO ()
 cleanUp = do
     td <- readIORef tdRef
-    sequence_ (tempDirAtExit td)
+    tempDirAtExit td
     if not (tempDirClean td) ||
         isNothing (tempDirPath td) then return () else do
     dir <- getTempDir
@@ -135,12 +136,13 @@ wrapMain main = E.catch (main >> cleanUp) f where
     f e = do
         ss <- readIORef stackRef
         td <- readIORef tdRef
-        case tempDirPath td of
-            Just td -> hPutStrLn stderr $
-                printf "Exiting abnormally. Work directory is '%s'" td
-            _ -> return ()
+        -- case tempDirPath td of
+        --     Just td -> hPutStrLn stderr $
+        --         printf "Exiting abnormally. Work directory is '%s'" td
+        --     _ -> return ()
         unless (null ss) $
             forM_ ("Stack:":ss) (hPutStrLn stderr)
+        cleanUp
         throwIO e
 
 -------------------
@@ -156,7 +158,7 @@ tdRef = unsafePerformIO $ newIORef TempDir {
     tempDirClean   = True,
     tempDirDump    = False,
     tempDirPath    = Nothing,
-    tempDirAtExit  = [],
+    tempDirAtExit  = return (),
     tempDirCleanup = Set.empty
     }
 

@@ -14,7 +14,7 @@ SHORTVERSION="$VERSION_MAJOR.$VERSION_MINOR"
 # or .hl files changes in an incompatible way.
 HO_VERSION=16
 
-AS_TMPDIR
+AS_TMPDIR([jcfg])
 AC_CANONICAL_HOST
 AC_PROG_LN_S
 AC_C_BIGENDIAN([BYTE_ORDER=BIG_ENDIAN],[BYTE_ORDER=LITTLE_ENDIAN],[BYTE_ORDER=PDP_ENDIAN])
@@ -106,7 +106,8 @@ AC_DEFINE_DIR(JETCPATH,jetcpath)
 
 dnl AX_CREATE_STDINT_H([cbits/_stdint.h])
 
-rmdir -f $tmp > /dev/null 2>&1
+[echo "Deleting tmpdir $tmp"
+ rmdir $tmp]
 
 AC_SUBST(BYTE_ORDER)
 AC_SUBST(EXTRA_PACKAGES)
