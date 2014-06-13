@@ -22,32 +22,32 @@ import Name.Names
 import Util.SetLike
 import qualified Data.Map as Map
 
-choDataTable = hoDataTable . hoBuild . choHo
+choDataTable      = hoDataTable . hoBuild . choHo
 choClassHierarchy = hoClassHierarchy . hoTcInfo . choHo
-choTypeSynonyms = hoTypeSynonyms . hoTcInfo . choHo
-choFixities = hoFixities . hoTcInfo . choHo
-choAssumps = hoAssumps . hoTcInfo . choHo
-choRules = hoRules . hoBuild . choHo
-choEs cho = [ (combHead c,combBody c) | c <- values $  choCombinators cho]
+choTypeSynonyms   = hoTypeSynonyms . hoTcInfo . choHo
+choFixities       = hoFixities . hoTcInfo . choHo
+choAssumps        = hoAssumps . hoTcInfo . choHo
+choRules          = hoRules . hoBuild . choHo
+choEs cho         = [ (combHead c,combBody c) | c <- values $  choCombinators cho]
 
 instance Monoid CollectedHo where
     mempty = updateChoHo CollectedHo {
         choExternalNames = mempty,
-        choOrphanRules = mempty,
-        choHoMap = Map.singleton mod_Prim_ pho,
-        choCombinators = mempty,
-        choHo = error "choHo-a",
-        choVarMap = error "choVarMap-a",
-        choLibDeps = mempty
-        } where pho = mempty { hoBuild = mempty { hoDataTable = dataTablePrims } }
+        choOrphanRules   = mempty,
+        choHoMap         = Map.singleton mod_Prim_ pho,
+        choCombinators   = mempty,
+        choHo            = error "choHo-a",
+        choVarMap        = error "choVarMap-a",
+        choLibDeps       = mempty
+        } where pho      = mempty { hoBuild = mempty { hoDataTable = dataTablePrims } }
     a `mappend` b = updateChoHo CollectedHo {
         choExternalNames = choExternalNames a `mappend` choExternalNames b,
-        choVarMap = error "choVarMap-b",
-        choOrphanRules = choOrphanRules a `mappend` choOrphanRules b,
-        choCombinators = choCombinators a `mergeChoCombinators` choCombinators b,
-        choLibDeps = choLibDeps a `mappend` choLibDeps b,
-        choHo = error "choHo-b",
-        choHoMap = Map.union (choHoMap a) (choHoMap b)
+        choVarMap        = error "choVarMap-b",
+        choOrphanRules   = choOrphanRules a `mappend` choOrphanRules b,
+        choCombinators   = choCombinators a `mergeChoCombinators` choCombinators b,
+        choLibDeps       = choLibDeps a `mappend` choLibDeps b,
+        choHo            = error "choHo-b",
+        choHoMap         = Map.union (choHoMap a) (choHoMap b)
         }
 
 updateChoHo cho = cho { choHo = ho, choVarMap = varMap } where

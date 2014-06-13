@@ -282,35 +282,35 @@ binopType _ t1 _ = t1
 
 isCommutable :: BinOp -> Bool
 isCommutable x = f x where
-    f Add = True
-    f Mul = True
-    f And = True
-    f Or  = True
-    f Xor = True
-    f Eq  = True
-    f NEq = True
-    f FAdd = True
-    f FMul = True
-    f FEq  = True
-    f FNEq = True
+    f Add      = True
+    f Mul      = True
+    f And      = True
+    f Or       = True
+    f Xor      = True
+    f Eq       = True
+    f NEq      = True
+    f FAdd     = True
+    f FMul     = True
+    f FEq      = True
+    f FNEq     = True
     f FOrdered = True
-    f _ = False
+    f _        = False
 
 commuteBinOp :: BinOp -> Maybe BinOp
 commuteBinOp x | isCommutable x = return x
-commuteBinOp Lt = return Gt
-commuteBinOp Gt = return Lt
-commuteBinOp Lte = return Gte
-commuteBinOp Gte = return Lte
-commuteBinOp ULt = return UGt
-commuteBinOp UGt = return ULt
+commuteBinOp Lt   = return Gt
+commuteBinOp Gt   = return Lt
+commuteBinOp Lte  = return Gte
+commuteBinOp Gte  = return Lte
+commuteBinOp ULt  = return UGt
+commuteBinOp UGt  = return ULt
 commuteBinOp ULte = return UGte
 commuteBinOp UGte = return ULte
-commuteBinOp FLt = return FGt
-commuteBinOp FGt = return FLt
+commuteBinOp FLt  = return FGt
+commuteBinOp FGt  = return FLt
 commuteBinOp FLte = return FGte
 commuteBinOp FGte = return FLte
-commuteBinOp _ = Nothing
+commuteBinOp _    = Nothing
 
 isAssociative :: BinOp -> Bool
 isAssociative x = f x where
@@ -319,26 +319,26 @@ isAssociative x = f x where
     f And = True
     f Or  = True
     f Xor = True
-    f _ = False
+    f _   = False
 
 unopFloat :: Ty -> UnOp -> Maybe String
 unopFloat (TyBits b HintFloat) op = g b =<< f op where
     g (Bits 64) x = return x
     g (Bits 32) x = return $ x ++ "f"
-    g _ _ = Nothing
+    g _ _  = Nothing
     f FAbs = return "fabs"
     f Sin  = return "sin"
     f Cos  = return "cos"
     f Tan  = return "tan"
-    f Sinh  = return "sinh"
-    f Cosh  = return "cosh"
-    f Tanh  = return "tanh"
-    f Asin  = return "asin"
-    f Acos  = return "acos"
-    f Atan  = return "atan"
+    f Sinh = return "sinh"
+    f Cosh = return "cosh"
+    f Tanh = return "tanh"
+    f Asin = return "asin"
+    f Acos = return "acos"
+    f Atan = return "atan"
     f Sqrt = return "sqrt"
-    f Log = return "log"
-    f Exp = return "exp"
+    f Log  = return "log"
+    f Exp  = return "exp"
 
     f _ = Nothing
 unopFloat _ _ = Nothing
@@ -371,38 +371,38 @@ binopInfix ULte = Just ("<=",2)
 binopInfix ULt  = Just ("<",2)
 binopInfix Eq   = Just ("==",2)
 binopInfix NEq  = Just ("!=",2)
-binopInfix _ = Nothing
+binopInfix _    = Nothing
 
 class IsOperator o where
-    isCheap :: o -> Bool
+    isCheap     :: o -> Bool
     isEagerSafe :: o -> Bool
 
 instance IsOperator BinOp where
-    isCheap FAtan2 = False
-    isCheap _ = True
+    isCheap FAtan2   = False
+    isCheap _        = True
 
-    isEagerSafe Div = False
-    isEagerSafe Mod = False
+    isEagerSafe Div  = False
+    isEagerSafe Mod  = False
     isEagerSafe Quot = False
     isEagerSafe Rem  = False
     isEagerSafe UDiv = False
     isEagerSafe UMod = False
-    isEagerSafe _ = True
+    isEagerSafe _    = True
 
 instance IsOperator UnOp where
-    isCheap _ = True
+    isCheap _     = True
     isEagerSafe _ = True
 
 instance IsOperator ConvOp where
-    isCheap _ = True
+    isCheap _     = True
     isEagerSafe _ = True
 
 instance IsOperator (Op v) where
-    isCheap (BinOp o _ _) = isCheap o
-    isCheap (UnOp o _) = isCheap o
-    isCheap (ConvOp o _) = isCheap o
-    isCheap _ = False
+    isCheap (BinOp o _ _)     = isCheap o
+    isCheap (UnOp o _)        = isCheap o
+    isCheap (ConvOp o _)      = isCheap o
+    isCheap _                 = False
     isEagerSafe (BinOp o _ _) = isEagerSafe o
-    isEagerSafe (UnOp o _) = isEagerSafe o
-    isEagerSafe (ConvOp o _) = isEagerSafe o
-    isEagerSafe _ = False
+    isEagerSafe (UnOp o _)    = isEagerSafe o
+    isEagerSafe (ConvOp o _)  = isEagerSafe o
+    isEagerSafe _             = False

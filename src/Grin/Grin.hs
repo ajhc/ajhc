@@ -1,35 +1,31 @@
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Grin.Grin(
+    BaseOp(..),
     Callable(..),
     Exp(..),
     FuncDef(..),
     FuncProps(..),
     Grin(..),
-    TyThunk(..),
     Lam(..),
     Phase(..),
-    BaseOp(..),
     Tag,
-    updateFuncDefProps,
+    TagInfo(..),
     Ty(..),
     TyEnv(..),
+    TyThunk(..),
     TyTy(..),
-    tyTy,
     Val(..),
     Var(..),
-    extendTyEnv,
     createFuncDef,
-    setGrinFunctions,
-    grinFuncs,
     emptyGrin,
-    tyINode,
-    tyDNode,
+    extendTyEnv,
     findArgs,
     findArgsType,
     findTyTy,
     gEval,
     grinEntryPointNames,
+    grinFuncs,
     isHole,
     isValUnknown,
     isVar,
@@ -38,10 +34,10 @@ module Grin.Grin(
     partialTag,
     phaseEvalInlined,
     properHole,
+    setGrinFunctions,
     tagFlipFunction,
     tagHole,
     tagInfo,
-    TagInfo(..),
     tagIsFunction,
     tagIsPartialAp,
     tagIsSuspFunction,
@@ -49,6 +45,10 @@ module Grin.Grin(
     tagIsWHNF,
     tagToFunction,
     tagUnfunction,
+    tyDNode,
+    tyINode,
+    tyTy,
+    updateFuncDefProps,
     v0,v1,v2,v3,lamExp,lamBind,
     valIsNF
     ) where
@@ -211,11 +211,11 @@ data TyThunk
     deriving(Eq,Show)
 
 data TyTy = TyTy {
-    tySlots :: [Ty],
-    tyReturn :: [Ty],
-    tyThunk :: TyThunk,
+    tySlots    :: [Ty],
+    tyReturn   :: [Ty],
+    tyThunk    :: TyThunk,
     tySiblings :: Maybe [Atom]
-}
+    }
 
 tyTy = TyTy { tySlots = [], tyReturn = [], tySiblings = Nothing, tyThunk = TyNotThunk }
 
@@ -254,28 +254,27 @@ extendTyEnv ds (TyEnv env) = TyEnv (fromList xs `mappend` env) where
 
 -- cached info
 data FuncProps = FuncProps {
-    funcInfo    :: Info.Info,
+    funcInfo     :: Info.Info,
     funcFreeVars :: Set.Set Var,
-    funcTags    :: Set.Set Tag,
-    funcType    :: ([Ty],[Ty]),
-    funcExits   :: Perhaps,      -- ^ function quits the program
-    funcCuts    :: Perhaps,      -- ^ function cuts to a value
-    funcAllocs  :: Perhaps,      -- ^ function allocates memory
-    funcCreates :: Perhaps,      -- ^ function allocates memory and stores or returns it
-    funcLoops   :: Perhaps       -- ^ function may loop
-    }
-    deriving(Eq,Ord,Show)
+    funcTags     :: Set.Set Tag,
+    funcType     :: ([Ty],[Ty]),
+    funcExits    :: Perhaps,      -- ^ function quits the program
+    funcCuts     :: Perhaps,      -- ^ function cuts to a value
+    funcAllocs   :: Perhaps,      -- ^ function allocates memory
+    funcCreates  :: Perhaps,      -- ^ function allocates memory and stores or returns it
+    funcLoops    :: Perhaps       -- ^ function may loop
+    } deriving(Eq,Ord,Show)
 
 funcProps = FuncProps {
-    funcInfo = mempty,
+    funcInfo     = mempty,
     funcFreeVars = mempty,
-    funcTags = mempty,
-    funcType = undefined,
-    funcExits = Maybe,
-    funcCuts = Maybe,
-    funcAllocs = Maybe,
-    funcCreates = Maybe,
-    funcLoops = Maybe
+    funcTags     = mempty,
+    funcType     = undefined,
+    funcExits    = Maybe,
+    funcCuts     = Maybe,
+    funcAllocs   = Maybe,
+    funcCreates  = Maybe,
+    funcLoops    = Maybe
     }
 
 data Phase = PhaseInit | PostInlineEval | PostAeOptimize | PostDevolve
@@ -284,26 +283,26 @@ data Phase = PhaseInit | PostInlineEval | PostAeOptimize | PostDevolve
 phaseEvalInlined e = e >= PostInlineEval
 
 data Grin = Grin {
-    grinEntryPoints :: GMap Atom FfiExport,
-    grinPhase :: !Phase,
-    grinTypeEnv :: TyEnv,
-    grinFunctions :: [FuncDef],
+    grinEntryPoints   :: GMap Atom FfiExport,
+    grinPhase         :: !Phase,
+    grinTypeEnv       :: TyEnv,
+    grinFunctions     :: [FuncDef],
     grinSuspFunctions :: Set.Set Atom,
     grinPartFunctions :: Set.Set Atom,
-    grinStats :: !Stats.Stat,
-    grinCafs :: [(Var,Val)]
-}
+    grinStats         :: !Stats.Stat,
+    grinCafs          :: [(Var,Val)]
+    }
 
 emptyGrin = Grin {
-    grinEntryPoints = mempty,
-    grinPhase = PhaseInit,
-    grinTypeEnv = mempty,
-    grinFunctions = [],
+    grinEntryPoints   = mempty,
+    grinPhase         = PhaseInit,
+    grinTypeEnv       = mempty,
+    grinFunctions     = [],
     grinSuspFunctions = mempty,
     grinPartFunctions = mempty,
-    grinStats = mempty,
-    grinCafs = mempty
-}
+    grinStats         = mempty,
+    grinCafs          = mempty
+    }
 
 grinEntryPointNames = keys . grinEntryPoints
 
@@ -505,17 +504,17 @@ instance  FreeVars Exp (Set.Set Var,Set.Set Tag) where
 
 instance FreeVars Val (Set.Set Var) where
     freeVars (NodeC t xs) = freeVars xs
-    freeVars (Const v) = freeVars v
-    freeVars (Index a b) = freeVars (a,b)
-    freeVars (Var v _) = Set.singleton v
-    freeVars _ = Set.empty
+    freeVars (Const v)    = freeVars v
+    freeVars (Index a b)  = freeVars (a,b)
+    freeVars (Var v _)    = Set.singleton v
+    freeVars _            = Set.empty
 
 instance FreeVars Val (Set.Set (Var,Ty)) where
     freeVars (NodeC t xs) = freeVars xs
-    freeVars (Const v) = freeVars v
-    freeVars (Index a b) = freeVars (a,b)
-    freeVars (Var v t) = Set.singleton (v,t)
-    freeVars _ = Set.empty
+    freeVars (Const v)    = freeVars v
+    freeVars (Index a b)  = freeVars (a,b)
+    freeVars (Var v t)    = Set.singleton (v,t)
+    freeVars _            = Set.empty
 
 instance FreeVars FuncProps (Set.Set Var) where
     freeVars FuncProps { funcFreeVars = fv } = fv
@@ -527,14 +526,14 @@ instance FreeVars FuncProps a => FreeVars FuncDef a where
     freeVars fd = freeVars (funcDefProps fd)
 
 instance FreeVars Exp (Set.Set Var) where
-    freeVars (a :>>= b) = freeVars (a,b)
-    freeVars (App a vs _) =  freeVars vs
-    freeVars (Case x xs) = freeVars (x,xs)
-    freeVars (Return v) = freeVars v
---    freeVars (Store v) = freeVars v
-    freeVars (BaseOp _ vs) = freeVars vs
-    freeVars (Prim _ x _) = freeVars x
-    freeVars Error {} = Set.empty
+    freeVars (a :>>= b)      = freeVars (a,b)
+    freeVars (App a vs _)    = freeVars vs
+    freeVars (Case x xs)     = freeVars (x,xs)
+    freeVars (Return v)      = freeVars v
+    --    freeVars (Store v) = freeVars v
+    freeVars (BaseOp _ vs)   = freeVars vs
+    freeVars (Prim _ x _)    = freeVars x
+    freeVars Error {}        = Set.empty
     freeVars Let { expDefs = fdefs, expBody = body } = mconcat (map (funcFreeVars . funcDefProps) fdefs) `mappend` freeVars body
     freeVars NewRegion { expLam = l } = freeVars l
     freeVars Alloc { expValue = v, expCount = c, expRegion = r } = freeVars (v,c,r)
@@ -544,14 +543,14 @@ instance FreeVars Exp (Set.Set Var) where
     freeVars GcRoots { expValues = v, expBody = b } = freeVars (v,b)
 
 instance FreeVars Exp (Set.Set (Var,Ty)) where
-    freeVars (a :>>= b) = freeVars (a,b)
-    freeVars (App a vs _) =  freeVars vs
-    freeVars (Case x xs) = freeVars (x,xs)
-    freeVars (Return v) = freeVars v
---    freeVars (Store v) = freeVars v
-    freeVars (BaseOp _ vs) = freeVars vs
-    freeVars (Prim _ x _) = freeVars x
-    freeVars Error {} = Set.empty
+    freeVars (a :>>= b)      = freeVars (a,b)
+    freeVars (App a vs _)    = freeVars vs
+    freeVars (Case x xs)     = freeVars (x,xs)
+    freeVars (Return v)      = freeVars v
+    --    freeVars (Store v) = freeVars v
+    freeVars (BaseOp _ vs)   = freeVars vs
+    freeVars (Prim _ x _)    = freeVars x
+    freeVars Error {}        = Set.empty
     freeVars Let { expDefs = fdefs, expBody = body } = mconcat (map (freeVars . funcDefBody) fdefs) `mappend` freeVars body
     freeVars NewRegion { expLam = l } = freeVars l
     freeVars Alloc { expValue = v, expCount = c, expRegion = r } = freeVars (v,c,r)
@@ -562,9 +561,9 @@ instance FreeVars Exp (Set.Set (Var,Ty)) where
 
 instance FreeVars Val (Set.Set Tag) where
     freeVars (NodeC t xs) = Set.singleton t `Set.union` freeVars xs
-    freeVars (Index a b) = freeVars (a,b)
-    freeVars (Const v) = freeVars v
-    freeVars _ = Set.empty
+    freeVars (Index a b)  = freeVars (a,b)
+    freeVars (Const v)    = freeVars v
+    freeVars _            = Set.empty
 
 instance FreeVars Val [Tag] where
     freeVars v = Set.toList $ freeVars v
@@ -576,14 +575,14 @@ instance FreeVars Lam (Set.Set Tag) where
     freeVars (a :-> b) = freeVars (a,b)
 
 instance FreeVars Exp (Set.Set Tag) where
-    freeVars (a :>>= b) = freeVars (a,b)
-    freeVars (App a vs _) = Set.singleton a `Set.union` freeVars vs
-    freeVars (Case x xs) = freeVars (x,xs)
-    freeVars (Return v) = freeVars v
---    freeVars (Store v) = freeVars v
-    freeVars (BaseOp _ vs) = freeVars vs
-    freeVars (Prim _ x _) = freeVars x
-    freeVars Error {} = Set.empty
+    freeVars (a :>>= b)      = freeVars (a,b)
+    freeVars (App a vs _)    = Set.singleton a `Set.union` freeVars vs
+    freeVars (Case x xs)     = freeVars (x,xs)
+    freeVars (Return v)      = freeVars v
+    --    freeVars (Store v) = freeVars v
+    freeVars (BaseOp _ vs)   = freeVars vs
+    freeVars (Prim _ x _)    = freeVars x
+    freeVars Error {}        = Set.empty
     freeVars Let { expDefs = fdefs, expBody = body } = mconcat (map (funcTags . funcDefProps) fdefs) `mappend` freeVars body
     freeVars NewRegion { expLam = l } = freeVars l
     freeVars Alloc { expValue = v, expCount = c, expRegion = r } = freeVars (v,c,r)
@@ -600,10 +599,10 @@ instance  FreeVars Exp (GSet Var,GSet Tag) where
 
 instance FreeVars Val (GSet Var) where
     freeVars (NodeC t xs) = freeVars xs
-    freeVars (Const v) = freeVars v
-    freeVars (Index a b) = freeVars (a,b)
-    freeVars (Var v _) = singleton v
-    freeVars _ = sempty
+    freeVars (Const v)    = freeVars v
+    freeVars (Index a b)  = freeVars (a,b)
+    freeVars (Var v _)    = singleton v
+    freeVars _            = sempty
 
 instance FreeVars FuncProps (GSet Var) where
     freeVars FuncProps { funcFreeVars = fv } = fromDistinctAscList $ toList fv
@@ -612,14 +611,14 @@ instance FreeVars FuncProps (GSet Tag) where
     freeVars FuncProps { funcTags = fv } = fromDistinctAscList $ toList fv
 
 instance FreeVars Exp (GSet Var) where
-    freeVars (a :>>= b) = freeVars (a,b)
-    freeVars (App a vs _) =  freeVars vs
-    freeVars (Case x xs) = freeVars (x,xs)
-    freeVars (Return v) = freeVars v
---    freeVars (Store v) = freeVars v
-    freeVars (BaseOp _ vs) = freeVars vs
-    freeVars (Prim _ x _) = freeVars x
-    freeVars Error {} = sempty
+    freeVars (a :>>= b)      = freeVars (a,b)
+    freeVars (App a vs _)    = freeVars vs
+    freeVars (Case x xs)     = freeVars (x,xs)
+    freeVars (Return v)      = freeVars v
+    --    freeVars (Store v) = freeVars v
+    freeVars (BaseOp _ vs)   = freeVars vs
+    freeVars (Prim _ x _)    = freeVars x
+    freeVars Error {}        = sempty
     freeVars Let { expDefs = fdefs, expBody = body } = mconcat (map (fromDistinctAscList . toList . funcFreeVars . funcDefProps) fdefs) `mappend` freeVars body
     freeVars NewRegion { expLam = l } = freeVars l
     freeVars Alloc { expValue = v, expCount = c, expRegion = r } = freeVars (v,c,r)
@@ -637,22 +636,22 @@ instance FreeVars Lam [Var] where
 
 instance FreeVars Val (GSet Tag) where
     freeVars (NodeC t xs) = singleton t `union` freeVars xs
-    freeVars (Index a b) = freeVars (a,b)
-    freeVars (Const v) = freeVars v
-    freeVars _ = sempty
+    freeVars (Index a b)  = freeVars (a,b)
+    freeVars (Const v)    = freeVars v
+    freeVars _            = sempty
 
 instance FreeVars Lam (GSet Tag) where
     freeVars (a :-> b) = freeVars (a,b)
 
 instance FreeVars Exp (GSet Tag) where
-    freeVars (a :>>= b) = freeVars (a,b)
-    freeVars (App a vs _) = singleton a `union` freeVars vs
-    freeVars (Case x xs) = freeVars (x,xs)
-    freeVars (Return v) = freeVars v
---    freeVars (Store v) = freeVars v
-    freeVars (BaseOp _ vs) = freeVars vs
-    freeVars (Prim _ x _) = freeVars x
-    freeVars Error {} = sempty
+    freeVars (a :>>= b)      = freeVars (a,b)
+    freeVars (App a vs _)    = singleton a `union` freeVars vs
+    freeVars (Case x xs)     = freeVars (x,xs)
+    freeVars (Return v)      = freeVars v
+    --    freeVars (Store v) = freeVars v
+    freeVars (BaseOp _ vs)   = freeVars vs
+    freeVars (Prim _ x _)    = freeVars x
+    freeVars Error {}        = sempty
     freeVars Let { expDefs = fdefs, expBody = body } = unions (map (fromDistinctAscList . toList . funcTags . funcDefProps) fdefs) `mappend` freeVars body
     freeVars NewRegion { expLam = l } = freeVars l
     freeVars Alloc { expValue = v, expCount = c, expRegion = r } = freeVars (v,c,r)
@@ -673,16 +672,16 @@ instance Show Ty where
     showsPrec n (TyAnd t1 t2) = showParen (n >= 9) $ showsPrec 10 t1 <> text " && " <> showsPrec 10 t2
     showsPrec n (TyOr t1 t2) = showParen (n >= 9) $ showsPrec 10 t1 <> text " || " <> showsPrec 10 t2
     showsPrec _ t = showString (f t) where
-        f TyNode = "N"
-        f TyINode = "I"
-        f (TyPtr t) = '&':show t
-        f (TyUnit) = "()"
-        f (TyPrim t) = show t
-        f TyRegion = "M"
-        f TyGcContext = "GC"
-        f (TyRegister t) = 'r':show t
+        f TyNode           = "N"
+        f TyINode          = "I"
+        f (TyPtr t)        = '&':show t
+        f (TyUnit)         = "()"
+        f (TyPrim t)       = show t
+        f TyRegion         = "M"
+        f TyGcContext      = "GC"
+        f (TyRegister t)   = 'r':show t
         f (TyCall c as rt) = show c <> tupled (map show as) <+> "->" <+> show rt
-        f TyUnknown = "?"
+        f TyUnknown        = "?"
         f _ = "BADTYPE"
 
 instance Show Val where
@@ -719,12 +718,12 @@ instance Show Val where
 -- misc instances
 
 instance TypeNames Ty where
-    tIntzh = TyPrim (Op.bits32)
+    tIntzh  = TyPrim (Op.bits32)
     tEnumzh = TyPrim (Op.bits16)
     tCharzh = TyPrim (Op.bits32)
 
 instance Intjection Var where
-    toIntjection i = V (fromIntegral i)
+    toIntjection i       = V (fromIntegral i)
     fromIntjection (V i) = fromIntegral i
 
 newtype instance GSet Var = GSetVar (IntjectionSet Var)

@@ -39,51 +39,51 @@ data DotNetPrim = DotNetField | DotNetCtor | DotNetMethod
 
 primReqs p = f p where
     f CConst {} = primRequires p
-    f Func {} = primRequires p
-    f IFunc {} = primRequires p
+    f Func {}   = primRequires p
+    f IFunc {}  = primRequires p
     f AddrOf {} = primRequires p
-    f _ = mempty
+    f _         = mempty
 
 data Prim =
     PrimPrim Atom -- Special primitive implemented in the compiler somehow.
     | CConst {
         primRequires :: Requires,
-        primConst :: !PackedString
+        primConst    :: !PackedString
         }  -- C code which evaluates to a constant
     | Func {
         primRequires :: Requires,
-        funcName :: !PackedString,
+        funcName     :: !PackedString,
         primArgTypes :: [ExtType],
-        primRetType :: ExtType,
-	primRetArgs :: [ExtType],
-        primSafety  :: Safety
+        primRetType  :: ExtType,
+        primRetArgs  :: [ExtType],
+        primSafety   :: Safety
         }   -- function call with C calling convention
     | IFunc {
         primRequires :: Requires,
         primArgTypes :: [ExtType],
-        primRetType :: ExtType
+        primRetType  :: ExtType
         } -- indirect function call with C calling convention
     | AddrOf {
         primRequires :: Requires,
-        primConst :: !PackedString -- address of linker name
+        primConst    :: !PackedString -- address of linker name
         }
     | Peek { primArgTy :: Op.Ty }  -- read value from memory
     | Poke { primArgTy :: Op.Ty }  -- write value to memory
     | PrimTypeInfo {
-        primArgTy :: Op.Ty,
-        primRetTy :: Op.Ty,
+        primArgTy    :: Op.Ty,
+        primRetTy    :: Op.Ty,
         primTypeInfo :: !PrimTypeInfo
         }
     | PrimString !PackedString  -- address of a raw string. encoded in utf8.
     | PrimDotNet {
-        primStatic :: !Bool,
-        primDotNet :: !DotNetPrim,
-        primIOLike :: !Bool,
-        primAssembly :: !PackedString,
+        primStatic     :: !Bool,
+        primDotNet     :: !DotNetPrim,
+        primIOLike     :: !Bool,
+        primAssembly   :: !PackedString,
         primDotNetName :: !PackedString
         }
     | Op {
-        primCOp :: Op.Op Op.Ty,
+        primCOp   :: Op.Op Op.Ty,
         primRetTy :: Op.Ty
         }
     deriving(Typeable, Eq, Ord, Show)
@@ -97,11 +97,11 @@ primStaticTypeInfo :: Op.Ty -> PrimTypeInfo -> Maybe Integer
 primStaticTypeInfo (Op.TyBits (Op.Bits b) _) w = Just ans where
     bits = toInteger b
     ans = case w of
-        PrimSizeOf -> bits `div` 8
-        PrimAlignmentOf ->  bits `div` 8
-        PrimMinBound -> negate $ 2^(bits - 1)
-        PrimMaxBound -> 2^(bits - 1) - 1
-        PrimUMaxBound -> 2^bits - 1
+        PrimSizeOf      -> bits `div` 8
+        PrimAlignmentOf -> bits `div` 8
+        PrimMinBound    -> negate $ 2^(bits - 1)
+        PrimMaxBound    -> 2^(bits - 1) - 1
+        PrimUMaxBound   -> 2^bits - 1
 primStaticTypeInfo _ _ = Nothing
 
 -- | These primitives may safely be duplicated without affecting performance or
@@ -109,19 +109,19 @@ primStaticTypeInfo _ _ = Nothing
 -- will be recombined in a later pass.
 
 primIsCheap :: Prim -> Bool
-primIsCheap AddrOf {} = True
-primIsCheap CConst {} = True
-primIsCheap PrimString {} = True
+primIsCheap AddrOf {}       = True
+primIsCheap CConst {}       = True
+primIsCheap PrimString {}   = True
 primIsCheap PrimTypeInfo {} = True
-primIsCheap Op { primCOp = op } = Op.isCheap op
-primIsCheap _ = False
+primIsCheap Op { primCOp = op }  = Op.isCheap op
+primIsCheap _               = False
 
 -- | whether a primitive represents a constant expression (assuming all its arguments are constant)
 -- TODO needs grin support
 primIsConstant :: Prim -> Bool
-primIsConstant CConst {} = True
-primIsConstant AddrOf {} = True
-primIsConstant PrimString {} = True
+primIsConstant CConst {}       = True
+primIsConstant AddrOf {}       = True
+primIsConstant PrimString {}   = True
 primIsConstant PrimTypeInfo {} = True
 primIsConstant Op { primCOp = op } = Op.isEagerSafe op
 primIsConstant _ = False
@@ -129,9 +129,9 @@ primIsConstant _ = False
 -- | whether a primitive can be eagarly evaluated.
 -- TODO needs grin support
 primEagerSafe :: Prim -> Bool
-primEagerSafe CConst {} = True
-primEagerSafe PrimString {} = True
-primEagerSafe AddrOf {} = True
+primEagerSafe CConst {}       = True
+primEagerSafe PrimString {}   = True
+primEagerSafe AddrOf {}       = True
 primEagerSafe PrimTypeInfo {} = True
 primEagerSafe Op { primCOp = op } = Op.isEagerSafe op
 primEagerSafe _ = False
@@ -144,14 +144,14 @@ instance DocLike d => PPrint d ExtType where
 --    pprint t = text $ unpackPS t
 
 instance DocLike d => PPrint d Prim where
-    pprint (PrimPrim t) = text (fromAtom t)
-    pprint (CConst _ s) = parens (text $ unpackPS s)
-    pprint Func { .. } = parens (tshow primRetType) <> text (unpackPS funcName) <> tupled (map pprint primArgTypes)
-    pprint IFunc { .. } = parens (tshow primRetType) <> parens (char '*') <> tupled (map pprint primArgTypes)
-    pprint (AddrOf _ s) = char '&' <> text (unpackPS s)
+    pprint (PrimPrim t)   = text (fromAtom t)
+    pprint (CConst _ s)   = parens (text $ unpackPS s)
+    pprint Func { .. }    = parens (tshow primRetType) <> text (unpackPS funcName) <> tupled (map pprint primArgTypes)
+    pprint IFunc { .. }   = parens (tshow primRetType) <> parens (char '*') <> tupled (map pprint primArgTypes)
+    pprint (AddrOf _ s)   = char '&' <> text (unpackPS s)
     pprint (PrimString s) = tshow s <> char '#'
-    pprint (Peek t) = char '*' <> tshow t
-    pprint (Poke t) = char '=' <> tshow t
+    pprint (Peek t)       = char '*' <> tshow t
+    pprint (Poke t)       = char '=' <> tshow t
     pprint Op { primCOp = Op.BinOp bo ta tb, primRetTy = rt } | rt == ta && rt == tb = parens (pprint rt) <> tshow bo
     pprint Op { primCOp = Op.UnOp bo ta, primRetTy = rt } | rt == ta = parens (pprint rt) <> tshow bo
     pprint Op { primCOp = op, primRetTy = rt } = parens (pprint rt) <> pprint op

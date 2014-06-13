@@ -108,12 +108,12 @@ data HoLib = HoLib {
     }
 
 data Library = Library {
-    libHoHeader :: HoHeader,
-    libHoLib :: HoLib,
-    libTcMap :: (Map.Map ModuleGroup HoTcInfo),
-    libBuildMap :: (Map.Map ModuleGroup HoBuild),
+    libHoHeader   :: HoHeader,
+    libHoLib      :: HoLib,
+    libTcMap      :: (Map.Map ModuleGroup HoTcInfo),
+    libBuildMap   :: (Map.Map ModuleGroup HoBuild),
     libExtraFiles :: [ExtraFile],
-    libFileName :: FilePath
+    libFileName   :: FilePath
     }
 
 instance Show Library where
@@ -121,29 +121,29 @@ instance Show Library where
 
 -- data only needed for type checking.
 data HoTcInfo = HoTcInfo {
-    hoExports :: Map.Map Module [Name],
-    hoDefs :: Map.Map Name (SrcLoc,[Name]),
-    hoAssumps :: Map.Map Name Type,        -- used for typechecking
-    hoFixities :: FixityMap,
-    hoKinds :: KindEnv,                    -- used for typechecking
-    hoTypeSynonyms :: TypeSynonyms,
+    hoExports        :: Map.Map Module [Name],
+    hoDefs           :: Map.Map Name (SrcLoc,[Name]),
+    hoAssumps        :: Map.Map Name Type,        -- used for typechecking
+    hoFixities       :: FixityMap,
+    hoKinds          :: KindEnv,                  -- used for typechecking
+    hoTypeSynonyms   :: TypeSynonyms,
     hoClassHierarchy :: ClassHierarchy,
-    hoFieldMap :: FieldMap
+    hoFieldMap       :: FieldMap
     }
     {-! derive: update, Monoid !-}
 
 data HoBuild = HoBuild {
     -- Filled in by E generation
     hoDataTable :: DataTable,
-    hoEs :: [(TVr,E)],
-    hoRules :: Rules
+    hoEs        :: [(TVr,E)],
+    hoRules     :: Rules
     }
     {-! derive: update, Monoid !-}
 
 data Ho = Ho {
     hoModuleGroup :: ModuleGroup,
-    hoTcInfo :: HoTcInfo,
-    hoBuild :: HoBuild
+    hoTcInfo      :: HoTcInfo,
+    hoBuild       :: HoBuild
     }
     {-! derive: update !-}
 

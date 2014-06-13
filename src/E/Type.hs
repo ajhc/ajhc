@@ -51,20 +51,20 @@ normalized form mangled
 
 -- the type of a supercombinator
 data Comb = Comb {
-    combHead :: TVr,
-    combBody :: E,
+    combHead  :: TVr,
+    combBody  :: E,
     combRules :: [Rule]
     }
 
 instance HasProperties Comb where
     modifyProperties f comb = combHead_u (modifyProperties f) comb
-    getProperties comb = getProperties $ combHead comb
-    putProperties p comb = combHead_u (putProperties p) comb
+    getProperties comb      = getProperties $ combHead comb
+    putProperties p comb    = combHead_u (putProperties p) comb
 
 instance HasProperties TVr where
     modifyProperties f = tvrInfo_u (modifyProperties f)
-    getProperties = getProperties . tvrInfo
-    putProperties prop =  tvrInfo_u (putProperties prop)
+    getProperties      = getProperties . tvrInfo
+    putProperties prop = tvrInfo_u (putProperties prop)
 
 combBody_u f r@Comb{combBody  = x} = r{combBody = f x}
 combHead_u f r@Comb{combHead  = x} = r{combHead = f x}
@@ -72,9 +72,9 @@ combRules_u f r@Comb{combRules  = x} = cp r{combRules = fx} where
     cp = if null fx then unsetProperty PROP_HASRULE else setProperty PROP_HASRULE
     fx = f x
 
-combBody_s v =  combBody_u  (const v)
-combHead_s v =  combHead_u  (const v)
-combRules_s v =  combRules_u  (const v)
+combBody_s v  = combBody_u  (const v)
+combHead_s v  = combHead_u  (const v)
+combRules_s v = combRules_u  (const v)
 
 emptyComb = Comb { combHead = tvr, combBody = Unknown, combRules = [] }
 combIdent = tvrIdent . combHead
@@ -91,19 +91,19 @@ data RuleType = RuleSpecialization | RuleUser | RuleCatalyst
 -- a rule in its user visible form
 
 data Rule = Rule {
-    ruleHead :: TVr,
+    ruleHead  :: TVr,
     ruleBinds :: [TVr],
-    ruleArgs :: [E],
+    ruleArgs  :: [E],
     ruleNArgs :: {-# UNPACK #-} !Int,
-    ruleBody :: E,
-    ruleType :: RuleType,
-    ruleUniq :: (Module,Int),
-    ruleName :: Atom
+    ruleBody  :: E,
+    ruleType  :: RuleType,
+    ruleUniq  :: (Module,Int),
+    ruleName  :: Atom
     }
 
 data ARules = ARules {
     aruleFreeVars :: IdSet,
-    aruleRules :: [Rule]
+    aruleRules    :: [Rule]
     }
 
 data Lit e t = LitInt { litNumber :: Number, litType :: t }
@@ -142,11 +142,11 @@ data E = EAp E E
     | EError String E
     | ECase {
        eCaseScrutinee :: E,
-       eCaseType :: E, -- due to GADTs and typecases, the final type of the expression might not be so obvious, so we include it here.
-       eCaseBind :: TVr,
-       eCaseAlts :: [Alt E],
-       eCaseDefault :: (Maybe E),
-       eCaseAllFV  :: IdSet
+       eCaseType      :: E, -- due to GADTs and typecases, the final type of the expression might not be so obvious, so we include it here.
+       eCaseBind      :: TVr,
+       eCaseAlts      :: [Alt E],
+       eCaseDefault   :: (Maybe E),
+       eCaseAllFV     :: IdSet
        }
 	deriving(Eq, Ord)
     {-! derive: is, from !-}
@@ -160,12 +160,12 @@ data E = EAp E E
 --        LitInt i t -> do t <- f t; return $ LitInt i t
 
 instance Show ESort where
-    showsPrec _ EStar = showString "*"
-    showsPrec _ EHash = showString "#"
-    showsPrec _ EStarStar = showString "**"
-    showsPrec _ EHashHash = showString "##"
-    showsPrec _ ETuple = showString "(#)"
-    showsPrec _ EBang = showString "!"
+    showsPrec _ EStar          = showString "*"
+    showsPrec _ EHash          = showString "#"
+    showsPrec _ EStarStar      = showString "**"
+    showsPrec _ EHashHash      = showString "##"
+    showsPrec _ ETuple         = showString "(#)"
+    showsPrec _ EBang          = showString "!"
     showsPrec _ (ESortNamed n) = shows n
 
 instance (Show e,Show t) => Show (Lit e t) where
