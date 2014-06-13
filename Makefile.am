@@ -53,7 +53,7 @@ HSFILES= \
     src/Util/UnionFindST.hs src/FrontEnd/Syn/Q.hs src/Deriving/Ix.hs src/Deriving/Text.hs src/Deriving/Ord.hs \
     src/Deriving/Derive.hs src/Deriving/Type.hs src/Deriving/Util.hs src/Deriving/Typeable.hs \
     src/Deriving/Traverse.hs src/Text/PrettyPrint/Leijen.hs src/Support/Exit.hs \
-    src/FrontEnd/Lex/Layout2.hs src/Support/Gcc.hs
+    src/FrontEnd/Lex/Layout2.hs src/Support/Gcc.hs src/Info/Property.hs
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
 GHCPROFOPTS= -prof -fprof-auto -rtsopts -auto-all -odir @builddir@/obj/prof -hidir @builddir@/obj/prof

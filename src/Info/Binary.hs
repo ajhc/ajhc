@@ -25,7 +25,6 @@ cb n x = (n, Binable x, typeOf x)
 -- If you change them then you must change the ABI version number in
 -- Ho.Binary and invalidate all old files.
 binTableValues =  [
-    cb 1 (u :: Properties),
     cb 2 (u :: E.CPR.Val),
     cb 3 (u :: FfiExport),
     cb 4 (u :: E.Demand.DemandSignature)
@@ -59,17 +58,19 @@ instance Binary Info where
     get = Info.Binary.getInfo
 
 putInfo :: Info.Info.Info -> Put
-putInfo (Info ds) = do
+putInfo (Info p ds) = do
     let ds' = concatMap (\d -> do
             case Prelude.lookup (entryType d) revBinTable of
               Just (ps,x)  -> return (ps,entryThing d,x)
               Nothing -> fail "key not found"
           ) (Map.elems ds)
+    put p
     putWord8 (fromIntegral $ length ds')
     mapM_ putDyn ds'
 
 getInfo :: Get Info.Info.Info
 getInfo = do
+    p <- get
     n <- getWord8
     xs <- replicateM (fromIntegral n) getDyn
-    return (Info $ Map.fromList [ (entryType x,x) |x <- xs] )
+    return (Info p $ Map.fromList [ (entryType x,x) |x <- xs] )

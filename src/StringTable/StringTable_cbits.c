@@ -111,11 +111,6 @@ static struct hentry *htable = init_htable;
 
 static void hash_insert(struct hentry x);
 
-static void
-fast_insert(int t, int tb, struct hentry hb) {
-        hash_insert(hb);
-}
-
 #ifndef NDEBUG
 
 static bool

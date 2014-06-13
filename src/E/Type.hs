@@ -179,7 +179,7 @@ instance Show a => Show (TVr' a) where
         Nothing  -> shows x . showString "::" . shows e
 
 type TVr = TVr' E
-data TVr' e = TVr { tvrIdent :: !Id, tvrType :: e, tvrInfo :: Info.Info }
+data TVr' e = TVr { tvrIdent :: !Id, tvrType :: e, tvrInfo :: !Info.Info }
     deriving(Functor,Foldable,Traversable)
         {-!derive: update !-}
 

@@ -12,7 +12,7 @@ SHORTVERSION="$VERSION_MAJOR.$VERSION_MINOR"
 
 # tracks changes in binary format, should be incremented when the format of .ho
 # or .hl files changes in an incompatible way.
-HO_VERSION=16
+HO_VERSION=17
 
 AS_TMPDIR([jcfg])
 AC_CANONICAL_HOST

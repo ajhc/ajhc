@@ -18,11 +18,9 @@ import DataConstructors
 import E.Annotate
 import E.E
 import Ho.Type
-import Info.Types
 import Name.Names
 import Util.SetLike
 import qualified Data.Map as Map
-import qualified Info.Info as Info
 
 choDataTable = hoDataTable . hoBuild . choHo
 choClassHierarchy = hoClassHierarchy . hoTcInfo . choHo
@@ -65,9 +63,5 @@ updateChoHo cho = cho { choHo = ho, choVarMap = varMap } where
 mergeChoCombinators :: IdMap Comb -> IdMap Comb -> IdMap Comb
 mergeChoCombinators x y = unionWith f x y where
     f c1 c2 = combRules_s (combRules c1 `Data.List.union` combRules c2) . combHead_s (merge (combHead c1) (combHead c2)) $ c1
-    merge ta tb = ta { tvrInfo = minfo' }   where
+    merge ta tb = ta { tvrInfo = minfo }   where
         minfo = tvrInfo ta `mappend` tvrInfo tb
-        minfo' = dex (undefined :: Properties) $ minfo
-        dex dummy y = g (Info.lookup (tvrInfo tb) `asTypeOf` Just dummy) where
-            g Nothing = y
-            g (Just x) = Info.insertWith mappend x y
