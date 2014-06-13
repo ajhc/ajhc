@@ -11,7 +11,7 @@ GHCOPTS= -fallow-overlapping-instances -fallow-undecidable-instances -fglasgow-e
 
 HC= ghc
 
-TESTPROGS=md5 sha1 TestParse cff SelfTest UnionSolve TempDir
+TESTPROGS=md5 sha1 TestParse cff SelfTest UnionSolve TempDir comptest
 all: $(TESTPROGS)
 
 UnionSolve: UnionSolve.hs ../src/Util/UnionSolve.hs
