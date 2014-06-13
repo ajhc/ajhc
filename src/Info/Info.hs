@@ -7,8 +7,8 @@ module Info.Info(
     Info.Info.lookupTyp,
     insertWith,
     insert,
-    limit,
     maybeInsert,
+    entryType,
     singleton,
     member,
     delete,
@@ -21,9 +21,8 @@ module Info.Info(
 
 import Data.Dynamic
 import Data.Monoid
-import qualified Data.List as List
+import qualified Data.Map as Map
 
-import GenUtil
 import Util.HasSize
 
 -- extensible type indexed product
@@ -32,9 +31,10 @@ type T = Info
 
 data Entry = Entry {
     entryThing   :: Dynamic,
-    entryString  :: String,
-    entryType    :: !TypeRep
+    entryString  :: String
     }
+
+entryType = dynTypeRep . entryThing
 
 instance Eq Entry where
     a == b = entryType a == entryType b
@@ -43,9 +43,9 @@ instance Show Entry where
     showsPrec _ x = showString (entryString x)
 
 instance Ord Entry where
-    compare a b = compare (show $ entryType a) (show $ entryType b)
+    compare a b = compare (entryType a) (entryType b)
 
-newtype Info = Info [Entry]
+newtype Info = Info (Map.Map TypeRep Entry)
     deriving(HasSize,Typeable)
 
 -- the Eq and Ord instances for info make them all seem equivalent.
@@ -55,7 +55,7 @@ instance Ord Info where
     compare _ _ = EQ
 
 instance Show Info where
-    show (Info ds) = show (sortUnder (show . entryType) ds)
+    show (Info ds) = show (Map.toList $ ds)
 
 --instance Data Info where
 --    toConstr = undefined
@@ -63,7 +63,7 @@ instance Show Info where
 
 instance Monoid Info where
     mempty = empty
-    mappend (Info as) (Info bs) = Info (List.union as bs)
+    mappend (Info as) (Info bs) = Info (Map.union as bs)
 
 class HasInfo a where
     getInfo :: a -> Info
@@ -74,12 +74,12 @@ instance HasInfo Info where
     modifyInfo f x = f x
 
 lookupTyp :: forall a . Typeable a => a -> Info -> Maybe a
-lookupTyp a = f where
-    f (Info mp) = g mp
+lookupTyp _ = f where
+    f (Info mp) = Map.lookup typ mp >>= fromDynamic . entryThing
     typ = typeOf (undefined :: a)
-    g [] = Nothing
-    g (x:xs) | entryType x == typ = fromDynamic (entryThing x)
-    g (_:xs) = g xs
+--    g [] = Nothing
+--    g (x:xs) | entryType x == typ = fromDynamic (entryThing x)
+--    g (_:xs) = g xs
 
 lookup :: forall a m . (Monad m,Typeable a) => Info -> m a
 lookup = maybe (fail $ "Info: could not find: " ++ show typ) return . f where
@@ -87,20 +87,20 @@ lookup = maybe (fail $ "Info: could not find: " ++ show typ) return . f where
     f = lookupTyp (undefined :: a)
 
 insertWith :: (Show a,Typeable a) => (a -> a -> a) -> a -> Info -> Info
-insertWith f newx (Info mp) = Info (g mp) where
-    g [] = [newEntry newx]
-    g (x:xs) | entryType x == typ = newEntry (f newx (fromDyn (entryThing x) (error "can't happen"))):xs
-             | otherwise = x:g xs
+insertWith f newx (Info mp) = Info (Map.insert typ (newEntry newx) mp) where
+    -- g [] = [newEntry newx]
+    -- g (x:xs) | entryType x == typ = newEntry (f newx (fromDyn (entryThing x) (error "can't happen"))):xs
+    --          | otherwise = x:g xs
     typ = typeOf newx
 
 newEntry :: (Typeable a,Show a) => a -> Entry
-newEntry x = Entry { entryThing = toDyn x, entryString = show x, entryType = typeOf x }
+newEntry x = Entry { entryThing = toDyn x, entryString = show x }
 
 insert :: (Show a,Typeable a) => a -> Info -> Info
-insert newx (Info nfo) = Info $ newEntry newx:f nfo where
-    f [] = []
-    f (x:xs) | entryType x == typ = xs
-             | otherwise = x:f xs
+insert newx (Info nfo) = Info $ Map.insert typ (newEntry newx) nfo where
+    -- f [] = []
+    -- f (x:xs) | entryType x == typ = xs
+    --          | otherwise = x:f xs
     typ = typeOf newx
 
 maybeInsert :: (Show a, Typeable a) => Maybe a -> Info -> Info
@@ -126,29 +126,31 @@ delete :: (Typeable a) => a -> Info -> Info
 delete x info = deleteTyp (typeOf x) info
 
 deleteTyp :: TypeRep -> Info -> Info
-deleteTyp typ (Info mp) = Info (f mp) where
-    f [] = []
-    f (x:xs) | entryType x == typ = xs
-             | otherwise = x:f xs
+deleteTyp typ (Info mp) = Info (Map.delete typ mp) where
+    -- f [] = []
+    -- f (x:xs) | entryType x == typ = xs
+    --          | otherwise = x:f xs
 
-limit :: [TypeRep] -> Info -> Info
-limit trs (Info mp) = Info (f mp) where
-    f (x:xs) | entryType x `elem` trs = x:f xs
-             | otherwise = f xs
-    f [] = []
+-- limit :: [TypeRep] -> Info -> Info
+-- limit trs (Info mp) = Info (f mp) where
+--     tset = Set.fromList trs
+
+    -- f (x:xs) | entryType x `elem` trs = x:f xs
+    --          | otherwise = f xs
+    -- f [] = []
 
 fetch :: (Monoid a, Typeable a) => Info -> a
 fetch info = maybe mempty id  (Info.Info.lookup info)
 
 member :: (Typeable a) => a -> Info -> Bool
-member x (Info s) = f s where
+member x (Info s) = (Map.member typ s) where
     typ = typeOf x
-    f [] = False
-    f (x:xs) | entryType x == typ = True
-             | otherwise = f xs
+    -- f [] = False
+    -- f (x:xs) | entryType x == typ = True
+    --          | otherwise = f xs
 
 extend :: (Show a,Monoid a, Typeable a) => a -> Info -> Info
 extend x info = insertWith mappend x info
 
 empty :: Info
-empty = Info []
+empty = Info mempty

@@ -17,7 +17,7 @@ data Binable = forall a . (Typeable a, Binary a, Show a) => Binable a
 u :: (Typeable a, Binary a) => a
 u = u
 
-newEntry x = Entry { entryThing = toDyn x, entryString = show x, entryType = typeOf x }
+newEntry x = Entry { entryThing = toDyn x, entryString = show x }
 
 cb n x = (n, Binable x, typeOf x)
 
@@ -64,7 +64,7 @@ putInfo (Info ds) = do
             case Prelude.lookup (entryType d) revBinTable of
               Just (ps,x)  -> return (ps,entryThing d,x)
               Nothing -> fail "key not found"
-          ) ds
+          ) (Map.elems ds)
     putWord8 (fromIntegral $ length ds')
     mapM_ putDyn ds'
 
@@ -72,4 +72,4 @@ getInfo :: Get Info.Info.Info
 getInfo = do
     n <- getWord8
     xs <- replicateM (fromIntegral n) getDyn
-    return (Info xs)
+    return (Info $ Map.fromList [ (entryType x,x) |x <- xs] )
