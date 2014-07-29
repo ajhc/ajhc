@@ -1,8 +1,16 @@
 # [Ajhc](http://ajhc.metasepi.org/) - arafura-jhc
 
+## *** We are closing Ajhc project. ***
+
+[Metasepi Arafura](http://metasepi.org/en/posts/2013-01-09-design_arafura.html) iteration is closed.
+We decided to use [ATS Programming Language](http://www.ats-lang.org/") for our next iteration.
+After merging Ajhc's [Context Local Heap](http://metasepi.org/doc/metasepi-icfp2014.pdf) into jhc,
+this project will be shutdown.
+
+Please use [jhc](http://repetae.net/computer/jhc/) instead of Ajhc.
+
 A fork of [jhc](http://repetae.net/computer/jhc/).
 And also a Haskell compiler. 
-
 This project is founded by [Metasepi Project](http://metasepi.org/).
 
 ## Build Status
