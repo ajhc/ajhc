@@ -71,7 +71,7 @@ main = defaultMainWithHooks $ simpleUserHooks {
   postBuild = \ _ flags pkg lbi -> do
      let verb = (S.fromFlag $ S.buildVerbosity flags)
      buildStdLib pkg lbi verb NoCopyDest ,
-  postInst = \ _ flags pkg lbi -> do
-     let verb = (S.fromFlag $ S.installVerbosity flags)
+  postCopy = \ _ flags pkg lbi -> do
+     let verb = (S.fromFlag $ S.copyVerbosity flags)
      installStdLib pkg lbi verb NoCopyDest
   }
