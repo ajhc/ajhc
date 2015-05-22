@@ -298,6 +298,7 @@ executable @PACKAGE_NAME@
         temporary,
         utf8-string,
         zlib,
+        network-uri,
         @PACKAGE_NAME@
 
     if os(windows)
@@ -323,6 +324,7 @@ executable jahm
         pretty,
         process,
         directory,
+        network-uri,
         @PACKAGE_NAME@
 
   if !os(windows)

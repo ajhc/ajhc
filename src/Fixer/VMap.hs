@@ -13,7 +13,7 @@ module Fixer.VMap(
     )where
 
 import Data.Monoid(Monoid(..))
-import Data.Typeable
+import Data.Typeable(Typeable)
 import Data.List(intersperse)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
