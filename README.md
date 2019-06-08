@@ -7,7 +7,7 @@ We decided to use [ATS Programming Language](http://www.ats-lang.org/) for our n
 After merging Ajhc's [Context Local Heap](http://metasepi.org/doc/metasepi-icfp2014.pdf) into jhc,
 this project will be shutdown.
 
-Please use [jhc](http://repetae.net/computer/jhc/) instead of Ajhc.
+Please use [jhc](http://repetae.net/computer/jhc/) instead of Ajhc. The [jhc-components](https://github.com/csabahruska/jhc-components) may be useful, if you can't build original jhc.</p>
 
 A fork of [jhc](http://repetae.net/computer/jhc/).
 And also a Haskell compiler. 
